@@ -1,0 +1,217 @@
+desc:s3g 3OA Mixer
+tags: multichannel ambisonics HOA mixer mask ducking
+
+in_pin:wet 01
+in_pin:wet 02
+in_pin:wet 03
+in_pin:wet 04
+in_pin:wet 05
+in_pin:wet 06
+in_pin:wet 07
+in_pin:wet 08
+in_pin:wet 09
+in_pin:wet 10
+in_pin:wet 11
+in_pin:wet 12
+in_pin:wet 13
+in_pin:wet 14
+in_pin:wet 15
+in_pin:wet 16
+in_pin:wet 17
+in_pin:wet 18
+in_pin:wet 19
+in_pin:wet 20
+in_pin:wet 21
+in_pin:wet 22
+in_pin:wet 23
+in_pin:wet 24
+in_pin:dry 01
+in_pin:dry 02
+in_pin:dry 03
+in_pin:dry 04
+in_pin:dry 05
+in_pin:dry 06
+in_pin:dry 07
+in_pin:dry 08
+in_pin:dry 09
+in_pin:dry 10
+in_pin:dry 11
+in_pin:dry 12
+in_pin:dry 13
+in_pin:dry 14
+in_pin:dry 15
+in_pin:dry 16
+in_pin:dry 17
+in_pin:dry 18
+in_pin:dry 19
+in_pin:dry 20
+in_pin:dry 21
+in_pin:dry 22
+in_pin:dry 23
+in_pin:dry 24
+in_pin:mask 01
+in_pin:mask 02
+in_pin:mask 03
+in_pin:mask 04
+in_pin:mask 05
+in_pin:mask 06
+in_pin:mask 07
+in_pin:mask 08
+in_pin:mask 09
+in_pin:mask 10
+in_pin:mask 11
+in_pin:mask 12
+in_pin:mask 13
+in_pin:mask 14
+in_pin:mask 15
+in_pin:mask 16
+in_pin:mask 17
+in_pin:mask 18
+in_pin:mask 19
+in_pin:mask 20
+in_pin:mask 21
+in_pin:mask 22
+in_pin:mask 23
+in_pin:mask 24
+out_pin:mix 01
+out_pin:mix 02
+out_pin:mix 03
+out_pin:mix 04
+out_pin:mix 05
+out_pin:mix 06
+out_pin:mix 07
+out_pin:mix 08
+out_pin:mix 09
+out_pin:mix 10
+out_pin:mix 11
+out_pin:mix 12
+out_pin:mix 13
+out_pin:mix 14
+out_pin:mix 15
+out_pin:mix 16
+out_pin:mix 17
+out_pin:mix 18
+out_pin:mix 19
+out_pin:mix 20
+out_pin:mix 21
+out_pin:mix 22
+out_pin:mix 23
+out_pin:mix 24
+out_pin:dry thru 01
+out_pin:dry thru 02
+out_pin:dry thru 03
+out_pin:dry thru 04
+out_pin:dry thru 05
+out_pin:dry thru 06
+out_pin:dry thru 07
+out_pin:dry thru 08
+out_pin:dry thru 09
+out_pin:dry thru 10
+out_pin:dry thru 11
+out_pin:dry thru 12
+out_pin:dry thru 13
+out_pin:dry thru 14
+out_pin:dry thru 15
+out_pin:dry thru 16
+out_pin:dry thru 17
+out_pin:dry thru 18
+out_pin:dry thru 19
+out_pin:dry thru 20
+out_pin:dry thru 21
+out_pin:dry thru 22
+out_pin:dry thru 23
+out_pin:dry thru 24
+out_pin:mask smooth 01
+out_pin:mask smooth 02
+out_pin:mask smooth 03
+out_pin:mask smooth 04
+out_pin:mask smooth 05
+out_pin:mask smooth 06
+out_pin:mask smooth 07
+out_pin:mask smooth 08
+out_pin:mask smooth 09
+out_pin:mask smooth 10
+out_pin:mask smooth 11
+out_pin:mask smooth 12
+out_pin:mask smooth 13
+out_pin:mask smooth 14
+out_pin:mask smooth 15
+out_pin:mask smooth 16
+out_pin:mask smooth 17
+out_pin:mask smooth 18
+out_pin:mask smooth 19
+out_pin:mask smooth 20
+out_pin:mask smooth 21
+out_pin:mask smooth 22
+out_pin:mask smooth 23
+out_pin:mask smooth 24
+
+slider1:1<0,1,1{Parallel,Insert duck}>Insert mode
+slider2:1.00<0,1,0.001>Wet trim
+slider3:0.65<0,1,0.001>Dry trim
+slider4:0.90<0,1,0.001>Output trim
+slider5:0.10<0,1,0.001>Mask contrast
+slider6:0.92<0.5,1,0.001>Mask ceiling
+slider7:0.00<0,1,0.001>Duck curve
+slider8:0.15<0,1,0.001>Wet limiter
+slider9:0.15<0,1,0.001>Mask attack lag
+slider10:0.35<0,1,0.001>Mask release lag
+slider11:1<0,1,1{Raw,Smoothed}>Write mask 49-72
+
+@init
+NUM_SPK = 24;
+ms = 0;
+
+function clamp01(v)
+(
+  v < 0 ? 0 : v > 1 ? 1 : v;
+);
+
+function clamp_range(v, lo, hi)
+(
+  v < lo ? lo : v > hi ? hi : v;
+);
+
+function soft_sat(v)
+(
+  v / sqrt(1 + v * v);
+);
+
+@slider
+insert_mode = clamp01(slider1);
+wet_trim = clamp01(slider2);
+dry_trim = clamp01(slider3);
+out_trim = clamp01(slider4);
+mask_contrast = 1 + clamp01(slider5) * 2.5;
+mask_ceil = clamp_range(slider6, 0.5, 1);
+duck_pow = 1 - clamp01(slider7) * 0.4;
+wet_limiter = clamp01(slider8);
+mask_lag = clamp01(slider9);
+release_lag = clamp01(slider10);
+write_smoothed_mask = slider11 >= 0.5;
+
+@sample
+attack = 0.35 * ((1 - mask_lag) ^ 2) + 0.0005;
+release = 0.20 * ((1 - release_lag) ^ 2) + 0.0002;
+
+i = 0;
+loop(NUM_SPK,
+  wet = spl(i);
+  dry = spl(i + 24);
+  m_in = clamp01(spl(i + 48));
+
+  m_total_raw = min(mask_ceil, m_in ^ mask_contrast);
+  lag = m_total_raw > ms[i] ? attack : release;
+  ms[i] += lag * (m_total_raw - ms[i]);
+  m_total = (clamp_range(ms[i], 0, mask_ceil)) ^ duck_pow;
+
+  active_duck = m_total * wet_trim;
+  dry_gain = (1 - insert_mode) + insert_mode * cos(active_duck * $pi * 0.5);
+  wet_sum = wet * wet_trim;
+  wet_safe = (1 - wet_limiter) * wet_sum + wet_limiter * soft_sat(wet_sum);
+
+  spl(i) = (dry * dry_trim * dry_gain + wet_safe) * out_trim;
+  spl(i + 24) = dry;
+  spl(i + 48) = write_smoothed_mask ? m_total : m_in;
+  i += 1;
+);

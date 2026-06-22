@@ -1,0 +1,225 @@
+desc:s3g 3OA Send
+tags: multichannel ambisonics HOA mask send
+
+in_pin:dry 01
+in_pin:dry 02
+in_pin:dry 03
+in_pin:dry 04
+in_pin:dry 05
+in_pin:dry 06
+in_pin:dry 07
+in_pin:dry 08
+in_pin:dry 09
+in_pin:dry 10
+in_pin:dry 11
+in_pin:dry 12
+in_pin:dry 13
+in_pin:dry 14
+in_pin:dry 15
+in_pin:dry 16
+in_pin:dry 17
+in_pin:dry 18
+in_pin:dry 19
+in_pin:dry 20
+in_pin:dry 21
+in_pin:dry 22
+in_pin:dry 23
+in_pin:dry 24
+out_pin:wet send 01
+out_pin:wet send 02
+out_pin:wet send 03
+out_pin:wet send 04
+out_pin:wet send 05
+out_pin:wet send 06
+out_pin:wet send 07
+out_pin:wet send 08
+out_pin:wet send 09
+out_pin:wet send 10
+out_pin:wet send 11
+out_pin:wet send 12
+out_pin:wet send 13
+out_pin:wet send 14
+out_pin:wet send 15
+out_pin:wet send 16
+out_pin:wet send 17
+out_pin:wet send 18
+out_pin:wet send 19
+out_pin:wet send 20
+out_pin:wet send 21
+out_pin:wet send 22
+out_pin:wet send 23
+out_pin:wet send 24
+out_pin:dry copy 01
+out_pin:dry copy 02
+out_pin:dry copy 03
+out_pin:dry copy 04
+out_pin:dry copy 05
+out_pin:dry copy 06
+out_pin:dry copy 07
+out_pin:dry copy 08
+out_pin:dry copy 09
+out_pin:dry copy 10
+out_pin:dry copy 11
+out_pin:dry copy 12
+out_pin:dry copy 13
+out_pin:dry copy 14
+out_pin:dry copy 15
+out_pin:dry copy 16
+out_pin:dry copy 17
+out_pin:dry copy 18
+out_pin:dry copy 19
+out_pin:dry copy 20
+out_pin:dry copy 21
+out_pin:dry copy 22
+out_pin:dry copy 23
+out_pin:dry copy 24
+out_pin:mask 01
+out_pin:mask 02
+out_pin:mask 03
+out_pin:mask 04
+out_pin:mask 05
+out_pin:mask 06
+out_pin:mask 07
+out_pin:mask 08
+out_pin:mask 09
+out_pin:mask 10
+out_pin:mask 11
+out_pin:mask 12
+out_pin:mask 13
+out_pin:mask 14
+out_pin:mask 15
+out_pin:mask 16
+out_pin:mask 17
+out_pin:mask 18
+out_pin:mask 19
+out_pin:mask 20
+out_pin:mask 21
+out_pin:mask 22
+out_pin:mask 23
+out_pin:mask 24
+
+slider1:0<-179.9,179.9,0.1>Send azimuth (deg)
+slider2:0<-90,90,0.1>Send elevation (deg)
+slider3:0.20<0,1,0.001>Motion smoothing
+slider4:0.75<0,1,0.001>Width
+slider5:0.05<0,1,0.001>Focus
+slider6:1.00<0,1,0.001>Send level
+slider7:0.02<0,0.25,0.001>Beam floor
+slider8:1.00<0,1,0.001>Rear reject
+slider9:0.65<0,1,0.001>Energy comp
+slider10:1.25<0.25,4,0.001>Mask gamma
+slider11:1<0,1,1{Muted,Passed}>Dry copy to 25-48
+slider12:0<0,1,1{Off,Mask}>Write send mask monitor to 49-72
+
+@init
+NUM_SPK = 24;
+EPS = 0.000001;
+deg2rad = $pi / 180;
+
+sx = 0;
+sy = 32;
+sz = 64;
+dry = 96;
+mask = 128;
+gain = 160;
+
+tx_s = 1;
+ty_s = 0;
+tz_s = 0;
+
+sx[0]  = 0.285652275;  sy[0]  = 0.000000000;  sz[0]  = 0.958333333;
+sx[1]  = -0.356977173; sy[1]  = 0.327020333;  sz[1]  = 0.875000000;
+sx[2]  = 0.053413032;  sy[2]  = -0.608613947; sz[2]  = 0.791666667;
+sx[3]  = 0.429483666;  sy[3]  = 0.560185389;  sz[3]  = 0.708333333;
+sx[4]  = -0.768691718; sy[4]  = -0.135970741; sz[4]  = 0.625000000;
+sx[5]  = 0.709255111;  sy[5]  = -0.451170045; sz[5]  = 0.541666667;
+sx[6]  = -0.230731212; sy[6]  = 0.858308606;  sz[6]  = 0.458333333;
+sx[7]  = -0.427272247; sy[7]  = -0.822686712; sz[7]  = 0.375000000;
+sx[8]  = 0.898479629;  sy[8]  = 0.328123319;  sz[8]  = 0.291666667;
+sx[9]  = -0.904063458; sy[9]  = 0.373184253;  sz[9]  = 0.208333333;
+sx[10] = 0.420521661;  sy[10] = -0.898630365; sz[10] = 0.125000000;
+sx[11] = 0.299023957;  sy[11] = 0.953335493;  sz[11] = 0.041666667;
+sx[12] = -0.864459832; sy[12] = -0.500972143; sz[12] = -0.041666667;
+sx[13] = 0.969015453;  sy[13] = -0.213035329; sz[13] = -0.125000000;
+sx[14] = -0.562509872; sy[14] = 0.800112409;  sz[14] = -0.208333333;
+sx[15] = -0.122923048; sy[15] = -0.948588678; sz[15] = -0.291666667;
+sx[16] = 0.708848590;  sy[16] = 0.597418342;  sz[16] = -0.375000000;
+sx[17] = -0.888021405; sy[17] = 0.036722473;  sz[17] = -0.458333333;
+sx[18] = 0.595837310;  sy[18] = -0.592937705; sz[18] = -0.541666667;
+sx[19] = -0.036058186; sy[19] = 0.779791515;  sz[19] = -0.625000000;
+sx[20] = -0.452262552; sy[20] = -0.541961689; sz[20] = -0.708333333;
+sx[21] = 0.605497091;  sy[21] = 0.081468777;  sz[21] = -0.791666667;
+sx[22] = -0.397396334; sy[22] = 0.276498018;  sz[22] = -0.875000000;
+sx[23] = 0.062695352;  sy[23] = -0.278687127; sz[23] = -0.958333333;
+
+function clamp01(v)
+(
+  v < 0 ? 0 : v > 1 ? 1 : v;
+);
+
+function clamp_range(v, lo, hi)
+(
+  v < lo ? lo : v > hi ? hi : v;
+);
+
+function update_target(az_deg, el_deg, smooth) local(sm, azr, elr, tx_t, ty_t, tz_t, len)
+(
+  sm = 0.25 * ((1 - clamp01(smooth)) ^ 2) + 0.0005;
+  azr = az_deg * deg2rad;
+  elr = el_deg * deg2rad;
+  tx_t = cos(elr) * cos(azr);
+  ty_t = cos(elr) * sin(azr);
+  tz_t = sin(elr);
+  tx_s += sm * (tx_t - tx_s);
+  ty_s += sm * (ty_t - ty_s);
+  tz_s += sm * (tz_t - tz_s);
+  len = max(EPS, sqrt(tx_s * tx_s + ty_s * ty_s + tz_s * tz_s));
+  tx_s /= len;
+  ty_s /= len;
+  tz_s /= len;
+);
+
+@slider
+send_az = slider1;
+send_el = slider2;
+send_smooth = slider3;
+width = clamp01(slider4);
+focus = clamp01(slider5);
+send_level = clamp01(slider6);
+beam_floor = clamp_range(slider7, 0, 0.25);
+rear_reject = clamp01(slider8);
+energy_comp = clamp01(slider9);
+mask_gamma = clamp_range(slider10, 0.25, 4);
+dry_pass = slider11 >= 0.5;
+monitor_mask = slider12 >= 0.5;
+
+@sample
+update_target(send_az, send_el, send_smooth);
+
+reject_shape = rear_reject ^ 0.75;
+cone_edge = reject_shape * (0.35 + ((1 - width) ^ 1.15) * 0.55);
+beam_pow = 1 + ((1 - width) ^ 1.5) * 20 + focus * 20;
+steep = 1 + focus * 4;
+
+pow_sum = 0;
+i = 0;
+loop(NUM_SPK,
+  dry[i] = spl(i);
+  dot = max(-1, min(1, sx[i] * tx_s + sy[i] * ty_s + sz[i] * tz_s));
+  f = clamp01((dot - cone_edge) / max(EPS, 1 - cone_edge));
+  m = clamp01((beam_floor * f + (1 - beam_floor) * (clamp01(f) ^ beam_pow)) ^ steep);
+  mask[i] = m;
+  pow_sum += m * m;
+  i += 1;
+);
+
+comp = (1 - energy_comp) + energy_comp / max(1, sqrt(pow_sum));
+
+i = 0;
+loop(NUM_SPK,
+  g = (mask[i] ^ mask_gamma) * comp * send_level;
+  spl(i) = dry[i] * g;
+  spl(i + 24) = dry_pass ? dry[i] : 0;
+  spl(i + 48) = monitor_mask ? mask[i] : 0;
+  i += 1;
+);

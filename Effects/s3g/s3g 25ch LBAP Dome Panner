@@ -1,0 +1,277 @@
+desc:s3g 25ch LBAP Dome Panner
+tags: multichannel spatial LBAP dome panner
+
+slider1:1<0.25,4,0.01>LBAP sharpness
+slider2:6<0,48,0.1>Distance rolloff (dB/oct)
+slider3:35<1,250,1>Distance smoothing (ms)
+slider4:0<-360,360,0.1>Global azimuth (deg)
+slider5:0<0,90,0.1>Global elevation (deg)
+slider6:0<-3,3,0.01>Global distance offset (dome radius)
+slider7:0<-48,24,0.1>Output gain (dB)
+slider8:0<0,1,1>Reserved 1
+slider9:0<0,1,1>Reserved 2
+
+slider10:0<-360,360,0.1>S1 azimuth (deg)
+slider11:0<0,90,0.1>S1 elevation (deg)
+slider12:1<0.1,3,0.01>S1 distance (dome radius, edge=1)
+slider13:45<-360,360,0.1>S2 azimuth (deg)
+slider14:0<0,90,0.1>S2 elevation (deg)
+slider15:1<0.1,3,0.01>S2 distance (dome radius, edge=1)
+slider16:90<-360,360,0.1>S3 azimuth (deg)
+slider17:0<0,90,0.1>S3 elevation (deg)
+slider18:1<0.1,3,0.01>S3 distance (dome radius, edge=1)
+slider19:135<-360,360,0.1>S4 azimuth (deg)
+slider20:0<0,90,0.1>S4 elevation (deg)
+slider21:1<0.1,3,0.01>S4 distance (dome radius, edge=1)
+slider22:180<-360,360,0.1>S5 azimuth (deg)
+slider23:0<0,90,0.1>S5 elevation (deg)
+slider24:1<0.1,3,0.01>S5 distance (dome radius, edge=1)
+slider25:-135<-360,360,0.1>S6 azimuth (deg)
+slider26:0<0,90,0.1>S6 elevation (deg)
+slider27:1<0.1,3,0.01>S6 distance (dome radius, edge=1)
+slider28:-90<-360,360,0.1>S7 azimuth (deg)
+slider29:0<0,90,0.1>S7 elevation (deg)
+slider30:1<0.1,3,0.01>S7 distance (dome radius, edge=1)
+slider31:-45<-360,360,0.1>S8 azimuth (deg)
+slider32:0<0,90,0.1>S8 elevation (deg)
+slider33:1<0.1,3,0.01>S8 distance (dome radius, edge=1)
+
+slider34:0<-60,24,0.1>S1 gain (dB)
+slider35:0<0,1,1>S1 mute
+slider36:0<0,1,1>S1 solo
+slider37:0<-60,24,0.1>S2 gain (dB)
+slider38:0<0,1,1>S2 mute
+slider39:0<0,1,1>S2 solo
+slider40:0<-60,24,0.1>S3 gain (dB)
+slider41:0<0,1,1>S3 mute
+slider42:0<0,1,1>S3 solo
+slider43:0<-60,24,0.1>S4 gain (dB)
+slider44:0<0,1,1>S4 mute
+slider45:0<0,1,1>S4 solo
+slider46:0<-60,24,0.1>S5 gain (dB)
+slider47:0<0,1,1>S5 mute
+slider48:0<0,1,1>S5 solo
+slider49:0<-60,24,0.1>S6 gain (dB)
+slider50:0<0,1,1>S6 mute
+slider51:0<0,1,1>S6 solo
+slider52:0<-60,24,0.1>S7 gain (dB)
+slider53:0<0,1,1>S7 mute
+slider54:0<0,1,1>S7 solo
+slider55:0<-60,24,0.1>S8 gain (dB)
+slider56:0<0,1,1>S8 mute
+slider57:0<0,1,1>S8 solo
+
+@init
+NUM_SPEAKERS = 25;
+NUM_SOURCES = 8;
+EPS = 0.000001;
+deg2rad = $pi / 180;
+
+spk_az = 0;
+spk_el = 64;
+spk_layer = 128;
+spk_step = 192;
+dist_z = 256;
+src_az = 320;
+src_el = 384;
+src_dist = 448;
+mix = 512;
+src_gain = 576;
+src_level = 640;
+src_mute = 704;
+src_solo = 768;
+
+spk_az[0] = 30;   spk_el[0] = 0;    spk_layer[0] = 1; spk_step[0] = 30;
+spk_az[1] = 60;   spk_el[1] = 0;    spk_layer[1] = 1; spk_step[1] = 30;
+spk_az[2] = 90;   spk_el[2] = 0;    spk_layer[2] = 1; spk_step[2] = 30;
+spk_az[3] = 120;  spk_el[3] = 0;    spk_layer[3] = 1; spk_step[3] = 30;
+spk_az[4] = 150;  spk_el[4] = 0;    spk_layer[4] = 1; spk_step[4] = 30;
+spk_az[5] = 180;  spk_el[5] = 0;    spk_layer[5] = 1; spk_step[5] = 30;
+spk_az[6] = -150; spk_el[6] = 0;    spk_layer[6] = 1; spk_step[6] = 30;
+spk_az[7] = -120; spk_el[7] = 0;    spk_layer[7] = 1; spk_step[7] = 30;
+spk_az[8] = -90;  spk_el[8] = 0;    spk_layer[8] = 1; spk_step[8] = 30;
+spk_az[9] = -60;  spk_el[9] = 0;    spk_layer[9] = 1; spk_step[9] = 30;
+spk_az[10] = -30; spk_el[10] = 0;   spk_layer[10] = 1; spk_step[10] = 30;
+spk_az[11] = 0;   spk_el[11] = 0;   spk_layer[11] = 1; spk_step[11] = 30;
+
+spk_az[12] = 45;   spk_el[12] = 32; spk_layer[12] = 2; spk_step[12] = 45;
+spk_az[13] = 90;   spk_el[13] = 32; spk_layer[13] = 2; spk_step[13] = 45;
+spk_az[14] = 135;  spk_el[14] = 32; spk_layer[14] = 2; spk_step[14] = 45;
+spk_az[15] = 180;  spk_el[15] = 32; spk_layer[15] = 2; spk_step[15] = 45;
+spk_az[16] = -135; spk_el[16] = 32; spk_layer[16] = 2; spk_step[16] = 45;
+spk_az[17] = -90;  spk_el[17] = 32; spk_layer[17] = 2; spk_step[17] = 45;
+spk_az[18] = -45;  spk_el[18] = 32; spk_layer[18] = 2; spk_step[18] = 45;
+spk_az[19] = 0;    spk_el[19] = 32; spk_layer[19] = 2; spk_step[19] = 45;
+
+spk_az[20] = 90;  spk_el[20] = 66.6; spk_layer[20] = 3; spk_step[20] = 90;
+spk_az[21] = 180; spk_el[21] = 66.6; spk_layer[21] = 3; spk_step[21] = 90;
+spk_az[22] = -90; spk_el[22] = 66.6; spk_layer[22] = 3; spk_step[22] = 90;
+spk_az[23] = 0;   spk_el[23] = 66.6; spk_layer[23] = 3; spk_step[23] = 90;
+
+spk_az[24] = 0; spk_el[24] = 90; spk_layer[24] = 4; spk_step[24] = 0;
+
+i = 0;
+loop(NUM_SOURCES,
+  dist_z[i] = 1;
+  i += 1;
+);
+
+function wrap_degrees(deg) local(wrapped)
+(
+  wrapped = deg - floor(deg / 360) * 360;
+  wrapped > 180 ? wrapped -= 360;
+  wrapped;
+);
+
+function abs_degrees(deg)
+(
+  deg < 0 ? -deg : deg;
+);
+
+function clamp_distance(distance)
+(
+  distance < 0.1 ? 0.1 : distance;
+);
+
+function distance_amp(distance)
+(
+  distance <= 1 ? 1 :
+  distance_rolloff_db == 6 ? 1 / distance :
+  distance_rolloff_db == 12 ? 1 / (distance * distance) :
+  distance_rolloff_db == 18 ? 1 / (distance * distance * distance) :
+  1 / (distance ^ (distance_rolloff_db / 6));
+);
+
+function lbap_ring_gain(source_az, speaker_az, step_degrees, layer_gain) local(diff, v)
+(
+  layer_gain <= EPS ? (
+    0;
+  ) : (
+    diff = abs_degrees(wrap_degrees(source_az - speaker_az));
+    diff > step_degrees ? (
+      0;
+    ) : (
+      v = cos(diff / step_degrees * $pi / 2);
+      lbap_sharpness == 1 ? layer_gain * v :
+      lbap_sharpness == 2 ? layer_gain * v * v :
+      layer_gain * (v ^ lbap_sharpness);
+    );
+  );
+);
+
+function source_gain(speaker_az, step_degrees, layer_index, wrapped_az, radius, w1, w2, w3, w4) local(directional)
+(
+  directional = w4;
+  layer_index == 1 ? directional = lbap_ring_gain(wrapped_az, speaker_az, step_degrees, w1);
+  layer_index == 2 ? directional = lbap_ring_gain(wrapped_az, speaker_az, step_degrees, w2);
+  layer_index == 3 ? directional = lbap_ring_gain(wrapped_az, speaker_az, step_degrees, w3);
+  radius < 1 ? (1 - radius + directional * radius) : directional;
+);
+
+@slider
+lbap_sharpness = max(0.25, slider1);
+distance_rolloff_db = max(0, slider2);
+distance_smoothing_ms = max(1, slider3);
+global_az = slider4;
+global_el = max(0, min(90, slider5));
+global_dist = slider6;
+out_gain = 10 ^ (slider7 / 20);
+distance_coef = exp(-1000 / (distance_smoothing_ms * srate));
+
+src_az[0] = slider10; src_el[0] = slider11; src_dist[0] = slider12;
+src_az[1] = slider13; src_el[1] = slider14; src_dist[1] = slider15;
+src_az[2] = slider16; src_el[2] = slider17; src_dist[2] = slider18;
+src_az[3] = slider19; src_el[3] = slider20; src_dist[3] = slider21;
+src_az[4] = slider22; src_el[4] = slider23; src_dist[4] = slider24;
+src_az[5] = slider25; src_el[5] = slider26; src_dist[5] = slider27;
+src_az[6] = slider28; src_el[6] = slider29; src_dist[6] = slider30;
+src_az[7] = slider31; src_el[7] = slider32; src_dist[7] = slider33;
+
+src_level[0] = 10 ^ (slider34 / 20); src_mute[0] = slider35 >= 0.5; src_solo[0] = slider36 >= 0.5;
+src_level[1] = 10 ^ (slider37 / 20); src_mute[1] = slider38 >= 0.5; src_solo[1] = slider39 >= 0.5;
+src_level[2] = 10 ^ (slider40 / 20); src_mute[2] = slider41 >= 0.5; src_solo[2] = slider42 >= 0.5;
+src_level[3] = 10 ^ (slider43 / 20); src_mute[3] = slider44 >= 0.5; src_solo[3] = slider45 >= 0.5;
+src_level[4] = 10 ^ (slider46 / 20); src_mute[4] = slider47 >= 0.5; src_solo[4] = slider48 >= 0.5;
+src_level[5] = 10 ^ (slider49 / 20); src_mute[5] = slider50 >= 0.5; src_solo[5] = slider51 >= 0.5;
+src_level[6] = 10 ^ (slider52 / 20); src_mute[6] = slider53 >= 0.5; src_solo[6] = slider54 >= 0.5;
+src_level[7] = 10 ^ (slider55 / 20); src_mute[7] = slider56 >= 0.5; src_solo[7] = slider57 >= 0.5;
+
+@sample
+i = 0;
+loop(NUM_SPEAKERS,
+  mix[i] = 0;
+  i += 1;
+);
+
+solo_count = 0;
+src = 0;
+loop(NUM_SOURCES,
+  src_solo[src] ? solo_count += 1;
+  src += 1;
+);
+
+src = 0;
+loop(NUM_SOURCES,
+  src < num_ch ? (
+    input = spl(src);
+  ) : (
+    input = 0;
+  );
+
+  src_mute[src] || (solo_count > 0 && !src_solo[src]) ? input = 0;
+
+  source_az = src_az[src] + global_az;
+  source_el = max(0, min(90, src_el[src] + global_el));
+  source_dist_target = clamp_distance(src_dist[src] + global_dist);
+  dist_z[src] = source_dist_target + (dist_z[src] - source_dist_target) * distance_coef;
+  source_dist = dist_z[src];
+  source_radius = clamp_distance(source_dist);
+  source_amp = distance_amp(source_dist);
+  wrapped_az = wrap_degrees(source_az);
+
+  w1 = 0; w2 = 0; w3 = 0; w4 = 0;
+  source_el <= 32 ? (
+    layer_t = source_el / 32;
+    w1 = cos(layer_t * $pi / 2);
+    w2 = sin(layer_t * $pi / 2);
+  ) : source_el <= 66.6 ? (
+    layer_t = (source_el - 32) / (66.6 - 32);
+    w2 = cos(layer_t * $pi / 2);
+    w3 = sin(layer_t * $pi / 2);
+  ) : (
+    layer_t = (source_el - 66.6) / (90 - 66.6);
+    w3 = cos(layer_t * $pi / 2);
+    w4 = sin(layer_t * $pi / 2);
+  );
+
+  scale = 0;
+  spk = 0;
+  loop(NUM_SPEAKERS,
+    g = source_gain(spk_az[spk], spk_step[spk], spk_layer[spk], wrapped_az, source_radius, w1, w2, w3, w4);
+    src_gain[spk] = g;
+    scale += g * g;
+    spk += 1;
+  );
+
+  scale = scale < EPS ? 1 : sqrt(scale);
+  weighted = input * src_level[src] * source_amp / scale;
+  spk = 0;
+  loop(NUM_SPEAKERS,
+    mix[spk] += weighted * src_gain[spk];
+    spk += 1;
+  );
+
+  src += 1;
+);
+
+i = 0;
+loop(NUM_SPEAKERS,
+  spl(i) = mix[i] * out_gain;
+  i += 1;
+);
+
+i = NUM_SPEAKERS;
+loop(64 - NUM_SPEAKERS,
+  spl(i) = 0;
+  i += 1;
+);

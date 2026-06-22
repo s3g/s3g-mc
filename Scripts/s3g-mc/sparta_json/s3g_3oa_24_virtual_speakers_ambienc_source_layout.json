@@ -1,0 +1,34 @@
+{
+  "Name": "s3g 3OA 24 virtual speakers - ambiENC",
+  "Description": "24 source directions matching the Max 3OAFX-SR virtual speaker layout. Use in SPARTA ambiENC so channels 1-24 re-encode from the same positions used by ambiDEC and the s3g JSFX masks.",
+  "GenericLayout": {
+    "Name": "s3g 24 virtual source directions",
+    "Description": "Use in SPARTA ambiENC as the 24 input source directions.",
+    "Elements": [
+      { "Azimuth": 0.000000, "Elevation": 73.402158, "Radius": 1.0, "IsImaginary": false, "Channel": 1, "Gain": 1.0 },
+      { "Azimuth": 137.507764, "Elevation": 61.044976, "Radius": 1.0, "IsImaginary": false, "Channel": 2, "Gain": 1.0 },
+      { "Azimuth": -84.984472, "Elevation": 52.341538, "Radius": 1.0, "IsImaginary": false, "Channel": 3, "Gain": 1.0 },
+      { "Azimuth": 52.523292, "Elevation": 45.099472, "Radius": 1.0, "IsImaginary": false, "Channel": 4, "Gain": 1.0 },
+      { "Azimuth": -169.968944, "Elevation": 38.682187, "Radius": 1.0, "IsImaginary": false, "Channel": 5, "Gain": 1.0 },
+      { "Azimuth": -32.461180, "Elevation": 32.797168, "Radius": 1.0, "IsImaginary": false, "Channel": 6, "Gain": 1.0 },
+      { "Azimuth": 105.046584, "Elevation": 27.279613, "Radius": 1.0, "IsImaginary": false, "Channel": 7, "Gain": 1.0 },
+      { "Azimuth": -117.445652, "Elevation": 22.024313, "Radius": 1.0, "IsImaginary": false, "Channel": 8, "Gain": 1.0 },
+      { "Azimuth": 20.062112, "Elevation": 16.957763, "Radius": 1.0, "IsImaginary": false, "Channel": 9, "Gain": 1.0 },
+      { "Azimuth": 157.569876, "Elevation": 12.024699, "Radius": 1.0, "IsImaginary": false, "Channel": 10, "Gain": 1.0 },
+      { "Azimuth": -64.922360, "Elevation": 7.180756, "Radius": 1.0, "IsImaginary": false, "Channel": 11, "Gain": 1.0 },
+      { "Azimuth": 72.585405, "Elevation": 2.388015, "Radius": 1.0, "IsImaginary": false, "Channel": 12, "Gain": 1.0 },
+      { "Azimuth": -149.906831, "Elevation": -2.388015, "Radius": 1.0, "IsImaginary": false, "Channel": 13, "Gain": 1.0 },
+      { "Azimuth": -12.399067, "Elevation": -7.180756, "Radius": 1.0, "IsImaginary": false, "Channel": 14, "Gain": 1.0 },
+      { "Azimuth": 125.108697, "Elevation": -12.024699, "Radius": 1.0, "IsImaginary": false, "Channel": 15, "Gain": 1.0 },
+      { "Azimuth": -97.383539, "Elevation": -16.957763, "Radius": 1.0, "IsImaginary": false, "Channel": 16, "Gain": 1.0 },
+      { "Azimuth": 40.124225, "Elevation": -22.024313, "Radius": 1.0, "IsImaginary": false, "Channel": 17, "Gain": 1.0 },
+      { "Azimuth": 177.631989, "Elevation": -27.279613, "Radius": 1.0, "IsImaginary": false, "Channel": 18, "Gain": 1.0 },
+      { "Azimuth": -44.860247, "Elevation": -32.797168, "Radius": 1.0, "IsImaginary": false, "Channel": 19, "Gain": 1.0 },
+      { "Azimuth": 92.647517, "Elevation": -38.682187, "Radius": 1.0, "IsImaginary": false, "Channel": 20, "Gain": 1.0 },
+      { "Azimuth": -129.844719, "Elevation": -45.099472, "Radius": 1.0, "IsImaginary": false, "Channel": 21, "Gain": 1.0 },
+      { "Azimuth": 7.663045, "Elevation": -52.341538, "Radius": 1.0, "IsImaginary": false, "Channel": 22, "Gain": 1.0 },
+      { "Azimuth": 145.170809, "Elevation": -61.044976, "Radius": 1.0, "IsImaginary": false, "Channel": 23, "Gain": 1.0 },
+      { "Azimuth": -77.321427, "Elevation": -73.402158, "Radius": 1.0, "IsImaginary": false, "Channel": 24, "Gain": 1.0 }
+    ]
+  }
+}

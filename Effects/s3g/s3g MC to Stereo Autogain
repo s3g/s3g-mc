@@ -1,0 +1,82 @@
+desc:s3g MC to Stereo Autogain
+tags: multichannel stereo mixer downmix utility
+
+slider1:8<2,64,1>Input channels
+slider2:100<0,200,1>Spread/width (%)
+slider3:0<-180,180,1>Rotation (degrees)
+slider4:1<0,2,1{Off,Power/sqrt(N),Energy sum}>Autogain
+slider5:0<-24,24,0.1>Output gain (dB)
+slider6:0<0,4,1{Ring projection,Linear left-right,Odd/even stereo,Center-out,Pair-preserving}>Layout
+slider7:1<0,1,1{Keep extra channels,Clear extra channels}>Extra channel output
+slider8:100<0,100,1>Layout weighting (%)
+
+@init
+two_pi = 2 * $pi;
+
+@slider
+chan_count = max(2, min(64, floor(slider1 + 0.5)));
+width = max(0, slider2 / 100);
+rotation = slider3 * $pi / 180;
+autogain = floor(slider4 + 0.5);
+out_gain = 10 ^ (slider5 / 20);
+raw_layout = floor(slider6 + 0.5);
+layout = raw_layout > 4 ? 0 : raw_layout;
+clear_extra = floor(slider7 + 0.5);
+layout_weight = max(0, min(1, slider8 / 100));
+
+auto =
+  autogain == 1 ? 1 / sqrt(chan_count) :
+  autogain == 2 ? 1 / chan_count :
+  1;
+
+@sample
+left = 0;
+right = 0;
+
+i = 0;
+loop(chan_count,
+  input = spl(i);
+  angle = rotation + ((two_pi * i) / chan_count);
+
+  layout == 0 ? (
+    frontness = (cos(angle) + 1) * 0.5;
+    rear_fold = frontness + (1 - frontness) * layout_weight;
+    pan = sin(angle) * width * rear_fold;
+  ) : layout == 1 ? (
+    rotated_index = (i + ((rotation / two_pi) * chan_count)) % chan_count;
+    pan = -1 + ((2 * rotated_index) / (chan_count - 1));
+    pan *= width * layout_weight;
+  ) : layout == 2 ? (
+    pan = (i % 2 == 0 ? -1 : 1) * width * layout_weight;
+  ) : layout == 3 ? (
+    center = (chan_count - 1) * 0.5;
+    offset = i - center;
+    rank = floor(abs(offset) + 0.5);
+    side = offset < 0 ? -1 : 1;
+    pan = rank <= 0 ? 0 : side * (rank / max(1, center)) * width * layout_weight;
+  ) : (
+    pair = floor(i / 2);
+    pair_count = max(1, floor((chan_count + 1) / 2));
+    pair_pos = pair_count <= 1 ? 0 : -1 + ((2 * pair) / (pair_count - 1));
+    pair_width = i % 2 == 0 ? -0.16 : 0.16;
+    pan = (pair_pos * 0.82 + pair_width) * width * layout_weight;
+  );
+
+  pan = max(-1, min(1, pan));
+  theta = (pan + 1) * $pi / 4;
+  left += input * cos(theta);
+  right += input * sin(theta);
+
+  i += 1;
+);
+
+spl0 = left * auto * out_gain;
+spl1 = right * auto * out_gain;
+
+clear_extra ? (
+  i = 2;
+  loop(chan_count - 2,
+    spl(i) = 0;
+    i += 1;
+  );
+);

@@ -1,0 +1,259 @@
+desc:s3g MC Channel Automation Mixer 128
+tags: multichannel channel gain automation mixer utility
+
+<? loop(x=1; 128, printf("in_pin:ch %03d\n", x); x += 1); ?>
+<? loop(x=1; 128, printf("out_pin:ch %03d\n", x); x += 1); ?>
+
+<? loop(x=1; 128, printf("slider%d:0<-60,12,0.1>Ch %03d level (dB)\n", x, x); x += 1); ?>
+
+options:no_meter
+
+@init
+ext_tail_size = -2;
+ext_noinit = 1;
+gfx_ext_retina == 0 ? gfx_ext_retina = 1;
+max_ch = 128;
+fader_min_db = -60;
+fader_max_db = 12;
+view_ch = 0;
+drag_idx = -1;
+mouse_wheel_last = 0;
+
+function db_to_gain(db)
+(
+  db <= fader_min_db ? 0 : exp(log(10) * db / 20);
+);
+
+<? loop(x=0; 128, printf("_v%d = db_to_gain(slider%d);%s", x, x + 1, (x & 3) < 3 ? " " : "\n"); x += 1); ?>
+
+@block
+_s = max(1, samplesblock);
+<? loop(x=0; 128,
+  printf("_t%d = db_to_gain(slider%d); _dv%d = (_t%d - _v%d) / _s; _v%d = _t%d;%s",
+    x, x + 1, x, x, x, x, x, (x & 1) ? "\n" : " ");
+  x += 1;
+); ?>
+
+@sample
+_s -= 1;
+_pos = max(0, _s);
+<? loop(x=0; 128,
+  printf("num_ch > %d ? spl%d *= _v%d - _dv%d * _pos;%s",
+    x, x, x, x, (x & 1) ? "\n" : " ");
+  x += 1;
+); ?>
+
+@gfx 760 360
+
+sc = gfx_ext_retina;
+bg = gfx_getsyscol();
+bgr = bg & 255; bgg = (bg >> 8) & 255; bgb = (bg >> 16) & 255;
+fg = bgr*130 + bgg*256 + bgb*50 < 60000;
+muted = 0.38 + fg*0.18;
+accent_r = fg ? 0.20 : 0.16;
+accent_g = fg ? 0.74 : 0.54;
+accent_b = fg ? 0.82 : 0.62;
+
+gfx_clear = bg;
+gfx_setfont(1, "Arial", 14*sc);
+gfx_setfont(2, "Arial", 11*sc);
+gfx_setfont(3, "Arial", 10*sc);
+
+function clamp01(v) ( v < 0 ? 0 : v > 1 ? 1 : v; );
+function clamp_db(v) ( v < fader_min_db ? fader_min_db : v > fader_max_db ? fader_max_db : v; );
+function db_to_fader_pos(db)
+(
+  db = clamp_db(db);
+  db <= fader_min_db ? 0 : db >= fader_max_db ? 1 : (db - fader_min_db) / (fader_max_db - fader_min_db);
+);
+function fader_pos_to_db(v)
+(
+  v = clamp01(v);
+  v <= 0 ? fader_min_db : fader_min_db + v * (fader_max_db - fader_min_db);
+);
+function set_fg(a) ( gfx_set(fg, fg, fg, a); );
+function set_muted(a) ( gfx_set(muted, muted, muted, a); );
+function set_accent(a) ( gfx_set(accent_r, accent_g, accent_b, a); );
+
+function draw_text(x y str font align) local(tw th)
+(
+  gfx_setfont(font);
+  gfx_measurestr(str, tw, th);
+  align == 1 ? x -= tw/2 : align == 2 ? x -= tw;
+  gfx_x = x;
+  gfx_y = y;
+  gfx_drawstr(str);
+);
+
+function hit_rect(x y w h)
+(
+  mouse_x >= x && mouse_x < x+w && mouse_y >= y && mouse_y < y+h;
+);
+
+function draw_button(x y w h label active) local(rad)
+(
+  active ? set_accent(0.28) : set_muted(0.18);
+  gfx_rect(x, y, w, h, 1);
+  active ? set_accent(1) : set_fg(0.85);
+  gfx_rect(x, y, w, h, 0);
+  draw_text(x+w/2, y+h/2-gfx_texth/2, label, 2, 1);
+);
+
+function automate_idx(idx)
+(
+<? loop(x=0; 128,
+  printf("  idx == %d ? slider_automate(slider%d);%s", x, x + 1, (x & 1) ? "\n" : " ");
+  x += 1;
+); ?>
+);
+
+function set_slider_idx(idx val)
+(
+  val = clamp_db(val);
+  slider(idx+1) = val;
+  automate_idx(idx);
+);
+
+function reset_range(first count) local(i idx)
+(
+  i = 0;
+  loop(count,
+    idx = first + i;
+    idx >= 0 && idx < max_ch ? set_slider_idx(idx, 0);
+    i += 1;
+  );
+);
+
+active_ch = min(max(get_host_numchan(), 2), max_ch);
+
+margin = 14*sc;
+top_h = 54*sc;
+bottom_h = 34*sc;
+label_h = 34*sc;
+col_w = 40*sc;
+slot_w = 34*sc;
+fader_w = 14*sc;
+knob_h = 8*sc;
+left = margin;
+right = gfx_w - margin;
+usable_w = max(1, right - left);
+visible_ch = min(active_ch, max(1, floor(usable_w / col_w)));
+view_ch > active_ch - visible_ch ? view_ch = max(0, active_ch - visible_ch);
+view_ch < 0 ? view_ch = 0;
+
+fader_top = top_h + label_h;
+fader_bot = gfx_h - bottom_h - 18*sc;
+fader_h = max(60*sc, fader_bot - fader_top);
+fader_bot = fader_top + fader_h;
+
+set_fg(1);
+sprintf(#title, "MC Channel Automation Mixer 128");
+draw_text(margin, 12*sc, #title, 1, 0);
+set_muted(1);
+sprintf(#status, "track channels: %d    showing: %d-%d", active_ch, view_ch+1, view_ch+visible_ch);
+draw_text(margin, 32*sc, #status, 2, 0);
+
+button_y = 12*sc;
+button_h = 24*sc;
+button_w = 62*sc;
+reset_all_x = gfx_w - margin - button_w;
+reset_view_x = reset_all_x - button_w - 8*sc;
+chan_x = reset_view_x - button_w - 8*sc;
+draw_button(chan_x, button_y, button_w, button_h, "Chans", 0);
+draw_button(reset_view_x, button_y, button_w, button_h, "Reset View", 0);
+draw_button(reset_all_x, button_y, button_w, button_h, "Reset All", 0);
+
+set_muted(0.42);
+gfx_line(left, fader_top, left + visible_ch*col_w, fader_top);
+gfx_line(left, fader_bot, left + visible_ch*col_w, fader_bot);
+set_muted(0.22);
+unity_y = fader_bot - db_to_fader_pos(0)*fader_h;
+half_y = fader_bot - db_to_fader_pos(-12)*fader_h;
+gfx_line(left, unity_y, left + visible_ch*col_w, unity_y);
+gfx_line(left, half_y, left + visible_ch*col_w, half_y);
+
+i = 0;
+loop(visible_ch,
+  idx = view_ch + i;
+  cx = left + i*col_w + col_w/2;
+  v = clamp_db(slider(idx+1));
+  y = fader_bot - db_to_fader_pos(v)*fader_h;
+
+  set_muted(0.35);
+  gfx_rect(cx - fader_w/2, fader_top, fader_w, fader_h, 0);
+  set_accent(0.34);
+  gfx_rect(cx - fader_w/2 + sc, y, fader_w - 2*sc, fader_bot - y, 1);
+  set_accent(1);
+  gfx_rect(cx - slot_w/2, y - knob_h/2, slot_w, knob_h, 1);
+
+  set_fg(0.94);
+  sprintf(#ch, "%03d", idx+1);
+  draw_text(cx, top_h, #ch, 2, 1);
+  v <= fader_min_db ? strcpy(#db, "-inf") : sprintf(#db, "%+.1f", v);
+  set_muted(1);
+  draw_text(cx, fader_bot + 6*sc, #db, 3, 1);
+
+  i += 1;
+);
+
+active_ch > visible_ch ? (
+  bar_y = gfx_h - 18*sc;
+  bar_h = 7*sc;
+  set_muted(0.20);
+  gfx_rect(left, bar_y, visible_ch*col_w, bar_h, 1);
+  thumb_w = max(18*sc, visible_ch*col_w * visible_ch / active_ch);
+  thumb_x = left + (visible_ch*col_w - thumb_w) * view_ch / max(1, active_ch - visible_ch);
+  set_accent(0.78);
+  gfx_rect(thumb_x, bar_y, thumb_w, bar_h, 1);
+);
+
+cap_now = mouse_cap & 1;
+cap_now && !cap_last ? (
+  hit_rect(chan_x, button_y, button_w, button_h) ? (
+    gfx_x = chan_x;
+    gfx_y = button_y + button_h;
+    strcpy(#menu, "2|4|8|16|32|64|128");
+    choice = gfx_showmenu(#menu);
+    choice == 1 ? set_host_numchan(2) :
+    choice == 2 ? set_host_numchan(4) :
+    choice == 3 ? set_host_numchan(8) :
+    choice == 4 ? set_host_numchan(16) :
+    choice == 5 ? set_host_numchan(32) :
+    choice == 6 ? set_host_numchan(64) :
+    choice == 7 ? set_host_numchan(128);
+  ) :
+  hit_rect(reset_view_x, button_y, button_w, button_h) ? (
+    reset_range(view_ch, visible_ch);
+  ) :
+  hit_rect(reset_all_x, button_y, button_w, button_h) ? (
+    reset_range(0, max_ch);
+  ) :
+  hit_rect(left, fader_top - 8*sc, visible_ch*col_w, fader_h + 16*sc) ? (
+    drag_idx = view_ch + floor((mouse_x - left) / col_w);
+    drag_idx >= active_ch ? drag_idx = active_ch - 1;
+  ) :
+  active_ch > visible_ch && hit_rect(left, gfx_h - 24*sc, visible_ch*col_w, 20*sc) ? (
+    view_ch = floor((mouse_x - left) / max(1, visible_ch*col_w) * active_ch - visible_ch/2);
+  );
+);
+
+cap_now && drag_idx >= 0 ? (
+  nv = fader_pos_to_db((fader_bot - mouse_y) / fader_h);
+  set_slider_idx(drag_idx, nv);
+);
+
+!cap_now ? drag_idx = -1;
+cap_last = cap_now;
+
+mouse_wheel ? (
+  hit_rect(left, fader_top - 8*sc, visible_ch*col_w, fader_h + 16*sc) ? (
+    wheel_idx = view_ch + floor((mouse_x - left) / col_w);
+    wheel_idx >= 0 && wheel_idx < active_ch ? (
+      nv = slider(wheel_idx+1) + mouse_wheel/120 * 0.5;
+      set_slider_idx(wheel_idx, nv);
+    );
+  ) : (
+    view_ch -= floor(mouse_wheel/120) * max(1, floor(visible_ch/4));
+  );
+  mouse_wheel = 0;
+);
