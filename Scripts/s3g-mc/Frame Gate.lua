@@ -1,4 +1,4 @@
--- @description Frame gate multichannel item
+-- @description Frame Gate
 -- @author s3g
 -- @version 0.1
 -- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
@@ -15,7 +15,7 @@ local function main()
   local item, take, source_channels = mc.require_selected_multichannel_item()
   if not item then return end
 
-  local ok, input = reaper.GetUserInputs("Frame gate multichannel item", 4,
+  local ok, input = reaper.GetUserInputs("Frame Gate", 4,
     "Slices,Active group size,Step channels,Fade sec",
     "32,2,1,0.005")
   if not ok then return end

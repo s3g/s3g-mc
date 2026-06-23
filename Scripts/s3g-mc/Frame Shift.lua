@@ -1,4 +1,4 @@
--- @description Frame shift multichannel item
+-- @description Frame Shift
 -- @author s3g
 -- @version 0.2
 -- @requires ReaImGui; Multichannel Library.lua; REAPER multichannel stem render action
@@ -11,7 +11,7 @@ local script_dir = script_path:match("^(.*[/\\])") or ""
 local mc = dofile(script_dir .. "Multichannel Library.lua")
 
 if not reaper.APIExists("ImGui_GetVersion") then
-  reaper.MB("ReaImGui is not installed or not loaded.", "Frame shift multichannel item", 0)
+  reaper.MB("ReaImGui is not installed or not loaded.", "Frame Shift", 0)
   return
 end
 
@@ -50,7 +50,7 @@ local function main()
   local item, take, channel_count = mc.require_selected_multichannel_item()
   if not item then return end
 
-  local ctx = ImGui.CreateContext("Frame shift multichannel item")
+  local ctx = ImGui.CreateContext("Frame Shift")
   local open = true
   local mode = 1
   local offset = 1
@@ -59,7 +59,7 @@ local function main()
   local function loop()
     ImGui.SetNextWindowSize(ctx, 420, 210, ImGui.Cond_FirstUseEver)
     local visible
-    visible, open = ImGui.Begin(ctx, "Frame shift multichannel item", open)
+    visible, open = ImGui.Begin(ctx, "Frame Shift", open)
     if visible then
       ImGui.Text(ctx, "Source: " .. mc.item_label(item) .. "  (" .. tostring(channel_count) .. " ch)")
       ImGui.Spacing(ctx)

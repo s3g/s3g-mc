@@ -1,4 +1,4 @@
--- @description Channel smear multichannel item
+-- @description Channel Smear
 -- @author s3g
 -- @version 0.1
 -- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
@@ -15,7 +15,7 @@ local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
 
-  local ok, input = reaper.GetUserInputs("Channel smear multichannel item", 6,
+  local ok, input = reaper.GetUserInputs("Channel Smear", 6,
     "Slices,Output channels,Source channel,Spread width,Path 1=cw 2=pingpong 3=random,Fade sec",
     "32,8,1,3,2,0.005")
   if not ok then return end

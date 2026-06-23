@@ -1,4 +1,4 @@
--- @description Texture clouds multichannel item
+-- @description Texture Clouds
 -- @author s3g
 -- @version 0.1
 -- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
@@ -15,7 +15,7 @@ local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
 
-  local ok, input = reaper.GetUserInputs("Texture clouds multichannel item", 7,
+  local ok, input = reaper.GetUserInputs("Texture Clouds", 7,
     "Events,Output channels,Source channel,Avg grain sec,Length rand 0-1,Timing scatter 0-1,Fade sec",
     "160,8,1,0.08,0.6,1,0.005")
   if not ok then return end
@@ -61,7 +61,7 @@ local function main()
 
   local did_render = tex.render_events(item, output_channels, events, "Texture clouds", { mute_source_item = true })
   if did_render then
-    mc.print_plan("Texture clouds multichannel item", {
+    mc.print_plan("Texture Clouds", {
       "Events: " .. tostring(event_count),
       "Output channels: " .. tostring(output_channels),
       "Average grain: " .. tostring(grain),

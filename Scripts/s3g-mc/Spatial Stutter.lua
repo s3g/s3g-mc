@@ -1,4 +1,4 @@
--- @description Spatial stutter multichannel item
+-- @description Spatial Stutter
 -- @author s3g
 -- @version 0.1
 -- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
@@ -15,7 +15,7 @@ local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
 
-  local ok, input = reaper.GetUserInputs("Spatial stutter multichannel item", 7,
+  local ok, input = reaper.GetUserInputs("Spatial Stutter", 7,
     "Slices,Repeats,Output channels,Source channel,Stutter gap sec,Decay 0-1,Path 1=cw 2=pingpong 3=random",
     "16,4,8,1,0.035,0.8,2")
   if not ok then return end

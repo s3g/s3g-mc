@@ -1,4 +1,4 @@
--- @description Spatial repeater multichannel item
+-- @description Spatial Repeater
 -- @author s3g
 -- @version 0.1
 -- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
@@ -14,7 +14,7 @@ local mc = tex.mc
 local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
-  local ok, input = reaper.GetUserInputs("Spatial repeater multichannel item", 6,
+  local ok, input = reaper.GetUserInputs("Spatial Repeater", 6,
     "Repeats,Output channels,Source channel,Spacing sec,Decay 0-1,Path 1=cw 2=pingpong 3=random",
     "8,8,1,0.25,0.75,1")
   if not ok then return end

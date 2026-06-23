@@ -1,4 +1,4 @@
--- @description Fracture mono to multichannel space
+-- @description Fracture
 -- @author s3g
 -- @version 0.3
 -- @requires ReaImGui; Multichannel Texture Library.lua; REAPER multichannel stem render action
@@ -12,7 +12,7 @@ local tex = dofile(script_dir .. "Multichannel Texture Library.lua")
 local mc = tex.mc
 
 if not reaper.APIExists("ImGui_GetVersion") then
-  reaper.MB("ReaImGui is not installed or not loaded.", "Fracture mono to multichannel space", 0)
+  reaper.MB("ReaImGui is not installed or not loaded.", "Fracture", 0)
   return
 end
 
@@ -88,7 +88,7 @@ local function render_fracture(item, source_channel, slice_count, output_channel
 
   local did_render = tex.render_events(item, output_channels, events, "Fracture texture", { mute_source_item = true })
   if did_render then
-    mc.print_plan("Fracture mono to multichannel space", {
+    mc.print_plan("Fracture", {
       "Slices: " .. tostring(slice_count),
       "Kept slices: " .. tostring(math.max(kept_slices, 1)),
       "Events rendered: " .. tostring(#events),
@@ -103,7 +103,7 @@ local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
 
-  local ctx = ImGui.CreateContext("Fracture mono to multichannel space")
+  local ctx = ImGui.CreateContext("Fracture")
   local open = true
   local slice_count = 32
   local output_channels = math.min(math.max(source_channels, 8), mc.MAX_REAPER_TRACK_CHANNELS)
@@ -118,7 +118,7 @@ local function main()
   local function loop()
     ImGui.SetNextWindowSize(ctx, 450, 330, ImGui.Cond_FirstUseEver)
     local visible
-    visible, open = ImGui.Begin(ctx, "Fracture mono to multichannel space", open)
+    visible, open = ImGui.Begin(ctx, "Fracture", open)
     if visible then
       ImGui.Text(ctx, "Source: " .. mc.item_label(item) .. "  (" .. tostring(source_channels) .. " ch)")
       ImGui.Spacing(ctx)

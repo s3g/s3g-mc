@@ -1,4 +1,4 @@
--- @description Shred / slice multichannel item
+-- @description Shred / Slice
 -- @author s3g
 -- @version 0.2
 -- @requires ReaImGui; Multichannel Library.lua; REAPER multichannel stem render action
@@ -18,7 +18,7 @@ local mc = dofile(script_dir .. "Multichannel Library.lua")
 local MUTE_SOURCE_ITEM_AFTER_RENDER = true
 
 if not reaper.APIExists("ImGui_GetVersion") then
-  reaper.MB("ReaImGui is not installed or not loaded.", "Shred / slice multichannel item", 0)
+  reaper.MB("ReaImGui is not installed or not loaded.", "Shred / Slice", 0)
   return
 end
 
@@ -278,7 +278,7 @@ local function run_process(item, take, source_channels, slice_mode, motion_mode,
     if is_mono_motion(motion_mode) then
       lines[#lines + 1] = "Mono source channel: " .. tostring(source_channel)
     end
-    mc.print_plan("Shred / slice multichannel item", lines)
+    mc.print_plan("Shred / Slice", lines)
     if MUTE_SOURCE_ITEM_AFTER_RENDER then
       reaper.ShowConsoleMsg("Muted the original source item so the rendered result is audible by itself.\n")
     end
@@ -307,7 +307,7 @@ local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
 
-  local ctx = ImGui.CreateContext("Shred / slice multichannel item")
+  local ctx = ImGui.CreateContext("Shred / Slice")
   local open = true
   local slice_mode = SLICE_EQUAL
   local motion_mode = MODE_ORDERED_MONO
@@ -321,7 +321,7 @@ local function main()
   local function loop()
     ImGui.SetNextWindowSize(ctx, 440, 270, ImGui.Cond_FirstUseEver)
     local visible
-    visible, open = ImGui.Begin(ctx, "Shred / slice multichannel item", open)
+    visible, open = ImGui.Begin(ctx, "Shred / Slice", open)
 
     if visible then
       ImGui.Text(ctx, "Source: " .. mc.item_label(item) .. "  (" .. tostring(source_channels) .. " ch)")
