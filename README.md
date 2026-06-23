@@ -38,40 +38,40 @@ Native REAPER variations inspired by the
 <a href="https://www.composersdesktop.com/docs/html/cgromc.htm" target="_blank" rel="noopener noreferrer">CDP multichannel processes</a>.
 These scripts do not require CDP.
 
-- `Frame Shift`: channel-frame rotation, mirror,
-  odd/even split, pair interleave, or half-swap render.
-- `Shred / Slice`: equal or project-marker slices with
-  ordered mono spread, random mono scatter, and multichannel reorientation
-  modes.
+- `Brownian Walk`: short fragments follow a bounded random walk through source
+  time and output channels.
+- `Cascade Spatial Echo`: equal source segments print decaying echoes that step
+  through multichannel space.
+- `Channel Orbit Delay`: whole-item delay repeats orbit through output channels.
+- `Channel Smear`: slices duplicate to neighboring channels
+  with gain compensation.
+- `Crumble Spatial Groups`: slices are projected through progressively smaller
+  channel groups.
+- `Flutter Gate`: moving active-channel groups create a multichannel flutter
+  gate pattern.
 - `Fracture`: time-ordered slices from one source
   channel dispersed across a controlled channel path with jitter, drop, and
   spread voices.
-- `Spatial Repeater`: repeated prints of one source channel
-  around clockwise, ping-pong, or random channel paths.
-- `Zigzag Channel Walker`: equal slices walk back and forth across output
-  channels, with optional reverse source-slice order.
-- `Cascade Spatial Echo`: equal source segments print decaying echoes that step
-  through multichannel space.
-- `Crumble Spatial Groups`: slices are projected through progressively smaller
-  channel groups.
-- `Texture Clouds`: dense short fragments from one source
-  channel scattered across an output field.
-- `Spatial Stutter`: repeated short slices advance through a
-  spatial path.
-- `Channel Orbit Delay`: whole-item delay repeats orbit through output channels.
 - `Frame Gate`: rotating active channel groups print a
   multichannel gate pattern.
+- `Frame Shift`: channel-frame rotation, mirror,
+  odd/even split, pair interleave, or half-swap render.
 - `Marker Spatial Montage`: project markers inside the selected item define
   chunks for ordered or shuffled montage.
-- `Channel Smear`: slices duplicate to neighboring channels
-  with gain compensation.
-- `Brownian Walk`: short fragments follow a bounded random walk through source
-  time and output channels.
-- `Flutter Gate`: moving active-channel groups create a multichannel flutter
-  gate pattern.
-- `Stereo Spin`: sliced stereo images rotate around a multichannel output field.
 - `Mono Fill`: one source channel fills every output channel with optional gain
   compensation and slice rotation.
+- `Shred / Slice`: equal or project-marker slices with
+  ordered mono spread, random mono scatter, and multichannel reorientation
+  modes.
+- `Spatial Repeater`: repeated prints of one source channel
+  around clockwise, ping-pong, or random channel paths.
+- `Spatial Stutter`: repeated short slices advance through a
+  spatial path.
+- `Stereo Spin`: sliced stereo images rotate around a multichannel output field.
+- `Texture Clouds`: dense short fragments from one source
+  channel scattered across an output field.
+- `Zigzag Channel Walker`: equal slices walk back and forth across output
+  channels, with optional reverse source-slice order.
 
 ### Track Building / Routing
 
