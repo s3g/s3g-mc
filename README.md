@@ -35,7 +35,7 @@ fold-down monitoring, and spatial workflows.
 ### Multichannel Texture / Montage
 
 Native REAPER variations inspired by the
-[CDP multichannel processes](https://www.composersdesktop.com/docs/html/cgromc.htm).
+<a href="https://www.composersdesktop.com/docs/html/cgromc.htm" target="_blank" rel="noopener noreferrer">CDP multichannel processes</a>.
 These scripts do not require CDP.
 
 - `Frame shift multichannel item`: channel-frame rotation, mirror,
@@ -76,17 +76,17 @@ These scripts do not require CDP.
 
 ## Dependencies
 
-- [REAPER](https://www.reaper.fm/)
-- [ReaImGui](https://codeberg.org/cfillion/reaimgui) for the package browser
+- <a href="https://www.reaper.fm/" target="_blank" rel="noopener noreferrer">REAPER</a>
+- <a href="https://codeberg.org/cfillion/reaimgui" target="_blank" rel="noopener noreferrer">ReaImGui</a> for the package browser
   and controller scripts. ReaImGui is distributed through ReaPack's default
   ReaTeam Extensions repository.
-- [SWS Extension](https://sws-extension.org/) is recommended for render-based
+- <a href="https://sws-extension.org/" target="_blank" rel="noopener noreferrer">SWS Extension</a> is recommended for render-based
   workflows. Source is available at
-  [reaper-oss/sws](https://github.com/reaper-oss/sws).
-- [SPARTA plugins](https://leomccormack.github.io/sparta-site/), specifically
+  <a href="https://github.com/reaper-oss/sws" target="_blank" rel="noopener noreferrer">reaper-oss/sws</a>.
+- <a href="https://leomccormack.github.io/sparta-site/" target="_blank" rel="noopener noreferrer">SPARTA plugins</a>, specifically
   AmbiDEC and AmbiENC, are recommended for the 3OA workflow. Source and
   releases are available at
-  [leomccormack/SPARTA](https://github.com/leomccormack/SPARTA).
+  <a href="https://github.com/leomccormack/SPARTA" target="_blank" rel="noopener noreferrer">leomccormack/SPARTA</a>.
 
 ## Install
 
