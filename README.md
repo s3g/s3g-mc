@@ -14,8 +14,18 @@ fold-down monitoring, and spatial workflows.
 
 ### Spatial / HOA
 
+- `25ch Cosine Dome Panner`: broad angular-focus panning for up to 8 mono
+  source channels across the 25-speaker dome layout.
+- `25ch DBAP Dome Panner`: distance-based amplitude panning for up to 8 mono
+  source channels across the 25-speaker dome layout.
 - `25ch LBAP Dome Panner`: panning for up to 8 mono source channels across the
   25-speaker dome layout of the RISD SRST Spatial Audio Studio.
+- `25ch Region Dome Panner`: constrains up to 8 mono source channels to
+  speaker-defined rings, arcs, ribs, triangles, and caps.
+- `25ch Vector Morph Dome Panner`: stores four 8-source spatial snapshots and
+  morphs the whole scene with two automatable controls.
+- `25ch VBAP Dome Panner`: nearest-region vector-style panning for up to 8 mono
+  source channels across the 25-speaker dome layout.
 - `3OA Send/Return FX Controller`: places a 24-channel insert lane inside an
   ambisonic decode/encode chain.
 

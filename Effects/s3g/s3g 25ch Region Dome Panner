@@ -1,0 +1,465 @@
+desc:s3g 25ch Region Dome Panner
+tags: multichannel spatial Region dome panner
+
+slider1:1<0.25,4,0.01>Region sharpness
+slider2:6<0,48,0.1>Distance rolloff (dB/oct)
+slider3:35<1,250,1>Distance smoothing (ms)
+slider4:0<-360,360,0.1>Global azimuth (deg)
+slider5:0<0,90,0.1>Global elevation (deg)
+slider6:0<-3,3,0.01>Global distance offset (dome radius)
+slider7:0<-48,24,0.1>Output gain (dB)
+slider8:0<0,1,1>Reserved 1
+slider9:0<0,1,1>Reserved 2
+
+slider10:0<-360,360,0.1>S1 azimuth (deg)
+slider11:0<0,90,0.1>S1 elevation (deg)
+slider12:1<0.1,3,0.01>S1 distance (dome radius, edge=1)
+slider13:45<-360,360,0.1>S2 azimuth (deg)
+slider14:0<0,90,0.1>S2 elevation (deg)
+slider15:1<0.1,3,0.01>S2 distance (dome radius, edge=1)
+slider16:90<-360,360,0.1>S3 azimuth (deg)
+slider17:0<0,90,0.1>S3 elevation (deg)
+slider18:1<0.1,3,0.01>S3 distance (dome radius, edge=1)
+slider19:135<-360,360,0.1>S4 azimuth (deg)
+slider20:0<0,90,0.1>S4 elevation (deg)
+slider21:1<0.1,3,0.01>S4 distance (dome radius, edge=1)
+slider22:180<-360,360,0.1>S5 azimuth (deg)
+slider23:0<0,90,0.1>S5 elevation (deg)
+slider24:1<0.1,3,0.01>S5 distance (dome radius, edge=1)
+slider25:-135<-360,360,0.1>S6 azimuth (deg)
+slider26:0<0,90,0.1>S6 elevation (deg)
+slider27:1<0.1,3,0.01>S6 distance (dome radius, edge=1)
+slider28:-90<-360,360,0.1>S7 azimuth (deg)
+slider29:0<0,90,0.1>S7 elevation (deg)
+slider30:1<0.1,3,0.01>S7 distance (dome radius, edge=1)
+slider31:-45<-360,360,0.1>S8 azimuth (deg)
+slider32:0<0,90,0.1>S8 elevation (deg)
+slider33:1<0.1,3,0.01>S8 distance (dome radius, edge=1)
+
+slider34:0<-60,24,0.1>S1 gain (dB)
+slider35:0<0,1,1>S1 mute
+slider36:0<0,1,1>S1 solo
+slider37:0<-60,24,0.1>S2 gain (dB)
+slider38:0<0,1,1>S2 mute
+slider39:0<0,1,1>S2 solo
+slider40:0<-60,24,0.1>S3 gain (dB)
+slider41:0<0,1,1>S3 mute
+slider42:0<0,1,1>S3 solo
+slider43:0<-60,24,0.1>S4 gain (dB)
+slider44:0<0,1,1>S4 mute
+slider45:0<0,1,1>S4 solo
+slider46:0<-60,24,0.1>S5 gain (dB)
+slider47:0<0,1,1>S5 mute
+slider48:0<0,1,1>S5 solo
+slider49:0<-60,24,0.1>S6 gain (dB)
+slider50:0<0,1,1>S6 mute
+slider51:0<0,1,1>S6 solo
+slider52:0<-60,24,0.1>S7 gain (dB)
+slider53:0<0,1,1>S7 mute
+slider54:0<0,1,1>S7 solo
+slider55:0<-60,24,0.1>S8 gain (dB)
+slider56:0<0,1,1>S8 mute
+slider57:0<0,1,1>S8 solo
+slider58:0<0,13,1>S1 shape
+slider59:0<0,1,0.001>S1 position
+slider60:0<0,1,0.001>S1 depth
+slider61:0.18<0,1,0.001>S1 width
+slider62:1<0,13,1>S2 shape
+slider63:0.14<0,1,0.001>S2 position
+slider64:0<0,1,0.001>S2 depth
+slider65:0.18<0,1,0.001>S2 width
+slider66:2<0,13,1>S3 shape
+slider67:0.28<0,1,0.001>S3 position
+slider68:0<0,1,0.001>S3 depth
+slider69:0.18<0,1,0.001>S3 width
+slider70:3<0,13,1>S4 shape
+slider71:0.42<0,1,0.001>S4 position
+slider72:0<0,1,0.001>S4 depth
+slider73:0.18<0,1,0.001>S4 width
+slider74:4<0,13,1>S5 shape
+slider75:0.56<0,1,0.001>S5 position
+slider76:0<0,1,0.001>S5 depth
+slider77:0.18<0,1,0.001>S5 width
+slider78:5<0,13,1>S6 shape
+slider79:0.70<0,1,0.001>S6 position
+slider80:0<0,1,0.001>S6 depth
+slider81:0.18<0,1,0.001>S6 width
+slider82:6<0,13,1>S7 shape
+slider83:0.35<0,1,0.001>S7 position
+slider84:0.35<0,1,0.001>S7 depth
+slider85:0.10<0,1,0.001>S7 width
+slider86:7<0,13,1>S8 shape
+slider87:0.50<0,1,0.001>S8 position
+slider88:0.50<0,1,0.001>S8 depth
+slider89:0.20<0,1,0.001>S8 width
+slider90:16781313<0,33554431,1>S1 constellation mask
+slider91:0<0,33554431,1>S2 constellation mask
+slider92:0<0,33554431,1>S3 constellation mask
+slider93:0<0,33554431,1>S4 constellation mask
+slider94:0<0,33554431,1>S5 constellation mask
+slider95:0<0,33554431,1>S6 constellation mask
+slider96:0<0,33554431,1>S7 constellation mask
+slider97:0<0,33554431,1>S8 constellation mask
+slider98:0<0,1,1>S1 constellation closed
+slider99:0<0,1,1>S2 constellation closed
+slider100:0<0,1,1>S3 constellation closed
+slider101:0<0,1,1>S4 constellation closed
+slider102:0<0,1,1>S5 constellation closed
+slider103:0<0,1,1>S6 constellation closed
+slider104:0<0,1,1>S7 constellation closed
+slider105:0<0,1,1>S8 constellation closed
+
+@init
+NUM_SPEAKERS = 25;
+NUM_SOURCES = 8;
+EPS = 0.000001;
+deg2rad = $pi / 180;
+
+spk_az = 0;
+spk_el = 64;
+spk_layer = 128;
+spk_step = 192;
+dist_z = 256;
+src_az = 320;
+src_el = 384;
+src_dist = 448;
+mix = 512;
+src_gain = 576;
+src_level = 640;
+src_mute = 704;
+src_solo = 768;
+src_shape = 832;
+src_pos = 896;
+src_depth = 960;
+src_width = 1024;
+constel_bits = 1088;
+constel_closed = 1152;
+
+spk_az[0] = 30;   spk_el[0] = 0;    spk_layer[0] = 1; spk_step[0] = 30;
+spk_az[1] = 60;   spk_el[1] = 0;    spk_layer[1] = 1; spk_step[1] = 30;
+spk_az[2] = 90;   spk_el[2] = 0;    spk_layer[2] = 1; spk_step[2] = 30;
+spk_az[3] = 120;  spk_el[3] = 0;    spk_layer[3] = 1; spk_step[3] = 30;
+spk_az[4] = 150;  spk_el[4] = 0;    spk_layer[4] = 1; spk_step[4] = 30;
+spk_az[5] = 180;  spk_el[5] = 0;    spk_layer[5] = 1; spk_step[5] = 30;
+spk_az[6] = -150; spk_el[6] = 0;    spk_layer[6] = 1; spk_step[6] = 30;
+spk_az[7] = -120; spk_el[7] = 0;    spk_layer[7] = 1; spk_step[7] = 30;
+spk_az[8] = -90;  spk_el[8] = 0;    spk_layer[8] = 1; spk_step[8] = 30;
+spk_az[9] = -60;  spk_el[9] = 0;    spk_layer[9] = 1; spk_step[9] = 30;
+spk_az[10] = -30; spk_el[10] = 0;   spk_layer[10] = 1; spk_step[10] = 30;
+spk_az[11] = 0;   spk_el[11] = 0;   spk_layer[11] = 1; spk_step[11] = 30;
+
+spk_az[12] = 45;   spk_el[12] = 32; spk_layer[12] = 2; spk_step[12] = 45;
+spk_az[13] = 90;   spk_el[13] = 32; spk_layer[13] = 2; spk_step[13] = 45;
+spk_az[14] = 135;  spk_el[14] = 32; spk_layer[14] = 2; spk_step[14] = 45;
+spk_az[15] = 180;  spk_el[15] = 32; spk_layer[15] = 2; spk_step[15] = 45;
+spk_az[16] = -135; spk_el[16] = 32; spk_layer[16] = 2; spk_step[16] = 45;
+spk_az[17] = -90;  spk_el[17] = 32; spk_layer[17] = 2; spk_step[17] = 45;
+spk_az[18] = -45;  spk_el[18] = 32; spk_layer[18] = 2; spk_step[18] = 45;
+spk_az[19] = 0;    spk_el[19] = 32; spk_layer[19] = 2; spk_step[19] = 45;
+
+spk_az[20] = 90;  spk_el[20] = 66.6; spk_layer[20] = 3; spk_step[20] = 90;
+spk_az[21] = 180; spk_el[21] = 66.6; spk_layer[21] = 3; spk_step[21] = 90;
+spk_az[22] = -90; spk_el[22] = 66.6; spk_layer[22] = 3; spk_step[22] = 90;
+spk_az[23] = 0;   spk_el[23] = 66.6; spk_layer[23] = 3; spk_step[23] = 90;
+
+spk_az[24] = 0; spk_el[24] = 90; spk_layer[24] = 4; spk_step[24] = 0;
+
+i = 0;
+loop(NUM_SOURCES,
+  dist_z[i] = 1;
+  i += 1;
+);
+
+function wrap_degrees(deg) local(wrapped)
+(
+  wrapped = deg - floor(deg / 360) * 360;
+  wrapped > 180 ? wrapped -= 360;
+  wrapped;
+);
+
+function abs_degrees(deg)
+(
+  deg < 0 ? -deg : deg;
+);
+
+function clamp_distance(distance)
+(
+  distance < 0.1 ? 0.1 : distance;
+);
+
+function distance_amp(distance)
+(
+  distance <= 1 ? 1 :
+  distance_rolloff_db == 6 ? 1 / distance :
+  distance_rolloff_db == 12 ? 1 / (distance * distance) :
+  distance_rolloff_db == 18 ? 1 / (distance * distance * distance) :
+  1 / (distance ^ (distance_rolloff_db / 6));
+);
+
+function node_gain(spk_id, target_id, node_position, pos, width, closed) local(d, spread)
+(
+  spk_id == target_id ? (
+    d = abs(pos - node_position);
+    closed ? d = min(d, 1 - d);
+    spread = 0.001 + width * 0.30;
+    d > spread ? 0 : cos(d / spread * $pi / 2) ^ region_sharpness;
+  ) : (
+    0;
+  );
+);
+
+function path4_gain(spk_id, pos, width, closed, a, b, c, d)
+(
+  node_gain(spk_id, a, 0/4, pos, width, closed) +
+  node_gain(spk_id, b, 1/4, pos, width, closed) +
+  node_gain(spk_id, c, 2/4, pos, width, closed) +
+  node_gain(spk_id, d, 3/4, pos, width, closed);
+);
+
+function path4_open_gain(spk_id, pos, width, a, b, c, d)
+(
+  node_gain(spk_id, a, 0/3, pos, width, 0) +
+  node_gain(spk_id, b, 1/3, pos, width, 0) +
+  node_gain(spk_id, c, 2/3, pos, width, 0) +
+  node_gain(spk_id, d, 3/3, pos, width, 0);
+);
+
+function path5_gain(spk_id, pos, width, closed, a, b, c, d, e)
+(
+  node_gain(spk_id, a, 0/5, pos, width, closed) +
+  node_gain(spk_id, b, 1/5, pos, width, closed) +
+  node_gain(spk_id, c, 2/5, pos, width, closed) +
+  node_gain(spk_id, d, 3/5, pos, width, closed) +
+  node_gain(spk_id, e, 4/5, pos, width, closed);
+);
+
+function path7_gain(spk_id, pos, width, closed, a, b, c, d, e, f, h)
+(
+  node_gain(spk_id, a, 0/6, pos, width, closed) +
+  node_gain(spk_id, b, 1/6, pos, width, closed) +
+  node_gain(spk_id, c, 2/6, pos, width, closed) +
+  node_gain(spk_id, d, 3/6, pos, width, closed) +
+  node_gain(spk_id, e, 4/6, pos, width, closed) +
+  node_gain(spk_id, f, 5/6, pos, width, closed) +
+  node_gain(spk_id, h, 6/6, pos, width, closed);
+);
+
+function path8_gain(spk_id, pos, width, closed, a, b, c, d, e, f, h, j)
+(
+  node_gain(spk_id, a, 0/8, pos, width, closed) +
+  node_gain(spk_id, b, 1/8, pos, width, closed) +
+  node_gain(spk_id, c, 2/8, pos, width, closed) +
+  node_gain(spk_id, d, 3/8, pos, width, closed) +
+  node_gain(spk_id, e, 4/8, pos, width, closed) +
+  node_gain(spk_id, f, 5/8, pos, width, closed) +
+  node_gain(spk_id, h, 6/8, pos, width, closed) +
+  node_gain(spk_id, j, 7/8, pos, width, closed);
+);
+
+function path12_gain(spk_id, pos, width, closed)
+(
+  node_gain(spk_id, 1, 0/12, pos, width, closed) +
+  node_gain(spk_id, 2, 1/12, pos, width, closed) +
+  node_gain(spk_id, 3, 2/12, pos, width, closed) +
+  node_gain(spk_id, 4, 3/12, pos, width, closed) +
+  node_gain(spk_id, 5, 4/12, pos, width, closed) +
+  node_gain(spk_id, 6, 5/12, pos, width, closed) +
+  node_gain(spk_id, 7, 6/12, pos, width, closed) +
+  node_gain(spk_id, 8, 7/12, pos, width, closed) +
+  node_gain(spk_id, 9, 8/12, pos, width, closed) +
+  node_gain(spk_id, 10, 9/12, pos, width, closed) +
+  node_gain(spk_id, 11, 10/12, pos, width, closed) +
+  node_gain(spk_id, 12, 11/12, pos, width, closed);
+);
+
+function spiral25_gain(spk_id, pos, width)
+(
+  node_gain(spk_id, 1, 0/24, pos, width, 0) +
+  node_gain(spk_id, 2, 1/24, pos, width, 0) +
+  node_gain(spk_id, 3, 2/24, pos, width, 0) +
+  node_gain(spk_id, 4, 3/24, pos, width, 0) +
+  node_gain(spk_id, 5, 4/24, pos, width, 0) +
+  node_gain(spk_id, 6, 5/24, pos, width, 0) +
+  node_gain(spk_id, 7, 6/24, pos, width, 0) +
+  node_gain(spk_id, 8, 7/24, pos, width, 0) +
+  node_gain(spk_id, 9, 8/24, pos, width, 0) +
+  node_gain(spk_id, 10, 9/24, pos, width, 0) +
+  node_gain(spk_id, 11, 10/24, pos, width, 0) +
+  node_gain(spk_id, 12, 11/24, pos, width, 0) +
+  node_gain(spk_id, 13, 12/24, pos, width, 0) +
+  node_gain(spk_id, 14, 13/24, pos, width, 0) +
+  node_gain(spk_id, 15, 14/24, pos, width, 0) +
+  node_gain(spk_id, 16, 15/24, pos, width, 0) +
+  node_gain(spk_id, 17, 16/24, pos, width, 0) +
+  node_gain(spk_id, 18, 17/24, pos, width, 0) +
+  node_gain(spk_id, 19, 18/24, pos, width, 0) +
+  node_gain(spk_id, 20, 19/24, pos, width, 0) +
+  node_gain(spk_id, 21, 20/24, pos, width, 0) +
+  node_gain(spk_id, 22, 21/24, pos, width, 0) +
+  node_gain(spk_id, 23, 22/24, pos, width, 0) +
+  node_gain(spk_id, 24, 23/24, pos, width, 0) +
+  node_gain(spk_id, 25, 24/24, pos, width, 0);
+);
+
+function triangle_gain(spk_id, pos, depth, width, a, b, c) local(wa, wb, wc, center, perimeter)
+(
+  center = min(max(depth, 0), 1);
+  perimeter = path4_gain(spk_id, pos, width, 1, a, b, c, a);
+  wa = spk_id == a ? 1/3 : 0;
+  wb = spk_id == b ? 1/3 : 0;
+  wc = spk_id == c ? 1/3 : 0;
+  perimeter * (1 - center) + (wa + wb + wc) * center;
+);
+
+function constellation_selected(src, speaker_index) local(mask, div)
+(
+  mask = max(0, floor(constel_bits[src] + 0.5));
+  div = 2 ^ speaker_index;
+  floor(mask / div) - floor(mask / (div * 2)) * 2;
+);
+
+function constellation_gain(src, spk_id, pos, width) local(i, count, rank, selected, closed, target_pos, denom)
+(
+  count = 0;
+  rank = -1;
+  i = 0;
+  loop(NUM_SPEAKERS,
+    selected = constellation_selected(src, i) >= 0.5;
+    selected ? (
+      spk_id == i + 1 ? rank = count;
+      count += 1;
+    );
+    i += 1;
+  );
+
+  count <= 0 ? (
+    0;
+  ) : count == 1 ? (
+    rank == 0 ? 1 : 0;
+  ) : rank < 0 ? (
+    0;
+  ) : (
+    closed = constel_closed[src] >= 0.5;
+    denom = closed ? count : count - 1;
+    target_pos = rank / denom;
+    node_gain(spk_id, spk_id, target_pos, pos, width, closed);
+  );
+);
+
+function region_gain(src, shape, spk_id, pos, depth, width)
+(
+  shape == 0 ? path12_gain(spk_id, pos, width, 1) :
+  shape == 1 ? path8_gain(spk_id, pos, width, 1, 13, 14, 15, 16, 17, 18, 19, 20) :
+  shape == 2 ? path4_gain(spk_id, pos, width, 1, 21, 22, 23, 24) :
+  shape == 3 ? path7_gain(spk_id, pos, width, 0, 9, 18, 23, 25, 21, 14, 3) :
+  shape == 4 ? path4_open_gain(spk_id, pos, width, 12, 20, 24, 25) :
+  shape == 5 ? path4_open_gain(spk_id, pos, width, 9, 18, 23, 25) :
+  shape == 6 ? triangle_gain(spk_id, pos, depth, width, 10, 19, 11) :
+  shape == 7 ? path5_gain(spk_id, pos, width, 1, 21, 22, 23, 24, 25) :
+  shape == 8 ? path7_gain(spk_id, pos, width, 0, 12, 20, 24, 25, 22, 16, 6) :
+  shape == 9 ? triangle_gain(spk_id, pos, depth, width, 1, 13, 2) :
+  shape == 10 ? triangle_gain(spk_id, pos, depth, width, 4, 15, 5) :
+  shape == 11 ? triangle_gain(spk_id, pos, depth, width, 7, 17, 8) :
+  shape == 12 ? spiral25_gain(spk_id, pos, width) :
+  constellation_gain(src, spk_id, pos, width);
+);
+
+@slider
+region_sharpness = max(0.25, slider1);
+distance_rolloff_db = max(0, slider2);
+distance_smoothing_ms = max(1, slider3);
+global_az = slider4;
+global_el = max(0, min(90, slider5));
+global_dist = slider6;
+out_gain = 10 ^ (slider7 / 20);
+distance_coef = exp(-1000 / (distance_smoothing_ms * srate));
+
+src_az[0] = slider10; src_el[0] = slider11; src_dist[0] = slider12;
+src_az[1] = slider13; src_el[1] = slider14; src_dist[1] = slider15;
+src_az[2] = slider16; src_el[2] = slider17; src_dist[2] = slider18;
+src_az[3] = slider19; src_el[3] = slider20; src_dist[3] = slider21;
+src_az[4] = slider22; src_el[4] = slider23; src_dist[4] = slider24;
+src_az[5] = slider25; src_el[5] = slider26; src_dist[5] = slider27;
+src_az[6] = slider28; src_el[6] = slider29; src_dist[6] = slider30;
+src_az[7] = slider31; src_el[7] = slider32; src_dist[7] = slider33;
+
+src_level[0] = 10 ^ (slider34 / 20); src_mute[0] = slider35 >= 0.5; src_solo[0] = slider36 >= 0.5;
+src_level[1] = 10 ^ (slider37 / 20); src_mute[1] = slider38 >= 0.5; src_solo[1] = slider39 >= 0.5;
+src_level[2] = 10 ^ (slider40 / 20); src_mute[2] = slider41 >= 0.5; src_solo[2] = slider42 >= 0.5;
+src_level[3] = 10 ^ (slider43 / 20); src_mute[3] = slider44 >= 0.5; src_solo[3] = slider45 >= 0.5;
+src_level[4] = 10 ^ (slider46 / 20); src_mute[4] = slider47 >= 0.5; src_solo[4] = slider48 >= 0.5;
+src_level[5] = 10 ^ (slider49 / 20); src_mute[5] = slider50 >= 0.5; src_solo[5] = slider51 >= 0.5;
+src_level[6] = 10 ^ (slider52 / 20); src_mute[6] = slider53 >= 0.5; src_solo[6] = slider54 >= 0.5;
+src_level[7] = 10 ^ (slider55 / 20); src_mute[7] = slider56 >= 0.5; src_solo[7] = slider57 >= 0.5;
+
+src_shape[0] = slider58; src_pos[0] = slider59; src_depth[0] = slider60; src_width[0] = slider61;
+src_shape[1] = slider62; src_pos[1] = slider63; src_depth[1] = slider64; src_width[1] = slider65;
+src_shape[2] = slider66; src_pos[2] = slider67; src_depth[2] = slider68; src_width[2] = slider69;
+src_shape[3] = slider70; src_pos[3] = slider71; src_depth[3] = slider72; src_width[3] = slider73;
+src_shape[4] = slider74; src_pos[4] = slider75; src_depth[4] = slider76; src_width[4] = slider77;
+src_shape[5] = slider78; src_pos[5] = slider79; src_depth[5] = slider80; src_width[5] = slider81;
+src_shape[6] = slider82; src_pos[6] = slider83; src_depth[6] = slider84; src_width[6] = slider85;
+src_shape[7] = slider86; src_pos[7] = slider87; src_depth[7] = slider88; src_width[7] = slider89;
+
+constel_bits[0] = slider90; constel_bits[1] = slider91; constel_bits[2] = slider92; constel_bits[3] = slider93;
+constel_bits[4] = slider94; constel_bits[5] = slider95; constel_bits[6] = slider96; constel_bits[7] = slider97;
+constel_closed[0] = slider98; constel_closed[1] = slider99; constel_closed[2] = slider100; constel_closed[3] = slider101;
+constel_closed[4] = slider102; constel_closed[5] = slider103; constel_closed[6] = slider104; constel_closed[7] = slider105;
+
+@sample
+i = 0;
+loop(NUM_SPEAKERS,
+  mix[i] = 0;
+  i += 1;
+);
+
+solo_count = 0;
+src = 0;
+loop(NUM_SOURCES,
+  src_solo[src] ? solo_count += 1;
+  src += 1;
+);
+
+src = 0;
+loop(NUM_SOURCES,
+  active_source = src < num_ch && !src_mute[src] && (solo_count == 0 || src_solo[src]);
+  active_source ? (
+    input = spl(src);
+
+    source_dist_target = clamp_distance(src_dist[src] + global_dist);
+    dist_z[src] = source_dist_target + (dist_z[src] - source_dist_target) * distance_coef;
+    source_dist = dist_z[src];
+    source_amp = distance_amp(source_dist);
+
+    scale = 0;
+    spk = 0;
+    loop(NUM_SPEAKERS,
+      g = region_gain(src, src_shape[src], spk + 1, src_pos[src], src_depth[src], src_width[src]);
+      src_gain[spk] = g;
+      scale += g * g;
+      spk += 1;
+    );
+
+    scale = scale < EPS ? 1 : sqrt(scale);
+    weighted = input * src_level[src] * source_amp / scale;
+    spk = 0;
+    loop(NUM_SPEAKERS,
+      mix[spk] += weighted * src_gain[spk];
+      spk += 1;
+    );
+  );
+
+  src += 1;
+);
+
+i = 0;
+loop(NUM_SPEAKERS,
+  spl(i) = mix[i] * out_gain;
+  i += 1;
+);
+
+i = NUM_SPEAKERS;
+loop(64 - NUM_SPEAKERS,
+  spl(i) = 0;
+  i += 1;
+);

@@ -1,7 +1,7 @@
-desc:s3g 25ch LBAP Dome Panner
-tags: multichannel spatial LBAP dome panner
+desc:s3g 25ch Vector Morph Dome Panner
+tags: multichannel spatial vector morph dome panner
 
-slider1:1<0.25,4,0.01>LBAP sharpness
+slider1:1<0.25,4,0.01>Vector sharpness
 slider2:6<0,48,0.1>Distance rolloff (dB/oct)
 slider3:35<1,250,1>Distance smoothing (ms)
 slider4:0<-360,360,0.1>Global azimuth (deg)
@@ -60,6 +60,104 @@ slider54:0<0,1,1>S7 solo
 slider55:0<-60,24,0.1>S8 gain (dB)
 slider56:0<0,1,1>S8 mute
 slider57:0<0,1,1>S8 solo
+slider58:0<0,1,0.001>Morph X (A-B / C-D)
+slider59:0<0,1,0.001>Morph Y (AB-CD)
+slider60:0<-360,360,0.1>A S1 azimuth (deg)
+slider61:0<0,90,0.1>A S1 elevation (deg)
+slider62:1<0.1,3,0.01>A S1 distance (dome radius, edge=1)
+slider63:45<-360,360,0.1>A S2 azimuth (deg)
+slider64:0<0,90,0.1>A S2 elevation (deg)
+slider65:1<0.1,3,0.01>A S2 distance (dome radius, edge=1)
+slider66:90<-360,360,0.1>A S3 azimuth (deg)
+slider67:0<0,90,0.1>A S3 elevation (deg)
+slider68:1<0.1,3,0.01>A S3 distance (dome radius, edge=1)
+slider69:135<-360,360,0.1>A S4 azimuth (deg)
+slider70:0<0,90,0.1>A S4 elevation (deg)
+slider71:1<0.1,3,0.01>A S4 distance (dome radius, edge=1)
+slider72:180<-360,360,0.1>A S5 azimuth (deg)
+slider73:0<0,90,0.1>A S5 elevation (deg)
+slider74:1<0.1,3,0.01>A S5 distance (dome radius, edge=1)
+slider75:-135<-360,360,0.1>A S6 azimuth (deg)
+slider76:0<0,90,0.1>A S6 elevation (deg)
+slider77:1<0.1,3,0.01>A S6 distance (dome radius, edge=1)
+slider78:-90<-360,360,0.1>A S7 azimuth (deg)
+slider79:0<0,90,0.1>A S7 elevation (deg)
+slider80:1<0.1,3,0.01>A S7 distance (dome radius, edge=1)
+slider81:-45<-360,360,0.1>A S8 azimuth (deg)
+slider82:0<0,90,0.1>A S8 elevation (deg)
+slider83:1<0.1,3,0.01>A S8 distance (dome radius, edge=1)
+slider84:90<-360,360,0.1>B S1 azimuth (deg)
+slider85:0<0,90,0.1>B S1 elevation (deg)
+slider86:1<0.1,3,0.01>B S1 distance (dome radius, edge=1)
+slider87:135<-360,360,0.1>B S2 azimuth (deg)
+slider88:0<0,90,0.1>B S2 elevation (deg)
+slider89:1<0.1,3,0.01>B S2 distance (dome radius, edge=1)
+slider90:180<-360,360,0.1>B S3 azimuth (deg)
+slider91:0<0,90,0.1>B S3 elevation (deg)
+slider92:1<0.1,3,0.01>B S3 distance (dome radius, edge=1)
+slider93:-135<-360,360,0.1>B S4 azimuth (deg)
+slider94:0<0,90,0.1>B S4 elevation (deg)
+slider95:1<0.1,3,0.01>B S4 distance (dome radius, edge=1)
+slider96:-90<-360,360,0.1>B S5 azimuth (deg)
+slider97:0<0,90,0.1>B S5 elevation (deg)
+slider98:1<0.1,3,0.01>B S5 distance (dome radius, edge=1)
+slider99:-45<-360,360,0.1>B S6 azimuth (deg)
+slider100:0<0,90,0.1>B S6 elevation (deg)
+slider101:1<0.1,3,0.01>B S6 distance (dome radius, edge=1)
+slider102:0<-360,360,0.1>B S7 azimuth (deg)
+slider103:0<0,90,0.1>B S7 elevation (deg)
+slider104:1<0.1,3,0.01>B S7 distance (dome radius, edge=1)
+slider105:45<-360,360,0.1>B S8 azimuth (deg)
+slider106:0<0,90,0.1>B S8 elevation (deg)
+slider107:1<0.1,3,0.01>B S8 distance (dome radius, edge=1)
+slider108:-90<-360,360,0.1>C S1 azimuth (deg)
+slider109:0<0,90,0.1>C S1 elevation (deg)
+slider110:1<0.1,3,0.01>C S1 distance (dome radius, edge=1)
+slider111:-45<-360,360,0.1>C S2 azimuth (deg)
+slider112:0<0,90,0.1>C S2 elevation (deg)
+slider113:1<0.1,3,0.01>C S2 distance (dome radius, edge=1)
+slider114:0<-360,360,0.1>C S3 azimuth (deg)
+slider115:0<0,90,0.1>C S3 elevation (deg)
+slider116:1<0.1,3,0.01>C S3 distance (dome radius, edge=1)
+slider117:45<-360,360,0.1>C S4 azimuth (deg)
+slider118:0<0,90,0.1>C S4 elevation (deg)
+slider119:1<0.1,3,0.01>C S4 distance (dome radius, edge=1)
+slider120:90<-360,360,0.1>C S5 azimuth (deg)
+slider121:0<0,90,0.1>C S5 elevation (deg)
+slider122:1<0.1,3,0.01>C S5 distance (dome radius, edge=1)
+slider123:135<-360,360,0.1>C S6 azimuth (deg)
+slider124:0<0,90,0.1>C S6 elevation (deg)
+slider125:1<0.1,3,0.01>C S6 distance (dome radius, edge=1)
+slider126:180<-360,360,0.1>C S7 azimuth (deg)
+slider127:0<0,90,0.1>C S7 elevation (deg)
+slider128:1<0.1,3,0.01>C S7 distance (dome radius, edge=1)
+slider129:-135<-360,360,0.1>C S8 azimuth (deg)
+slider130:0<0,90,0.1>C S8 elevation (deg)
+slider131:1<0.1,3,0.01>C S8 distance (dome radius, edge=1)
+slider132:180<-360,360,0.1>D S1 azimuth (deg)
+slider133:0<0,90,0.1>D S1 elevation (deg)
+slider134:1<0.1,3,0.01>D S1 distance (dome radius, edge=1)
+slider135:-135<-360,360,0.1>D S2 azimuth (deg)
+slider136:0<0,90,0.1>D S2 elevation (deg)
+slider137:1<0.1,3,0.01>D S2 distance (dome radius, edge=1)
+slider138:-90<-360,360,0.1>D S3 azimuth (deg)
+slider139:0<0,90,0.1>D S3 elevation (deg)
+slider140:1<0.1,3,0.01>D S3 distance (dome radius, edge=1)
+slider141:-45<-360,360,0.1>D S4 azimuth (deg)
+slider142:0<0,90,0.1>D S4 elevation (deg)
+slider143:1<0.1,3,0.01>D S4 distance (dome radius, edge=1)
+slider144:0<-360,360,0.1>D S5 azimuth (deg)
+slider145:0<0,90,0.1>D S5 elevation (deg)
+slider146:1<0.1,3,0.01>D S5 distance (dome radius, edge=1)
+slider147:45<-360,360,0.1>D S6 azimuth (deg)
+slider148:0<0,90,0.1>D S6 elevation (deg)
+slider149:1<0.1,3,0.01>D S6 distance (dome radius, edge=1)
+slider150:90<-360,360,0.1>D S7 azimuth (deg)
+slider151:0<0,90,0.1>D S7 elevation (deg)
+slider152:1<0.1,3,0.01>D S7 distance (dome radius, edge=1)
+slider153:135<-360,360,0.1>D S8 azimuth (deg)
+slider154:0<0,90,0.1>D S8 elevation (deg)
+slider155:1<0.1,3,0.01>D S8 distance (dome radius, edge=1)
 
 @init
 NUM_SPEAKERS = 25;
@@ -80,6 +178,9 @@ src_gain = 576;
 src_level = 640;
 src_mute = 704;
 src_solo = 768;
+scene_az = 832;
+scene_el = 1024;
+scene_dist = 1216;
 
 spk_az[0] = 30;   spk_el[0] = 0;    spk_layer[0] = 1; spk_step[0] = 30;
 spk_az[1] = 60;   spk_el[1] = 0;    spk_layer[1] = 1; spk_step[1] = 30;
@@ -121,6 +222,17 @@ function wrap_degrees(deg) local(wrapped)
   wrapped = deg - floor(deg / 360) * 360;
   wrapped > 180 ? wrapped -= 360;
   wrapped;
+);
+
+function lerp(a, b, t)
+(
+  a + (b - a) * t;
+);
+
+function lerp_degrees(a, b, t) local(diff)
+(
+  diff = wrap_degrees(b - a);
+  wrap_degrees(a + diff * t);
 );
 
 function abs_degrees(deg)
@@ -196,6 +308,45 @@ src_level[5] = 10 ^ (slider49 / 20); src_mute[5] = slider50 >= 0.5; src_solo[5] 
 src_level[6] = 10 ^ (slider52 / 20); src_mute[6] = slider53 >= 0.5; src_solo[6] = slider54 >= 0.5;
 src_level[7] = 10 ^ (slider55 / 20); src_mute[7] = slider56 >= 0.5; src_solo[7] = slider57 >= 0.5;
 
+morph_x = slider58;
+morph_y = slider59;
+
+scene_az[0] = slider60; scene_el[0] = slider61; scene_dist[0] = slider62;
+scene_az[1] = slider63; scene_el[1] = slider64; scene_dist[1] = slider65;
+scene_az[2] = slider66; scene_el[2] = slider67; scene_dist[2] = slider68;
+scene_az[3] = slider69; scene_el[3] = slider70; scene_dist[3] = slider71;
+scene_az[4] = slider72; scene_el[4] = slider73; scene_dist[4] = slider74;
+scene_az[5] = slider75; scene_el[5] = slider76; scene_dist[5] = slider77;
+scene_az[6] = slider78; scene_el[6] = slider79; scene_dist[6] = slider80;
+scene_az[7] = slider81; scene_el[7] = slider82; scene_dist[7] = slider83;
+
+scene_az[8] = slider84; scene_el[8] = slider85; scene_dist[8] = slider86;
+scene_az[9] = slider87; scene_el[9] = slider88; scene_dist[9] = slider89;
+scene_az[10] = slider90; scene_el[10] = slider91; scene_dist[10] = slider92;
+scene_az[11] = slider93; scene_el[11] = slider94; scene_dist[11] = slider95;
+scene_az[12] = slider96; scene_el[12] = slider97; scene_dist[12] = slider98;
+scene_az[13] = slider99; scene_el[13] = slider100; scene_dist[13] = slider101;
+scene_az[14] = slider102; scene_el[14] = slider103; scene_dist[14] = slider104;
+scene_az[15] = slider105; scene_el[15] = slider106; scene_dist[15] = slider107;
+
+scene_az[16] = slider108; scene_el[16] = slider109; scene_dist[16] = slider110;
+scene_az[17] = slider111; scene_el[17] = slider112; scene_dist[17] = slider113;
+scene_az[18] = slider114; scene_el[18] = slider115; scene_dist[18] = slider116;
+scene_az[19] = slider117; scene_el[19] = slider118; scene_dist[19] = slider119;
+scene_az[20] = slider120; scene_el[20] = slider121; scene_dist[20] = slider122;
+scene_az[21] = slider123; scene_el[21] = slider124; scene_dist[21] = slider125;
+scene_az[22] = slider126; scene_el[22] = slider127; scene_dist[22] = slider128;
+scene_az[23] = slider129; scene_el[23] = slider130; scene_dist[23] = slider131;
+
+scene_az[24] = slider132; scene_el[24] = slider133; scene_dist[24] = slider134;
+scene_az[25] = slider135; scene_el[25] = slider136; scene_dist[25] = slider137;
+scene_az[26] = slider138; scene_el[26] = slider139; scene_dist[26] = slider140;
+scene_az[27] = slider141; scene_el[27] = slider142; scene_dist[27] = slider143;
+scene_az[28] = slider144; scene_el[28] = slider145; scene_dist[28] = slider146;
+scene_az[29] = slider147; scene_el[29] = slider148; scene_dist[29] = slider149;
+scene_az[30] = slider150; scene_el[30] = slider151; scene_dist[30] = slider152;
+scene_az[31] = slider153; scene_el[31] = slider154; scene_dist[31] = slider155;
+
 @sample
 i = 0;
 loop(NUM_SPEAKERS,
@@ -216,9 +367,22 @@ loop(NUM_SOURCES,
   active_source ? (
     input = spl(src);
 
-    source_az = src_az[src] + global_az;
-    source_el = max(0, min(90, src_el[src] + global_el));
-    source_dist_target = clamp_distance(src_dist[src] + global_dist);
+    idx_a = src;
+    idx_b = 8 + src;
+    idx_c = 16 + src;
+    idx_d = 24 + src;
+
+    az_ab = lerp_degrees(scene_az[idx_a], scene_az[idx_b], morph_x);
+    az_cd = lerp_degrees(scene_az[idx_c], scene_az[idx_d], morph_x);
+    source_az = lerp_degrees(az_ab, az_cd, morph_y) + global_az;
+
+    el_ab = lerp(scene_el[idx_a], scene_el[idx_b], morph_x);
+    el_cd = lerp(scene_el[idx_c], scene_el[idx_d], morph_x);
+    source_el = max(0, min(90, lerp(el_ab, el_cd, morph_y) + global_el));
+
+    dist_ab = lerp(scene_dist[idx_a], scene_dist[idx_b], morph_x);
+    dist_cd = lerp(scene_dist[idx_c], scene_dist[idx_d], morph_x);
+    source_dist_target = clamp_distance(lerp(dist_ab, dist_cd, morph_y) + global_dist);
     dist_z[src] = source_dist_target + (dist_z[src] - source_dist_target) * distance_coef;
     source_dist = dist_z[src];
     source_radius = clamp_distance(source_dist);
