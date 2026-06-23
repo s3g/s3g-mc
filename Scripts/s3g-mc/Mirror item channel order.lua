@@ -15,30 +15,21 @@ local mc = dofile(script_dir .. "Multichannel Library.lua")
 local MUTE_SOURCE_ITEM_AFTER_RENDER = true
 
 local function main()
-  local item, take, channel_count = mc.get_selected_audio_item()
+  local item, take, channel_count = mc.require_selected_multichannel_item()
   if not item then return end
-
-  if channel_count < 2 then
-    mc.show_error("The selected item is mono; there is nothing to mirror.")
-    return
-  end
 
   local channel_map = mc.mirror_map(channel_count)
 
   reaper.Undo_BeginBlock()
-  reaper.PreventUIRefresh(1)
-
-  local did_render = mc.build_multichannel_render_from_item(item, channel_count,
-    channel_map, "Mirrored channels", { mute_source_item = MUTE_SOURCE_ITEM_AFTER_RENDER })
-
-  reaper.PreventUIRefresh(-1)
-  reaper.TrackList_AdjustWindows(false)
-  reaper.UpdateArrange()
+  local did_render = mc.with_ui_refresh_block(function()
+    return mc.build_multichannel_render_from_item(item, channel_count,
+      channel_map, "Mirrored channels", { mute_source_item = MUTE_SOURCE_ITEM_AFTER_RENDER })
+  end)
   reaper.Undo_EndBlock("Mirror channels of selected multichannel item", -1)
 
-  reaper.ShowConsoleMsg("")
   if did_render then
-    reaper.ShowConsoleMsg("Rendered mirrored channel map: " .. table.concat(channel_map, " ") .. "\n")
+    mc.print_plan("Mirrored item channels", mc.render_plan_for_item(item, channel_count,
+      channel_map, "Mirrored channels"))
     if MUTE_SOURCE_ITEM_AFTER_RENDER then
       reaper.ShowConsoleMsg("Muted the original source item so the rendered result is audible by itself.\n")
     end

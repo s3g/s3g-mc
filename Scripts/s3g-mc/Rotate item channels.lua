@@ -15,13 +15,8 @@ local mc = dofile(script_dir .. "Multichannel Library.lua")
 local MUTE_SOURCE_ITEM_AFTER_RENDER = true
 
 local function main()
-  local item, take, channel_count = mc.get_selected_audio_item()
+  local item, take, channel_count = mc.require_selected_multichannel_item()
   if not item then return end
-
-  if channel_count < 2 then
-    mc.show_error("The selected item is mono; there is nothing to rotate.")
-    return
-  end
 
   local ok, input = reaper.GetUserInputs("Rotate multichannel item", 1,
     "Channel offset", "1")
@@ -36,20 +31,16 @@ local function main()
   local channel_map = mc.rotate_map(channel_count, offset)
 
   reaper.Undo_BeginBlock()
-  reaper.PreventUIRefresh(1)
-
-  local did_render = mc.build_multichannel_render_from_item(item, channel_count,
-    channel_map, "Rotated channels " .. tostring(offset),
-    { mute_source_item = MUTE_SOURCE_ITEM_AFTER_RENDER })
-
-  reaper.PreventUIRefresh(-1)
-  reaper.TrackList_AdjustWindows(false)
-  reaper.UpdateArrange()
+  local did_render = mc.with_ui_refresh_block(function()
+    return mc.build_multichannel_render_from_item(item, channel_count,
+      channel_map, "Rotated channels " .. tostring(offset),
+      { mute_source_item = MUTE_SOURCE_ITEM_AFTER_RENDER })
+  end)
   reaper.Undo_EndBlock("Rotate channels of selected multichannel item", -1)
 
-  reaper.ShowConsoleMsg("")
   if did_render then
-    reaper.ShowConsoleMsg("Rendered rotated channel map: " .. table.concat(channel_map, " ") .. "\n")
+    mc.print_plan("Rotated item channels", mc.render_plan_for_item(item, channel_count,
+      channel_map, "Rotated channels " .. tostring(offset)))
     if MUTE_SOURCE_ITEM_AFTER_RENDER then
       reaper.ShowConsoleMsg("Muted the original source item so the rendered result is audible by itself.\n")
     end

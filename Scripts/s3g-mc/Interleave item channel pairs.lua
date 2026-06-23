@@ -1,13 +1,12 @@
--- @description Reorder item channels
+-- @description Interleave item channel pairs
 -- @author s3g
 -- @version 0.1
 -- @requires Multichannel Library.lua; REAPER multichannel stem render action
 -- @category Item Channel Transforms
 -- @render Yes; bounds to source item length.
--- @method Applies a user-entered output-to-input channel map.
+-- @method Renders a copy of the selected item with channel halves interleaved into pairs.
 -- @about
---   Creates a rendered multichannel stem from the selected item using a custom
---   output-to-input channel map, e.g. "3 4 1 2".
+--   Converts split pair order such as L1 L2 R1 R2 into L1 R1 L2 R2.
 
 local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
@@ -18,27 +17,18 @@ local function main()
   local item, take, channel_count = mc.require_selected_multichannel_item()
   if not item then return end
 
-  local default_map = table.concat(mc.identity_map(channel_count), " ")
-  local ok, input = reaper.GetUserInputs("Reorder multichannel item", 1,
-    "Output channels use input channels", default_map)
-  if not ok then return end
-
-  local channel_map, err = mc.parse_channel_map(input, channel_count, true)
-  if not channel_map then
-    mc.show_error(err)
-    return
-  end
+  local channel_map = mc.interleave_pairs_map(channel_count)
 
   reaper.Undo_BeginBlock()
   local did_render = mc.with_ui_refresh_block(function()
     return mc.build_multichannel_render_from_item(item, channel_count,
-      channel_map, "Reordered channels", { mute_source_item = MUTE_SOURCE_ITEM_AFTER_RENDER })
+      channel_map, "Interleaved pairs", { mute_source_item = MUTE_SOURCE_ITEM_AFTER_RENDER })
   end)
-  reaper.Undo_EndBlock("Reorder channels of selected multichannel item", -1)
+  reaper.Undo_EndBlock("Interleave channel pairs of selected item", -1)
 
   if did_render then
-    mc.print_plan("Reordered item channels", mc.render_plan_for_item(item, channel_count,
-      channel_map, "Reordered channels"))
+    mc.print_plan("Interleaved item channel pairs", mc.render_plan_for_item(item, channel_count,
+      channel_map, "Interleaved pairs"))
     if MUTE_SOURCE_ITEM_AFTER_RENDER then
       reaper.ShowConsoleMsg("Muted the original source item so the rendered result is audible by itself.\n")
     end

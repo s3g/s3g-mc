@@ -2,6 +2,7 @@
 -- @browser hidden
 
 local M = {}
+local unpack_values = table.unpack or unpack
 
 M.PROJECT = 0
 M.MAX_REAPER_TRACK_CHANNELS = 128
@@ -104,6 +105,40 @@ function M.select_only_item(item)
   reaper.SetMediaItemSelected(item, true)
 end
 
+function M.save_selected_tracks()
+  local tracks = {}
+  for index = 0, reaper.CountSelectedTracks(M.PROJECT) - 1 do
+    tracks[#tracks + 1] = reaper.GetSelectedTrack(M.PROJECT, index)
+  end
+  return tracks
+end
+
+function M.restore_selected_tracks(tracks)
+  reaper.Main_OnCommand(40297, 0) -- Track: Unselect all tracks
+  for _, track in ipairs(tracks or {}) do
+    if reaper.ValidatePtr2(M.PROJECT, track, "MediaTrack*") then
+      reaper.SetTrackSelected(track, true)
+    end
+  end
+end
+
+function M.save_selected_items()
+  local items = {}
+  for index = 0, reaper.CountSelectedMediaItems(M.PROJECT) - 1 do
+    items[#items + 1] = reaper.GetSelectedMediaItem(M.PROJECT, index)
+  end
+  return items
+end
+
+function M.restore_selected_items(items)
+  reaper.Main_OnCommand(40289, 0) -- Item: Unselect all items
+  for _, item in ipairs(items or {}) do
+    if reaper.ValidatePtr2(M.PROJECT, item, "MediaItem*") then
+      reaper.SetMediaItemSelected(item, true)
+    end
+  end
+end
+
 function M.move_track_items_by(track, offset)
   if not track or offset == 0 then return end
   for item_index = 0, reaper.CountTrackMediaItems(track) - 1 do
@@ -178,6 +213,44 @@ function M.restore_render_bounds(saved)
   reaper.GetSetProjectInfo(M.PROJECT, "RENDER_ENDPOS", saved.end_pos or 0, true)
 end
 
+function M.with_ui_refresh_block(fn)
+  reaper.PreventUIRefresh(1)
+  local results = { pcall(fn) }
+  reaper.PreventUIRefresh(-1)
+  reaper.TrackList_AdjustWindows(false)
+  reaper.UpdateArrange()
+  if not results[1] then error(results[2]) end
+  return unpack_values(results, 2)
+end
+
+function M.with_preserved_selection(fn)
+  local tracks = M.save_selected_tracks()
+  local items = M.save_selected_items()
+  local results = { pcall(fn) }
+  M.restore_selected_tracks(tracks)
+  M.restore_selected_items(items)
+  if not results[1] then error(results[2]) end
+  return unpack_values(results, 2)
+end
+
+function M.with_render_bounds_for_range(start_pos, end_pos, fn)
+  local saved_time_selection = M.save_time_selection()
+  local saved_render_bounds = M.save_render_bounds()
+  M.set_time_selection(start_pos, end_pos)
+  M.set_render_bounds_to_time_selection(start_pos, end_pos)
+  local results = { pcall(fn) }
+  M.restore_render_bounds(saved_render_bounds)
+  M.restore_time_selection(saved_time_selection)
+  if not results[1] then error(results[2]) end
+  return unpack_values(results, 2)
+end
+
+function M.with_render_bounds_for_item(item, fn)
+  local start_pos = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
+  local end_pos = M.item_end_position(item)
+  return M.with_render_bounds_for_range(start_pos, end_pos, fn)
+end
+
 function M.clone_item_to_track(item, track)
   local ok, chunk = reaper.GetItemStateChunk(item, "", false)
   if not ok then return nil end
@@ -192,6 +265,23 @@ end
 function M.set_take_to_mono_source_channel(take, channel)
   -- I_CHANMODE: 3 = mono source channel 1, 4 = mono source channel 2, etc.
   reaper.SetMediaItemTakeInfo_Value(take, "I_CHANMODE", channel + 2)
+end
+
+function M.duplicate_item_as_mono_channel(item, track, channel)
+  local clone = M.clone_item_to_track(item, track)
+  if not clone then return nil end
+  local take = reaper.GetActiveTake(clone)
+  M.set_take_to_mono_source_channel(take, channel)
+  return clone
+end
+
+function M.create_mono_channel_track_from_item(item, channel, insert_index, name)
+  local source_track = reaper.GetMediaItemTrack(item)
+  insert_index = insert_index or M.get_insert_index_after_track(source_track)
+  name = name or (M.get_track_name(source_track) .. " ch " .. tostring(channel))
+  local track = M.insert_track_at(insert_index, name, 2)
+  local clone = M.duplicate_item_as_mono_channel(item, track, channel)
+  return track, clone
 end
 
 function M.insert_track_at(index, name, channel_count)
@@ -294,6 +384,70 @@ function M.parse_channel_map(text, channel_count, require_unique)
   return map
 end
 
+function M.validate_channel_count(channel_count, label, minimum, maximum)
+  label = label or "Channel count"
+  minimum = minimum or 1
+  maximum = maximum or M.MAX_REAPER_TRACK_CHANNELS
+  channel_count = tonumber(channel_count)
+  if not channel_count or channel_count ~= math.floor(channel_count) then
+    return nil, label .. " must be a whole number."
+  end
+  if channel_count < minimum or channel_count > maximum then
+    return nil, label .. " must be in the range " .. tostring(minimum) .. "-" .. tostring(maximum) .. "."
+  end
+  return channel_count
+end
+
+function M.validate_even_reaper_channel_count(channel_count, label)
+  local count, err = M.validate_channel_count(channel_count, label or "Track channel count", 2, M.MAX_REAPER_TRACK_CHANNELS)
+  if not count then return nil, err end
+  if count % 2 ~= 0 then
+    return nil, (label or "Track channel count") .. " must be even for REAPER multichannel tracks."
+  end
+  return count
+end
+
+function M.require_selected_audio_item(min_channels)
+  local item, take, channels = M.get_selected_audio_item()
+  if not item then return nil end
+  min_channels = min_channels or 1
+  if channels < min_channels then
+    M.show_error("The selected item needs at least " .. tostring(min_channels) .. " source channels.")
+    return nil
+  end
+  return item, take, channels
+end
+
+function M.require_selected_multichannel_item()
+  return M.require_selected_audio_item(2)
+end
+
+function M.require_selected_tracks()
+  local tracks = {}
+  for index = 0, reaper.CountSelectedTracks(M.PROJECT) - 1 do
+    tracks[#tracks + 1] = reaper.GetSelectedTrack(M.PROJECT, index)
+  end
+  if #tracks == 0 then
+    M.show_error("Select one or more tracks first.")
+    return nil
+  end
+  return tracks
+end
+
+function M.require_selected_mono_compatible_tracks()
+  local tracks = M.require_selected_tracks()
+  if not tracks then return nil end
+  for _, track in ipairs(tracks) do
+    local channels = M.get_track_media_channel_count(track)
+    if channels ~= 1 then
+      M.show_error("Selected track '" .. M.get_track_name(track) .. "' is " .. tostring(channels) ..
+        " channel; this operation expects mono-compatible tracks.")
+      return nil
+    end
+  end
+  return tracks
+end
+
 function M.identity_map(channel_count)
   local map = {}
   for channel = 1, channel_count do map[channel] = channel end
@@ -314,6 +468,141 @@ function M.mirror_map(channel_count)
     map[output_channel] = channel_count - output_channel + 1
   end
   return map
+end
+
+function M.odd_even_map(channel_count)
+  local map = {}
+  for channel = 1, channel_count, 2 do map[#map + 1] = channel end
+  for channel = 2, channel_count, 2 do map[#map + 1] = channel end
+  return map
+end
+
+function M.deinterleave_pairs_map(channel_count)
+  return M.odd_even_map(channel_count)
+end
+
+function M.interleave_pairs_map(channel_count)
+  local map = {}
+  local left_count = math.ceil(channel_count / 2)
+  for index = 1, left_count do
+    map[#map + 1] = index
+    local paired = index + left_count
+    if paired <= channel_count then map[#map + 1] = paired end
+  end
+  return map
+end
+
+function M.swap_halves_map(channel_count)
+  local map = {}
+  local split = math.floor(channel_count / 2)
+  for channel = split + 1, channel_count do map[#map + 1] = channel end
+  for channel = 1, split do map[#map + 1] = channel end
+  return map
+end
+
+function M.split_halves_map(channel_count)
+  return M.swap_halves_map(channel_count)
+end
+
+function M.repeat_sources_map(source_count, output_count)
+  local map = {}
+  if source_count < 1 then return map end
+  for output_channel = 1, output_count do
+    map[output_channel] = ((output_channel - 1) % source_count) + 1
+  end
+  return map
+end
+
+function M.grouped_downmix_plan(source_count, output_count)
+  local plan = {}
+  if source_count < 1 or output_count < 1 then return plan end
+  for output_channel = 1, output_count do
+    plan[output_channel] = { inputs = {}, gain = 1 }
+  end
+  for source_channel = 1, source_count do
+    local output_channel = math.floor((source_channel - 1) * output_count / source_count) + 1
+    plan[output_channel].inputs[#plan[output_channel].inputs + 1] = source_channel
+  end
+  for _, group in ipairs(plan) do
+    group.gain = #group.inputs > 0 and (1 / #group.inputs) or 1
+  end
+  return plan
+end
+
+function M.adjacent_pair_downmix_map(source_count, output_count)
+  return M.grouped_downmix_plan(source_count, output_count)
+end
+
+function M.adjacent_pair_downmix_plan(source_count, output_count)
+  return M.grouped_downmix_plan(source_count, output_count)
+end
+
+function M.format_channel_map(map)
+  local parts = {}
+  for output_channel, input_channel in ipairs(map or {}) do
+    parts[#parts + 1] = tostring(output_channel) .. "<-" .. tostring(input_channel)
+  end
+  return table.concat(parts, " ")
+end
+
+function M.channel_range_label(start_channel, channel_count)
+  if channel_count <= 1 then return tostring(start_channel) end
+  return tostring(start_channel) .. "-" .. tostring(start_channel + channel_count - 1)
+end
+
+function M.describe_map(map)
+  if not map or #map == 0 then return "empty map" end
+  local identity = true
+  local mirror = true
+  for index, value in ipairs(map) do
+    if value ~= index then identity = false end
+    if value ~= (#map - index + 1) then mirror = false end
+  end
+  if identity then return "identity " .. tostring(#map) .. "ch" end
+  if mirror then return "mirror " .. tostring(#map) .. "ch" end
+  return "custom " .. tostring(#map) .. "ch: " .. M.format_channel_map(map)
+end
+
+function M.describe_downmix_plan(plan)
+  local parts = {}
+  for output_channel, group in ipairs(plan or {}) do
+    parts[#parts + 1] = tostring(output_channel) .. "<-" .. table.concat(group.inputs or {}, "+") ..
+      " @ " .. string.format("%.3f", group.gain or 1)
+  end
+  return table.concat(parts, " ")
+end
+
+function M.console_header(title)
+  reaper.ShowConsoleMsg("\n[" .. tostring(title or "s3g-mc") .. "]\n")
+end
+
+function M.print_plan(title, lines)
+  M.console_header(title)
+  for _, line in ipairs(lines or {}) do
+    reaper.ShowConsoleMsg(tostring(line) .. "\n")
+  end
+end
+
+function M.item_label(item)
+  local take = item and reaper.GetActiveTake(item)
+  if take then
+    local name = reaper.GetTakeName(take)
+    if name and name ~= "" then return name end
+  end
+  return "(unnamed item)"
+end
+
+function M.render_plan_for_item(item, source_channel_count, channel_map, label)
+  local start_pos = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
+  local length = reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
+  return {
+    "Item: " .. M.item_label(item),
+    "Source channels: " .. tostring(source_channel_count),
+    "Output channels: " .. tostring(#channel_map),
+    "Map: " .. M.describe_map(channel_map),
+    "Render bounds: " .. string.format("%.3f to %.3f sec", start_pos, start_pos + length),
+    "Output label: " .. tostring(label or "multichannel render"),
+  }
 end
 
 function M.build_multichannel_render_from_item(item, source_channel_count, channel_map, label, options)
@@ -396,6 +685,100 @@ function M.build_multichannel_render_from_item(item, source_channel_count, chann
     end
     for index = #temp_tracks, 1, -1 do
       local track = temp_tracks[index]
+      if reaper.ValidatePtr2(M.PROJECT, track, "MediaTrack*") then
+        reaper.DeleteTrack(track)
+      end
+    end
+
+    if rendered_track and reaper.ValidatePtr2(M.PROJECT, rendered_track, "MediaTrack*") then
+      M.select_only_track(rendered_track)
+    end
+  end
+
+  return did_render, rendered_track
+end
+
+function M.build_multichannel_mix_render_from_item(item, source_channel_count, output_mixes, label, options)
+  options = options or {}
+
+  if source_channel_count > M.MAX_REAPER_TRACK_CHANNELS or #output_mixes > M.MAX_REAPER_TRACK_CHANNELS then
+    M.show_error("REAPER tracks support up to " .. tostring(M.MAX_REAPER_TRACK_CHANNELS) .. " channels.")
+    return false, nil
+  end
+
+  local source_track = reaper.GetMediaItemTrack(item)
+  local insert_index = M.get_insert_index_after_track(source_track)
+  local source_position = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
+  local source_length = reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
+  local temp_tracks = {}
+
+  for output_channel, mix in ipairs(output_mixes) do
+    for _, input_channel in ipairs(mix.inputs or {}) do
+      local temp_track = M.insert_track_at(insert_index + #temp_tracks,
+        "tmp " .. label .. " out " .. tostring(output_channel) ..
+        " <- " .. tostring(input_channel), 2)
+      reaper.SetMediaTrackInfo_Value(temp_track, "B_MAINSEND", 0)
+      local clone = M.clone_item_to_track(item, temp_track)
+      if not clone then return false, nil end
+      reaper.SetMediaItemInfo_Value(clone, "D_POSITION", 0)
+      local clone_take = reaper.GetActiveTake(clone)
+      M.set_take_to_mono_source_channel(clone_take, input_channel)
+      temp_tracks[#temp_tracks + 1] = {
+        track = temp_track,
+        output_channel = output_channel,
+        gain = mix.gain or 1,
+      }
+    end
+  end
+
+  local bus = M.insert_track_at(insert_index + #temp_tracks,
+    label .. " (" .. tostring(#output_mixes) .. "ch)",
+    M.reaper_track_channel_count(#output_mixes))
+
+  for _, entry in ipairs(temp_tracks) do
+    local send_index = M.create_postfx_send(entry.track, bus, 1, entry.output_channel - 1)
+    reaper.SetTrackSendInfo_Value(entry.track, 0, send_index, "D_VOL", entry.gain)
+  end
+
+  reaper.TrackList_AdjustWindows(false)
+  reaper.UpdateArrange()
+  M.select_only_track(bus)
+
+  local before_guids
+  local track_count_before_render
+  M.with_render_bounds_for_range(0, source_length, function()
+    before_guids = M.snapshot_track_guids()
+    track_count_before_render = reaper.CountTracks(M.PROJECT)
+    reaper.Main_OnCommand(M.render_multichannel_post_fader_stem_command(), 0)
+  end)
+
+  local did_render = reaper.CountTracks(M.PROJECT) > track_count_before_render
+  local rendered_track = nil
+
+  if did_render then
+    local excluded_tracks = { bus }
+    for _, entry in ipairs(temp_tracks) do excluded_tracks[#excluded_tracks + 1] = entry.track end
+    rendered_track = M.find_new_track(before_guids) or M.get_selected_track_excluding(excluded_tracks)
+
+    if rendered_track then
+      reaper.GetSetMediaTrackInfo_String(rendered_track, "P_NAME",
+        label .. " render (" .. tostring(#output_mixes) .. "ch)", true)
+      reaper.SetMediaTrackInfo_Value(rendered_track, "I_NCHAN",
+        M.reaper_track_channel_count(#output_mixes))
+      M.set_track_items_length(rendered_track, source_length)
+      local rendered_start = M.track_items_bounds({ rendered_track })
+      M.move_track_items_by(rendered_track, source_position - rendered_start)
+    end
+
+    if options.mute_source_item then
+      reaper.SetMediaItemInfo_Value(item, "B_MUTE", 1)
+    end
+
+    if reaper.ValidatePtr2(M.PROJECT, bus, "MediaTrack*") then
+      reaper.DeleteTrack(bus)
+    end
+    for index = #temp_tracks, 1, -1 do
+      local track = temp_tracks[index].track
       if reaper.ValidatePtr2(M.PROJECT, track, "MediaTrack*") then
         reaper.DeleteTrack(track)
       end

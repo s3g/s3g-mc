@@ -3,7 +3,7 @@
 -- @version 0.1
 -- @requires ReaImGui; JSFX: s3g 3OA Send, s3g 3OA Return Mask, s3g 3OA Mixer
 -- @category Spatial / HOA
--- @method Requires SPARTA AmbiDEC before Send and SPARTA AmbiENC after Mixer; both must load the included 24-point JSON layouts. Insert chain: Send -> 24-channel effect -> Return Mask -> Mixer.
+-- @method Requires SPARTA AmbiDEC before Send, set to MMD, and SPARTA AmbiENC after Mixer; both must load the included 24-point JSON layouts.
 -- @about
 --   ReaImGui companion controller for a 3OA 24-channel insert lane.
 --   Use on a 72-channel 3OA FX track with:
@@ -13,9 +13,10 @@
 --   4. JS: s3g 3OA Mixer
 --   Requires an ambisonic decoder and encoder around the 24-channel virtual
 --   speaker lane. Recommended: SPARTA AmbiDEC before JS: s3g 3OA Send, and
---   SPARTA AmbiENC after JS: s3g 3OA Mixer. Both plugins must load the
---   included 24-point coordinate JSON layouts from this script folder's
---   sparta_json directory.
+--   SPARTA AmbiENC after JS: s3g 3OA Mixer. Set AmbiDEC to MMD / multi-mode
+--   decoder for the custom irregular 24-point virtual speaker cloud. Both
+--   plugins must load the included 24-point coordinate JSON layouts from this
+--   script folder's sparta_json directory.
 --   The effect must be inserted between Send and Return Mask so it processes
 --   the masked 24-channel send before the return mask and mixer recombine it.
 

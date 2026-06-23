@@ -39,6 +39,7 @@ local CATEGORY_ORDER = {
   "All",
   "Channel Mixing / Automation",
   "Spatial / HOA",
+  "Multichannel Texture / Montage",
   "Item Channel Transforms",
   "Track Building / Routing",
   "Package / Utilities",
@@ -130,6 +131,7 @@ end
 local function classify(name, description)
   local hay = (name .. " " .. (description or "")):lower()
   if hay:find("cdp") or hay:find("reacoma") then return "CDP / ReaCoMa" end
+  if hay:find("shred") or hay:find("fracture") or hay:find("zigzag") or hay:find("cascade") or hay:find("crumble") or hay:find("spatial repeater") then return "Multichannel Texture / Montage" end
   if hay:find("lbap") or hay:find("hoa") or hay:find("3oa") or hay:find("dome") then return "Spatial / HOA" end
   if hay:find("automation") or hay:find("mixer") or hay:find("fader") then return "Channel Mixing / Automation" end
   if hay:find("selected item") or hay:find("multichannel item") or hay:find("item channel") or hay:find("shred") then return "Item Channel Transforms" end

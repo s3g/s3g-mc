@@ -25,12 +25,31 @@ Controller:
 
 On one REAPER track, use this order:
 
-1. `JS: s3g 3OA Send`
-2. One 24-channel effect insert
-3. `JS: s3g 3OA Return Mask`
-4. `JS: s3g 3OA Mixer`
+1. SPARTA AmbiDEC
+2. `JS: s3g 3OA Send`
+3. One 24-channel effect insert
+4. `JS: s3g 3OA Return Mask`
+5. `JS: s3g 3OA Mixer`
+6. SPARTA AmbiENC
 
 The track must be set to 72 channels.
+
+Recommended SPARTA settings:
+
+- Ambisonic order: `3rd order`
+- Channel ordering: `ACN`
+- Normalization: `SN3D`
+- AmbiDEC decoder mode: `MMD` / multi-mode decoder
+- Number of virtual speaker/source points: `24`
+
+Load the included JSON layouts from `sparta_json/`:
+
+- AmbiDEC: `s3g_3oa_24_virtual_speakers_ambidec_loudspeaker_layout.json`
+- AmbiENC: `s3g_3oa_24_virtual_speakers_ambienc_source_layout.json`
+
+`MMD` is recommended for AmbiDEC because this workflow decodes to a custom
+irregular 24-point virtual speaker cloud before re-encoding, rather than to a
+standard symmetric speaker preset.
 
 ## Channel Layout
 
@@ -121,29 +140,20 @@ mask lanes.
 
 ## Troubleshooting
 
-If new JSFX names do not appear, open the FX browser and run a rescan, or restart
-REAPER. JSFX pin-count and name changes can remain cached while an old instance
-is loaded.
+If the `s3g` JSFX do not appear, confirm that this package's `Effects/s3g`
+folder was copied or symlinked to `REAPER/Effects/s3g`, then rescan JSFX or
+restart REAPER.
 
-If `s3g 3OA Return Mask` does not show as 72 in / 72 out, remove any old return-mask
-instance and add `JS: s3g 3OA Return Mask` again after rescanning.
+If the 3OA chain does not pass audio, confirm that the track is set to 72
+channels and that the plugin order is AmbiDEC, Send, insert effect, Return Mask,
+Mixer, AmbiENC.
 
-If the map says `Predicted mask peak` instead of `Live mask peak`, remove and
-re-add `JS: s3g 3OA Return Mask` after rescanning. Existing loaded instances can
-cache older JSFX code before the live meter was added.
+If spatial positions seem wrong, confirm that AmbiDEC is set to MMD, that both
+SPARTA plugins use ACN/SN3D 3rd-order ambisonics, and that both included
+24-point JSON layouts are loaded.
 
-If old generated 3OA/HOA test effects appear in `REAPER/Effects/s3g`, they are
-stale local files and should not be treated as part of this public package.
+If the controller map says `Predicted mask peak` instead of `Live mask peak`,
+make sure `JS: s3g 3OA Return Mask` is present in the chain and enabled.
 
 If an insert effect processes the dry path, click `Pin inserts 1-24`. REAPER may
 auto-wire a newly inserted FX too broadly on a 72-channel track.
-
-## Development Notes
-
-Do not keep active JSFX copies in the Scripts folder. Edit and test JSFX from
-the package `Effects/s3g` folder or the installed `REAPER/Effects/s3g` folder,
-depending on whether you are working from a repo symlink or a copied install.
-
-For new 3OA inserts, prefer small, stable JSFX that use smoothing and avoid
-abrupt buffer-size or delay-tap changes. Delay/reverb/diffusion effects need
-careful design before they are safe for this workflow.

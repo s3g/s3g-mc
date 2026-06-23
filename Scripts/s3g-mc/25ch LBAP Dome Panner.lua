@@ -3,12 +3,13 @@
 -- @version 0.9
 -- @requires ReaImGui; JSFX: s3g 25ch LBAP Dome Panner
 -- @category Spatial / HOA
--- @method Auto-loads the JSFX on the selected track and pans up to 8 mono source channels across a fixed 25-channel dome using LBAP-style distance weighting.
+-- @method Auto-loads the JSFX on the selected track and pans up to 8 mono source channels across the 25-speaker dome layout of the RISD SRST Spatial Audio Studio using LBAP-style distance weighting.
 -- @about
 --   ReaImGui companion controller for JS: s3g 25ch LBAP Dome Panner.
 --   Automatically loads or repairs the JSFX on the selected track. The track
 --   carries 8 source channels into the panner and the JSFX distributes them
---   across the 25-channel dome output.
+--   across the 25-channel dome output. The speaker layout models the
+--   loudspeaker array of the RISD SRST Spatial Audio Studio.
 
 if not reaper.APIExists("ImGui_GetVersion") then
   reaper.MB("ReaImGui is not installed or not loaded.", "25ch LBAP Dome Panner", 0)

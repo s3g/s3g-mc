@@ -1,7 +1,7 @@
 -- @description Build multichannel stem from selected tracks
 -- @author s3g
 -- @version 0.2
--- @requires REAPER multichannel stem render action
+-- @requires Multichannel Library.lua; REAPER multichannel stem render action
 -- @category Track Building / Routing
 -- @render Prompts before rendering; bounds to selected-track media range.
 -- @method Creates routing from selected tracks into consecutive multichannel outputs.
@@ -13,26 +13,26 @@
 --   Example: 8 selected mono media tracks -> one 8-channel destination track,
 --   with source tracks routed to destination channels 1..8, then rendered.
 
-local PROJECT = 0
-local SEND_MODE_POST_FX = 3
-local MAX_REAPER_TRACK_CHANNELS = 128
+local script_path = ({reaper.get_action_context()})[2]
+local script_dir = script_path:match("^(.*[/\\])") or ""
+local mc = dofile(script_dir .. "Multichannel Library.lua")
+
+local PROJECT = mc.PROJECT
+local SEND_MODE_POST_FX = mc.SEND_MODE_POST_FX
+local MAX_REAPER_TRACK_CHANNELS = mc.MAX_REAPER_TRACK_CHANNELS
 local RENDER_AFTER_ROUTING = true
 local ASK_BEFORE_RENDER = true
 local DELETE_ROUTING_BUS_AFTER_RENDER = true
 
 local RENDER_SELECTED_AREA_MULTICHANNEL_POST_FADER_STEM_NAME =
-  "Track: Render selected area of tracks to multichannel post-fader stem tracks (and mute originals)"
-local RENDER_SELECTED_AREA_MULTICHANNEL_POST_FADER_STEM_FALLBACK_COMMAND = 40900
+  mc.RENDER_MULTICHANNEL_POST_FADER_STEM_NAME
 
 local function show_error(message)
   reaper.MB(message, "Create multichannel track", 0)
 end
 
 local function get_track_name(track)
-  local ok, name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
-  if ok and name ~= "" then return name end
-  local index = math.floor(reaper.GetMediaTrackInfo_Value(track, "IP_TRACKNUMBER"))
-  return "Track " .. tostring(index)
+  return mc.get_track_name(track)
 end
 
 local function get_track_media_channel_count(track)
@@ -91,140 +91,71 @@ local function get_insert_index_after_selection(tracks)
 end
 
 local function select_only_track(track)
-  reaper.Main_OnCommand(40297, 0) -- Track: Unselect all tracks
-  reaper.SetTrackSelected(track, true)
-end
-
-local function track_is_excluded(track, excluded_tracks)
-  for _, excluded in ipairs(excluded_tracks or {}) do
-    if track == excluded then return true end
-  end
-  return false
+  mc.select_only_track(track)
 end
 
 local function get_selected_track_excluding(excluded_tracks)
-  for index = 0, reaper.CountSelectedTracks(PROJECT) - 1 do
-    local track = reaper.GetSelectedTrack(PROJECT, index)
-    if not track_is_excluded(track, excluded_tracks) then return track end
-  end
-  return nil
+  return mc.get_selected_track_excluding(excluded_tracks)
 end
 
 local function snapshot_track_guids()
-  local guids = {}
-  for index = 0, reaper.CountTracks(PROJECT) - 1 do
-    local track = reaper.GetTrack(PROJECT, index)
-    guids[reaper.GetTrackGUID(track)] = true
-  end
-  return guids
+  return mc.snapshot_track_guids()
 end
 
 local function find_new_track(before_guids)
-  for index = 0, reaper.CountTracks(PROJECT) - 1 do
-    local track = reaper.GetTrack(PROJECT, index)
-    if not before_guids[reaper.GetTrackGUID(track)] then return track end
-  end
-  return nil
+  return mc.find_new_track(before_guids)
 end
 
 local function track_items_bounds(track_entries)
-  local start_position = nil
-  local end_position = nil
+  local tracks = {}
   for _, entry in ipairs(track_entries or {}) do
-    local track = entry.track
-    if track then
-      for item_index = 0, reaper.CountTrackMediaItems(track) - 1 do
-        local item = reaper.GetTrackMediaItem(track, item_index)
-        local item_start = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
-        local item_end = item_start + reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
-        start_position = start_position and math.min(start_position, item_start) or item_start
-        end_position = end_position and math.max(end_position, item_end) or item_end
-      end
-    end
+    tracks[#tracks + 1] = entry.track or entry
   end
-  return start_position or 0, end_position or 0
+  return mc.track_items_bounds(tracks)
 end
 
 local function move_track_items_by(track, offset)
-  if not track or offset == 0 then return end
-  for item_index = 0, reaper.CountTrackMediaItems(track) - 1 do
-    local item = reaper.GetTrackMediaItem(track, item_index)
-    local position = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
-    reaper.SetMediaItemInfo_Value(item, "D_POSITION", position + offset)
-  end
+  return mc.move_track_items_by(track, offset)
 end
 
 local function set_track_items_length(track, length)
-  if not track or not length or length <= 0 then return end
-  for item_index = 0, reaper.CountTrackMediaItems(track) - 1 do
-    local item = reaper.GetTrackMediaItem(track, item_index)
-    reaper.SetMediaItemInfo_Value(item, "D_LENGTH", length)
-  end
+  return mc.set_track_items_length(track, length)
 end
 
 local function save_time_selection()
-  local start_pos, end_pos = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
-  return { start_pos = start_pos, end_pos = end_pos }
+  return mc.save_time_selection()
 end
 
 local function set_time_selection(start_pos, end_pos)
-  reaper.GetSet_LoopTimeRange(true, false, start_pos, math.max(start_pos, end_pos), false)
+  return mc.set_time_selection(start_pos, end_pos)
 end
 
 local function restore_time_selection(saved)
-  if not saved then return end
-  reaper.GetSet_LoopTimeRange(true, false, saved.start_pos or 0, saved.end_pos or 0, false)
+  return mc.restore_time_selection(saved)
 end
 
 local function save_render_bounds()
-  return {
-    flag = reaper.GetSetProjectInfo(PROJECT, "RENDER_BOUNDSFLAG", 0, false),
-    start_pos = reaper.GetSetProjectInfo(PROJECT, "RENDER_STARTPOS", 0, false),
-    end_pos = reaper.GetSetProjectInfo(PROJECT, "RENDER_ENDPOS", 0, false),
-  }
+  return mc.save_render_bounds()
 end
 
 local function set_render_bounds_to_time_selection(start_pos, end_pos)
-  reaper.GetSetProjectInfo(PROJECT, "RENDER_BOUNDSFLAG", 2, true)
-  reaper.GetSetProjectInfo(PROJECT, "RENDER_STARTPOS", start_pos, true)
-  reaper.GetSetProjectInfo(PROJECT, "RENDER_ENDPOS", math.max(start_pos, end_pos), true)
+  return mc.set_render_bounds_to_time_selection(start_pos, end_pos)
 end
 
 local function restore_render_bounds(saved)
-  if not saved then return end
-  reaper.GetSetProjectInfo(PROJECT, "RENDER_BOUNDSFLAG", saved.flag or 0, true)
-  reaper.GetSetProjectInfo(PROJECT, "RENDER_STARTPOS", saved.start_pos or 0, true)
-  reaper.GetSetProjectInfo(PROJECT, "RENDER_ENDPOS", saved.end_pos or 0, true)
+  return mc.restore_render_bounds(saved)
 end
 
 local function source_channel_flag(channel_count)
-  if channel_count == 1 then
-    return 1024
-  end
-
-  return math.floor((channel_count + 1) / 2) * 1024
+  return mc.source_channel_flag(channel_count)
 end
 
 local function destination_channel_flag(channel_offset, channel_count)
-  if channel_count == 1 then
-    return channel_offset + 1024
-  end
-
-  return channel_offset
-end
-
-local function find_main_action_by_exact_name(name)
-  if not reaper.kbd_getTextFromCmd then return nil end
-  for command_id = 40000, 50000 do
-    local text = reaper.kbd_getTextFromCmd(command_id, 0)
-    if text == name then return command_id end
-  end
-  return nil
+  return mc.destination_channel_flag(channel_offset, channel_count)
 end
 
 local function render_selected_area_multichannel_command()
-  return find_main_action_by_exact_name(RENDER_SELECTED_AREA_MULTICHANNEL_POST_FADER_STEM_NAME) or
-    RENDER_SELECTED_AREA_MULTICHANNEL_POST_FADER_STEM_FALLBACK_COMMAND
+  return mc.render_multichannel_post_fader_stem_command()
 end
 
 local function render_destination_track(destination, source_entries, destination_track_channels)
