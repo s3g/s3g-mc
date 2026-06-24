@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category Spectral / Convolution
 -- @render Yes; writes a new convolved media item with optional full tail or source-length trim.
--- @method Offline SoundHack-inspired file convolution. Select two audio items: source and impulse response. Supports mono, stereo, and multichannel channel-pairing modes.
+-- @method Offline SoundHack-inspired file convolution. Select two audio items: source and impulse response. Supports mono, stereo, multichannel pairing, and summed matrix modes.
 -- @about
 --   Uses Python/NumPy to read selected WAV media, convolve channel pairs, and
 --   write a 24-bit PCM WAV inserted on a new track at the source item position.
@@ -30,7 +30,7 @@ local MODE_NAMES = {
   [MODE_MATCHED_WRAP] = "Matched / wrap impulse",
   [MODE_IMPULSE_MONO] = "Each source ch x impulse mix",
   [MODE_SOURCE_MONO] = "Source mix x each impulse ch",
-  [MODE_MATRIX] = "Full source x impulse matrix",
+  [MODE_MATRIX] = "Matrix sum",
 }
 
 local TAIL_FULL = 1
@@ -171,35 +171,52 @@ end
 
 local function channel_plan(source_channels, impulse_channels, mode)
   local plan = {}
+  local output_channels = source_channels
   if mode == MODE_IMPULSE_MONO then
+    output_channels = source_channels
     for source_channel = 1, source_channels do
-      plan[#plan + 1] = { source = source_channel, impulse = "mix", label = "src" .. source_channel .. "_irmix" }
+      plan[#plan + 1] = {
+        source = source_channel,
+        impulse = "mix",
+        output = source_channel,
+        label = "src" .. source_channel .. "_irmix",
+      }
     end
   elseif mode == MODE_SOURCE_MONO then
+    output_channels = impulse_channels
     for impulse_channel = 1, impulse_channels do
-      plan[#plan + 1] = { source = "mix", impulse = impulse_channel, label = "srcmix_ir" .. impulse_channel }
+      plan[#plan + 1] = {
+        source = "mix",
+        impulse = impulse_channel,
+        output = impulse_channel,
+        label = "srcmix_ir" .. impulse_channel,
+      }
     end
   elseif mode == MODE_MATRIX then
+    output_channels = impulse_channels
     for source_channel = 1, source_channels do
       for impulse_channel = 1, impulse_channels do
         plan[#plan + 1] = {
           source = source_channel,
           impulse = impulse_channel,
-          label = "src" .. source_channel .. "_ir" .. impulse_channel,
+          output = impulse_channel,
+          label = "src" .. source_channel .. "_ir" .. impulse_channel .. "_to_out" .. impulse_channel,
         }
       end
     end
   else
+    output_channels = source_channels
     for source_channel = 1, source_channels do
       local impulse_channel = ((source_channel - 1) % impulse_channels) + 1
       plan[#plan + 1] = {
         source = source_channel,
         impulse = impulse_channel,
+        output = source_channel,
         label = "src" .. source_channel .. "_ir" .. impulse_channel,
       }
     end
   end
-  return plan
+  return plan, output_channels
 end
 
 local function json_string(value)
@@ -374,7 +391,7 @@ with open(sys.argv[1], "r", encoding="utf-8") as handle:
 
 gain = 10 ** (float(manifest.get("wet_gain_db", 0.0)) / 20.0)
 wav_cache = {}
-channels = []
+rendered = []
 for pair in manifest["pairs"]:
     src = channel_segment(wav_cache, pair["source_path"], pair["source_channel"],
                           pair.get("source_start", 0.0), pair["source_duration"], int(manifest["sample_rate"]))
@@ -382,16 +399,22 @@ for pair in manifest["pairs"]:
                          pair.get("impulse_start", 0.0), pair["impulse_duration"], int(manifest["sample_rate"]))
     print(f"{pair['label']} source peak:", float(np.max(np.abs(src))) if src.size else 0.0)
     print(f"{pair['label']} impulse peak:", float(np.max(np.abs(ir))) if ir.size else 0.0)
-    channels.append(convolve(src, ir, int(pair.get("trim_samples", 0)), gain, pair["label"]))
-if not channels:
+    rendered.append((int(pair.get("output_channel", len(rendered) + 1)), convolve(src, ir, int(pair.get("trim_samples", 0)), gain, pair["label"])))
+if not rendered:
     raise RuntimeError("No channel pairs were provided.")
-max_len = max((channel.size for channel in channels), default=0)
+output_channel_count = int(manifest.get("output_channel_count", len(rendered)))
+if output_channel_count <= 0:
+    raise RuntimeError("Output channel count must be positive.")
+max_len = max((channel.size for _output_channel, channel in rendered), default=0)
 if max_len <= 0:
     max_len = 1
-stacked = np.zeros((max_len, len(channels)), dtype=np.float32)
-for index, channel in enumerate(channels):
+stacked = np.zeros((max_len, output_channel_count), dtype=np.float32)
+for output_channel, channel in rendered:
+    output_index = output_channel - 1
+    if output_index < 0 or output_index >= output_channel_count:
+        raise RuntimeError(f"Output channel {output_channel} is outside the rendered output.")
     if channel.size > 0:
-        stacked[:channel.size, index] = channel
+        stacked[:channel.size, output_index] += channel
 
 if manifest.get("normalize", False):
     peak = float(np.max(np.abs(stacked))) if stacked.size else 0.0
@@ -430,6 +453,7 @@ local function write_manifest(path, data)
   file:write("  \"normalize\": " .. (data.normalize and "true" or "false") .. ",\n")
   file:write("  \"normalize_db\": " .. tostring(data.normalize_db or -6.0) .. ",\n")
   file:write("  \"wet_gain_db\": " .. tostring(data.wet_gain_db or 0.0) .. ",\n")
+  file:write("  \"output_channel_count\": " .. tostring(data.output_channel_count or #data.pairs) .. ",\n")
   file:write("  \"pairs\": [\n")
   for index, pair in ipairs(data.pairs) do
     file:write("    {\"label\": " .. json_string(pair.label) ..
@@ -441,6 +465,7 @@ local function write_manifest(path, data)
       ", \"impulse_channel\": " .. json_string(pair.impulse_channel) ..
       ", \"impulse_start\": " .. tostring(pair.impulse_start or 0) ..
       ", \"impulse_duration\": " .. tostring(pair.impulse_duration or 0) ..
+      ", \"output_channel\": " .. tostring(pair.output_channel or index) ..
       ", \"trim_samples\": " .. tostring(pair.trim_samples or 0) .. "}")
     if index < #data.pairs then file:write(",") end
     file:write("\n")
@@ -483,9 +508,9 @@ local function run_convolution(source, impulse, mode, tail_mode, normalize, norm
     return
   end
 
-  local plan = channel_plan(source.channels, impulse.channels, mode)
-  if #plan > mc.MAX_REAPER_TRACK_CHANNELS then
-    mc.show_error("This channel mode would create " .. tostring(#plan) .. " output channels. REAPER maximum is 128.")
+  local plan, output_channels = channel_plan(source.channels, impulse.channels, mode)
+  if output_channels > mc.MAX_REAPER_TRACK_CHANNELS then
+    mc.show_error("This channel mode would create " .. tostring(output_channels) .. " output channels. REAPER maximum is 128.")
     return
   end
   if source.filename == "" or not file_exists(source.filename) then
@@ -515,7 +540,7 @@ local function run_convolution(source, impulse, mode, tail_mode, normalize, norm
   reaper.RecursiveCreateDirectory(output_dir, 0)
   local sample_rate = source_sample_rate(source)
   local source_samples = frame_count(source, sample_rate)
-  local output_path = output_dir .. "/s3g_convolved_" .. stamp .. "_" .. tostring(#plan) .. "ch.wav"
+  local output_path = output_dir .. "/s3g_convolved_" .. stamp .. "_" .. tostring(output_channels) .. "ch.wav"
   local manifest_path = temp_dir .. "/manifest.json"
   local render_log_path = temp_dir .. "/render.log"
   local cleanup_paths = { helper_path, manifest_path, render_log_path }
@@ -545,14 +570,20 @@ local function run_convolution(source, impulse, mode, tail_mode, normalize, norm
       impulse_channel = pair.impulse,
       impulse_start = impulse.start_offset,
       impulse_duration = impulse.length * math.max(0.000001, impulse.playrate),
+      output_channel = pair.output,
       trim_samples = tail_mode == TAIL_TRIM and source_samples or 0,
     }
-    log_lines[#log_lines + 1] = "Channel " .. tostring(index) .. ": " .. pair.label
+    if mode == MODE_MATRIX then
+      log_lines[#log_lines + 1] = "Path " .. tostring(index) .. " -> out" .. tostring(pair.output) .. ": " .. pair.label
+    else
+      log_lines[#log_lines + 1] = "Channel " .. tostring(pair.output or index) .. ": " .. pair.label
+    end
   end
 
   if not write_manifest(manifest_path, {
     output_path = output_path,
     sample_rate = sample_rate,
+    output_channel_count = output_channels,
     normalize = normalize,
     normalize_db = normalize_db,
     wet_gain_db = wet_gain_db,
@@ -578,12 +609,13 @@ local function run_convolution(source, impulse, mode, tail_mode, normalize, norm
   end
 
   reaper.Undo_BeginBlock()
-  local item, err = insert_output_item(output_path, "Convolved items (" .. tostring(#plan) .. "ch)", source.position, #plan)
+  local item, err = insert_output_item(output_path, "Convolved items (" .. tostring(output_channels) .. "ch)", source.position, output_channels)
   reaper.Undo_EndBlock("Convolve selected items", -1)
   cleanup_temp()
   if not item then mc.show_error(err or "Could not insert output item.") return end
 
-  log_lines[#log_lines + 1] = "Output channels: " .. tostring(#plan)
+  log_lines[#log_lines + 1] = "Convolution paths: " .. tostring(#plan)
+  log_lines[#log_lines + 1] = "Output channels: " .. tostring(output_channels)
   log_lines[#log_lines + 1] = "Sample rate: " .. tostring(sample_rate) .. " Hz"
   log_lines[#log_lines + 1] = string.format("NumPy time: %.2f sec", python_elapsed)
   log_lines[#log_lines + 1] = string.format("Total time: %.2f sec", reaper.time_precise() - total_start)
@@ -617,7 +649,7 @@ local function main()
     if visible then
       local source = swap and entries[2] or entries[1]
       local impulse = swap and entries[1] or entries[2]
-      local plan = channel_plan(source.channels, impulse.channels, mode)
+      local plan, output_channels = channel_plan(source.channels, impulse.channels, mode)
       ImGui.Text(ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
       ImGui.Text(ctx, "Impulse: " .. impulse.name .. "  (" .. tostring(impulse.channels) .. " ch)")
       if ImGui.Button(ctx, "Swap source / impulse") then swap = not swap end
@@ -633,13 +665,14 @@ local function main()
       ImGui.Spacing(ctx)
       ImGui.Separator(ctx)
       ImGui.Spacing(ctx)
-      ImGui.Text(ctx, "Output channels: " .. tostring(#plan))
-      if #plan > mc.MAX_REAPER_TRACK_CHANNELS then
+      ImGui.Text(ctx, "Convolution paths: " .. tostring(#plan))
+      ImGui.Text(ctx, "Output channels: " .. tostring(output_channels))
+      if output_channels > mc.MAX_REAPER_TRACK_CHANNELS then
         ImGui.Text(ctx, "Too many output channels for REAPER.")
       else
         ImGui.Text(ctx, "Renders offline from WAV media with NumPy.")
       end
-      if ImGui.Button(ctx, "Render", 92, 26) and #plan <= mc.MAX_REAPER_TRACK_CHANNELS then
+      if ImGui.Button(ctx, "Render", 92, 26) and output_channels <= mc.MAX_REAPER_TRACK_CHANNELS then
         should_render = true
       end
       ImGui.SameLine(ctx)

@@ -1,10 +1,10 @@
--- @description Shapee Spectral Shaper
+-- @description Spectral Shaper
 -- @author s3g
 -- @version 0.1
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category Spectral / Convolution
 -- @render Yes; writes a new spectrally-shaped media item.
--- @method FFTease shapee-inspired offline spectral envelope transfer with an alternate CDP/SoundThread-inspired formant-vocode algorithm. Select two WAV-backed media items: carrier first, shaper second. The carrier keeps timing and phase while the shaper supplies either the spectral envelope or broad formant contour.
+-- @method Offline spectral envelope transfer with an alternate formant-vocode algorithm. Select two WAV-backed media items: carrier first, shaper second. The carrier keeps timing and phase while the shaper supplies either the spectral envelope or broad formant contour.
 -- @about
 --   Uses NumPy STFT/ISTFT to apply the shaper item's spectral envelope to the
 --   carrier item. The result is inserted on a new track and REAPER is asked to
@@ -15,7 +15,7 @@ local script_dir = script_path:match("^(.*[/\\])") or ""
 local mc = dofile(script_dir .. "Multichannel Library.lua")
 
 if not reaper.APIExists("ImGui_GetVersion") then
-  reaper.MB("ReaImGui is not installed or not loaded.", "Shapee Spectral Shaper", 0)
+  reaper.MB("ReaImGui is not installed or not loaded.", "Spectral Shaper", 0)
   return
 end
 
@@ -37,7 +37,7 @@ local FFT_VALUES = {
 }
 
 local ALGORITHM_NAMES = {
-  [1] = "Shapee envelope transfer",
+  [1] = "Envelope transfer",
   [2] = "Formant vocode",
 }
 
@@ -573,13 +573,13 @@ local function run_shapee(carrier, shaper, algorithm_index, fft_index, amount, m
   if not run_command(command, log_path) or not file_exists(output_path) then
     local details = read_file(log_path)
     cleanup()
-    reaper.MB("Spectral shaper failed.\n\n" .. details .. "\n\nCommand:\n" .. command, "Shapee Spectral Shaper", 0)
+    reaper.MB("Spectral shaper failed.\n\n" .. details .. "\n\nCommand:\n" .. command, "Spectral Shaper", 0)
     return
   end
 
   reaper.Undo_BeginBlock()
-  local item, err = insert_output_item(output_path, "Shapee spectral transfer (" .. tostring(carrier.channels) .. "ch)", carrier.position, carrier.channels)
-  reaper.Undo_EndBlock("Shapee Spectral Shaper", -1)
+  local item, err = insert_output_item(output_path, "Spectral shaper transfer (" .. tostring(carrier.channels) .. "ch)", carrier.position, carrier.channels)
+  reaper.Undo_EndBlock("Spectral Shaper", -1)
   local details = trim(read_file(log_path))
   cleanup()
   if not item then mc.show_error(err or "Could not insert output item.") return end
@@ -588,7 +588,7 @@ local function run_shapee(carrier, shaper, algorithm_index, fft_index, amount, m
     "Carrier: " .. carrier.name .. " (" .. tostring(carrier.channels) .. "ch)",
     "Shaper: " .. shaper.name .. " (" .. tostring(shaper.channels) .. "ch)",
     "Backend: Python WAV reader + NumPy STFT",
-    "Algorithm: " .. (ALGORITHM_NAMES[algorithm_index] or "Shapee envelope transfer"),
+    "Algorithm: " .. (ALGORITHM_NAMES[algorithm_index] or "Spectral envelope transfer"),
     "FFT: " .. tostring(FFT_VALUES[fft_index] or 2048),
     (algorithm_index == 2 and "Formant amount: " or "Envelope amount: ") .. string.format("%.3f", amount),
     "Mix: " .. string.format("%.3f", mix),
@@ -602,7 +602,7 @@ local function run_shapee(carrier, shaper, algorithm_index, fft_index, amount, m
   lines[#lines + 1] = "Peak build: requested for selected output item"
   lines[#lines + 1] = "Output: " .. output_path
   if normalize then lines[#lines + 1] = "Peak normalize: " .. tostring(normalize_db) .. " dB" end
-  mc.print_plan("Shapee Spectral Shaper", lines)
+  mc.print_plan("Spectral Shaper", lines)
 end
 
 local function main()
@@ -612,7 +612,7 @@ local function main()
     return
   end
 
-  local ctx = ImGui.CreateContext("Shapee Spectral Shaper")
+  local ctx = ImGui.CreateContext("Spectral Shaper")
   local open = true
   local algorithm_index = 1
   local fft_index = 2
@@ -629,7 +629,7 @@ local function main()
   local function loop()
     ImGui.SetNextWindowSize(ctx, 560, 430, ImGui.Cond_FirstUseEver)
     local visible
-    visible, open = ImGui.Begin(ctx, "Shapee Spectral Shaper", open)
+    visible, open = ImGui.Begin(ctx, "Spectral Shaper", open)
     if visible then
       local carrier = swap and entries[2] or entries[1]
       local shaper = swap and entries[1] or entries[2]

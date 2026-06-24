@@ -1,0 +1,351 @@
+desc:s3g MC Spectra Synth Engine
+tags: multichannel spectra synth generator engine
+options:gmem=s3g_spectra_synth
+
+slider1:8<1,128,1>Output channels
+slider2:0<0,4,1{Partial cloud,Comb strata,Formant bands,Impulse resonator,Noise spectra}>Algorithm
+slider3:0.42<0,1,0.001>Rate
+slider4:110<20,4000,0.1>Base frequency (Hz)
+slider5:0.48<0,1,0.001>Density / chaos
+slider6:0.58<0,1,0.001>Brightness
+slider7:0.62<0,1,0.001>Decay / sustain
+slider8:0.70<0,1,0.001>Field spread
+slider9:0.55<0,1,0.001>Channel correlation
+slider10:0.24<0,1,0.001>Drift
+slider11:0<0,1,0.001>Crush / decimate
+slider12:-18<-60,0,0.1>Output gain (dB)
+slider13:1<1,9999,1>Seed
+slider14:1<0,1,1{Keep extra channels,Clear extra channels}>Extra channel output
+
+@init
+MAX_CH = 128;
+TWO_PI = 2 * $pi;
+
+phase1 = 0;
+phase2 = 256;
+phase3 = 512;
+env = 768;
+state = 1024;
+hold = 1280;
+lp = 1536;
+bp = 1792;
+counter = 2048;
+decim = 2304;
+decim_hold = 2560;
+spatial = 2816;
+strike_gate = 3072;
+
+last_seed = -1;
+amp_curve_generation = -1;
+amp_curve_active = 0;
+amp_curve_points = 0;
+amp_curve_duration_samples = 1;
+render_sample = 0;
+
+function clamp01(x)
+(
+  x < 0 ? 0 : x > 1 ? 1 : x;
+);
+
+function db_to_amp(db)
+(
+  10 ^ (db / 20);
+);
+
+function hash01(x) local(v)
+(
+  v = sin((x + 1.2345) * 12.9898) * 43758.5453;
+  v - floor(v);
+);
+
+function noise_next(idx) local(x)
+(
+  x = state[idx];
+  x = (x * 1664525 + 1013904223) % 4294967296;
+  state[idx] = x;
+  (x / 2147483648) - 1;
+);
+
+function softclip(x)
+(
+  x / (1 + abs(x));
+);
+
+function tri_wave(p) local(v)
+(
+  p -= floor(p);
+  v = p < 0.5 ? p * 4 - 1 : 3 - p * 4;
+  v;
+);
+
+function wrap_dist(a, b) local(d)
+(
+  d = abs(a - b);
+  min(d, 1 - d);
+);
+
+function init_channel(idx) local(h)
+(
+  h = hash01(seed * 97 + idx * 23.17);
+  state[idx] = floor(1 + h * 4294967294);
+  phase1[idx] = h;
+  phase2[idx] = hash01(seed * 131 + idx * 7.9);
+  phase3[idx] = hash01(seed * 171 + idx * 11.3);
+  env[idx] = 0;
+  hold[idx] = 0;
+  lp[idx] = 0;
+  bp[idx] = 0;
+  counter[idx] = 0;
+  decim[idx] = 0;
+  decim_hold[idx] = 0;
+  spatial[idx] = 1;
+  strike_gate[idx] = 1;
+);
+
+function reseed_all() local(i)
+(
+  i = 0;
+  loop(MAX_CH,
+    init_channel(i);
+    i += 1;
+  );
+);
+
+function update_slider_state()
+(
+  chan_count = max(1, min(MAX_CH, floor(slider1 + 0.5)));
+  algorithm = floor(slider2 + 0.5);
+  rate = clamp01(slider3);
+  base_freq = max(1, slider4);
+  density = clamp01(slider5);
+  brightness = clamp01(slider6);
+  decay = clamp01(slider7);
+  field_spread = clamp01(slider8);
+  correlation = clamp01(slider9);
+  drift = clamp01(slider10);
+  crush = clamp01(slider11);
+  out_gain = db_to_amp(slider12) / sqrt(max(1, chan_count));
+  seed = floor(slider13 + 0.5);
+  clear_extra = floor(slider14 + 0.5);
+  crush_steps = max(1, floor(1 + crush * 48));
+);
+
+function update_amp_curve_state()
+(
+  amp_curve_active = gmem[0] == 1 ? 1 : 0;
+  gmem[1] != amp_curve_generation ? (
+    amp_curve_generation = gmem[1];
+    render_sample = 0;
+  );
+  amp_curve_duration_samples = max(1, gmem[2] * srate);
+  amp_curve_points = max(0, min(32, floor(gmem[3] + 0.5)));
+);
+
+function amp_curve_at(pos) local(i, ax, ay, bx, by, span, t, found, value)
+(
+  amp_curve_active == 0 || amp_curve_points < 1 ? (
+    db_to_amp(slider12);
+  ) : (
+    pos <= gmem[4] ? (
+      gmem[5];
+    ) : (
+      i = 0;
+      found = 0;
+      value = gmem[5 + (amp_curve_points - 1) * 2];
+      loop(amp_curve_points - 1,
+        found == 0 ? (
+          ax = gmem[4 + i * 2];
+          ay = gmem[5 + i * 2];
+          bx = gmem[6 + i * 2];
+          by = gmem[7 + i * 2];
+          pos >= ax && pos <= bx ? (
+            span = max(0.000001, bx - ax);
+            t = (pos - ax) / span;
+            value = ay + (by - ay) * t;
+            found = 1;
+          );
+        );
+        i += 1;
+      );
+      value;
+    );
+  );
+);
+
+function channel_field(idx, salt) local(shared, localv, pos)
+(
+  pos = chan_count <= 1 ? 0 : idx / (chan_count - 1);
+  shared = hash01(seed * 43 + salt * 31);
+  localv = hash01(seed * 101 + idx * 13.7 + salt * 29);
+  ((shared * correlation) + (localv * (1 - correlation)) - 0.5) * 2 * field_spread + (pos - 0.5) * field_spread;
+);
+
+@slider
+update_slider_state();
+last_seed != seed ? (
+  last_seed = seed;
+  reseed_all();
+);
+
+@block
+update_slider_state();
+update_amp_curve_state();
+
+@sample
+sample_gain = amp_curve_active ? amp_curve_at(render_sample / amp_curve_duration_samples) / sqrt(max(1, chan_count)) : out_gain;
+i = 0;
+loop(chan_count,
+  field = channel_field(i, 1);
+  field2 = channel_field(i, 2);
+  field3 = channel_field(i, 3);
+  chaos = clamp01(density + field3 * 0.22);
+  ch_freq = max(0.1, base_freq * (2 ^ (field2 * 1.35)));
+  ch_rate = max(0.0001, rate * (0.3 + abs(field) * 0.7 + chaos));
+  pos = chan_count <= 1 ? 0.5 : i / (chan_count - 1);
+  motion_time = render_sample / srate;
+  y = 0;
+
+  algorithm == 0 ? (
+    // Partial cloud: drifting additive partials with channel-specific spectra.
+    p1 = 1 + floor(hash01(seed + i * 19 + 1) * (2 + brightness * 5));
+    p2 = 2 + floor(hash01(seed + i * 23 + 2) * (3 + brightness * 8));
+    p3 = 3 + floor(hash01(seed + i * 29 + 3) * (4 + brightness * 11));
+    phase1[i] += ch_freq * p1 * (0.16 + rate * 0.62 + drift * field * 0.012) / srate;
+    phase2[i] += ch_freq * p2 * (0.10 + rate * 0.44 + drift * field2 * 0.015) / srate;
+    phase3[i] += ch_freq * p3 * (0.06 + rate * 0.32 + drift * field3 * 0.018) / srate;
+    env[i] = env[i] * 0.9992 + (0.35 + chaos * 0.45) * 0.0008;
+    y = sin(TWO_PI * phase1[i]) * 0.46 +
+      sin(TWO_PI * phase2[i]) * (0.20 + brightness * 0.08) +
+      sin(TWO_PI * phase3[i]) * chaos * 0.12;
+    lp[i] = lp[i] * (0.982 - brightness * 0.035) + y * (0.018 + brightness * 0.035);
+    y = softclip(lp[i] * (0.86 + env[i] * 0.18));
+  ) : algorithm == 1 ? (
+    // Comb strata: resonant layered delays implied by close oscillator spacings.
+    phase1[i] += ch_freq * (0.25 + rate * 0.95) / srate;
+    phase2[i] += ch_freq * (0.25 + rate * 0.72 + 0.0012 + field * 0.006 + drift * 0.010) / srate;
+    phase3[i] += ch_freq * (0.42 + brightness * 1.05 + field2 * 0.045) / srate;
+    comb = sin(TWO_PI * phase1[i]) - sin(TWO_PI * phase2[i]);
+    shimmer = sin(TWO_PI * phase3[i] + comb * (0.45 + chaos * 0.90)) * (0.14 + brightness * 0.12);
+    y = comb * (0.40 + chaos * 0.16) + shimmer;
+    lp[i] = lp[i] * (0.975 - brightness * 0.045) + y * (0.025 + brightness * 0.045);
+    y = softclip(lp[i] * (0.98 + decay * 0.26));
+  ) : algorithm == 2 ? (
+    // Formant bands: clean harmonic exciters pass through moving vowel-like band centers.
+    n = noise_next(i) * 0.06;
+    center1 = ch_freq * (0.8 + brightness * 3.2 + abs(field) * 1.4);
+    center2 = ch_freq * (2.2 + brightness * 7.5 + abs(field2) * 2.2);
+    phase1[i] += center1 / srate;
+    phase2[i] += center2 / srate;
+    phase3[i] += ch_freq * (0.5 + rate * 0.55 + field3 * 0.04) / srate;
+    exciter = sin(TWO_PI * phase3[i]) * 0.58 + sin(TWO_PI * phase3[i] * 2.01) * 0.22 + n;
+    band = exciter * (sin(TWO_PI * phase1[i]) * 0.55 + sin(TWO_PI * phase2[i]) * 0.25);
+    bp[i] = bp[i] * (0.955 - brightness * 0.060) + band * (0.045 + brightness * 0.060);
+    lp[i] = lp[i] * (0.992 - decay * 0.035) + bp[i] * (0.008 + decay * 0.035);
+    y = softclip((bp[i] * (0.62 + chaos * 0.20) + lp[i] * decay * 0.38) * (1.02 + brightness * 0.28));
+  ) : algorithm == 3 ? (
+    // Impulse resonator: sparse strikes into channel-specific ringing partials.
+    trig = (0.0000015 + ch_rate * ch_rate * 0.0024) * (0.1 + chaos * 3.2);
+    noise_next(i) > 1 - min(0.38, trig) ? (
+      strike_gate[i] = 0;
+      env[i] = max(env[i], 0.0001);
+      hold[i] = noise_next(i) * 0.08;
+      counter[i] += 1;
+    );
+    decay_env = env[i] * exp(-1 / max(24, (0.055 + decay * 1.20 + chaos * 0.06) * srate));
+    strike_gate[i] < 1 ? (
+      attack_step = 1 / max(32, (0.010 + (1 - brightness) * 0.012) * srate);
+      strike_gate[i] = min(1, strike_gate[i] + attack_step);
+      attack_shape = strike_gate[i] * strike_gate[i] * (3 - 2 * strike_gate[i]);
+      env[i] = max(decay_env, attack_shape * 0.86);
+    ) : (
+      env[i] = decay_env;
+    );
+    res1 = 1 + floor(hash01(seed + i * 7) * (3 + brightness * 3));
+    res2 = 2 + floor(hash01(seed + i * 11) * (5 + brightness * 4));
+    phase1[i] += ch_freq * res1 / srate;
+    phase2[i] += ch_freq * res2 / srate;
+    strike = (sin(TWO_PI * phase1[i]) * 0.46 + sin(TWO_PI * phase2[i]) * 0.20 + hold[i] * 0.02) * env[i];
+    lp[i] = lp[i] * (0.982 - brightness * 0.030) + strike * (0.018 + brightness * 0.030);
+    y = softclip((strike * 0.26 + lp[i] * 0.78) * (0.92 + brightness * 0.24));
+  ) : (
+    // Noise spectra: polished filtered spectral sheets with slow moving peaks.
+    n = noise_next(i) * 0.38 + sin(TWO_PI * phase2[i]) * 0.24;
+    phase1[i] += (0.02 + rate * 0.55 + drift * abs(field)) / srate;
+    phase2[i] += ch_freq * (0.09 + brightness * 0.24 + rate * 0.16) / srate;
+    sweep = 0.5 + 0.5 * sin(TWO_PI * phase1[i] + field * 2.0);
+    coef = 0.992 - brightness * 0.18 - sweep * chaos * 0.055;
+    coef = max(0.72, min(0.998, coef));
+    lp[i] = lp[i] * coef + n * (1 - coef);
+    bp[i] = bp[i] * (0.92 - brightness * 0.075) + (n - lp[i]) * (0.08 + brightness * 0.075);
+    y = bp[i] * (0.42 + brightness * 0.30) + lp[i] * decay * 0.34;
+    y = softclip(y * (0.95 + chaos * 0.24));
+  );
+
+  // Spatial behavior is part of the synthesis model, not only output routing.
+  spatial_depth = field_spread * (0.28 + chaos * 0.34);
+  algorithm == 0 ? (
+    // Partial cloud: two broad drifting energy clouds.
+    center = 0.5 + 0.5 * sin(TWO_PI * ((0.006 + rate * 0.032) * motion_time) + field2 * 1.2);
+    center2 = 0.5 + 0.5 * sin(TWO_PI * ((0.004 + drift * 0.030) * motion_time) + field * 0.8 + 2.4);
+    width = 0.24 + (1 - field_spread) * 0.18 + decay * 0.20;
+    dist = wrap_dist(pos, center);
+    dist2 = wrap_dist(pos, center2);
+    motion_shape = max(exp(-(dist * dist) / max(0.0001, width * width)),
+      exp(-(dist2 * dist2) / max(0.0001, width * width)) * 0.70);
+    target_spatial_gain = 0.78 + spatial_depth * (motion_shape - 0.38);
+  ) : algorithm == 1 ? (
+    // Comb strata: slow rotating band emphasis.
+    strata_count = 2 + floor(brightness * 4);
+    strata = 0.5 + 0.5 * sin(TWO_PI * (pos * strata_count + motion_time * (0.010 + rate * 0.060)) + field * 0.55);
+    motion_shape = strata * strata * (3 - 2 * strata);
+    target_spatial_gain = 0.82 + spatial_depth * 0.86 * (motion_shape - 0.42);
+  ) : algorithm == 2 ? (
+    // Formant bands: paired resonant regions that breathe rather than jump.
+    center = 0.5 + 0.5 * sin(TWO_PI * ((0.004 + drift * 0.020) * motion_time) + field * 0.5);
+    center2 = 0.5 + 0.5 * sin(TWO_PI * ((0.003 + rate * 0.014) * motion_time) + field2 * 0.8 + 2.1);
+    width = 0.15 + decay * 0.24 + (1 - brightness) * 0.08;
+    dist = min(wrap_dist(pos, center), wrap_dist(pos, center2));
+    motion_shape = exp(-(dist * dist) / max(0.0001, width * width));
+    target_spatial_gain = 0.80 + spatial_depth * 0.92 * (motion_shape - 0.40);
+  ) : algorithm == 3 ? (
+    // Impulse resonator: struck channels bloom without hard channel switching.
+    spark = hash01(seed * 59 + i * 17 + counter[i] * 5);
+    motion_shape = min(1, env[i] * (0.42 + spark * 0.16) + spark * 0.10);
+    target_spatial_gain = 0.84 + spatial_depth * 0.66 * (motion_shape - 0.22);
+  ) : (
+    // Noise spectra: slow masks create shallow holes and sheets across channels.
+    mask_phase = 0.5 + 0.5 * sin(TWO_PI * (pos * (2 + floor(chaos * 5)) + motion_time * (0.006 + rate * 0.040)) + field3 * 1.0);
+    mask_smooth = mask_phase * mask_phase * (3 - 2 * mask_phase);
+    motion_shape = 0.35 + 0.65 * mask_smooth;
+    target_spatial_gain = 0.78 + spatial_depth * 0.78 * (motion_shape - 0.50);
+  );
+
+  target_spatial_gain = max(0.52, min(1.22, target_spatial_gain));
+  spatial_ms = algorithm == 3 ? 0.110 : 0.160;
+  spatial_ms += decay * 0.220 + (1 - rate) * 0.070;
+  spatial_coef = exp(-1 / max(16, spatial_ms * srate));
+  spatial[i] = spatial[i] * spatial_coef + target_spatial_gain * (1 - spatial_coef);
+  y *= spatial[i];
+
+  crush > 0 ? (
+    decim[i] += 1;
+    decim[i] >= crush_steps ? (
+      decim[i] = 0;
+      bits = max(2, floor(16 - crush * 14));
+      levels = 2 ^ bits;
+      decim_hold[i] = floor(y * levels) / levels;
+    );
+    y = decim_hold[i];
+  );
+
+  spl(i) = max(-1, min(1, y * sample_gain));
+  i += 1;
+);
+render_sample += 1;
+
+clear_extra ? (
+  loop(MAX_CH - chan_count,
+    spl(i) = 0;
+    i += 1;
+  );
+);

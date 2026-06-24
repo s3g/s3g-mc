@@ -1,0 +1,470 @@
+desc:s3g MC Carto Synth Engine
+tags: multichannel carto synth generator engine
+options:gmem=s3g_carto_synth
+
+slider1:8<1,128,1>Output channels
+slider2:0<0,4,1{Dust field,Pulse packet,Logic / fractal drone,Byte mask,Spline drift}>Algorithm
+slider3:0.45<0,1,0.001>Rate
+slider4:120<20,4000,0.1>Base frequency (Hz)
+slider5:0.45<0,1,0.001>Density / chaos
+slider6:0.55<0,1,0.001>Brightness
+slider7:0.35<0,1,0.001>Decay / sustain
+slider8:0.55<0,1,0.001>Field spread
+slider9:0.65<0,1,0.001>Channel correlation
+slider10:0.18<0,1,0.001>Drift
+slider11:0<0,1,0.001>Crush / decimate
+slider12:-18<-60,0,0.1>Output gain (dB)
+slider13:1<1,9999,1>Seed
+slider14:1<0,1,1{Keep extra channels,Clear extra channels}>Extra channel output
+
+@init
+MAX_CH = 128;
+TABLE_SIZE = 4096;
+TABLE_MASK = TABLE_SIZE - 1;
+TWO_PI = 2 * $pi;
+EPS = 0.000001;
+
+phase = 0;
+phase2 = 256;
+phase3 = 512;
+env = 768;
+held = 1024;
+lp = 1280;
+state = 1536;
+counter = 1792;
+decim = 2048;
+decim_hold = 2304;
+walk = 2560;
+addr = 2816;
+bit_clock = 3072;
+bit_gate = 3328;
+table = 4096;
+
+last_seed = -1;
+last_algorithm = -1;
+regen_table = 1;
+amp_curve_generation = -1;
+amp_curve_active = 0;
+amp_curve_points = 0;
+amp_curve_duration_samples = 1;
+render_sample = 0;
+
+function clamp01(x)
+(
+  x < 0 ? 0 : x > 1 ? 1 : x;
+);
+
+function db_to_amp(db)
+(
+  10 ^ (db / 20);
+);
+
+function hash01(x) local(v)
+(
+  v = sin((x + 1.2345) * 12.9898) * 43758.5453;
+  v - floor(v);
+);
+
+function noise_next(idx) local(x)
+(
+  x = state[idx];
+  x = (x * 1664525 + 1013904223) % 4294967296;
+  state[idx] = x;
+  (x / 2147483648) - 1;
+);
+
+function tri_wave(p) local(v)
+(
+  p -= floor(p);
+  v = p < 0.5 ? p * 4 - 1 : 3 - p * 4;
+  v;
+);
+
+function square_wave(p)
+(
+  p -= floor(p);
+  p < 0.5 ? 1 : -1;
+);
+
+function saw_wave(p)
+(
+  p -= floor(p);
+  p * 2 - 1;
+);
+
+function bit_shape(a, b, mode) local(ai, bi, y)
+(
+  ai = floor((a + 1) * 511.5);
+  bi = floor((b + 1) * 511.5);
+  mode == 0 ? y = (ai ~ bi) :
+  mode == 1 ? y = (ai | bi) :
+  mode == 2 ? y = (ai & bi) :
+  y = (1023 - (ai | bi));
+  (y / 511.5) - 1;
+);
+
+function softclip(x)
+(
+  x / (1 + abs(x));
+);
+
+function byte_to_audio(x)
+(
+  ((x & 255) / 127.5) - 1;
+);
+
+function regenerate_table() local(i, r, r2, burst, p, row, col, header, header_byte, byte, pix, chunk, folded)
+(
+  i = 0;
+  burst = 0;
+  loop(TABLE_SIZE,
+    r = hash01(seed * 17 + i * 0.731 + algorithm * 19);
+    r2 = hash01(seed * 31 + i * 0.097 + algorithm * 41);
+    p = i / TABLE_SIZE;
+    row = floor(i / 64);
+    col = i - row * 64;
+    header = i < 256 ? 1 : 0;
+    header_byte = 80 + i * 7 + seed * 11;
+    byte = ((i * (floor(i / 37) | floor(i / 251))) ~ floor(seed * 13 + row * 17 + col * 3)) & 255;
+    pix = ((row * 19 + col * 7 + floor(r * 255)) ~ floor(seed * 29 + col * row)) & 255;
+    chunk = (i % 509) < (18 + algorithm * 7) ? (r2 * 2 - 1) * 0.9 : 0;
+    burst = burst * (0.988 + r2 * 0.008) + (r > 0.982 ? (r * 2 - 1) : 0);
+    header ? (
+      byte = header_byte;
+    );
+    folded = byte_to_audio(byte) * 0.34 +
+      byte_to_audio(pix) * 0.28 +
+      sin(TWO_PI * p * (1 + floor(hash01(seed + i * 0.013) * 17))) * 0.22 +
+      chunk + burst * 0.26;
+    table[i] = max(-1, min(1, softclip(folded * 1.6)));
+    i += 1;
+  );
+);
+
+function init_channel(idx) local(h)
+(
+  h = hash01(seed * 97 + idx * 23.17);
+  state[idx] = floor(1 + h * 4294967294);
+  phase[idx] = h;
+  phase2[idx] = hash01(seed * 131 + idx * 7.9);
+  phase3[idx] = hash01(seed * 171 + idx * 11.3);
+  env[idx] = 0;
+  held[idx] = 0;
+  lp[idx] = 0;
+  counter[idx] = 0;
+  decim[idx] = 0;
+  decim_hold[idx] = 0;
+  walk[idx] = h * 2 - 1;
+  addr[idx] = floor(h * TABLE_SIZE);
+  bit_clock[idx] = 0;
+  bit_gate[idx] = 0;
+);
+
+function reseed_all() local(i)
+(
+  i = 0;
+  loop(MAX_CH,
+    init_channel(i);
+    i += 1;
+  );
+  regenerate_table();
+);
+
+function update_slider_state()
+(
+  chan_count = max(1, min(MAX_CH, floor(slider1 + 0.5)));
+  algorithm = floor(slider2 + 0.5);
+  rate = clamp01(slider3);
+  base_freq = max(1, slider4);
+  density = clamp01(slider5);
+  brightness = clamp01(slider6);
+  decay = clamp01(slider7);
+  field_spread = clamp01(slider8);
+  correlation = clamp01(slider9);
+  drift = clamp01(slider10);
+  crush = clamp01(slider11);
+  out_gain = db_to_amp(slider12) / sqrt(max(1, chan_count));
+  seed = floor(slider13 + 0.5);
+  clear_extra = floor(slider14 + 0.5);
+
+  decay_coef = exp(-1 / max(8, (0.004 + decay * 1.6) * srate));
+  lp_coef = exp(-1 / max(1, (0.0006 + (1 - brightness) * 0.08) * srate));
+  crush_steps = max(1, floor(1 + crush * 48));
+);
+
+function update_amp_curve_state()
+(
+  amp_curve_active = gmem[0] == 1 ? 1 : 0;
+  gmem[1] != amp_curve_generation ? (
+    amp_curve_generation = gmem[1];
+    render_sample = 0;
+  );
+  amp_curve_duration_samples = max(1, gmem[2] * srate);
+  amp_curve_points = max(0, min(32, floor(gmem[3] + 0.5)));
+);
+
+function amp_curve_at(pos) local(i, ax, ay, bx, by, span, t, found, value)
+(
+  amp_curve_active == 0 || amp_curve_points < 1 ? (
+    db_to_amp(slider12);
+  ) : (
+    pos <= gmem[4] ? (
+      gmem[5];
+    ) : (
+      i = 0;
+      found = 0;
+      value = gmem[5 + (amp_curve_points - 1) * 2];
+      loop(amp_curve_points - 1,
+        found == 0 ? (
+          ax = gmem[4 + i * 2];
+          ay = gmem[5 + i * 2];
+          bx = gmem[6 + i * 2];
+          by = gmem[7 + i * 2];
+          pos >= ax && pos <= bx ? (
+            span = max(0.000001, bx - ax);
+            t = (pos - ax) / span;
+            value = ay + (by - ay) * t;
+            found = 1;
+          );
+        );
+        i += 1;
+      );
+      value;
+    );
+  );
+);
+
+function channel_field(idx, salt) local(shared, localv, pos)
+(
+  pos = chan_count <= 1 ? 0 : idx / (chan_count - 1);
+  shared = hash01(seed * 43 + salt * 31);
+  localv = hash01(seed * 101 + idx * 13.7 + salt * 29);
+  ((shared * correlation) + (localv * (1 - correlation)) - 0.5) * 2 * field_spread + (pos - 0.5) * field_spread;
+);
+
+@slider
+update_slider_state();
+
+last_seed != seed ? (
+  last_seed = seed;
+  reseed_all();
+);
+last_algorithm != algorithm ? (
+  last_algorithm = algorithm;
+  regenerate_table();
+);
+
+@block
+update_slider_state();
+update_amp_curve_state();
+
+@sample
+sample_gain = amp_curve_active ? amp_curve_at(render_sample / amp_curve_duration_samples) / sqrt(max(1, chan_count)) : out_gain;
+i = 0;
+loop(chan_count,
+  field = channel_field(i, 1);
+  field2 = channel_field(i, 2);
+  field3 = channel_field(i, 3);
+
+  ch_rate = max(0.00001, rate * (1 + field * 0.85));
+  ch_freq = max(0.1, base_freq * (2 ^ (field2 * 1.5)));
+  chaos = clamp01(density + field3 * 0.35);
+  y = 0;
+
+  algorithm == 0 ? (
+    // Dust field: sparse grains through sand, static, scratch, metal rain, and storm mass.
+    p = (0.000003 + ch_rate * ch_rate * 0.0035) * (0.08 + chaos * 8.5);
+    grain_decay = exp(-1 / max(3, (0.0008 + decay * 0.075 + chaos * 0.018) * srate));
+    noise_next(i) > 1 - min(0.65, p) ? (
+      held[i] = noise_next(i) * (0.45 + chaos * 1.25);
+      env[i] = 1;
+      phase2[i] = hash01(seed * 7 + i * 23 + counter[i]);
+      phase3[i] = hash01(seed * 11 + i * 31 + counter[i]);
+      counter[i] += 1;
+    );
+    grain_freq = ch_freq * (0.18 + brightness * 3.2 + abs(field2) * 1.3 + chaos * 1.8);
+    phase2[i] += grain_freq / srate + noise_next(i) * drift * 0.00045;
+    phase3[i] += (grain_freq * (0.19 + field_spread * 0.45 + drift * 0.9)) / srate + noise_next(i) * 0.00025;
+    env[i] *= grain_decay;
+
+    n = noise_next(i);
+    lp[i] = lp[i] * (0.72 - brightness * 0.18) + n * (0.28 + brightness * 0.18);
+    sand = n - lp[i];
+    scratch = (noise_next(i) - noise_next(i) * 0.35) * env[i] * (0.18 + brightness * 0.55);
+    metal = (sin(TWO_PI * phase2[i] + noise_next(i) * 4.0) * 0.35 + sand * 0.65) *
+      env[i] * (brightness * brightness * 0.22);
+    storm = sand * (chaos * chaos) * (0.28 + brightness * 0.55);
+    rain = (noise_next(i) > 0.72 - chaos * 0.30 ? noise_next(i) : 0) * chaos * (0.12 + brightness * 0.40);
+    y = held[i] * env[i] * (0.42 + brightness * 0.24) + scratch + metal + storm + rain;
+    y = softclip(y * (0.88 + chaos * 1.18));
+  ) : algorithm == 1 ? (
+    // Pulse packet: short masked packets with random spectra and smoothed edges.
+    p = (0.0000004 + ch_rate * ch_rate * 0.00045) * (0.12 + chaos * 2.3);
+    noise_next(i) > 1 - p ? (
+      env[i] = 1;
+      held[i] = 0;
+      phase[i] = 0;
+      phase2[i] = 0;
+      phase3[i] = floor((0.002 + decay * 0.018 + chaos * 0.010) * srate);
+      counter[i] += 1;
+    );
+    packet_partial = 1 + floor(hash01(seed * 3 + i * 5 + counter[i]) * (3 + brightness * 9));
+    f = ch_freq * packet_partial * (0.28 + brightness * 1.25);
+    phase[i] += f / srate;
+    phase2[i] += f * (1.002 + field * 0.04) / srate;
+    phase3[i] > 0 ? (
+      phase3[i] -= 1;
+      target_mask = 1;
+    ) : (
+      target_mask = 0;
+    );
+    attack_coef = 0.015 + brightness * 0.030;
+    release_coef = 0.004 + decay * 0.010 + chaos * 0.004;
+    target_mask > held[i] ? held[i] += (target_mask - held[i]) * attack_coef :
+      held[i] += (target_mask - held[i]) * release_coef;
+    held[i] = clamp01(held[i]);
+    blip_decay = exp(-1 / max(20, (0.030 + decay * 0.95) * srate));
+    env[i] *= blip_decay;
+    mask = held[i] * held[i] * (3 - 2 * held[i]);
+    packet_body = sin(TWO_PI * phase[i]) * 0.54 +
+      sin(TWO_PI * phase2[i]) * 0.28 +
+      tri_wave(phase[i] * (1.5 + chaos * 3.5 + abs(field3) * 2)) * 0.18;
+    y = packet_body * mask * env[i];
+    lp[i] = lp[i] * (0.86 - brightness * 0.12) + y * (0.14 + brightness * 0.12);
+    y = softclip(lp[i] * (0.78 + brightness * 0.42));
+  ) : algorithm == 2 ? (
+    // Logic / fractal drone: cross-modulated oscillators with fractally arrayed spikes.
+    phase[i] += ch_freq / srate;
+    phase2[i] += ch_freq * (1.37 + chaos * 3.2 + field * 0.15) / srate;
+    phase3[i] += ch_freq * (0.51 + brightness * 1.8 + field2 * 0.12) / srate;
+    drift > 0 ? phase2[i] += noise_next(i) * drift * 0.00003;
+    a = tri_wave(phase[i]);
+    b = saw_wave(phase2[i]);
+    c = square_wave(phase3[i]);
+    mode = floor(abs(field3 * 11 + algorithm + i) % 4);
+    spike_rate = (0.0000002 + rate * rate * 0.0008) * (0.2 + chaos * 3.5);
+    noise_next(i) > 1 - spike_rate ? (
+      env[i] = 1;
+      held[i] = 1 + floor(hash01(seed * 37 + i * 41 + counter[i] * 5) * (3 + brightness * 11));
+      counter[i] += 1;
+    );
+    env[i] *= exp(-1 / max(12, (0.004 + decay * 0.18) * srate));
+    fractal_spike = sin(TWO_PI * phase[i] * held[i]) * env[i] * chaos * (0.15 + brightness * 0.45);
+    y = bit_shape(a, b * (0.6 + chaos), mode) * (0.48 + brightness * 0.30) + c * chaos * 0.14 + fractal_spike;
+    lp[i] = lp[i] * (0.92 - brightness * 0.25) + y * (0.08 + brightness * 0.25);
+    y = lp[i];
+  ) : algorithm == 3 ? (
+    // Byte mask: sparse bytebeat articulations through a misread-data mask layer.
+    mask_rate = 0.02 + rate * 0.55 + chaos * 3.4;
+    bit_clock[i] += (mask_rate * (0.35 + abs(field) * 1.8)) / srate;
+    bit_clock[i] >= 1 ? (
+      bit_clock[i] -= floor(bit_clock[i]);
+      r = noise_next(i);
+      r > (0.82 - chaos * 0.60) ? (
+        bit_gate[i] = floor(abs(r) * (16 + brightness * 80 + chaos * 48));
+        held[i] = floor(hash01(seed * 71 + i * 19 + counter[i] * 11 + r * 53) * 7);
+        env[i] = 1;
+        counter[i] += 1;
+        phase[i] = 0;
+        drift > 0 ? walk[i] = max(-1, min(1, walk[i] + noise_next(i) * drift * (0.03 + chaos * 0.12)));
+      );
+    );
+    byte_decay = exp(-1 / max(10, (0.0015 + decay * 0.18 + chaos * 0.035) * srate));
+    env[i] *= byte_decay;
+
+    byte_note = floor(hash01(seed * 5 + i * 17 + counter[i] * 3 + held[i] * 29) * 21);
+    note_ratio = 2 ^ ((byte_note - 9) / 12);
+    speed = max(0.01, ch_freq * note_ratio * (0.03 + rate * 0.95) / srate);
+    addr[i] += speed * TABLE_SIZE * (0.12 + chaos * 0.36);
+    header_skip = floor((16 + brightness * 200) * (0.12 + chaos * 0.38) + abs(field) * 72);
+    stride = 1 + floor(abs(field2) * 4 + chaos * 5 + drift * 5 + held[i]);
+    raw_addr = floor(addr[i] * stride + walk[i] * field_spread * 1200 + header_skip);
+    t = abs(raw_addr) + floor(seed * 257 + i * 131 + bit_gate[i] * 17 + counter[i] * 23 + held[i] * 313);
+    mode = floor(abs(field2 * 23 + bit_gate[i] + chaos * 9) % 4);
+    mask = (2 ^ floor(1 + abs(field3) * (3 + brightness * 5))) - 1;
+    mode == 0 ? read_addr = raw_addr ~ mask :
+    mode == 1 ? read_addr = raw_addr | mask :
+    mode == 2 ? read_addr = raw_addr & (TABLE_MASK - mask) :
+    read_addr = raw_addr - (raw_addr % max(1, mask));
+    note_phase = floor(phase[i] * (16 + brightness * 160 + chaos * 96));
+    phase[i] += ch_freq * note_ratio * (0.18 + brightness * 1.6) / srate;
+    family = floor(abs(held[i] + field3 * 5 + counter[i] * 0.17)) % 5;
+    family == 0 ? (
+      b1 = byte_to_audio(((note_phase * (floor(t / 31) | floor(t / 257))) + bit_gate[i]) & 255);
+      b2 = byte_to_audio(((note_phase + t * floor(t / 19)) ~ floor(t / 11)) & 255);
+      b3 = byte_to_audio(((note_phase + bit_gate[i] * 97) & (floor(t / 17) | (mask & 255))) & 255);
+    ) : family == 1 ? (
+      b1 = byte_to_audio(((note_phase * 5) & floor(t / 8)) | ((t * 3) & 255));
+      b2 = byte_to_audio((floor(t / 32) | (note_phase * floor(t / 73))) & 255);
+      b3 = byte_to_audio(((note_phase ~ t) + bit_gate[i] * 13) & 255);
+    ) : family == 2 ? (
+      b1 = byte_to_audio((((t * floor(t / 256)) | (note_phase * 7)) + bit_gate[i]) & 255);
+      b2 = byte_to_audio(((note_phase * (3 + held[i])) ~ floor(t / 16)) & 255);
+      b3 = byte_to_audio(((floor(t / 64) & note_phase) | bit_gate[i]) & 255);
+    ) : family == 3 ? (
+      b1 = byte_to_audio(((note_phase + (t & floor(t / 512))) * (3 + held[i])) & 255);
+      b2 = byte_to_audio(((t * 5) ~ (note_phase * 11)) & 255);
+      b3 = byte_to_audio(((t | note_phase) & (mask * 17 + bit_gate[i])) & 255);
+    ) : (
+      b1 = byte_to_audio(((note_phase * floor(t / 97)) + (t & bit_gate[i])) & 255);
+      b2 = byte_to_audio(((note_phase | floor(t / 32)) ~ (bit_gate[i] * 9)) & 255);
+      b3 = byte_to_audio((((note_phase + t) & 127) * (1 + held[i])) & 255);
+    );
+    bend_a = table[read_addr & TABLE_MASK];
+    bend_b = table[(read_addr + header_skip + floor(walk[i] * 997)) & TABLE_MASK];
+    rowtear = table[(floor(read_addr / max(1, stride)) * 64 + (read_addr & 63) + bit_gate[i]) & TABLE_MASK];
+    y = bend_a * (0.30 + brightness * 0.30) +
+      bend_b * chaos * 0.10 +
+      rowtear * drift * 0.13 +
+      (b1 * 0.50 + b2 * chaos * 0.32 + b3 * brightness * 0.22) * (0.45 + brightness * 0.35);
+    mask_env = env[i] * env[i] * (1 - chaos * 0.35) + env[i] * chaos * 0.35;
+    y = softclip(y * mask_env * (1.2 + brightness * 0.65));
+  ) : (
+    // Spline drift: smoothly joined control points driving softened oscillator clouds.
+    spline_rate = 0.006 + rate * 0.92 + chaos * 0.34 + abs(field) * 0.16;
+    bit_clock[i] += spline_rate / srate;
+    bit_clock[i] >= 1 ? (
+      bit_clock[i] -= floor(bit_clock[i]);
+      held[i] = noise_next(i) * (0.44 + chaos * 0.42);
+      counter[i] += 1;
+      phase3[i] = hash01(seed * 83 + i * 29 + counter[i] * 7);
+    );
+
+    spline_smooth = exp(-1 / max(8, (0.060 + decay * 2.20 + (1 - brightness) * 0.55) * srate));
+    walk[i] = walk[i] * spline_smooth + held[i] * (1 - spline_smooth);
+    curve = walk[i] < 0 ? -(walk[i] * walk[i] * (3 - 2 * min(1, abs(walk[i])))) :
+      walk[i] * walk[i] * (3 - 2 * min(1, abs(walk[i])));
+    drift > 0 ? curve += noise_next(i) * drift * 0.00018;
+
+    phase[i] += ch_freq * (0.025 + rate * 0.24 + abs(curve) * 0.08) / srate;
+    phase2[i] += ch_freq * (0.037 + brightness * 0.29 + phase3[i] * 0.07) / srate;
+    grain = sin(TWO_PI * phase[i] + curve * 1.4) * 0.52 +
+      sin(TWO_PI * (phase2[i] + curve * 0.11)) * 0.26 +
+      tri_wave(phase[i] * (0.5 + brightness * 1.7) + phase2[i] * 0.08) * chaos * 0.12;
+    lp[i] = lp[i] * (0.975 - brightness * 0.035) + grain * (0.025 + brightness * 0.035);
+    env[i] = env[i] * 0.9995 + abs(held[i]) * 0.0005;
+    y = softclip((lp[i] + curve * (0.055 + chaos * 0.050)) * (1.45 + brightness * 0.62 + env[i] * 0.22));
+  );
+
+  crush > 0 ? (
+    decim[i] += 1;
+    decim[i] >= crush_steps ? (
+      decim[i] = 0;
+      bits = max(2, floor(16 - crush * 14));
+      levels = 2 ^ bits;
+      decim_hold[i] = floor(y * levels) / levels;
+    );
+    y = decim_hold[i];
+  );
+
+  spl(i) = max(-1, min(1, y * sample_gain));
+  i += 1;
+);
+render_sample += 1;
+
+clear_extra ? (
+  loop(MAX_CH - chan_count,
+    spl(i) = 0;
+    i += 1;
+  );
+);

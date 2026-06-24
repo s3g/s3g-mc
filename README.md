@@ -1,19 +1,17 @@
 # s3g-mc
 
 s3g-mc is a REAPER package for multichannel composition, spatial audio
-workflow, and offline sound transformation. It includes Lua actions, ReaImGui
-controllers, and JSFX for channel editing, 128-channel automation, fold-down
-monitoring, dome panning, third-order ambisonic send/return routing, and
-render-based multichannel texture processes.
+workflow, procedural synthesis, and offline sound transformation.
 
-The package is built for practical studio use with high-channel-count media:
-turn mono stems into multichannel items, reshape channel order, build
-speaker-aware panning systems, audition stereo reductions, and render
-CDP/SoundThread-, SoundHack-, FFTease-, and spectral-music-inspired processes
-directly inside REAPER. Most transformation tools are offline actions that
-write new media items, making them useful for exploratory composition,
-sound-design passes, and reproducible editing rather than real-time plugin
-chains.
+It includes Lua actions, ReaImGui controllers, and JSFX for channel editing,
+128-channel automation, fold-down monitoring, dome panning, third-order
+ambisonic send/return routing, procedural synthesis, and render-based
+multichannel processes.
+
+This package contains original scripts and JSFX implementations, released under
+0BSD. Many tools are inspired by and extensions of existing computer music
+practices; references are credited in the relevant documentation where
+appropriate.
 
 ## Tools
 
@@ -23,6 +21,21 @@ chains.
   groups, meters, and plugin pin remapping.
 - `MC to Stereo Autogain`: multichannel-to-stereo fold-down with layout modes,
   width, rotation, layout weighting, autogain, and output gain.
+
+### Procedural Synthesis
+
+- `Render MC Carto Synth`: offline controller for a multichannel JSFX
+  synthesis engine with CDP synth-inspired dust, pulse-packet,
+  logic/fractal-drone, byte-mask, and spline-drift algorithms.
+  Choose duration, channel count, algorithm, and map-route breakpoint curves;
+  the action writes automation to a temporary generator track, renders a
+  multichannel media item, normalizes if requested, and removes the temporary
+  track.
+- `Render MC Spectra Synth`: offline controller for a multichannel JSFX
+  synthesis engine with partial-cloud, comb-strata, formant-band,
+  impulse-resonator, and noise-spectra algorithms.
+  Uses the same breakpoint routing interface for slower spectral-mass and
+  resonance-based synthesis, with algorithm-specific channel-motion models.
 
 ### Spatial / HOA
 
@@ -56,32 +69,33 @@ These offline processes are inspired by spectral tool families such as
 <a href="https://www.michaelnorris.info/software/soundmagic-spectral" target="_blank" rel="noopener noreferrer">SoundMagic Spectral</a>,
 but run from the package's Python/NumPy backend.
 
-- `Convolve selected items`: SoundHack-inspired offline convolution of two
-  selected media items, with mono, stereo, and multichannel source/impulse
-  channel-pairing modes.
+- `Convolve selected items`: offline convolution of two selected media items,
+  with mono, stereo, multichannel pairing, and summed source-to-impulse matrix modes.
 - `Cross Synthesis`: offline STFT cross-synthesis for two WAV-backed media
   items. The first selected item keeps phase and timing while its spectral
   magnitudes are blended toward the second item's magnitudes.
-- `Shapee Spectral Shaper`: FFTease shapee-inspired offline spectral envelope
-  transfer for two WAV-backed media items, with an alternate
-  CDP/SoundThread-inspired formant-vocode algorithm. The first selected item is
-  the carrier/tune/timing source; the second supplies the spectral envelope or
-  broad formant contour.
-- `Spectral Accumulate`: CDP/SoundThread-inspired spectral sustain where each
-  frequency band holds until stronger energy replaces it.
+- `Render MC Impulse Field`: procedural multichannel impulse generator for
+  convolution. Creates impulse fields with selectable distribution rules,
+  spacing, channel counts, and impulse profiles.
+- `Spectral Accumulate`: spectral sustain where each frequency band holds until
+  stronger energy replaces it.
 - `Spectral Blur`: offline magnitude blur across neighboring STFT frames, with
   safe envelope mode and optional time expansion.
 - `Spectral Freeze`: imposes one selected spectral frame across the item while
   preserving phase/timing motion, with safe envelope mode, envelope floor, and
   optional time expansion.
-- `Spectral Morph`: CDP/SoundThread-inspired live or frozen spectral morph
-  between two WAV-backed media items.
+- `Spectral Morph`: live or frozen spectral morph between two WAV-backed media
+  items.
+- `Spectral Shaper`: offline spectral envelope transfer for two WAV-backed
+  media items, with an alternate formant-vocode algorithm. The first selected
+  item is the carrier/tune/timing source; the second supplies the spectral
+  envelope or broad formant contour.
 - `Spectral Spatializer`: distributes frequency bins across even output channel
   counts from 2 to 64.
-- `Spectral Step Drunk Freeze`: CDP/SoundThread-inspired stepped freeze or
-  random-walk freeze through spectral frames.
-- `Spectral Trace`: CDP/SoundThread-inspired partial tracing with modes to keep
-  loudest partials, suppress loudest partials, threshold, or thin randomly.
+- `Spectral Step Drunk Freeze`: stepped freeze or random-walk freeze through
+  spectral frames.
+- `Spectral Trace`: partial tracing with modes to keep loudest partials,
+  suppress loudest partials, threshold, or thin randomly.
 
 ### Item Channel Transforms
 
@@ -234,6 +248,6 @@ More detail is in `Scripts/s3g-mc/s3g_3oa_fx_workflow.md`.
 
 ## License
 
-MIT License. See `LICENSE`.
+Zero-Clause BSD. See `LICENSE`.
 
 Development assistance: OpenAI Codex.
