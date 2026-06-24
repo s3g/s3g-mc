@@ -1,68 +1,47 @@
 # s3g-mc
 
-s3g-mc is a REAPER package for multichannel composition, spatial audio
-workflow, procedural synthesis, and offline sound transformation.
+s3g-mc is a collection of REAPER tools for multichannel composition, spatial
+audio, offline sound transformation, and procedural synthesis.
 
 It includes Lua actions, ReaImGui controllers, and JSFX for channel editing,
-128-channel automation, fold-down monitoring, dome panning, third-order
-ambisonic send/return routing, procedural synthesis, and render-based
-multichannel processes.
+automation, fold-down monitoring, dome panning, 3OA send/return routing, and
+render-based multichannel processes.
 
-This package contains original scripts and JSFX implementations, released under
-0BSD. Many tools are inspired by and extensions of existing computer music
-practices; references are credited in the relevant documentation where
-appropriate.
+The code is released under 0BSD. Many of these tools are inspired by or extend  existing computer music practices, with references mentioned in the documentation where they are useful.
 
 ## Tools
 
 ### Channel Mixing / Automation
 
-- `128ch Automation Mixer`: track-aware faders, mute/solo, channel
-  groups, meters, and plugin pin remapping.
-- `MC to Stereo Autogain`: multichannel-to-stereo fold-down with layout modes,
-  width, rotation, layout weighting, autogain, and output gain.
+- `128ch Automation Mixer`: faders, mute/solo, channel groups, meters, and
+  plugin pin remapping for high-channel-count tracks.
+- `MC to Stereo Autogain`: multichannel fold-down with layout modes, width,
+  rotation, weighting, autogain, and output trim.
 
 ### Procedural Synthesis
 
-- `Render MC Carto Synth`: offline controller for a multichannel JSFX
-  synthesis engine with CDP synth-inspired dust, pulse-packet,
-  logic/fractal-drone, byte-mask, and spline-drift algorithms.
-  Choose duration, channel count, algorithm, and map-route breakpoint curves;
-  the action writes automation to a temporary generator track, renders a
-  multichannel media item, normalizes if requested, and removes the temporary
-  track.
-- `Render MC Spectra Synth`: offline controller for a multichannel JSFX
-  synthesis engine with partial-cloud, comb-strata, formant-band,
-  impulse-resonator, and noise-spectra algorithms.
-  Uses the same breakpoint routing interface for slower spectral-mass and
-  resonance-based synthesis, with algorithm-specific channel-motion models.
+- `Render MC Carto Synth`: renders multichannel dust, pulse-packet,
+  logic/fractal-drone, byte-mask, and spline-drift materials.
+- `Render MC Spectra Synth`: renders slower spectral-mass and resonant
+  materials: partial clouds, comb strata, formant bands, impulse resonators,
+  and noise spectra.
+
+Both use breakpoint curves for parameter motion and channel behavior, then
+write a new multichannel media item.
 
 ### Offline Synthesis / IR
 
-These NumPy-backed renderers are for offline processes that are too dense or
-array-oriented to fit comfortably in Lua or JSFX. The synth renderers include
-breakpoint envelopes for shaping key parameters over the rendered duration.
-Density controls event or peak admission before synthesis, not post-render
-amplitude, so drawn density shapes change texture occupancy without adding gain
-modulation.
+These NumPy-backed renderers handle processes that are easier to do offline
+with Pythaon than in Lua or JSFX. Breakpoint envelopes shape the render over time. Density means event or peak admission before synthesis, not gain modulation afterward.
 
-- `Dense Grain Cloud`: renders thousands of source-item grains into a new
-  multichannel media item with pitch scatter, spatial spread, density shaping,
-  breakpoint envelopes, and overlap-safe normalization.
+- `Dense Grain Cloud`: source-item grains scattered into a multichannel field.
 - `IR Toolkit`: reshapes a selected impulse response item with silence trim,
-  tail fade, peak normalization, optional early reflections, and channel
-  decorrelation.
-- `Mass Partial Field`: renders a high-density additive field with thousands of
-  independent partial events, frequency drift, envelopes, and multichannel
-  motion, with breakpoint control over amplitude, density, and event behavior.
-- `Partial Trace Resynth`: analyzes prominent spectral peaks from one selected
-  source item and renders them as a multichannel oscillator field with
-  breakpoint control over amplitude, density, trace gain, drift, and spatial
-  width.
-- `Resonant Terrain`: renders sparse excitation events through inharmonic
-  resonator banks, producing struck-metal, synthetic-IR, and multichannel
-  resonant-dust materials with breakpoint control over amplitude, density,
-  decay, and spatial width.
+  tail fade, normalization, early reflections, and channel decorrelation.
+- `Mass Partial Field`: additive partial events with drift and channel motion.
+- `Partial Trace Resynth`: STFT peak tracing rendered as a multichannel
+  oscillator field, with linked, point, smear, and frozen trace modes.
+- `Resonant Terrain`: struck resonator banks for metallic, synthetic-IR, and
+  resonant-dust materials.
 
 ### Spatial / HOA
 
@@ -84,26 +63,24 @@ modulation.
 The shared 25ch dome layout is based on the speaker array layout of RISD SRST
 Spatial Audio Studio.
 
-See the 3OA / SPARTA Setup section later in this document for the separate
-third-order ambisonic send/return workflow.
+See the 3OA / SPARTA setup section for the ambisonic send/return workflow.
 
 ### Spectral / Convolution
 
-These offline processes are inspired by spectral tool families such as
+These offline processes are informed by spectral tool families such as
 <a href="https://www.composersdesktop.com/" target="_blank" rel="noopener noreferrer">CDP</a>,
 <a href="https://www.soundhack.com/freeware/the-boneyard/" target="_blank" rel="noopener noreferrer">SoundHack</a>,
 <a href="https://github.com/ericlyon/FFTease3.0-MaxMSP" target="_blank" rel="noopener noreferrer">FFTease</a>, and
 <a href="https://www.michaelnorris.info/software/soundmagic-spectral" target="_blank" rel="noopener noreferrer">SoundMagic Spectral</a>,
-but run from the package's Python/NumPy backend.
+and run from the package's Python/NumPy backend.
 
-- `Convolve selected items`: offline convolution of two selected media items,
-  with mono, stereo, multichannel pairing, and summed source-to-impulse matrix modes.
+- `Convolve selected items`: convolution of two selected media items, including
+  mono, stereo, multichannel pairing, and summed matrix modes.
 - `Cross Synthesis`: offline STFT cross-synthesis for two WAV-backed media
   items. The first selected item keeps phase and timing while its spectral
   magnitudes are blended toward the second item's magnitudes.
-- `Render MC Impulse Field`: procedural multichannel impulse generator for
-  convolution. Creates impulse fields with selectable distribution rules,
-  spacing, channel counts, and impulse profiles.
+- `Render MC Impulse Field`: procedural multichannel impulse fields for
+  convolution.
 - `Spectral Accumulate`: spectral sustain where each frequency band holds until
   stronger energy replaces it.
 - `Spectral Blur`: offline magnitude blur across neighboring STFT frames, with
@@ -139,28 +116,24 @@ but run from the package's Python/NumPy backend.
 
 ### Multichannel Texture / Montage
 
-Native REAPER variations inspired by the
+Native REAPER variations inspired by
 <a href="https://www.composersdesktop.com/docs/html/cgromc.htm" target="_blank" rel="noopener noreferrer">CDP multichannel processes</a>.
 These scripts do not require CDP.
 
 - `Brownian Walk`: short fragments follow a bounded random walk through source
   time and output channels.
-- `Cascade Spatial Echo`: equal source segments print decaying echoes that step
-  through multichannel space.
-- `Channel Orbit Delay`: whole-item delay repeats orbit through output channels.
-- `Channel Smear`: slices duplicate to neighboring channels
-  with gain compensation.
-- `Crumble Spatial Groups`: slices are projected through progressively smaller
-  channel groups.
-- `Flutter Gate`: moving active-channel groups create a multichannel flutter
-  gate pattern.
-- `Fracture`: time-ordered slices from one source
-  channel dispersed across a controlled channel path with jitter, drop, and
-  spread voices.
-- `Frame Gate`: rotating active channel groups print a
-  multichannel gate pattern.
-- `Frame Shift`: channel-frame rotation, mirror,
-  odd/even split, pair interleave, or half-swap render.
+- `Cascade Spatial Echo`: equal segments print decaying echoes through space.
+- `Channel Orbit Delay`: whole-item delay repeats orbit around output channels.
+- `Channel Smear`: slices duplicate to neighboring channels with gain
+  compensation.
+- `Crumble Spatial Groups`: slices move through progressively smaller channel
+  groups.
+- `Flutter Gate`: moving active-channel groups create flutter patterns.
+- `Fracture`: ordered slices from one source channel disperse across a channel
+  path, with jitter, drop, and spread voices.
+- `Frame Gate`: rotating active-channel groups print gate patterns.
+- `Frame Shift`: channel-frame rotation, mirror, odd/even split, pair
+  interleave, or half-swap render.
 - `Marker Spatial Montage`: project markers or active-take markers inside the
   selected item define chunks for ordered or shuffled montage.
 - `Mono Fill`: one source channel fills every output channel with optional gain
@@ -172,46 +145,42 @@ These scripts do not require CDP.
 - `Shred / Slice`: equal, project-marker, or active-take-marker slices with
   ordered mono spread, random mono scatter, and multichannel reorientation
   modes.
-- `Spatial Repeater`: repeated prints of one source channel
-  around clockwise, ping-pong, or random channel paths.
-- `Spatial Stutter`: repeated short slices advance through a
-  spatial path.
+- `Spatial Repeater`: one source channel repeats around clockwise, ping-pong,
+  or random channel paths.
+- `Spatial Stutter`: repeated short slices advance through a spatial path.
 - `Stereo Spin`: sliced stereo images rotate around a multichannel output field.
-- `Texture Clouds`: dense short fragments from one source
-  channel scattered across an output field.
+- `Texture Clouds`: dense short fragments from one source channel scattered
+  across an output field.
 - `Zigzag Channel Walker`: equal slices walk back and forth across output
   channels, with optional reverse source-slice order.
 
 ### Track Building / Routing
 
 - `Build multichannel stem from selected tracks`: routes selected tracks to
-  consecutive channels on a new multichannel destination, then prompts to render
-  a bounded stem.
+  consecutive channels on a new multichannel destination, then renders a
+  bounded stem.
 - `Cycle mono tracks into multichannel stem`: selected mono tracks become a
-  multichannel stem, with repeat or grouped
-  downmix behavior when the requested output count differs from the source
-  count.
+  multichannel stem, with repeat or grouped downmix behavior when the requested
+  output count differs from the source count.
 - `Route selected tracks to multichannel folder bus`: creates a new parent
-  folder bus above the selected tracks, moves the selected tracks into it, and
-  assigns each child track's parent send to consecutive bus channels.
+  folder bus and assigns each child track to consecutive bus channels.
 
 ## Dependencies
 
 - <a href="https://www.reaper.fm/" target="_blank" rel="noopener noreferrer">REAPER</a>
-- <a href="https://codeberg.org/cfillion/reaimgui" target="_blank" rel="noopener noreferrer">ReaImGui</a> for the package browser
-  and controller scripts. ReaImGui is distributed through ReaPack's default
-  ReaTeam Extensions repository.
+- <a href="https://codeberg.org/cfillion/reaimgui" target="_blank" rel="noopener noreferrer">ReaImGui</a>
+  for the browser and controller scripts. It is available through ReaPack's
+  default ReaTeam Extensions repository.
 - <a href="https://sws-extension.org/" target="_blank" rel="noopener noreferrer">SWS Extension</a> is recommended for render-based
   workflows. Source is available at
   <a href="https://github.com/reaper-oss/sws" target="_blank" rel="noopener noreferrer">reaper-oss/sws</a>.
 - <a href="https://www.python.org/downloads/" target="_blank" rel="noopener noreferrer">Python 3</a>
   with <a href="https://numpy.org/install/" target="_blank" rel="noopener noreferrer">NumPy</a>
-  is required for offline spectral and convolution processes. If REAPER cannot
-  find the intended Python, place a `python3_path.txt` file beside the scripts
-  containing the full path to `python3`.
+  is required for the NumPy-backed offline processes. If REAPER cannot find the
+  intended Python, put a `python3_path.txt` file beside the scripts containing
+  the full path to `python3`.
 - <a href="https://leomccormack.github.io/sparta-site/" target="_blank" rel="noopener noreferrer">SPARTA plugins</a>, specifically
-  AmbiDEC and AmbiENC, are recommended for the 3OA workflow. Source and
-  releases are available at
+  AmbiDEC and AmbiENC, are recommended for the 3OA workflow. Source and releases:
   <a href="https://github.com/leomccormack/SPARTA" target="_blank" rel="noopener noreferrer">leomccormack/SPARTA</a>.
 
 ## Install
@@ -223,16 +192,15 @@ Scripts/s3g-mc -> REAPER/Scripts/s3g-mc
 Effects/s3g    -> REAPER/Effects/s3g
 ```
 
-Then in REAPER:
+In REAPER:
 
 1. Open `Actions > Show action list...`.
 2. Click `New Action > Load ReaScript...`.
 3. Choose `REAPER/Scripts/s3g-mc/s3g-mc Package Browser.lua`.
 4. Run `s3g-mc Package Browser`.
-5. Click `Install/refresh actions` in the browser to register the package
-   scripts.
+5. Click `Install/refresh actions` in the browser.
 
-If new JSFX do not appear in the FX browser, rescan JSFX or restart REAPER.
+If the JSFX do not appear, rescan JSFX or restart REAPER.
 
 ## 3OA / SPARTA Setup
 
@@ -268,13 +236,11 @@ Load the included JSON layouts:
   `Scripts/s3g-mc/sparta_json/s3g_3oa_24_virtual_speakers_ambienc_source_layout.json`
   as the matching 24-point source layout.
 
-`MMD` is recommended for AmbiDEC because this workflow decodes to a custom
-irregular 24-point virtual speaker cloud before re-encoding, rather than to a
-standard symmetric speaker preset.
+`MMD` is recommended for AmbiDEC here because the workflow decodes to a custom
+irregular 24-point virtual speaker cloud before re-encoding.
 
-After adding or moving the 24-channel insert effect, use the package controller's
-`Pin inserts 1-24` button so the insert processes only the wet/effect lane and
-does not touch the dry copy or return mask lanes.
+After adding or moving the 24-channel insert, use the controller's `Pin inserts
+1-24` button so the effect only touches the wet/effect lane.
 
 More detail is in `Scripts/s3g-mc/s3g_3oa_fx_workflow.md`.
 
