@@ -1,0 +1,759 @@
+#!/usr/bin/env python3
+import json
+import math
+import struct
+import sys
+
+import numpy as np
+
+
+def riff_chunks(handle):
+    handle.seek(12)
+    while True:
+        header = handle.read(8)
+        if len(header) < 8:
+            break
+        chunk_id, size = struct.unpack("<4sI", header)
+        data_pos = handle.tell()
+        yield chunk_id, size, data_pos
+        handle.seek(data_pos + size + (size & 1))
+
+
+def read_wav(path):
+    with open(path, "rb") as handle:
+        if handle.read(4) != b"RIFF":
+            raise RuntimeError(f"Not a RIFF WAV file: {path}")
+        handle.read(4)
+        if handle.read(4) != b"WAVE":
+            raise RuntimeError(f"Not a WAVE file: {path}")
+        fmt = None
+        data_pos = None
+        data_size = None
+        for chunk_id, size, pos in riff_chunks(handle):
+            if chunk_id == b"fmt ":
+                handle.seek(pos)
+                fmt = handle.read(size)
+            elif chunk_id == b"data":
+                data_pos = pos
+                data_size = size
+        if fmt is None or data_pos is None:
+            raise RuntimeError(f"WAV is missing fmt or data chunk: {path}")
+        audio_format, channels, sample_rate, _byte_rate, block_align, bits = struct.unpack("<HHIIHH", fmt[:16])
+        if audio_format == 0xFFFE and len(fmt) >= 40:
+            audio_format = struct.unpack("<H", fmt[24:26])[0]
+        handle.seek(data_pos)
+        raw = handle.read(data_size)
+        frames = len(raw) // block_align
+        raw = raw[:frames * block_align]
+
+    if audio_format == 3 and bits == 32:
+        data = np.frombuffer(raw, dtype="<f4").astype(np.float32)
+    elif audio_format == 1 and bits == 16:
+        data = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
+    elif audio_format == 1 and bits == 24:
+        u8 = np.frombuffer(raw, dtype=np.uint8).reshape(frames * channels, 3).astype(np.int32)
+        vals = u8[:, 0] | (u8[:, 1] << 8) | (u8[:, 2] << 16)
+        vals = np.where(vals & 0x800000, vals - 0x1000000, vals)
+        data = vals.astype(np.float32) / 8388608.0
+    elif audio_format == 1 and bits == 32:
+        data = np.frombuffer(raw, dtype="<i4").astype(np.float32) / 2147483648.0
+    else:
+        raise RuntimeError(f"Unsupported WAV encoding {audio_format}, {bits} bit: {path}")
+    return data.reshape(frames, channels), int(sample_rate)
+
+
+def write_pcm24_wav(path, data, sample_rate):
+    if data.ndim == 1:
+        data = data[:, None]
+    channels = int(data.shape[1])
+    clipped = np.clip(np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0), -1.0, 1.0)
+    ints = np.rint(clipped * 8388607.0).astype("<i4", copy=False)
+    payload = bytearray(ints.shape[0] * ints.shape[1] * 3)
+    cursor = 0
+    for value in ints.reshape(-1):
+        as_int = int(value)
+        if as_int < 0:
+            as_int += 1 << 24
+        payload[cursor] = as_int & 0xFF
+        payload[cursor + 1] = (as_int >> 8) & 0xFF
+        payload[cursor + 2] = (as_int >> 16) & 0xFF
+        cursor += 3
+    if channels > 2:
+        pcm_guid = bytes.fromhex("0100000000001000800000aa00389b71")
+        fmt = struct.pack(
+            "<HHIIHHHHI",
+            0xFFFE,
+            channels,
+            int(sample_rate),
+            int(sample_rate) * channels * 3,
+            channels * 3,
+            24,
+            22,
+            24,
+            0,
+        ) + pcm_guid
+    else:
+        fmt = struct.pack("<HHIIHH", 1, channels, int(sample_rate), int(sample_rate) * channels * 3, channels * 3, 24)
+    payload = bytes(payload)
+    riff_size = 4 + (8 + len(fmt)) + (8 + len(payload))
+    if riff_size > 0xFFFFFFFF:
+        raise RuntimeError("Output WAV is larger than the standard RIFF limit.")
+    with open(path, "wb") as handle:
+        handle.write(b"RIFF")
+        handle.write(struct.pack("<I", riff_size))
+        handle.write(b"WAVE")
+        handle.write(b"fmt ")
+        handle.write(struct.pack("<I", len(fmt)))
+        handle.write(fmt)
+        handle.write(b"data")
+        handle.write(struct.pack("<I", len(payload)))
+        handle.write(payload)
+
+
+def segment(data, source_rate, start_seconds, duration_seconds, target_rate):
+    start = max(0, int(round(float(start_seconds) * source_rate)))
+    count = max(1, int(round(float(duration_seconds) * source_rate)))
+    out = data[start:start + count]
+    if out.size == 0:
+        return np.zeros((1, data.shape[1]), dtype=np.float32)
+    if source_rate != target_rate and out.shape[0] > 1:
+        old_x = np.arange(out.shape[0], dtype=np.float64)
+        new_size = max(1, int(round(out.shape[0] * target_rate / source_rate)))
+        new_x = np.linspace(0, out.shape[0] - 1, new_size, dtype=np.float64)
+        out = np.stack([np.interp(new_x, old_x, out[:, ch]).astype(np.float32) for ch in range(out.shape[1])], axis=1)
+    return out.astype(np.float32)
+
+
+def normalize_peak(audio, db):
+    peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+    if peak > 1e-12:
+        audio = audio * ((10.0 ** (float(db) / 20.0)) / peak)
+    return audio.astype(np.float32), peak
+
+
+def mean_neighbor_correlation(audio):
+    if audio.ndim < 2 or audio.shape[1] < 2 or audio.shape[0] < 8:
+        return 0.0
+    values = []
+    for ch in range(audio.shape[1]):
+        a = audio[:, ch]
+        b = audio[:, (ch + 1) % audio.shape[1]]
+        a = a - float(np.mean(a))
+        b = b - float(np.mean(b))
+        denom = math.sqrt(float(np.sum(a * a) * np.sum(b * b))) + 1e-12
+        values.append(float(np.sum(a * b)) / denom)
+    return float(np.mean(values)) if values else 0.0
+
+
+def parse_envelope(text):
+    points = []
+    for part in str(text or "").split(";"):
+        if ":" not in part:
+            continue
+        x, y = part.split(":", 1)
+        try:
+            points.append((float(x), float(y)))
+        except ValueError:
+            pass
+    if len(points) < 2:
+        return None
+    points.sort(key=lambda p: p[0])
+    return np.array(points, dtype=np.float64)
+
+
+def env_value(cfg, key, x, default):
+    env = parse_envelope(cfg.get("env_" + key, ""))
+    if env is None:
+        return float(default)
+    x = float(np.clip(x, 0.0, 1.0))
+    y = float(np.interp(x, env[:, 0], env[:, 1]))
+    return float(y)
+
+
+def apply_output_envelope(audio, cfg, key="amplitude"):
+    env = parse_envelope(cfg.get("env_" + key, ""))
+    if env is None or audio.size == 0:
+        return audio
+    x = np.linspace(0.0, 1.0, audio.shape[0], dtype=np.float64)
+    values = np.interp(x, env[:, 0], env[:, 1]).astype(np.float32)
+    return (audio * values[:, None]).astype(np.float32)
+
+
+def pan_weights(position, channels, width):
+    position = float(np.clip(position, 0.0, max(0, channels - 1)))
+    width = max(0.001, float(width))
+    idx = np.arange(channels, dtype=np.float64)
+    d = np.abs(idx - position)
+    d = np.minimum(d, channels - d)
+    weights = np.exp(-(d * d) / (2.0 * width * width))
+    weights /= math.sqrt(float(np.sum(weights * weights)) + 1e-12)
+    return weights.astype(np.float32)
+
+
+def render_dense_grain(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    source, source_rate = read_wav(cfg["source_path"])
+    source = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    source = source - np.mean(source, axis=0, keepdims=True)
+    channels = int(cfg["channels"])
+    duration = float(cfg["duration"])
+    frames = max(1, int(round(duration * sample_rate)))
+    out = np.zeros((frames, channels), dtype=np.float32)
+    grains = int(cfg["grains"])
+    grain_ms = float(cfg["grain_ms"])
+    grain_jitter = float(cfg.get("grain_jitter", 0.6))
+    pitch_scatter = float(cfg["pitch_scatter"])
+    spread = float(cfg["spread"])
+    density = float(cfg.get("density", 1.0))
+    channel_contrast = float(cfg.get("channel_contrast", 0.75))
+    source_bias = float(cfg.get("source_bias", 0.55))
+    density_shape = float(cfg.get("density_shape", 0.0))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+    max_source_start = max(1, source.shape[0] - 2)
+    accepted = 0
+    for _ in range(grains):
+        center = rng.random()
+        if density_shape < -0.05:
+            t = duration * (center ** (1.0 + abs(density_shape) * 3.0))
+        elif density_shape > 0.05:
+            t = duration * (1.0 - ((1.0 - center) ** (1.0 + density_shape * 3.0)))
+        else:
+            t = duration * center
+        event_u = t / max(0.000001, duration)
+        local_density = env_value(cfg, "density", event_u, density)
+        local_density = float(np.clip(local_density, 0.0, 1.0))
+        if rng.random() > local_density:
+            continue
+        local_spread = env_value(cfg, "spread", event_u, spread)
+        local_pitch_scatter = env_value(cfg, "pitch_scatter", event_u, pitch_scatter)
+        glen = max(8, int(round((grain_ms / 1000.0) * sample_rate * rng.uniform(1.0 - grain_jitter, 1.0 + grain_jitter))))
+        rate = 2.0 ** rng.uniform(-local_pitch_scatter, local_pitch_scatter)
+        src_len = max(2, int(math.ceil(glen * rate)) + 2)
+        pos = rng.random() * max(0, channels - 1)
+        primary_channel = int(round(pos)) % max(1, channels)
+        source_u = (rng.random() * (1.0 - source_bias) + (primary_channel / max(1, channels)) * source_bias) % 1.0
+        src_start = int(source_u * max(1, max_source_start - src_len))
+        src_channel = (primary_channel + int(rng.integers(0, max(1, source.shape[1])))) % source.shape[1]
+        src = source[src_start:src_start + src_len, src_channel]
+        if src.size < 2:
+            continue
+        x = np.linspace(0, src.size - 1, glen)
+        grain = np.interp(x, np.arange(src.size), src).astype(np.float32)
+        grain *= np.hanning(glen).astype(np.float32)
+        start = int(round(t * sample_rate)) - glen // 2
+        if start >= frames or start + glen <= 0:
+            continue
+        g0 = max(0, -start)
+        g1 = min(glen, frames - start)
+        weights = pan_weights(pos, channels, local_spread)
+        if channel_contrast > 0.001:
+            power = 1.0 + channel_contrast * 8.0
+            weights = np.power(weights, power)
+            weights /= math.sqrt(float(np.sum(weights * weights)) + 1e-12)
+        out[start + g0:start + g1, :] += grain[g0:g1, None] * weights[None, :]
+        accepted += 1
+    out *= float(cfg.get("gain", 1.0)) / math.sqrt(max(1.0, grains / 160.0))
+    out = apply_output_envelope(out, cfg, "amplitude")
+    corr = mean_neighbor_correlation(out)
+    if cfg.get("normalize", True):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print(f"Dense grain cloud grains: {grains}")
+    print(f"Accepted grains: {accepted}")
+    print(f"Density: {density:.3f}")
+    print(f"Output channels: {channels}")
+    print(f"Spatial spread: {spread:.3f}")
+    print(f"Channel contrast: {channel_contrast:.3f}")
+    print(f"Source bias: {source_bias:.3f}")
+    print(f"Mean neighbor correlation: {corr:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
+def render_ir_toolkit(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    data, source_rate = read_wav(cfg["source_path"])
+    audio = segment(data, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    threshold = 10.0 ** (float(cfg.get("trim_db", -70.0)) / 20.0)
+    mono = np.max(np.abs(audio), axis=1)
+    active = np.where(mono > threshold)[0]
+    if bool(cfg.get("trim", True)) and active.size:
+        pad = int(round(float(cfg.get("pad_ms", 5.0)) * sample_rate / 1000.0))
+        start = max(0, int(active[0]) - pad)
+        end = min(audio.shape[0], int(active[-1]) + pad + 1)
+        audio = audio[start:end]
+    if bool(cfg.get("early_reflections", False)):
+        count = int(cfg.get("reflection_count", 12))
+        rng = np.random.default_rng(int(cfg.get("seed", 1)))
+        extra = int(round(float(cfg.get("reflection_ms", 120.0)) * sample_rate / 1000.0))
+        wet = np.zeros((audio.shape[0] + extra, audio.shape[1]), dtype=np.float32)
+        wet[:audio.shape[0], :] += audio
+        for _ in range(count):
+            delay = int(rng.integers(16, max(17, extra)))
+            gain = rng.uniform(0.08, 0.45) * math.exp(-delay / max(1.0, extra * 0.55))
+            src_ch = int(rng.integers(0, audio.shape[1]))
+            dst_ch = int(rng.integers(0, audio.shape[1]))
+            wet[delay:delay + audio.shape[0], dst_ch] += audio[:, src_ch] * gain
+        audio = wet
+    decor = float(cfg.get("decorrelate", 0.0))
+    if decor > 0.001 and audio.shape[1] > 1:
+        rng = np.random.default_rng(int(cfg.get("seed", 1)) + 31)
+        wet = audio.copy()
+        max_delay = max(1, int(round(float(cfg.get("decor_ms", 18.0)) * sample_rate / 1000.0)))
+        for ch in range(audio.shape[1]):
+            delay = int(rng.integers(1, max_delay + 1))
+            shifted = np.zeros(audio.shape[0], dtype=np.float32)
+            shifted[delay:] = audio[:-delay, ch]
+            wet[:, ch] = audio[:, ch] * (1.0 - decor) + shifted * decor * rng.choice([-1.0, 1.0])
+        audio = wet
+    fade = int(round(float(cfg.get("tail_fade_ms", 25.0)) * sample_rate / 1000.0))
+    if fade > 1 and audio.shape[0] > fade:
+        audio[-fade:, :] *= np.linspace(1.0, 0.0, fade, dtype=np.float32)[:, None]
+    if bool(cfg.get("normalize", True)):
+        audio, pre_peak = normalize_peak(audio, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+    write_pcm24_wav(cfg["output_path"], audio, sample_rate)
+    print(f"IR toolkit output frames: {audio.shape[0]}")
+    print(f"Output channels: {audio.shape[1]}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
+def render_mass_partial(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    duration = float(cfg["duration"])
+    channels = int(cfg["channels"])
+    frames = max(1, int(round(duration * sample_rate)))
+    out = np.zeros((frames, channels), dtype=np.float32)
+    partials = int(cfg["partials"])
+    base = float(cfg["base_freq"])
+    spread_oct = float(cfg["spread_oct"])
+    event_ms = float(cfg["event_ms"])
+    drift = float(cfg["drift"])
+    brightness = float(cfg["brightness"])
+    spatial_width = float(cfg["spatial_width"])
+    density = float(cfg.get("density", 1.0))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+    accepted = 0
+    for _ in range(partials):
+        start = int(rng.integers(0, max(1, frames)))
+        event_u = start / max(1, frames - 1)
+        local_density = env_value(cfg, "density", event_u, density)
+        local_density = float(np.clip(local_density, 0.0, 1.0))
+        if rng.random() > local_density:
+            continue
+        local_drift = env_value(cfg, "drift", event_u, drift)
+        local_brightness = env_value(cfg, "brightness", event_u, brightness)
+        local_spatial_width = env_value(cfg, "spatial_width", event_u, spatial_width)
+        local_event_ms = env_value(cfg, "event_ms", event_u, event_ms)
+        length = max(64, int(round(local_event_ms * sample_rate / 1000.0 * rng.uniform(0.45, 1.8))))
+        if start + length > frames:
+            length = frames - start
+        if length < 16:
+            continue
+        harmonic = rng.choice([1, 2, 3, 4, 5, 7, 9, 11])
+        freq = base * harmonic * (2.0 ** rng.uniform(-spread_oct, spread_oct))
+        freq = float(np.clip(freq, 18.0, sample_rate * 0.42))
+        bend = 1.0 + local_drift * rng.uniform(-1.0, 1.0) * np.linspace(0.0, 1.0, length)
+        phase = 2.0 * math.pi * np.cumsum(freq * bend) / sample_rate + rng.uniform(0, 2 * math.pi)
+        env = np.sin(np.linspace(0, math.pi, length)) ** rng.uniform(1.2, 3.8)
+        amp = (0.12 / math.sqrt(max(1.0, partials / 80.0))) * (harmonic ** (-local_brightness))
+        tone = (np.sin(phase) * env * amp).astype(np.float32)
+        pos0 = rng.random() * max(0, channels - 1)
+        pos1 = np.clip(pos0 + rng.normal(0.0, channels * 0.18), 0.0, max(0, channels - 1))
+        w0 = pan_weights(pos0, channels, local_spatial_width)
+        w1 = pan_weights(pos1, channels, local_spatial_width)
+        u = np.linspace(0.0, 1.0, length, dtype=np.float32)[:, None]
+        weights = w0[None, :] * (1.0 - u) + w1[None, :] * u
+        weights /= np.sqrt(np.sum(weights * weights, axis=1, keepdims=True) + 1e-12)
+        out[start:start + length, :] += tone[:, None] * weights.astype(np.float32, copy=False)
+        accepted += 1
+    out = apply_output_envelope(out, cfg, "amplitude")
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print(f"Partial events: {partials}")
+    print(f"Accepted partial events: {accepted}")
+    print(f"Density: {density:.3f}")
+    print(f"Output channels: {channels}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
+def render_resonant_terrain(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    duration = float(cfg["duration"])
+    channels = int(cfg["channels"])
+    frames = max(1, int(round(duration * sample_rate)))
+    out = np.zeros((frames, channels), dtype=np.float32)
+    events = int(cfg["events"])
+    resonators = int(cfg["resonators"])
+    base = float(cfg["base_freq"])
+    spread_oct = float(cfg["spread_oct"])
+    decay_ms = float(cfg["decay_ms"])
+    strike_ms = float(cfg["strike_ms"])
+    inharmonic = float(cfg["inharmonic"])
+    roughness = float(cfg["roughness"])
+    spatial_width = float(cfg["spatial_width"])
+    feedback = float(cfg.get("feedback", 0.2))
+    density = float(cfg.get("density", 1.0))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+    ratios = np.array([1.0, 1.414, 1.618, 2.236, 2.718, 3.142, 4.236, 5.385, 6.854], dtype=np.float64)
+    resonator_freqs = []
+    for i in range(resonators):
+        ratio = ratios[i % ratios.size] * (1.0 + inharmonic * rng.normal(0.0, 0.08))
+        freq = base * ratio * (2.0 ** rng.uniform(-spread_oct, spread_oct))
+        resonator_freqs.append(float(np.clip(freq, 18.0, sample_rate * 0.43)))
+    resonator_freqs = np.array(resonator_freqs, dtype=np.float64)
+    strike_len = max(2, int(round(strike_ms * sample_rate / 1000.0)))
+    accepted = 0
+    for event in range(events):
+        t = (event + rng.random() * 0.9) / max(1, events)
+        local_density = env_value(cfg, "density", t, density)
+        local_density = float(np.clip(local_density, 0.0, 1.0))
+        if rng.random() > local_density:
+            continue
+        start = int(round(t * frames))
+        if start >= frames:
+            continue
+        local_decay_ms = env_value(cfg, "decay_ms", t, decay_ms)
+        local_roughness = env_value(cfg, "roughness", t, roughness)
+        local_spatial_width = env_value(cfg, "spatial_width", t, spatial_width)
+        pos0 = rng.random() * max(0, channels - 1)
+        pos1 = np.clip(pos0 + rng.normal(0.0, channels * 0.22), 0.0, max(0, channels - 1))
+        picked = rng.choice(resonators, size=max(1, min(4, resonators)), replace=False)
+        event_gain = rng.uniform(0.5, 1.0) / math.sqrt(max(1.0, events / 48.0))
+        for r_index in picked:
+            freq = resonator_freqs[int(r_index)] * (1.0 + local_roughness * rng.normal(0.0, 0.015))
+            local_decay = local_decay_ms * rng.uniform(0.45, 1.65)
+            length = min(frames - start, max(32, int(round(local_decay * sample_rate / 1000.0 * 3.0))))
+            if length <= 16:
+                continue
+            time = np.arange(length, dtype=np.float64) / sample_rate
+            env = np.exp(-time / max(0.001, local_decay / 1000.0))
+            strike = np.ones(length, dtype=np.float64)
+            attack = min(length, strike_len)
+            if attack > 1:
+                strike[:attack] = np.linspace(0.0, 1.0, attack)
+            phase = rng.uniform(0, 2 * math.pi)
+            carrier = np.sin(2.0 * math.pi * freq * time + phase)
+            if feedback > 0.001:
+                carrier += feedback * np.sin(2.0 * math.pi * freq * (1.0 + rng.uniform(0.006, 0.04)) * time + phase * 0.7)
+            tone = (carrier * env * strike * event_gain * 0.09).astype(np.float32)
+            w0 = pan_weights(pos0, channels, local_spatial_width)
+            w1 = pan_weights(pos1, channels, local_spatial_width)
+            u = np.linspace(0.0, 1.0, length, dtype=np.float32)[:, None]
+            weights = w0[None, :] * (1.0 - u) + w1[None, :] * u
+            weights /= np.sqrt(np.sum(weights * weights, axis=1, keepdims=True) + 1e-12)
+            out[start:start + length, :] += tone[:, None] * weights.astype(np.float32, copy=False)
+        accepted += 1
+    out = apply_output_envelope(out, cfg, "amplitude")
+    corr = mean_neighbor_correlation(out)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print(f"Excitation events: {events}")
+    print(f"Accepted excitation events: {accepted}")
+    print(f"Density: {density:.3f}")
+    print(f"Resonators: {resonators}")
+    print(f"Output channels: {channels}")
+    print(f"Mean neighbor correlation: {corr:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
+def render_partial_trace_resynth(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    source, source_rate = read_wav(cfg["source_path"])
+    source = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    if source.shape[0] < 8:
+        raise RuntimeError("Selected source segment is too short for partial trace resynthesis.")
+    mono = np.mean(source, axis=1).astype(np.float32)
+    mono = mono - float(np.mean(mono))
+    channels = int(cfg["channels"])
+    duration = float(cfg["duration"])
+    frames = max(1, int(round(duration * sample_rate)))
+    out = np.zeros((frames, channels), dtype=np.float32)
+    fft_size = max(128, int(cfg.get("fft_size", 2048)))
+    hop = max(16, int(cfg.get("hop", fft_size // 4)))
+    partials_per_frame = max(1, int(cfg.get("partials_per_frame", 10)))
+    partial_ms = float(cfg.get("partial_ms", 120.0))
+    floor_db = float(cfg.get("floor_db", -62.0))
+    pitch_scale = float(cfg.get("pitch_scale", 1.0))
+    trace_gain = float(cfg.get("trace_gain", 1.0))
+    density = float(cfg.get("density", 1.0))
+    drift = float(cfg.get("drift", 0.012))
+    brightness = float(cfg.get("brightness", 1.0))
+    spatial_width = float(cfg.get("spatial_width", 0.65))
+    trace_behavior = str(cfg.get("trace_behavior", "linked"))
+    track_tolerance_cents = float(cfg.get("track_tolerance_cents", 90.0))
+    min_track_frames = max(2, int(cfg.get("min_track_frames", 3)))
+    clarity_protect = bool(cfg.get("clarity_protect", True))
+    low_cut_hz = float(cfg.get("low_cut_hz", 30.0))
+    soft_limit = bool(cfg.get("soft_limit", False))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+
+    window = np.hanning(fft_size).astype(np.float32)
+    padded = np.pad(mono, (fft_size // 2, fft_size), mode="constant")
+    freqs = np.fft.rfftfreq(fft_size, 1.0 / sample_rate)
+    starts = list(range(0, max(1, padded.shape[0] - fft_size + 1), hop))
+    if not starts:
+        starts = [0]
+    max_mag = 0.0
+    spectra = []
+    for start in starts:
+        frame = padded[start:start + fft_size]
+        if frame.shape[0] < fft_size:
+            frame = np.pad(frame, (0, fft_size - frame.shape[0]), mode="constant")
+        mag = np.abs(np.fft.rfft(frame * window))
+        spectra.append(mag.astype(np.float32))
+        local_max = float(np.max(mag)) if mag.size else 0.0
+        if local_max > max_mag:
+            max_mag = local_max
+    if max_mag <= 1e-12:
+        raise RuntimeError("Selected source segment appears silent.")
+
+    floor = max_mag * (10.0 ** (floor_db / 20.0))
+    min_peak_hz = max(20.0, low_cut_hz if clarity_protect else 20.0)
+    skipped_low = freqs < min_peak_hz
+    peak_frames = []
+    admitted_peaks = 0
+    for frame_index, mag in enumerate(spectra):
+        u = frame_index / max(1, len(spectra) - 1)
+        candidate = mag.copy()
+        candidate[skipped_low] = 0.0
+        candidate[candidate < floor] = 0.0
+        nonzero = np.flatnonzero(candidate > 0.0)
+        if nonzero.size == 0:
+            peak_frames.append([])
+            continue
+        local_density = env_value(cfg, "density", u, density)
+        local_density = float(np.clip(local_density, 0.0, 1.0))
+        n = min(partials_per_frame, int(nonzero.size))
+        n = int(round(n * local_density))
+        if n < 1:
+            peak_frames.append([])
+            continue
+        if n < nonzero.size:
+            picked = np.argpartition(candidate, -n)[-n:]
+        else:
+            picked = nonzero
+        picked = picked[np.argsort(candidate[picked])[::-1]]
+        peaks = []
+        for rank, bin_index in enumerate(picked):
+            freq = float(freqs[int(bin_index)] * pitch_scale)
+            if freq < 20.0 or freq > sample_rate * 0.45:
+                continue
+            mag_norm = float(candidate[int(bin_index)] / max_mag)
+            peaks.append({"u": u, "freq": freq, "mag": mag_norm, "rank": rank, "count": n})
+            admitted_peaks += 1
+        peak_frames.append(peaks)
+
+    def spectral_position(freq, rank, count, u):
+        freq_pos = math.log2(max(20.0, freq) / 20.0) / math.log2(max(21.0, sample_rate * 0.45) / 20.0)
+        rank_pos = rank / max(1, count - 1)
+        return (freq_pos * 0.65 + rank_pos * 0.20 + u * 0.15) * max(0, channels - 1)
+
+    def add_trace(start_u, freq0, mag0, rank, count, length_mult, phase=None):
+        local_gain = env_value(cfg, "trace_gain", start_u, trace_gain)
+        local_drift = env_value(cfg, "drift", start_u, drift)
+        local_spatial_width = env_value(cfg, "spatial_width", start_u, spatial_width)
+        out_start = int(round(start_u * max(0, frames - 1)))
+        length = max(32, int(round(partial_ms * length_mult * sample_rate / 1000.0 * rng.uniform(0.75, 1.35))))
+        if out_start + length > frames:
+            length = frames - out_start
+        if length < 16:
+            return 0
+        amp = (mag0 ** brightness) * local_gain * 0.085 / math.sqrt(max(1.0, partials_per_frame / 6.0))
+        if amp <= 1e-7:
+            return 0
+        env_power = 0.85 if length_mult > 1.5 else 1.35
+        env = np.sin(np.linspace(0.0, math.pi, length, dtype=np.float64)) ** env_power
+        bend = 1.0 + local_drift * rng.normal(0.0, 0.55) * np.linspace(0.0, 1.0, length)
+        phase0 = rng.uniform(0.0, 2.0 * math.pi) if phase is None else phase
+        phase_array = phase0 + 2.0 * math.pi * np.cumsum(freq0 * bend) / sample_rate
+        tone = (np.sin(phase_array) * env * amp).astype(np.float32)
+        pos0 = spectral_position(freq0, rank, count, start_u)
+        wander = channels * (0.10 + local_drift * (0.45 if length_mult <= 1.5 else 0.90))
+        pos1 = (pos0 + rng.normal(0.0, wander)) % max(1, channels)
+        w0 = pan_weights(pos0, channels, local_spatial_width)
+        w1 = pan_weights(pos1, channels, local_spatial_width)
+        motion = np.linspace(0.0, 1.0, length, dtype=np.float32)[:, None]
+        weights = w0[None, :] * (1.0 - motion) + w1[None, :] * motion
+        weights /= np.sqrt(np.sum(weights * weights, axis=1, keepdims=True) + 1e-12)
+        out[out_start:out_start + length, :] += tone[:, None] * weights.astype(np.float32, copy=False)
+        return 1
+
+    def highpass(audio, cutoff_hz):
+        if cutoff_hz <= 0.0 or audio.shape[0] < 2:
+            return audio
+        cutoff_hz = min(float(cutoff_hz), sample_rate * 0.24)
+        rc = 1.0 / (2.0 * math.pi * cutoff_hz)
+        dt = 1.0 / sample_rate
+        alpha = rc / (rc + dt)
+        wet = np.empty_like(audio)
+        wet[0, :] = audio[0, :]
+        for index in range(1, audio.shape[0]):
+            wet[index, :] = alpha * (wet[index - 1, :] + audio[index, :] - audio[index - 1, :])
+        return wet.astype(np.float32)
+
+    traces = 0
+    linked_tracks = 0
+    if trace_behavior == "linked":
+        tracks = []
+        active = []
+        max_gap = 2
+        for frame_index, peaks in enumerate(peak_frames):
+            used_tracks = set()
+            next_active = []
+            for peak in sorted(peaks, key=lambda p: p["mag"], reverse=True):
+                best_track = None
+                best_cents = track_tolerance_cents
+                for track_index in active:
+                    if track_index in used_tracks:
+                        continue
+                    track = tracks[track_index]
+                    if frame_index - track["last_frame"] > max_gap:
+                        continue
+                    cents = abs(1200.0 * math.log2(max(1e-9, peak["freq"]) / max(1e-9, track["last_freq"])))
+                    if cents < best_cents:
+                        best_cents = cents
+                        best_track = track_index
+                if best_track is None:
+                    tracks.append({
+                        "points": [peak],
+                        "last_freq": peak["freq"],
+                        "last_frame": frame_index,
+                    })
+                    next_active.append(len(tracks) - 1)
+                else:
+                    tracks[best_track]["points"].append(peak)
+                    tracks[best_track]["last_freq"] = peak["freq"]
+                    tracks[best_track]["last_frame"] = frame_index
+                    used_tracks.add(best_track)
+                    next_active.append(best_track)
+            for track_index in active:
+                if frame_index - tracks[track_index]["last_frame"] <= max_gap and track_index not in next_active:
+                    next_active.append(track_index)
+            active = next_active
+
+        for track in tracks:
+            points = track["points"]
+            if len(points) < min_track_frames:
+                continue
+            phase = rng.uniform(0.0, 2.0 * math.pi)
+            linked_tracks += 1
+            for index in range(len(points) - 1):
+                p0 = points[index]
+                p1 = points[index + 1]
+                start = int(round(p0["u"] * max(0, frames - 1)))
+                end = int(round(p1["u"] * max(0, frames - 1)))
+                length = max(8, end - start)
+                if start >= frames:
+                    continue
+                if start + length > frames:
+                    length = frames - start
+                if length < 8:
+                    continue
+                mid_u = (p0["u"] + p1["u"]) * 0.5
+                local_gain = env_value(cfg, "trace_gain", mid_u, trace_gain)
+                local_drift = env_value(cfg, "drift", mid_u, drift)
+                local_spatial_width = env_value(cfg, "spatial_width", mid_u, spatial_width)
+                freq_line = np.linspace(p0["freq"], p1["freq"], length, dtype=np.float64)
+                if local_drift > 0.0001:
+                    freq_line *= 1.0 + local_drift * rng.normal(0.0, 0.15)
+                amp_line = np.linspace(p0["mag"], p1["mag"], length, dtype=np.float64) ** brightness
+                amp_line *= local_gain * 0.060 / math.sqrt(max(1.0, partials_per_frame / 6.0))
+                if index == 0:
+                    ramp = min(length, max(8, int(0.015 * sample_rate)))
+                    amp_line[:ramp] *= np.linspace(0.0, 1.0, ramp)
+                if index == len(points) - 2:
+                    ramp = min(length, max(8, int(0.020 * sample_rate)))
+                    amp_line[-ramp:] *= np.linspace(1.0, 0.0, ramp)
+                phase_array = phase + 2.0 * math.pi * np.cumsum(freq_line) / sample_rate
+                phase = float(phase_array[-1] % (2.0 * math.pi))
+                tone = (np.sin(phase_array) * amp_line).astype(np.float32)
+                pos0 = spectral_position(p0["freq"], p0["rank"], p0["count"], p0["u"])
+                pos1 = spectral_position(p1["freq"], p1["rank"], p1["count"], p1["u"])
+                w0 = pan_weights(pos0, channels, local_spatial_width)
+                w1 = pan_weights(pos1, channels, local_spatial_width)
+                motion = np.linspace(0.0, 1.0, length, dtype=np.float32)[:, None]
+                weights = w0[None, :] * (1.0 - motion) + w1[None, :] * motion
+                weights /= np.sqrt(np.sum(weights * weights, axis=1, keepdims=True) + 1e-12)
+                out[start:start + length, :] += tone[:, None] * weights.astype(np.float32, copy=False)
+                traces += 1
+    else:
+        if trace_behavior == "smear":
+            length_mult = 2.8
+            stride = 1
+        elif trace_behavior == "freeze":
+            length_mult = 7.5
+            stride = max(1, int(round(700.0 / max(1.0, partial_ms))))
+        else:
+            length_mult = 1.0
+            stride = 1
+        for frame_index, peaks in enumerate(peak_frames):
+            if frame_index % stride != 0:
+                continue
+            for peak in peaks:
+                traces += add_trace(peak["u"], peak["freq"], peak["mag"], peak["rank"], peak["count"], length_mult)
+
+    if clarity_protect:
+        out -= np.mean(out, axis=0, keepdims=True)
+        if low_cut_hz > 0.0:
+            out = highpass(out, low_cut_hz)
+        if soft_limit:
+            protect_peak = float(np.max(np.abs(out))) if out.size else 0.0
+            if protect_peak > 1.20:
+                ceiling = 0.88
+                out = (ceiling * np.tanh(out / ceiling)).astype(np.float32)
+    out = apply_output_envelope(out, cfg, "amplitude")
+    corr = mean_neighbor_correlation(out)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print(f"Trace behavior: {trace_behavior}")
+    print(f"Analysis frames: {len(spectra)}")
+    print(f"Admitted peaks: {admitted_peaks}")
+    print(f"Oscillator traces: {traces}")
+    print(f"Density: {density:.3f}")
+    if trace_behavior == "linked":
+        print(f"Linked tracks: {linked_tracks}")
+    print(f"FFT size: {fft_size}")
+    print(f"Hop: {hop}")
+    print(f"Output channels: {channels}")
+    print(f"Clarity protect: {clarity_protect}")
+    if clarity_protect:
+        print(f"Low cut: {low_cut_hz:.1f} Hz")
+        print(f"Soft limit: {soft_limit}")
+    print(f"Mean neighbor correlation: {corr:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
+def main():
+    if len(sys.argv) != 3:
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth> <manifest.json>")
+    mode = sys.argv[1]
+    with open(sys.argv[2], "r", encoding="utf-8") as handle:
+        cfg = json.load(handle)
+    if mode == "dense_grain":
+        render_dense_grain(cfg)
+    elif mode == "ir_toolkit":
+        render_ir_toolkit(cfg)
+    elif mode == "mass_partial":
+        render_mass_partial(cfg)
+    elif mode == "resonant_terrain":
+        render_resonant_terrain(cfg)
+    elif mode == "partial_trace_resynth":
+        render_partial_trace_resynth(cfg)
+    else:
+        raise RuntimeError(f"Unknown render mode: {mode}")
+
+
+if __name__ == "__main__":
+    main()

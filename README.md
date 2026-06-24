@@ -37,6 +37,33 @@ appropriate.
   Uses the same breakpoint routing interface for slower spectral-mass and
   resonance-based synthesis, with algorithm-specific channel-motion models.
 
+### Offline Synthesis / IR
+
+These NumPy-backed renderers are for offline processes that are too dense or
+array-oriented to fit comfortably in Lua or JSFX. The synth renderers include
+breakpoint envelopes for shaping key parameters over the rendered duration.
+Density controls event or peak admission before synthesis, not post-render
+amplitude, so drawn density shapes change texture occupancy without adding gain
+modulation.
+
+- `Dense Grain Cloud`: renders thousands of source-item grains into a new
+  multichannel media item with pitch scatter, spatial spread, density shaping,
+  breakpoint envelopes, and overlap-safe normalization.
+- `IR Toolkit`: reshapes a selected impulse response item with silence trim,
+  tail fade, peak normalization, optional early reflections, and channel
+  decorrelation.
+- `Mass Partial Field`: renders a high-density additive field with thousands of
+  independent partial events, frequency drift, envelopes, and multichannel
+  motion, with breakpoint control over amplitude, density, and event behavior.
+- `Partial Trace Resynth`: analyzes prominent spectral peaks from one selected
+  source item and renders them as a multichannel oscillator field with
+  breakpoint control over amplitude, density, trace gain, drift, and spatial
+  width.
+- `Resonant Terrain`: renders sparse excitation events through inharmonic
+  resonator banks, producing struck-metal, synthetic-IR, and multichannel
+  resonant-dust materials with breakpoint control over amplitude, density,
+  decay, and spatial width.
+
 ### Spatial / HOA
 
 - `25ch Cosine Dome Panner`: soft angular-focus panning for up to 8 mono
@@ -157,11 +184,16 @@ These scripts do not require CDP.
 
 ### Track Building / Routing
 
-- `Build multichannel stem from selected tracks`
+- `Build multichannel stem from selected tracks`: routes selected tracks to
+  consecutive channels on a new multichannel destination, then prompts to render
+  a bounded stem.
 - `Cycle mono tracks into multichannel stem`: selected mono tracks become a
   multichannel stem, with repeat or grouped
   downmix behavior when the requested output count differs from the source
   count.
+- `Route selected tracks to multichannel folder bus`: creates a new parent
+  folder bus above the selected tracks, moves the selected tracks into it, and
+  assigns each child track's parent send to consecutive bus channels.
 
 ## Dependencies
 

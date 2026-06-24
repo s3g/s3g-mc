@@ -39,12 +39,26 @@ local CATEGORY_ORDER = {
   "All",
   "Channel Mixing / Automation",
   "Procedural Synthesis",
+  "Offline Synthesis / IR",
   "Spatial / HOA",
   "Spectral / Convolution",
   "Multichannel Texture / Montage",
   "Item Channel Transforms",
   "Track Building / Routing",
   "Package / Utilities",
+}
+
+local CATEGORY_LABELS = {
+  ["All"] = "All",
+  ["Channel Mixing / Automation"] = "Channel Mixing",
+  ["Procedural Synthesis"] = "Procedural Synth",
+  ["Offline Synthesis / IR"] = "Offline Synth / IR",
+  ["Spatial / HOA"] = "Spatial / HOA",
+  ["Spectral / Convolution"] = "Spectral / Convolution",
+  ["Multichannel Texture / Montage"] = "Texture / Montage",
+  ["Item Channel Transforms"] = "Item Transforms",
+  ["Track Building / Routing"] = "Track Routing",
+  ["Package / Utilities"] = "Package",
 }
 
 local function path_join(left, right)
@@ -231,8 +245,22 @@ local function register_actions()
 end
 
 local function category_button(label)
-  local shown = active_category == label and ("*" .. label) or label
+  local display = CATEGORY_LABELS[label] or label
+  local shown = active_category == label and ("*" .. display) or display
   if ImGui.Button(ctx, shown) then active_category = label end
+end
+
+local function draw_category_buttons()
+  local rows = {
+    { "All", "Channel Mixing / Automation", "Procedural Synthesis", "Offline Synthesis / IR", "Spatial / HOA" },
+    { "Spectral / Convolution", "Multichannel Texture / Montage", "Item Channel Transforms", "Track Building / Routing", "Package / Utilities" },
+  }
+  for _, row in ipairs(rows) do
+    for index, category in ipairs(row) do
+      if index > 1 then ImGui.SameLine(ctx) end
+      category_button(category)
+    end
+  end
 end
 
 local function wrapped_line_count(text, width)
@@ -358,10 +386,7 @@ local function loop()
     ImGui.SetNextItemWidth(ctx, 120)
     changed, detail_level = ImGui.SliderInt(ctx, "Detail", detail_level, 1, 3)
 
-    for i, category in ipairs(CATEGORY_ORDER) do
-      if i > 1 then ImGui.SameLine(ctx) end
-      category_button(category)
-    end
+    draw_category_buttons()
 
     ImGui.Separator(ctx)
     ImGui.Text(ctx, status)
