@@ -1,10 +1,10 @@
 -- @description Shred / Slice
 -- @author s3g
--- @version 0.2
+-- @version 0.3
 -- @requires ReaImGui; Multichannel Library.lua; REAPER multichannel stem render action
 -- @category Multichannel Texture / Montage
 -- @render Yes; bounds to source item length.
--- @method Slices the selected item by equal divisions or project markers, then spreads mono slices or reorients multichannel slices across the output channels.
+-- @method Slices the selected item by equal divisions, project markers, or active-take markers, then spreads mono slices or reorients multichannel slices across the output channels.
 -- @about
 --   Builds a new multichannel render from the selected item. Ordered mono
 --   spread keeps slices in time order and cycles them evenly through the
@@ -35,7 +35,7 @@ local MODE_RANDOM_ROTATE = 4
 
 local SLICE_MODE_NAMES = {
   [SLICE_EQUAL] = "Equal divisions",
-  [SLICE_MARKERS] = "Project markers",
+  [SLICE_MARKERS] = "Markers",
 }
 
 local MOTION_MODE_NAMES = {
@@ -60,7 +60,7 @@ local function clamp_fade(fade_seconds, length)
 end
 
 local function slice_mode_label(mode)
-  if mode == SLICE_MARKERS then return "project markers" end
+  if mode == SLICE_MARKERS then return "markers" end
   return "equal divisions"
 end
 
@@ -84,30 +84,49 @@ local function equal_slices(count, source_length)
   return slices
 end
 
-local function marker_slices(item_position, source_length)
+local function add_take_marker_points(points, item, source_length)
+  if not item then return end
+  local take = reaper.GetActiveTake(item)
+  if not take then return end
+  local marker_count = reaper.GetNumTakeMarkers(take) or 0
+  if marker_count <= 0 then return end
+  local start_offset = reaper.GetMediaItemTakeInfo_Value(take, "D_STARTOFFS")
+  local playrate = reaper.GetMediaItemTakeInfo_Value(take, "D_PLAYRATE")
+  if math.abs(playrate) < 0.000001 then playrate = 1 end
+
+  for index = 0, marker_count - 1 do
+    local source_position = reaper.GetTakeMarker(take, index, "", 0, 0)
+    local item_relative = (source_position - start_offset) / playrate
+    if item_relative > 0 and item_relative < source_length then
+      points[#points + 1] = item_relative
+    end
+  end
+end
+
+local function marker_slices(item, item_position, source_length)
   local item_end = item_position + source_length
-  local points = { item_position }
+  local points = { 0 }
   local _, marker_count, region_count = reaper.CountProjectMarkers(0)
   local total = marker_count + region_count
 
   for index = 0, total - 1 do
     local ok, is_region, marker_position = reaper.EnumProjectMarkers3(0, index)
     if ok and not is_region and marker_position > item_position and marker_position < item_end then
-      points[#points + 1] = marker_position
+      points[#points + 1] = marker_position - item_position
     end
   end
 
-  points[#points + 1] = item_end
+  add_take_marker_points(points, item, source_length)
+  points[#points + 1] = source_length
   table.sort(points)
 
   local slices = {}
   local output_start = 0
   for index = 1, #points - 1 do
-    local slice_start = points[index] - item_position
     local length = points[index + 1] - points[index]
     if length > 0 then
       slices[#slices + 1] = {
-        source_start = slice_start,
+        source_start = points[index],
         output_start = output_start,
         length = length,
       }
@@ -164,11 +183,11 @@ local function run_process(item, take, source_channels, slice_mode, motion_mode,
   local source_length = reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
   local source_start_offset = reaper.GetMediaItemTakeInfo_Value(take, "D_STARTOFFS")
   local source_playrate = reaper.GetMediaItemTakeInfo_Value(take, "D_PLAYRATE")
-  local slices = slice_mode == SLICE_MARKERS and marker_slices(source_position, source_length) or
+  local slices = slice_mode == SLICE_MARKERS and marker_slices(item, source_position, source_length) or
     equal_slices(slice_count, source_length)
 
   if #slices < 2 then
-    mc.show_error("Need at least two slices. Add project markers inside the item or use equal slicing.")
+    mc.show_error("Need at least two slices. Add project markers or active-take markers inside the item, or use equal slicing.")
     return
   end
 
@@ -335,7 +354,7 @@ local function main()
       if slice_mode == SLICE_EQUAL then
         changed, slice_count = ImGui.SliderInt(ctx, "Slices", slice_count, 2, 256)
       else
-        ImGui.Text(ctx, "Slices: project markers inside item")
+        ImGui.Text(ctx, "Slices: project or active-take markers inside item")
       end
 
       if mono_motion then

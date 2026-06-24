@@ -1,10 +1,10 @@
 -- @description Marker spatial montage
 -- @author s3g
--- @version 0.1
+-- @version 0.2
 -- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
 -- @category Multichannel Texture / Montage
 -- @render Yes; bounds to source item length.
--- @method Uses project markers inside the selected item as source chunks, then distributes them across a multichannel output.
+-- @method Uses project markers or active-take markers inside the selected item as source chunks, then distributes them across a multichannel output.
 
 local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
@@ -47,8 +47,8 @@ local function main()
   math.randomseed(os.time())
   local position = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
   local length = reaper.GetMediaItemInfo_Value(item, "D_LENGTH")
-  local chunks = tex.marker_slices(position, length)
-  if #chunks < 2 then mc.show_error("Add at least one project marker inside the selected item.") return end
+  local chunks = tex.marker_slices(position, length, item)
+  if #chunks < 2 then mc.show_error("Add at least one project marker or active-take marker inside the selected item.") return end
   local order = order_mode == 2 and shuffled_indices(#chunks) or nil
   local events = {}
   local output_start = 0

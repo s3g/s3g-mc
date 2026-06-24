@@ -39,6 +39,7 @@ local CATEGORY_ORDER = {
   "All",
   "Channel Mixing / Automation",
   "Spatial / HOA",
+  "Spectral / Convolution",
   "Multichannel Texture / Montage",
   "Item Channel Transforms",
   "Track Building / Routing",

@@ -35,6 +35,33 @@ Spatial Audio Studio.
 See the 3OA / SPARTA Setup section later in this document for the separate
 third-order ambisonic send/return workflow.
 
+### Spectral / Convolution
+
+These offline processes are inspired by spectral tool families such as
+<a href="https://www.composersdesktop.com/" target="_blank" rel="noopener noreferrer">CDP</a>,
+<a href="https://www.soundhack.com/freeware/the-boneyard/" target="_blank" rel="noopener noreferrer">SoundHack</a>,
+<a href="https://github.com/ericlyon/FFTease3.0-MaxMSP" target="_blank" rel="noopener noreferrer">FFTease</a>, and
+<a href="https://www.michaelnorris.info/software/soundmagic-spectral" target="_blank" rel="noopener noreferrer">SoundMagic Spectral</a>,
+but run from the package's Python/NumPy backend.
+
+- `Convolve selected items`: SoundHack-inspired offline convolution of two
+  selected media items, with mono, stereo, and multichannel source/impulse
+  channel-pairing modes.
+- `Cross Synthesis`: offline STFT cross-synthesis for two WAV-backed media
+  items. The first selected item keeps phase and timing while its spectral
+  magnitudes are blended toward the second item's magnitudes.
+- `Shapee Spectral Shaper`: FFTease shapee-inspired offline spectral envelope
+  transfer for two WAV-backed media items. The first selected item is the
+  carrier/tune/timing source; the second supplies the spectral envelope or
+  formant shape.
+- `Spectral Blur`: offline magnitude blur across neighboring STFT frames, with
+  safe envelope mode and optional time expansion.
+- `Spectral Freeze`: imposes one selected spectral frame across the item while
+  preserving phase/timing motion, with safe envelope mode, envelope floor, and
+  optional time expansion.
+- `Spectral Spatializer`: distributes frequency bins across even output channel
+  counts from 2 to 64.
+
 ### Item Channel Transforms
 
 - `Explode multichannel item to mono tracks`
@@ -72,11 +99,15 @@ These scripts do not require CDP.
   multichannel gate pattern.
 - `Frame Shift`: channel-frame rotation, mirror,
   odd/even split, pair interleave, or half-swap render.
-- `Marker Spatial Montage`: project markers inside the selected item define
-  chunks for ordered or shuffled montage.
+- `Marker Spatial Montage`: project markers or active-take markers inside the
+  selected item define chunks for ordered or shuffled montage.
 - `Mono Fill`: one source channel fills every output channel with optional gain
   compensation and slice rotation.
-- `Shred / Slice`: equal or project-marker slices with
+- `Scatter Slices`: multiple selected items are sliced by equal divisions,
+  project markers, or active-take markers, then randomly arranged across a
+  target multichannel duration with scatter, ordered-walk, stutter, repeater,
+  channel-smear, channel-motion, shape, and breakpoint-density variations.
+- `Shred / Slice`: equal, project-marker, or active-take-marker slices with
   ordered mono spread, random mono scatter, and multichannel reorientation
   modes.
 - `Spatial Repeater`: repeated prints of one source channel
@@ -106,6 +137,11 @@ These scripts do not require CDP.
 - <a href="https://sws-extension.org/" target="_blank" rel="noopener noreferrer">SWS Extension</a> is recommended for render-based
   workflows. Source is available at
   <a href="https://github.com/reaper-oss/sws" target="_blank" rel="noopener noreferrer">reaper-oss/sws</a>.
+- <a href="https://www.python.org/downloads/" target="_blank" rel="noopener noreferrer">Python 3</a>
+  with <a href="https://numpy.org/install/" target="_blank" rel="noopener noreferrer">NumPy</a>
+  is required for offline spectral and convolution processes. If REAPER cannot
+  find the intended Python, place a `python3_path.txt` file beside the scripts
+  containing the full path to `python3`.
 - <a href="https://leomccormack.github.io/sparta-site/" target="_blank" rel="noopener noreferrer">SPARTA plugins</a>, specifically
   AmbiDEC and AmbiENC, are recommended for the 3OA workflow. Source and
   releases are available at

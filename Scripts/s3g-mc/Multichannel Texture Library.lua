@@ -26,17 +26,37 @@ function T.equal_slices(count, duration)
   return slices
 end
 
-function T.marker_slices(item_position, duration)
+local function add_take_marker_points(points, item, duration)
+  if not item then return end
+  local take = reaper.GetActiveTake(item)
+  if not take then return end
+  local marker_count = reaper.GetNumTakeMarkers(take) or 0
+  if marker_count <= 0 then return end
+  local start_offset = reaper.GetMediaItemTakeInfo_Value(take, "D_STARTOFFS")
+  local playrate = reaper.GetMediaItemTakeInfo_Value(take, "D_PLAYRATE")
+  if math.abs(playrate) < 0.000001 then playrate = 1 end
+
+  for index = 0, marker_count - 1 do
+    local source_position = reaper.GetTakeMarker(take, index, "", 0, 0)
+    local item_relative = (source_position - start_offset) / playrate
+    if item_relative > 0 and item_relative < duration then
+      points[#points + 1] = item_relative
+    end
+  end
+end
+
+function T.marker_slices(item_position, duration, item)
   local item_end = item_position + duration
-  local points = { item_position }
+  local points = { 0 }
   local _, marker_count, region_count = reaper.CountProjectMarkers(0)
   for index = 0, marker_count + region_count - 1 do
     local ok, is_region, marker_position = reaper.EnumProjectMarkers3(0, index)
     if ok and not is_region and marker_position > item_position and marker_position < item_end then
-      points[#points + 1] = marker_position
+      points[#points + 1] = marker_position - item_position
     end
   end
-  points[#points + 1] = item_end
+  add_take_marker_points(points, item, duration)
+  points[#points + 1] = duration
   table.sort(points)
 
   local slices = {}
@@ -45,7 +65,7 @@ function T.marker_slices(item_position, duration)
     local length = points[index + 1] - points[index]
     if length > 0 then
       slices[#slices + 1] = {
-        source_start = points[index] - item_position,
+        source_start = points[index],
         output_start = output_start,
         length = length,
       }
