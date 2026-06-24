@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category Spectral / Convolution
 -- @render Yes; writes a new spectrally-shaped media item.
--- @method FFTease shapee-inspired offline spectral envelope transfer. Select two WAV-backed media items: carrier first, shaper second. The carrier keeps timing/phase while the shaper supplies the spectral envelope.
+-- @method FFTease shapee-inspired offline spectral envelope transfer with an alternate CDP/SoundThread-inspired formant-vocode algorithm. Select two WAV-backed media items: carrier first, shaper second. The carrier keeps timing and phase while the shaper supplies either the spectral envelope or broad formant contour.
 -- @about
 --   Uses NumPy STFT/ISTFT to apply the shaper item's spectral envelope to the
 --   carrier item. The result is inserted on a new track and REAPER is asked to
@@ -34,6 +34,16 @@ local FFT_VALUES = {
   [2] = 2048,
   [3] = 4096,
   [4] = 8192,
+}
+
+local ALGORITHM_NAMES = {
+  [1] = "Shapee envelope transfer",
+  [2] = "Formant vocode",
+}
+
+local ALGORITHM_VALUES = {
+  [1] = "shapee",
+  [2] = "formant_vocode",
 }
 
 local function shell_quote(path)
@@ -340,6 +350,62 @@ def shape_transfer_channel(carrier, shaper, sample_rate, cfg):
     out = out[:carrier.size].astype(np.float32)
     return (carrier * (1.0 - mix) + out * mix).astype(np.float32), frame_count
 
+def formant_vocode_channel(carrier, shaper, sample_rate, cfg):
+    fft_size = int(cfg["fft_size"])
+    overlap = int(cfg["overlap"])
+    hop = max(1, fft_size // overlap)
+    window = np.hanning(fft_size).astype(np.float32)
+    if carrier.size == 0:
+        return carrier, 0
+    shaper = resample_1d(shaper, carrier.size)
+    pad = fft_size
+    carrier_padded = np.pad(carrier.astype(np.float32), (0, pad))
+    shaper_padded = np.pad(shaper.astype(np.float32), (0, pad))
+    out = np.zeros(carrier_padded.size + fft_size, dtype=np.float64)
+    norm = np.zeros_like(out)
+    amount = np.clip(float(cfg["amount"]), 0.0, 1.0)
+    mix = np.clip(float(cfg["mix"]), 0.0, 1.0)
+    contrast = max(0.05, float(cfg["contrast"]))
+    floor = max(0.001, float(cfg["floor"]))
+    smooth = max(3, int(cfg["smooth_bins"]))
+    if smooth % 2 == 0:
+        smooth += 1
+    frame_count = 0
+    for start in range(0, carrier_padded.size - fft_size + 1, hop):
+        carrier_frame = carrier_padded[start:start + fft_size] * window
+        shaper_frame = shaper_padded[start:start + fft_size] * window
+        carrier_spec = np.fft.rfft(carrier_frame)
+        shaper_spec = np.fft.rfft(shaper_frame)
+        carrier_mag = np.abs(carrier_spec)
+        shaper_mag = np.abs(shaper_spec)
+        carrier_env = smooth_bins(carrier_mag, smooth)
+        shaper_env = smooth_bins(shaper_mag, smooth)
+        c_mean = float(np.mean(carrier_mag)) if carrier_mag.size else 0.0
+        ce_mean = float(np.mean(carrier_env)) if carrier_env.size else 0.0
+        se_mean = float(np.mean(shaper_env)) if shaper_env.size else 0.0
+        if c_mean <= 1e-12 or ce_mean <= 1e-12 or se_mean <= 1e-12:
+            target_mag = carrier_mag
+        else:
+            residual = carrier_mag / np.maximum(carrier_env, floor * ce_mean)
+            envelope = shaper_env * (c_mean / se_mean)
+            envelope = np.power(np.maximum(envelope, floor * c_mean), contrast)
+            e_mean = float(np.mean(envelope)) if envelope.size else 0.0
+            if e_mean > 1e-12:
+                envelope *= c_mean / e_mean
+            target_mag = residual * envelope
+            t_mean = float(np.mean(target_mag)) if target_mag.size else 0.0
+            if t_mean > 1e-12:
+                target_mag *= c_mean / t_mean
+        shaped_spec = (carrier_mag * (1.0 - amount) + target_mag * amount) * np.exp(1j * np.angle(carrier_spec))
+        wet = np.fft.irfft(shaped_spec, fft_size)
+        out[start:start + fft_size] += wet * window
+        norm[start:start + fft_size] += window * window
+        frame_count += 1
+    nz = norm > 1e-9
+    out[nz] /= norm[nz]
+    out = out[:carrier.size].astype(np.float32)
+    return (carrier * (1.0 - mix) + out * mix).astype(np.float32), frame_count
+
 with open(sys.argv[1], "r", encoding="utf-8") as handle:
     cfg = json.load(handle)
 
@@ -356,7 +422,10 @@ channels = []
 total_frames = 0
 for ch in range(carrier_audio.shape[1]):
     shaper_ch = ch % shaper_audio.shape[1]
-    shaped, frames = shape_transfer_channel(carrier_audio[:, ch], shaper_audio[:, shaper_ch], int(cfg["sample_rate"]), cfg)
+    if cfg.get("algorithm", "shapee") == "formant_vocode":
+        shaped, frames = formant_vocode_channel(carrier_audio[:, ch], shaper_audio[:, shaper_ch], int(cfg["sample_rate"]), cfg)
+    else:
+        shaped, frames = shape_transfer_channel(carrier_audio[:, ch], shaper_audio[:, shaper_ch], int(cfg["sample_rate"]), cfg)
     channels.append(shaped)
     total_frames += frames
 
@@ -368,6 +437,7 @@ if cfg.get("normalize", False):
 peak = float(np.max(np.abs(result))) if result.size else 0.0
 print("Carrier peak:", float(np.max(np.abs(carrier_audio))) if carrier_audio.size else 0.0)
 print("Shaper peak:", float(np.max(np.abs(shaper_audio))) if shaper_audio.size else 0.0)
+print("Algorithm:", cfg.get("algorithm", "shapee"))
 print("Output peak:", peak)
 print("STFT frames:", total_frames)
 write_pcm24_wav(cfg["output_path"], result, int(cfg["sample_rate"]))
@@ -383,6 +453,7 @@ local function write_manifest(path, data)
   file:write("  \"carrier_path\": " .. json_string(data.carrier_path) .. ",\n")
   file:write("  \"shaper_path\": " .. json_string(data.shaper_path) .. ",\n")
   file:write("  \"output_path\": " .. json_string(data.output_path) .. ",\n")
+  file:write("  \"algorithm\": " .. json_string(data.algorithm or "shapee") .. ",\n")
   file:write("  \"sample_rate\": " .. tostring(data.sample_rate) .. ",\n")
   file:write("  \"carrier_start_offset\": " .. tostring(data.carrier_start_offset or 0) .. ",\n")
   file:write("  \"carrier_duration\": " .. tostring(data.carrier_duration or 0) .. ",\n")
@@ -424,7 +495,7 @@ local function insert_output_item(path, label, position, channel_count)
   return item, nil
 end
 
-local function run_shapee(carrier, shaper, fft_index, amount, mix, smooth_bins, contrast, floor, normalize, normalize_db, swap)
+local function run_shapee(carrier, shaper, algorithm_index, fft_index, amount, mix, smooth_bins, contrast, floor, normalize, normalize_db, swap)
   if swap then carrier, shaper = shaper, carrier end
   local python = find_python()
   if not python then mc.show_error("python3 was not found.") return end
@@ -477,6 +548,7 @@ local function run_shapee(carrier, shaper, fft_index, amount, mix, smooth_bins, 
     carrier_path = carrier.filename,
     shaper_path = shaper.filename,
     output_path = output_path,
+    algorithm = ALGORITHM_VALUES[algorithm_index] or "shapee",
     sample_rate = sample_rate,
     carrier_start_offset = carrier.start_offset,
     carrier_duration = carrier.length * math.max(0.000001, carrier.playrate),
@@ -515,12 +587,13 @@ local function run_shapee(carrier, shaper, fft_index, amount, mix, smooth_bins, 
   local lines = {
     "Carrier: " .. carrier.name .. " (" .. tostring(carrier.channels) .. "ch)",
     "Shaper: " .. shaper.name .. " (" .. tostring(shaper.channels) .. "ch)",
-    "Backend: Python WAV reader + NumPy STFT envelope transfer",
+    "Backend: Python WAV reader + NumPy STFT",
+    "Algorithm: " .. (ALGORITHM_NAMES[algorithm_index] or "Shapee envelope transfer"),
     "FFT: " .. tostring(FFT_VALUES[fft_index] or 2048),
-    "Envelope amount: " .. string.format("%.3f", amount),
+    (algorithm_index == 2 and "Formant amount: " or "Envelope amount: ") .. string.format("%.3f", amount),
     "Mix: " .. string.format("%.3f", mix),
-    "Smooth bins: " .. tostring(smooth_bins),
-    "Contrast: " .. string.format("%.3f", contrast),
+    (algorithm_index == 2 and "Formant smoothing bins: " or "Envelope smoothing bins: ") .. tostring(smooth_bins),
+    (algorithm_index == 2 and "Formant contrast: " or "Envelope contrast: ") .. string.format("%.3f", contrast),
     "Floor: " .. string.format("%.3f", floor),
   }
   if details ~= "" then lines[#lines + 1] = details end
@@ -541,6 +614,7 @@ local function main()
 
   local ctx = ImGui.CreateContext("Shapee Spectral Shaper")
   local open = true
+  local algorithm_index = 1
   local fft_index = 2
   local amount = 0.75
   local mix = 1.0
@@ -553,7 +627,7 @@ local function main()
   local should_render = false
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 560, 390, ImGui.Cond_FirstUseEver)
+    ImGui.SetNextWindowSize(ctx, 560, 430, ImGui.Cond_FirstUseEver)
     local visible
     visible, open = ImGui.Begin(ctx, "Shapee Spectral Shaper", open)
     if visible then
@@ -564,18 +638,23 @@ local function main()
       if ImGui.Button(ctx, "Swap carrier / shaper") then swap = not swap end
       ImGui.Spacing(ctx)
       local changed
+      changed, algorithm_index = draw_combo(ctx, "Algorithm", algorithm_index, ALGORITHM_NAMES, 1, 2)
       changed, fft_index = draw_combo(ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
-      changed, amount = ImGui.SliderDouble(ctx, "Envelope amount", amount, 0, 1, "%.3f")
+      changed, amount = ImGui.SliderDouble(ctx, algorithm_index == 2 and "Formant amount" or "Envelope amount", amount, 0, 1, "%.3f")
       changed, mix = ImGui.SliderDouble(ctx, "Wet mix", mix, 0, 1, "%.3f")
-      changed, smooth_bins = ImGui.SliderInt(ctx, "Envelope smoothing bins", smooth_bins, 1, 96)
-      changed, contrast = ImGui.SliderDouble(ctx, "Envelope contrast", contrast, 0.1, 3.0, "%.2f")
+      changed, smooth_bins = ImGui.SliderInt(ctx, algorithm_index == 2 and "Formant smoothing bins" or "Envelope smoothing bins", smooth_bins, 1, 96)
+      changed, contrast = ImGui.SliderDouble(ctx, algorithm_index == 2 and "Formant contrast" or "Envelope contrast", contrast, 0.1, 3.0, "%.2f")
       changed, floor = ImGui.SliderDouble(ctx, "Envelope floor", floor, 0.001, 0.5, "%.3f")
       changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
       if normalize then
         changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f")
       end
       ImGui.Separator(ctx)
-      ImGui.Text(ctx, "Carrier keeps timing/phase; shaper supplies the spectral envelope.")
+      if algorithm_index == 2 then
+        ImGui.Text(ctx, "Carrier keeps timing/phase/detail; shaper supplies broad formant contour.")
+      else
+        ImGui.Text(ctx, "Carrier keeps timing/phase; shaper supplies the spectral envelope.")
+      end
       if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
       ImGui.SameLine(ctx)
       if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
@@ -584,7 +663,7 @@ local function main()
 
     if should_render then
       open = false
-      run_shapee(entries[1], entries[2], fft_index, amount, mix, smooth_bins, contrast, floor, normalize, normalize_db, swap)
+      run_shapee(entries[1], entries[2], algorithm_index, fft_index, amount, mix, smooth_bins, contrast, floor, normalize, normalize_db, swap)
       return
     end
     if open then reaper.defer(loop) end

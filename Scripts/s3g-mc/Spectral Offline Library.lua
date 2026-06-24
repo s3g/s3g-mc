@@ -462,6 +462,163 @@ def process_spatialize(audio, cfg):
     outs = [istft_frames(channel_specs[ch], size, fft_size, hop, window) for ch in range(out_ch)]
     return np.stack(outs, axis=1), len(specs) * out_ch
 
+def process_trace(audio, cfg):
+    fft_size = int(cfg["fft_size"]); hop = fft_size // int(cfg["overlap"])
+    window = np.hanning(fft_size).astype(np.float32)
+    kind = str(cfg.get("trace_kind", "keep"))
+    keep_bins = max(1, int(cfg.get("keep_bins", 24)))
+    threshold = float(cfg.get("threshold", 0.25))
+    amount = float(cfg.get("amount", 1.0)); mix = float(cfg.get("mix", 1.0))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+    out_channels = []
+    total = 0
+    for ch in range(audio.shape[1]):
+        specs, size = stft_frames(audio[:, ch], fft_size, hop, window)
+        new_specs = []
+        for spec in specs:
+            mag = np.abs(spec)
+            mask = np.ones_like(mag)
+            if kind == "keep":
+                mask[:] = 0.0
+                n = min(keep_bins, mag.size)
+                if n > 0:
+                    mask[np.argpartition(mag, -n)[-n:]] = 1.0
+            elif kind == "suppress":
+                n = min(keep_bins, mag.size)
+                if n > 0:
+                    mask[np.argpartition(mag, -n)[-n:]] = 0.0
+            elif kind == "thin":
+                keep_prob = np.clip(threshold, 0.0, 1.0)
+                mask = (rng.random(mag.size) < keep_prob).astype(np.float64)
+            elif kind == "threshold":
+                peak = float(np.max(mag)) if mag.size else 0.0
+                mask = (mag >= peak * threshold).astype(np.float64) if peak > 1e-12 else np.zeros_like(mag)
+            target_mag = mag * ((1.0 - amount) + amount * mask)
+            new_specs.append(target_mag * np.exp(1j * np.angle(spec)))
+        wet = istft_frames(new_specs, size, fft_size, hop, window)
+        out_channels.append(audio[:, ch] * (1 - mix) + wet * mix)
+        total += len(specs)
+    return np.stack(out_channels, axis=1), total
+
+def process_accumulate(audio, cfg):
+    fft_size = int(cfg["fft_size"]); hop = fft_size // int(cfg["overlap"])
+    window = np.hanning(fft_size).astype(np.float32)
+    decay = np.clip(float(cfg.get("decay", 0.985)), 0.0, 1.0)
+    amount = float(cfg.get("amount", 0.85)); mix = float(cfg.get("mix", 1.0))
+    floor = max(0.001, float(cfg.get("floor", 0.02)))
+    out_channels = []
+    total = 0
+    for ch in range(audio.shape[1]):
+        specs, size = stft_frames(audio[:, ch], fft_size, hop, window)
+        held = None
+        new_specs = []
+        for spec in specs:
+            mag = np.abs(spec)
+            if held is None:
+                held = mag.copy()
+            else:
+                held = np.maximum(mag, held * decay)
+            h_mean = float(np.mean(held)) if held.size else 0.0
+            m_mean = float(np.mean(mag)) if mag.size else 0.0
+            target = held
+            if h_mean > 1e-12 and m_mean > 1e-12:
+                target = held * (m_mean / h_mean)
+            target = np.maximum(target, floor * max(m_mean, 1e-9))
+            target_mag = mag * (1.0 - amount) + target * amount
+            new_specs.append(target_mag * np.exp(1j * np.angle(spec)))
+        wet = istft_frames(new_specs, size, fft_size, hop, window)
+        out_channels.append(audio[:, ch] * (1 - mix) + wet * mix)
+        total += len(specs)
+    return maybe_expand(np.stack(out_channels, axis=1), cfg), total
+
+def process_step_drunk(audio, cfg):
+    fft_size = int(cfg["fft_size"]); hop = fft_size // int(cfg["overlap"])
+    window = np.hanning(fft_size).astype(np.float32)
+    variant = str(cfg.get("freeze_variant", "step"))
+    step_frames = max(1, int(cfg.get("step_frames", 12)))
+    jump = max(1, int(cfg.get("jump_frames", 4)))
+    amount = float(cfg.get("amount", 0.8)); mix = float(cfg.get("mix", 1.0))
+    smooth = int(cfg.get("smooth_bins", 1))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+    out_channels = []
+    total = 0
+    for ch in range(audio.shape[1]):
+        specs, size = stft_frames(audio[:, ch], fft_size, hop, window)
+        mags = np.array([np.abs(s) for s in specs])
+        if mags.shape[0] == 0:
+            out_channels.append(audio[:, ch])
+            continue
+        read_idx = 0
+        frozen = mags[0]
+        new_specs = []
+        for i, spec in enumerate(specs):
+            if variant == "drunk":
+                if i == 0 or (i % step_frames) == 0:
+                    read_idx = int(np.clip(read_idx + rng.integers(-jump, jump + 1), 0, mags.shape[0] - 1))
+                    frozen = mags[read_idx]
+            else:
+                if (i % step_frames) == 0:
+                    frozen = mags[i]
+            target = smooth_bins(frozen, smooth)
+            mag = np.abs(spec)
+            f_mean = float(np.mean(target)) if target.size else 0.0
+            m_mean = float(np.mean(mag)) if mag.size else 0.0
+            if f_mean > 1e-12 and m_mean > 1e-12:
+                target = target * (m_mean / f_mean)
+            target_mag = mag * (1.0 - amount) + target * amount
+            new_specs.append(target_mag * np.exp(1j * np.angle(spec)))
+        wet = istft_frames(new_specs, size, fft_size, hop, window)
+        out_channels.append(audio[:, ch] * (1 - mix) + wet * mix)
+        total += len(specs)
+    return maybe_expand(np.stack(out_channels, axis=1), cfg), total
+
+def process_morph(carrier, modulator, cfg):
+    fft_size = int(cfg["fft_size"]); hop = fft_size // int(cfg["overlap"])
+    window = np.hanning(fft_size).astype(np.float32)
+    variant = str(cfg.get("morph_variant", "live"))
+    morph = np.clip(float(cfg.get("morph", 0.5)), 0.0, 1.0)
+    mix = float(cfg.get("mix", 1.0))
+    smooth = int(cfg.get("smooth_bins", 1))
+    cpos = np.clip(float(cfg.get("carrier_freeze_pos", 0.25)), 0.0, 1.0)
+    mpos = np.clip(float(cfg.get("modulator_freeze_pos", 0.75)), 0.0, 1.0)
+    modulator = np.stack([np.interp(np.linspace(0, modulator.shape[0]-1, carrier.shape[0]), np.arange(modulator.shape[0]), modulator[:, ch % modulator.shape[1]]) for ch in range(carrier.shape[1])], axis=1).astype(np.float32)
+    out_channels = []
+    total = 0
+    for ch in range(carrier.shape[1]):
+        c_specs, size = stft_frames(carrier[:, ch], fft_size, hop, window)
+        m_specs, _ = stft_frames(modulator[:, ch], fft_size, hop, window)
+        c_mags = np.array([np.abs(s) for s in c_specs])
+        m_mags = np.array([np.abs(s) for s in m_specs])
+        if variant == "freeze":
+            ci = min(len(c_specs) - 1, max(0, int(round(cpos * (len(c_specs) - 1)))))
+            mi = min(len(m_specs) - 1, max(0, int(round(mpos * (len(m_specs) - 1)))))
+            frozen_c = c_mags[ci]
+            frozen_m = m_mags[mi]
+        new_specs = []
+        for i, c in enumerate(c_specs):
+            c_mag = np.abs(c)
+            if variant == "freeze":
+                src_mag = frozen_c
+                dst_mag = frozen_m
+            else:
+                src_mag = c_mag
+                dst_mag = m_mags[min(i, len(m_mags) - 1)]
+            src_mag = smooth_bins(src_mag, smooth)
+            dst_mag = smooth_bins(dst_mag, smooth)
+            c_mean = float(np.mean(c_mag)) if c_mag.size else 0.0
+            d_mean = float(np.mean(dst_mag)) if dst_mag.size else 0.0
+            s_mean = float(np.mean(src_mag)) if src_mag.size else 0.0
+            if s_mean > 1e-12 and c_mean > 1e-12:
+                src_mag = src_mag * (c_mean / s_mean)
+            if d_mean > 1e-12 and c_mean > 1e-12:
+                dst_mag = dst_mag * (c_mean / d_mean)
+            target_mag = src_mag * (1.0 - morph) + dst_mag * morph
+            new_specs.append(target_mag * np.exp(1j * np.angle(c)))
+        wet = istft_frames(new_specs, size, fft_size, hop, window)
+        out_channels.append(carrier[:, ch] * (1 - mix) + wet * mix)
+        total += len(c_specs)
+    return maybe_expand(np.stack(out_channels, axis=1), cfg), total
+
 def normalize(data, db):
     peak = float(np.max(np.abs(data))) if data.size else 0.0
     if peak > 0.0:
@@ -482,6 +639,14 @@ elif mode == "cross":
     result, frames = process_cross(audio, load_item(cfg, "modulator"), cfg)
 elif mode == "spatialize":
     result, frames = process_spatialize(audio, cfg)
+elif mode == "trace":
+    result, frames = process_trace(audio, cfg)
+elif mode == "accumulate":
+    result, frames = process_accumulate(audio, cfg)
+elif mode == "step_drunk":
+    result, frames = process_step_drunk(audio, cfg)
+elif mode == "morph":
+    result, frames = process_morph(audio, load_item(cfg, "modulator"), cfg)
 else:
     raise RuntimeError(f"Unknown spectral mode: {mode}")
 if cfg.get("normalize", False):

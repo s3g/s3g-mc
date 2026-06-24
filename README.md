@@ -1,7 +1,19 @@
 # s3g-mc
 
-REAPER scripts and JSFX for multichannel editing, channel automation,
-fold-down monitoring, and spatial workflows.
+s3g-mc is a REAPER package for multichannel composition, spatial audio
+workflow, and offline sound transformation. It includes Lua actions, ReaImGui
+controllers, and JSFX for channel editing, 128-channel automation, fold-down
+monitoring, dome panning, third-order ambisonic send/return routing, and
+render-based multichannel texture processes.
+
+The package is built for practical studio use with high-channel-count media:
+turn mono stems into multichannel items, reshape channel order, build
+speaker-aware panning systems, audition stereo reductions, and render
+CDP/SoundThread-, SoundHack-, FFTease-, and spectral-music-inspired processes
+directly inside REAPER. Most transformation tools are offline actions that
+write new media items, making them useful for exploratory composition,
+sound-design passes, and reproducible editing rather than real-time plugin
+chains.
 
 ## Tools
 
@@ -51,16 +63,25 @@ but run from the package's Python/NumPy backend.
   items. The first selected item keeps phase and timing while its spectral
   magnitudes are blended toward the second item's magnitudes.
 - `Shapee Spectral Shaper`: FFTease shapee-inspired offline spectral envelope
-  transfer for two WAV-backed media items. The first selected item is the
-  carrier/tune/timing source; the second supplies the spectral envelope or
-  formant shape.
+  transfer for two WAV-backed media items, with an alternate
+  CDP/SoundThread-inspired formant-vocode algorithm. The first selected item is
+  the carrier/tune/timing source; the second supplies the spectral envelope or
+  broad formant contour.
+- `Spectral Accumulate`: CDP/SoundThread-inspired spectral sustain where each
+  frequency band holds until stronger energy replaces it.
 - `Spectral Blur`: offline magnitude blur across neighboring STFT frames, with
   safe envelope mode and optional time expansion.
 - `Spectral Freeze`: imposes one selected spectral frame across the item while
   preserving phase/timing motion, with safe envelope mode, envelope floor, and
   optional time expansion.
+- `Spectral Morph`: CDP/SoundThread-inspired live or frozen spectral morph
+  between two WAV-backed media items.
 - `Spectral Spatializer`: distributes frequency bins across even output channel
   counts from 2 to 64.
+- `Spectral Step Drunk Freeze`: CDP/SoundThread-inspired stepped freeze or
+  random-walk freeze through spectral frames.
+- `Spectral Trace`: CDP/SoundThread-inspired partial tracing with modes to keep
+  loudest partials, suppress loudest partials, threshold, or thin randomly.
 
 ### Item Channel Transforms
 
