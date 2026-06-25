@@ -9,7 +9,7 @@
   --soft-line: #202626;
   --accent: #78b7a6;
   --accent-dark: #a3d7c6;
-  --code-bg: #090b0b;
+  --code-bg: #1a1f1e;
 }
 
 * {
@@ -193,10 +193,11 @@ a:focus-visible {
 }
 
 .content code {
-  padding: 0.12rem 0.32rem;
+  padding: 0.13rem 0.36rem;
   background: var(--code-bg);
   border: 1px solid var(--soft-line);
   border-radius: 0;
+  color: #e2e8e3;
   font-size: 0.92em;
 }
 
