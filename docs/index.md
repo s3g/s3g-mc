@@ -25,16 +25,18 @@ The code is released under 0BSD. Many of these tools are inspired by or extend e
 
 - [Installation](installation.md)
 - [Tools](tools.md)
-- [3OA and SPARTA Workflow](workflows.md)
+- [3OAFX](workflows.md)
 - [Dependencies](dependencies.md)
 
 ## Highlights
 
 - 25-channel dome panners for up to 8 mono sources
-- 128-channel automation mixer and plugin pin controller
+- 3OAFX ambisonic send/return workflow for 24-channel effect inserts
+- track-level automation mixer for up to 128 channels, with plugin pin control
+- multichannel workflow helpers for item transforms, track routing, and stems
 - Offline spectral, convolution, and resynthesis processes
-- Multichannel texture and montage actions inspired by CDP-style workflows
-- JSFX-based procedural synth engines rendered offline from controller actions
+- Multichannel texture and montage actions 
+- Procedural synth engines rendered offline from controller actions
 
 ## License
 

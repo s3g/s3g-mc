@@ -181,7 +181,7 @@ mask lanes.
 
 ### Troubleshooting
 
-If the `s3g` JSFX do not appear, confirm that this package's `Effects/s3g`
+If the JSFX do not appear, confirm that this package's `Effects/s3g`
 folder was copied or symlinked to `REAPER/Effects/s3g`, then rescan JSFX or
 restart REAPER.
 
