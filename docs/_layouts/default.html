@@ -11,39 +11,16 @@
     <header class="site-header">
       <a class="brand" href="{{ '/' | relative_url }}">s3g-mc</a>
       <nav class="top-nav" aria-label="Top navigation">
-        <a href="{{ '/tools.html' | relative_url }}">Tools</a>
+        <a href="{{ '/' | relative_url }}">Getting Started</a>
         <a href="{{ '/installation.html' | relative_url }}">Install</a>
+        <a href="{{ '/dependencies.html' | relative_url }}">Dependencies</a>
+        <a href="{{ '/tools.html' | relative_url }}">Tools</a>
         <a href="{{ '/workflows.html' | relative_url }}">Workflows</a>
         <a href="https://github.com/s3g/s3g-mc" target="_blank" rel="noopener noreferrer">GitHub</a>
       </nav>
     </header>
 
     <div class="page-shell">
-      <aside class="sidebar" aria-label="Documentation navigation">
-        <div class="sidebar-section">
-          <h2>Getting Started</h2>
-          <a href="{{ '/' | relative_url }}">Overview</a>
-          <a href="{{ '/installation.html' | relative_url }}">Installation</a>
-          <a href="{{ '/dependencies.html' | relative_url }}">Dependencies</a>
-        </div>
-        <div class="sidebar-section">
-          <h2>Tools</h2>
-          <a href="{{ '/tools.html#channel-mixing--automation' | relative_url }}">Channel Mixing</a>
-          <a href="{{ '/tools.html#procedural-synthesis' | relative_url }}">Procedural Synthesis</a>
-          <a href="{{ '/tools.html#offline-synthesis--ir' | relative_url }}">Offline Synthesis / IR</a>
-          <a href="{{ '/tools.html#spatial--hoa' | relative_url }}">Spatial / HOA</a>
-          <a href="{{ '/tools.html#spectral--convolution' | relative_url }}">Spectral / Convolution</a>
-          <a href="{{ '/tools.html#item-channel-transforms' | relative_url }}">Item Transforms</a>
-          <a href="{{ '/tools.html#multichannel-texture--montage' | relative_url }}">Texture / Montage</a>
-          <a href="{{ '/tools.html#track-building--routing' | relative_url }}">Track Routing</a>
-        </div>
-        <div class="sidebar-section">
-          <h2>Workflows</h2>
-          <a href="{{ '/workflows.html#3oafx' | relative_url }}">3OAFX</a>
-          <a href="{{ '/workflows.html#package-browser' | relative_url }}">Package Browser</a>
-        </div>
-      </aside>
-
       <main class="content" id="content">
         {{ content }}
         {% if page.prev_page or page.next_page %}
