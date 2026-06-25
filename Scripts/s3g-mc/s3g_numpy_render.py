@@ -271,6 +271,145 @@ def render_dense_grain(cfg):
     print(f"Pre-normalize peak: {pre_peak:.6f}")
 
 
+def interpolated_read(channel, positions):
+    size = int(channel.shape[0])
+    wrapped = np.mod(positions, size)
+    idx0 = np.floor(wrapped).astype(np.int64)
+    frac = (wrapped - idx0).astype(np.float32)
+    idx1 = (idx0 + 1) % size
+    return (channel[idx0] * (1.0 - frac) + channel[idx1] * frac).astype(np.float32)
+
+
+def seamless_loop_read(channel, positions, xfade_frames, xfade_duck=0.12):
+    size = int(channel.shape[0])
+    if size < 2:
+        return np.zeros(positions.shape[0], dtype=np.float32)
+    xfade_frames = int(min(max(0, xfade_frames), max(0, (size - 2) // 2)))
+    if xfade_frames <= 1:
+        return interpolated_read(channel, positions)
+    period = max(2, size - xfade_frames)
+    phase = np.mod(positions, period)
+    normal = interpolated_read(channel, phase)
+    overlap = phase < xfade_frames
+    if np.any(overlap):
+        u = (phase[overlap] / max(1, xfade_frames)).astype(np.float32)
+        head = interpolated_read(channel, phase[overlap])
+        tail = interpolated_read(channel, phase[overlap] + period)
+        fade_in = 0.5 - 0.5 * np.cos(np.pi * u)
+        fade_out = 1.0 - fade_in
+        duck = 1.0 - float(np.clip(xfade_duck, 0.0, 0.75)) * np.sin(np.pi * u)
+        normal[overlap] = (tail * fade_out + head * fade_in) * duck
+    return normal.astype(np.float32)
+
+
+def render_loop_drift_bed(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    source, source_rate = read_wav(cfg["source_path"])
+    source = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    if source.shape[0] < 16:
+        raise RuntimeError("Selected source segment is too short for loop drifting.")
+    source = source - np.mean(source, axis=0, keepdims=True)
+    mono_source = np.mean(source, axis=1).astype(np.float32)
+    source_channels = int(source.shape[1])
+    channels = int(cfg["channels"])
+    duration = float(cfg["duration"])
+    frames = max(1, int(round(duration * sample_rate)))
+    out = np.zeros((frames, channels), dtype=np.float32)
+    base_rate = float(cfg.get("base_rate", 1.0))
+    rate_amount = float(cfg.get("rate_amount", 0.08))
+    rate_mode = str(cfg.get("rate_mode", "deviation"))
+    distribution = str(cfg.get("distribution", "cycle"))
+    phase_mode = str(cfg.get("phase_mode", "even"))
+    drift_amount = float(cfg.get("drift_amount", 0.0))
+    spread = float(cfg.get("spatial_spread", 0.0))
+    gain = float(cfg.get("gain", 0.85))
+    xfade_frames = int(round(float(cfg.get("xfade_ms", 80.0)) * sample_rate / 1000.0))
+    xfade_frames = int(min(max(0, xfade_frames), max(0, (source.shape[0] - 2) // 2)))
+    xfade_duck = float(cfg.get("xfade_duck", 0.12))
+    loop_period = max(2, source.shape[0] - xfade_frames)
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+    t = np.arange(frames, dtype=np.float64)
+
+    channel_rates = []
+    source_map = []
+    for dst in range(channels):
+        u = dst / max(1, channels - 1)
+        if rate_mode == "spread":
+            rate = base_rate * (1.0 + (u * 2.0 - 1.0) * rate_amount)
+        elif rate_mode == "ascending":
+            rate = base_rate * (1.0 + u * rate_amount)
+        elif rate_mode == "descending":
+            rate = base_rate * (1.0 + (1.0 - u) * rate_amount)
+        elif rate_mode == "random_steps":
+            choices = np.array([-1.0, -0.5, -0.25, 0.0, 0.25, 0.5, 1.0], dtype=np.float64)
+            rate = base_rate * (1.0 + float(rng.choice(choices)) * rate_amount)
+        else:
+            rate = base_rate * (1.0 + rng.uniform(-rate_amount, rate_amount))
+        channel_rates.append(max(0.05, float(rate)))
+
+        if distribution == "mono_sum":
+            source_index = -1
+        elif distribution == "mirror":
+            period = max(1, source_channels * 2 - 2)
+            pos = dst % period
+            source_index = pos if pos < source_channels else period - pos
+        elif distribution == "random":
+            source_index = int(rng.integers(0, source_channels))
+        elif distribution == "paired":
+            source_index = ((dst // 2) % source_channels)
+        else:
+            source_index = dst % source_channels
+        source_map.append(int(source_index))
+
+    for dst in range(channels):
+        if phase_mode == "random":
+            phase = rng.random() * loop_period
+        elif phase_mode == "aligned":
+            phase = 0.0
+        else:
+            phase = (dst / max(1, channels)) * loop_period
+        rate = channel_rates[dst]
+        if drift_amount > 0.0001:
+            drift_freq = rng.uniform(0.015, 0.09)
+            drift_phase = rng.uniform(0.0, 2.0 * math.pi)
+            drift = 1.0 + drift_amount * np.sin(2.0 * math.pi * drift_freq * t / sample_rate + drift_phase)
+            positions = phase + np.cumsum(rate * drift)
+        else:
+            positions = phase + t * rate
+        source_channel = mono_source if source_map[dst] < 0 else source[:, source_map[dst]]
+        loop = seamless_loop_read(source_channel, positions, xfade_frames, xfade_duck)
+        local_gain = gain / math.sqrt(max(1.0, channels / 2.0))
+        if spread > 0.001 and channels > 1:
+            width = 0.08 + spread * max(1.0, channels * 0.08)
+            weights = pan_weights(dst, channels, width)
+            out += loop[:, None] * weights[None, :] * local_gain
+        else:
+            out[:, dst] += loop * local_gain
+
+    out = apply_output_envelope(out, cfg, "amplitude")
+    corr = mean_neighbor_correlation(out)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print(f"Source channels: {source_channels}")
+    print(f"Output channels: {channels}")
+    print(f"Duration: {duration:.3f} sec")
+    print(f"Rate mode: {rate_mode}")
+    print(f"Base rate: {base_rate:.5f}")
+    print(f"Rate amount: {rate_amount:.5f}")
+    print(f"Distribution: {distribution}")
+    print(f"Phase mode: {phase_mode}")
+    print(f"Crossfade: {1000.0 * xfade_frames / sample_rate:.2f} ms")
+    print(f"Crossfade duck: {xfade_duck:.3f}")
+    print(f"Effective loop period: {loop_period / sample_rate:.6f} sec")
+    print(f"Spatial spread: {spread:.3f}")
+    print(f"Rate min/max: {min(channel_rates):.5f} / {max(channel_rates):.5f}")
+    print(f"Mean neighbor correlation: {corr:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
 def render_ir_toolkit(cfg):
     sample_rate = int(cfg.get("sample_rate", 48000))
     data, source_rate = read_wav(cfg["source_path"])
@@ -1001,12 +1140,14 @@ def render_fata_morgana(cfg):
 
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
     if mode == "dense_grain":
         render_dense_grain(cfg)
+    elif mode == "loop_drift_bed":
+        render_loop_drift_bed(cfg)
     elif mode == "ir_toolkit":
         render_ir_toolkit(cfg)
     elif mode == "mass_partial":

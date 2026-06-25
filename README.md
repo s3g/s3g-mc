@@ -142,6 +142,9 @@ These scripts do not require CDP.
 - `Frame Gate`: rotating active-channel groups print gate patterns.
 - `Frame Shift`: channel-frame rotation, mirror, odd/even split, pair
   interleave, or half-swap render.
+- `Loop Drift`: NumPy-backed seamless source loops distributed across a
+  multichannel bed, with overlap-add seam crossfades and per-channel
+  playback-rate spread or deviation.
 - `Marker Spatial Montage`: project markers or active-take markers inside the
   selected item define chunks for ordered or shuffled montage.
 - `Mono Fill`: one source channel fills every output channel with optional gain
