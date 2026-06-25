@@ -8,9 +8,9 @@
 -- @about
 --   Builds a new multichannel render from the selected item. Ordered mono
 --   spread keeps slices in time order and cycles them evenly through the
---   output channels. Random mono scatter behaves closer to CDP MCHSHRED mode
---   1. Multichannel rotate modes keep the source frame together but rotate
---   the channel image per slice, close to CDP MCHSHRED mode 2.
+--   output channels. Random mono scatter produces independent mono fragments
+--   across the output field. Multichannel rotate modes keep the source frame
+--   together but rotate the channel image per slice.
 
 local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""

@@ -19,7 +19,7 @@ Core effects:
 
 Controller:
 
-- `3OA Send Return FX Controller.lua`
+- `3OAFX Send Return Controller.lua`
 
 ## Basic Chain
 
@@ -86,7 +86,7 @@ from the Return/Mask direction, width, focus, floor, and rear-reject controls.
 ## Controller Workflow
 
 1. Select the 3OA FX track.
-2. Run `3OA Send Return FX Controller.lua`.
+2. Run `3OAFX Send Return Controller.lua`.
 3. Click `Load/repair JSFX` to add or repair the core chain.
 4. Add the desired 24-channel insert effect between `s3g 3OA Send` and `s3g 3OA Return Mask`.
 5. Click `Pin inserts 1-24`.

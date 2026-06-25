@@ -4,7 +4,7 @@
 -- @requires ReaImGui; JSFX: s3g MC Spectra Synth Engine
 -- @category Procedural Synthesis
 -- @render Yes; creates a temporary synth track and renders it to a multichannel media item.
--- @method Offline controller for the multichannel Spectra synth engine. CDP synthesis-inspired algorithms generate partial clouds, comb strata, formant bands, impulse resonators, and noise spectra with algorithm-specific channel-motion models. Choose duration, algorithm, and map-route breakpoint curves; the action writes automation to a temporary generator track, renders the selected range as a multichannel stem, then removes the temporary track.
+-- @method Offline controller for the multichannel Spectra synth engine. Algorithms generate partial clouds, comb strata, formant bands, impulse resonators, and noise spectra with algorithm-specific channel-motion models. Choose duration, algorithm, and map-route breakpoint curves; the action writes automation to a temporary generator track, renders the selected range as a multichannel stem, then removes the temporary track.
 
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""

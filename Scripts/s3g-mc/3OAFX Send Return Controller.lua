@@ -1,4 +1,4 @@
--- @description 3OA Send/Return FX Controller
+-- @description 3OAFX Send Return Controller
 -- @author s3g
 -- @version 0.1
 -- @requires ReaImGui; JSFX: s3g 3OA Send, s3g 3OA Return Mask, s3g 3OA Mixer
@@ -21,14 +21,14 @@
 --   the masked 24-channel send before the return mask and mixer recombine it.
 
 if not reaper.APIExists("ImGui_GetVersion") then
-  reaper.MB("ReaImGui is not installed or not loaded.", "3OA Send Return FX Controller", 0)
+  reaper.MB("ReaImGui is not installed or not loaded.", "3OAFX Send Return Controller", 0)
   return
 end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
 
-local ctx = ImGui.CreateContext("3OA Send Return FX Controller")
+local ctx = ImGui.CreateContext("3OAFX Send Return Controller")
 local open = true
 local PROJECT = 0
 
@@ -740,7 +740,7 @@ end
 local function loop()
   ImGui.SetNextWindowSize(ctx, 920, 860, ImGui.Cond_FirstUseEver)
   local visible
-  visible, open = ImGui.Begin(ctx, "3OA Send Return FX Controller", open)
+  visible, open = ImGui.Begin(ctx, "3OAFX Send Return Controller", open)
   if visible then
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     if not track then

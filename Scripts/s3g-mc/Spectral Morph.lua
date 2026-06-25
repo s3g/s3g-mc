@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category Spectral / Convolution
 -- @render Yes; writes a new spectrally morphed media item.
--- @method CDP/SoundThread-inspired offline spectral morph. Select two WAV-backed media items: carrier first, modulator second. Morph live spectral frames or two frozen spectral frames while preserving carrier phase/timing.
+-- @method Offline spectral morph. Select two WAV-backed media items: carrier first, modulator second. Morph live spectral frames or two frozen spectral frames while preserving carrier phase/timing.
 
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""

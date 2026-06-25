@@ -80,7 +80,7 @@ modulation afterward.
   to 8 mono sources, driven by two automatable controls.
 - `25ch VBAP Dome Panner`: nearest-region vector-style panning for up to 8 mono
   sources across the 25-speaker dome.
-- `3OA Send/Return FX Controller`: places a 24-channel insert lane inside an
+- `3OAFX Send Return Controller`: places a 24-channel insert lane inside an
   ambisonic decode/encode chain.
 
 The shared 25ch dome layout is based on the speaker array layout of RISD SRST

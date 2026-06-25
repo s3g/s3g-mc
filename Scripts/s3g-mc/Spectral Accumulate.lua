@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category Spectral / Convolution
 -- @render Yes; writes a new spectrally accumulated media item.
--- @method CDP/SoundThread-inspired offline spectral accumulation. Select one WAV-backed media item; each spectral band sustains until stronger energy arrives, with decay, floor, and optional expansion.
+-- @method Offline spectral accumulation. Select one WAV-backed media item; each spectral band sustains until stronger energy arrives, with decay, floor, and optional expansion.
 
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""

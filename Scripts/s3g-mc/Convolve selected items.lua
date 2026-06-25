@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category Spectral / Convolution
 -- @render Yes; writes a new convolved media item with optional full tail or source-length trim.
--- @method Offline SoundHack-inspired file convolution. Select two audio items: source and impulse response. Supports mono, stereo, multichannel pairing, and summed matrix modes.
+-- @method Offline file convolution. Select two audio items: source and impulse response. Supports mono, stereo, multichannel pairing, and summed matrix modes.
 -- @about
 --   Uses Python/NumPy to read selected WAV media, convolve channel pairs, and
 --   write a 24-bit PCM WAV inserted on a new track at the source item position.

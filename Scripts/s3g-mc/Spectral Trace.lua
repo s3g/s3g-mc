@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category Spectral / Convolution
 -- @render Yes; writes a new spectrally traced media item.
--- @method CDP/SoundThread-inspired offline spectral trace. Select one WAV-backed media item; retain, suppress, threshold, or randomly thin spectral partials while preserving phase/timing.
+-- @method Offline spectral trace. Select one WAV-backed media item; retain, suppress, threshold, or randomly thin spectral partials while preserving phase/timing.
 
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""

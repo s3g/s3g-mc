@@ -65,7 +65,7 @@ modulation afterward.
   to 8 mono sources, driven by two automatable controls.
 - `25ch VBAP Dome Panner`: nearest-region vector-style panning for up to 8 mono
   sources across the 25-speaker dome.
-- `3OA Send/Return FX Controller`: places a 24-channel insert lane inside an
+- `3OAFX Send Return Controller`: places a 24-channel insert lane inside an
   ambisonic decode/encode chain.
 
 The shared 25ch dome layout is based on the speaker array layout of RISD SRST
@@ -179,9 +179,6 @@ These scripts do not require CDP.
 - <a href="https://codeberg.org/cfillion/reaimgui" target="_blank" rel="noopener noreferrer">ReaImGui</a>
   for the browser and controller scripts. It is available through ReaPack's
   default ReaTeam Extensions repository.
-- <a href="https://sws-extension.org/" target="_blank" rel="noopener noreferrer">SWS Extension</a> is recommended for render-based
-  workflows. Source is available at
-  <a href="https://github.com/reaper-oss/sws" target="_blank" rel="noopener noreferrer">reaper-oss/sws</a>.
 - <a href="https://www.python.org/downloads/" target="_blank" rel="noopener noreferrer">Python 3</a>
   with <a href="https://numpy.org/install/" target="_blank" rel="noopener noreferrer">NumPy</a>
   is required for the NumPy-backed offline processes. If REAPER cannot find the

@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category Spectral / Convolution
 -- @render Yes; writes a new stepped or drunk-frozen spectral media item.
--- @method CDP/SoundThread-inspired stepped freeze and drunk freeze. Select one WAV-backed media item; spectral frames are held at regular intervals or by random walk while preserving carrier phase/timing.
+-- @method Stepped freeze and random-walk freeze. Select one WAV-backed media item; spectral frames are held at regular intervals or by random walk while preserving carrier phase/timing.
 
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""

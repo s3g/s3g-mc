@@ -146,7 +146,7 @@ end
 
 local function classify(name, description)
   local hay = (name .. " " .. (description or "")):lower()
-  if hay:find("cdp") or hay:find("reacoma") then return "CDP / ReaCoMa" end
+  if hay:find("cdp") or hay:find("reacoma") then return "Personal / Advanced" end
   if hay:find("carto synth") or hay:find("procedural synth") then return "Procedural Synthesis" end
   if hay:find("shred") or hay:find("fracture") or hay:find("zigzag") or hay:find("cascade") or hay:find("crumble") or hay:find("spatial repeater") then return "Multichannel Texture / Montage" end
   if hay:find("lbap") or hay:find("hoa") or hay:find("3oa") or hay:find("dome") then return "Spatial / HOA" end
