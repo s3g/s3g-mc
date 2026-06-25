@@ -9,7 +9,13 @@ render-based multichannel processes.
 
 Documentation and workflow notes: <a href="https://s3g.github.io/s3g-mc/" target="_blank" rel="noopener noreferrer">s3g-mc docs site</a>.
 
-The code is released under 0BSD. Many of these tools are inspired by or extend  existing computer music practices, with references mentioned in the documentation where they are useful.
+The code is released under 0BSD. If this package is useful in a project,
+performance, publication, installation, or teaching context, attribution is
+appreciated: s3g-mc by Shawn Greenlee.
+
+Many of these tools are inspired by or extend existing computer music
+practices, with references mentioned in the documentation where they are
+useful.
 
 ## Tools
 
@@ -144,7 +150,11 @@ These scripts do not require CDP.
   interleave, or half-swap render.
 - `Loop Drift`: NumPy-backed seamless source loops distributed across a
   multichannel bed, with overlap-add seam crossfades and per-channel
-  playback-rate spread or deviation.
+  playback-rate spread, source-pool routing, quantization, direction, gain, and
+  motion variation.
+- `Loop Rift`: NumPy-backed loop sections with graceful dropouts,
+  overlap-add fades, source-pool routing, grouped channel openings, and
+  unstable playback rates.
 - `Marker Spatial Montage`: project markers or active-take markers inside the
   selected item define chunks for ordered or shuffled montage.
 - `Mono Fill`: one source channel fills every output channel with optional gain

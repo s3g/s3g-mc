@@ -157,7 +157,11 @@ These scripts do not require CDP.
   interleave, or half-swap render.
 - `Loop Drift`: NumPy-backed seamless source loops distributed across a
   multichannel bed, with overlap-add seam crossfades and per-channel
-  playback-rate spread or deviation.
+  playback-rate spread, source-pool routing, quantization, direction, gain, and
+  motion variation.
+- `Loop Rift`: NumPy-backed loop sections with graceful dropouts,
+  overlap-add fades, source-pool routing, grouped channel openings, and
+  unstable playback rates.
 - `Marker Spatial Montage`: project markers or active-take markers inside the
   selected item define chunks for ordered or shuffled montage.
 - `Mono Fill`: one source channel fills every output channel with optional gain
