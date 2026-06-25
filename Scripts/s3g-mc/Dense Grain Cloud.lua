@@ -21,7 +21,7 @@ package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
 local WINDOW_OPEN_COND = ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver
 
-local EXT = "s3g_mc_dense_grain_cloud"
+local EXT = "s3g_mc_dense_grain_cloud_v2"
 
 local ENV_DEFS = {
   { key = "amplitude", label = "Amplitude", min = 0.0, max = 1.5, default = 1.0, fmt = "%.2f" },
@@ -82,7 +82,8 @@ local function render(entry, settings, env_points, env_enabled)
 
   reaper.Undo_BeginBlock()
   local item, err = nr.insert_output_item(output_path,
-    "Dense grain cloud (" .. tostring(settings.channels) .. "ch)", entry.position, settings.channels)
+    "Dense grain cloud (" .. tostring(settings.channels) .. "ch)", entry.position, settings.channels,
+    { track_gain = settings.insert_gain })
   reaper.Undo_EndBlock("Dense Grain Cloud", -1)
   if not item then mc.show_error(err or "Could not insert rendered grain cloud.") return end
 
@@ -91,6 +92,7 @@ local function render(entry, settings, env_points, env_enabled)
     "Output: " .. output_path,
     "Duration: " .. tostring(settings.duration) .. " sec",
     "Channels: " .. tostring(settings.channels),
+    "Inserted track gain: " .. string.format("%.1f dB", 20 * math.log(settings.insert_gain, 10)),
     "NumPy time: " .. string.format("%.2f sec", elapsed),
     log,
   })
@@ -115,9 +117,10 @@ local function main()
     channel_contrast = get_number("channel_contrast", 0.75),
     source_bias = get_number("source_bias", 0.55),
     density_shape = get_number("density_shape", 0.0),
-    gain = get_number("gain", 1.0),
+    gain = get_number("gain", 0.75),
     normalize = reaper.GetExtState(EXT, "normalize") ~= "0",
-    normalize_db = get_number("normalize_db", -6.0),
+    normalize_db = get_number("normalize_db", -12.0),
+    insert_gain = get_number("insert_gain", 0.25),
     seed = get_number("seed", 1),
   }
   local env_points, env_enabled = be.init(ENV_DEFS, settings)
@@ -151,8 +154,9 @@ local function main()
       changed, settings.gain = ImGui.SliderDouble(ctx, "Cloud gain", settings.gain, 0.05, 4.0, "%.2f")
       changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
       if settings.normalize then
-        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -36.0, -3.0, "%.1f")
       end
+      changed, settings.insert_gain = ImGui.SliderDouble(ctx, "Inserted track gain", settings.insert_gain, 0.05, 1.0, "%.2f")
       changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
       settings.channels = clamp(math.floor(settings.channels), 1, mc.MAX_REAPER_TRACK_CHANNELS)
       ImGui.Separator(ctx)

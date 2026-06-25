@@ -20,6 +20,8 @@ The code is released under 0BSD. Many of these tools are inspired by or extend  
 
 ### Procedural Synthesis
 
+These render actions drive included JSFX synth engines offline.
+
 - `Render MC Carto Synth`: renders multichannel dust, pulse-packet,
   logic/fractal-drone, byte-mask, and spline-drift materials.
 - `Render MC Spectra Synth`: renders slower spectral-mass and resonant
@@ -32,9 +34,13 @@ write a new multichannel media item.
 ### Offline Synthesis / IR
 
 These NumPy-backed renderers handle processes that are easier to do offline
-with Pythaon than in Lua or JSFX. Breakpoint envelopes shape the render over time. Density means event or peak admission before synthesis, not gain modulation afterward.
+with Python than in Lua or JSFX. Breakpoint envelopes shape the render over
+time. Density means event or peak admission before synthesis, not gain
+modulation afterward.
 
 - `Dense Grain Cloud`: source-item grains scattered into a multichannel field.
+- `Fata Morgana Resynth`: hybrid oscillator resynthesis from 2-16 selected
+  source items, recombining timing, pitch, amplitude, and spatial traits.
 - `IR Toolkit`: reshapes a selected impulse response item with silence trim,
   tail fade, normalization, early reflections, and channel decorrelation.
 - `Mass Partial Field`: additive partial events with drift and channel motion.

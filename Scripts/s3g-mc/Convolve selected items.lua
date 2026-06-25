@@ -35,6 +35,7 @@ local MODE_NAMES = {
 
 local TAIL_FULL = 1
 local TAIL_TRIM = 2
+local DEFAULT_INSERT_GAIN = 0.5
 
 local TAIL_NAMES = {
   [TAIL_FULL] = "Full convolution tail",
@@ -484,6 +485,7 @@ local function insert_output_item(path, label, position, channel_count)
   local track = reaper.GetTrack(mc.PROJECT, reaper.CountTracks(mc.PROJECT) - 1)
   reaper.GetSetMediaTrackInfo_String(track, "P_NAME", label, true)
   reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", mc.reaper_track_channel_count(channel_count))
+  reaper.SetMediaTrackInfo_Value(track, "D_VOL", DEFAULT_INSERT_GAIN)
   local item = reaper.AddMediaItemToTrack(track)
   local take = reaper.AddTakeToMediaItem(item)
   reaper.SetMediaItemTake_Source(take, source)
@@ -616,6 +618,7 @@ local function run_convolution(source, impulse, mode, tail_mode, normalize, norm
 
   log_lines[#log_lines + 1] = "Convolution paths: " .. tostring(#plan)
   log_lines[#log_lines + 1] = "Output channels: " .. tostring(output_channels)
+  log_lines[#log_lines + 1] = "Inserted track gain: -6.0 dB"
   log_lines[#log_lines + 1] = "Sample rate: " .. tostring(sample_rate) .. " Hz"
   log_lines[#log_lines + 1] = string.format("NumPy time: %.2f sec", python_elapsed)
   log_lines[#log_lines + 1] = string.format("Total time: %.2f sec", reaper.time_precise() - total_start)

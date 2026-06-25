@@ -4,6 +4,7 @@
 local M = {}
 
 local mc = dofile((debug.getinfo(1, "S").source:match("^@(.+[/\\])") or "") .. "Multichannel Library.lua")
+local DEFAULT_INSERT_GAIN = 0.5
 
 function M.shell_quote(path)
   return "'" .. tostring(path):gsub("'", "'\\''") .. "'"
@@ -147,6 +148,7 @@ function M.insert_output_item(path, label, position, channel_count)
   local track = reaper.GetTrack(mc.PROJECT, reaper.CountTracks(mc.PROJECT) - 1)
   reaper.GetSetMediaTrackInfo_String(track, "P_NAME", label, true)
   reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", mc.reaper_track_channel_count(channel_count))
+  reaper.SetMediaTrackInfo_Value(track, "D_VOL", DEFAULT_INSERT_GAIN)
   local item = reaper.AddMediaItemToTrack(track)
   local take = reaper.AddTakeToMediaItem(item)
   reaper.SetMediaItemTake_Source(take, source)
@@ -736,6 +738,7 @@ function M.render(script_dir, title, entry, manifest, label, log_lines)
   local lines = log_lines or {}
   if details ~= "" then lines[#lines + 1] = details end
   lines[#lines + 1] = "Output channels: " .. tostring(output_channels)
+  lines[#lines + 1] = "Inserted track gain: -6.0 dB"
   lines[#lines + 1] = string.format("Total time: %.2f sec", reaper.time_precise() - start_time)
   lines[#lines + 1] = "Peak build: requested for selected output item"
   lines[#lines + 1] = "Output: " .. output_path

@@ -21,7 +21,7 @@ package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
 local WINDOW_OPEN_COND = ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver
 
-local EXT = "s3g_mc_mass_partial_field"
+local EXT = "s3g_mc_mass_partial_field_v2"
 
 local ENV_DEFS = {
   { key = "amplitude", label = "Amplitude", min = 0.0, max = 1.5, default = 1.0, fmt = "%.2f" },
@@ -81,13 +81,15 @@ local function render(settings, env_points, env_enabled)
   if not log then return end
   reaper.Undo_BeginBlock()
   local item, err = nr.insert_output_item(output_path,
-    "Mass partial field (" .. tostring(settings.channels) .. "ch)", reaper.GetCursorPosition(), settings.channels)
+    "Mass partial field (" .. tostring(settings.channels) .. "ch)", reaper.GetCursorPosition(), settings.channels,
+    { track_gain = settings.insert_gain })
   reaper.Undo_EndBlock("Mass Partial Field", -1)
   if not item then mc.show_error(err or "Could not insert rendered partial field.") return end
   mc.print_plan("Mass Partial Field", {
     "Output: " .. output_path,
     "Duration: " .. tostring(settings.duration) .. " sec",
     "Channels: " .. tostring(settings.channels),
+    "Inserted track gain: " .. string.format("%.1f dB", 20 * math.log(settings.insert_gain, 10)),
     "NumPy time: " .. string.format("%.2f sec", elapsed),
     log,
   })
@@ -107,7 +109,8 @@ local function main()
     brightness = get_number("brightness", 1.15),
     spatial_width = get_number("spatial_width", 0.9),
     normalize = get_bool("normalize", true),
-    normalize_db = get_number("normalize_db", -6.0),
+    normalize_db = get_number("normalize_db", -12.0),
+    insert_gain = get_number("insert_gain", 0.25),
     seed = get_number("seed", 1),
   }
   local env_points, env_enabled = be.init(ENV_DEFS, settings)
@@ -137,8 +140,9 @@ local function main()
       changed, settings.spatial_width = ImGui.SliderDouble(ctx, "Spatial width", settings.spatial_width, 0.05, 6.0, "%.2f")
       changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
       if settings.normalize then
-        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -36.0, -3.0, "%.1f")
       end
+      changed, settings.insert_gain = ImGui.SliderDouble(ctx, "Inserted track gain", settings.insert_gain, 0.05, 1.0, "%.2f")
       changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
       settings.channels = clamp(math.floor(settings.channels), 1, mc.MAX_REAPER_TRACK_CHANNELS)
       ImGui.Separator(ctx)

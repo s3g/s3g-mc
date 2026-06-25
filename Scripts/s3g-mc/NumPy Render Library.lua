@@ -156,7 +156,8 @@ function M.output_dir(folder_name, source_path, script_dir)
   return dir
 end
 
-function M.insert_output_item(path, label, position, channel_count)
+function M.insert_output_item(path, label, position, channel_count, options)
+  options = options or {}
   local source = reaper.PCM_Source_CreateFromFile(path)
   if not source then return nil, "REAPER could not create a PCM source from output file." end
   local source_length = ({ reaper.GetMediaSourceLength(source) })[1] or 0
@@ -164,6 +165,9 @@ function M.insert_output_item(path, label, position, channel_count)
   local track = reaper.GetTrack(mc.PROJECT, reaper.CountTracks(mc.PROJECT) - 1)
   reaper.GetSetMediaTrackInfo_String(track, "P_NAME", label, true)
   reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", mc.reaper_track_channel_count(channel_count))
+  if options.track_gain then
+    reaper.SetMediaTrackInfo_Value(track, "D_VOL", options.track_gain)
+  end
   local item = reaper.AddMediaItemToTrack(track)
   local take = reaper.AddTakeToMediaItem(item)
   reaper.SetMediaItemTake_Source(take, source)

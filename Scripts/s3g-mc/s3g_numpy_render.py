@@ -735,9 +735,273 @@ def render_partial_trace_resynth(cfg):
     print(f"Pre-normalize peak: {pre_peak:.6f}")
 
 
+def analyze_peak_frames(path, start_seconds, duration_seconds, sample_rate, fft_size, hop, floor_db, pitch_scale, min_peak_hz):
+    source, source_rate = read_wav(path)
+    source = segment(source, source_rate, start_seconds, duration_seconds, sample_rate)
+    if source.shape[0] < 8:
+        raise RuntimeError(f"Source is too short for hybrid resynthesis: {path}")
+    mono = np.mean(source, axis=1).astype(np.float32)
+    mono = mono - float(np.mean(mono))
+    window = np.hanning(fft_size).astype(np.float32)
+    padded = np.pad(mono, (fft_size // 2, fft_size), mode="constant")
+    freqs = np.fft.rfftfreq(fft_size, 1.0 / sample_rate)
+    starts = list(range(0, max(1, padded.shape[0] - fft_size + 1), hop))
+    if not starts:
+        starts = [0]
+    spectra = []
+    max_mag = 0.0
+    for start in starts:
+        frame = padded[start:start + fft_size]
+        if frame.shape[0] < fft_size:
+            frame = np.pad(frame, (0, fft_size - frame.shape[0]), mode="constant")
+        mag = np.abs(np.fft.rfft(frame * window))
+        spectra.append(mag.astype(np.float32))
+        max_mag = max(max_mag, float(np.max(mag)) if mag.size else 0.0)
+    if max_mag <= 1e-12:
+        raise RuntimeError(f"Source appears silent: {path}")
+    floor = max_mag * (10.0 ** (floor_db / 20.0))
+    skipped_low = freqs < max(20.0, min_peak_hz)
+    peak_frames = []
+    for frame_index, mag in enumerate(spectra):
+        u = frame_index / max(1, len(spectra) - 1)
+        candidate = mag.copy()
+        candidate[skipped_low] = 0.0
+        candidate[candidate < floor] = 0.0
+        nonzero = np.flatnonzero(candidate > 0.0)
+        peaks = []
+        if nonzero.size:
+            picked_count = min(96, int(nonzero.size))
+            picked = np.argpartition(candidate, -picked_count)[-picked_count:] if picked_count < nonzero.size else nonzero
+            picked = picked[np.argsort(candidate[picked])[::-1]]
+            for rank, bin_index in enumerate(picked):
+                freq = float(freqs[int(bin_index)] * pitch_scale)
+                if 20.0 <= freq <= sample_rate * 0.45:
+                    peaks.append({
+                        "u": u,
+                        "freq": freq,
+                        "mag": float(candidate[int(bin_index)] / max_mag),
+                        "rank": rank,
+                        "count": picked_count,
+                    })
+        peak_frames.append(peaks)
+    return peak_frames
+
+
+def render_fata_morgana(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    duration = float(cfg["duration"])
+    channels = int(cfg["channels"])
+    frames = max(1, int(round(duration * sample_rate)))
+    out = np.zeros((frames, channels), dtype=np.float32)
+    source_count = max(2, min(16, int(cfg.get("source_count", 2))))
+    fft_size = max(128, int(cfg.get("fft_size", 2048)))
+    hop = max(16, int(cfg.get("hop", fft_size // 4)))
+    partials_per_frame = max(1, int(cfg.get("partials_per_frame", 12)))
+    partial_ms = float(cfg.get("partial_ms", 140.0))
+    floor_db = float(cfg.get("floor_db", -62.0))
+    pitch_scale = float(cfg.get("pitch_scale", 1.0))
+    trace_gain = float(cfg.get("trace_gain", 1.0))
+    density = float(cfg.get("density", 1.0))
+    mutation = float(cfg.get("mutation", 0.65))
+    texture_bias = float(np.clip(cfg.get("texture_bias", 0.55), 0.0, 1.0))
+    drift = float(cfg.get("drift", 0.012))
+    brightness = float(cfg.get("brightness", 1.0))
+    spatial_width = float(cfg.get("spatial_width", 0.75))
+    hybrid_mode = str(cfg.get("hybrid_mode", "chimera"))
+    trace_behavior = str(cfg.get("trace_behavior", "point"))
+    clarity_protect = bool(cfg.get("clarity_protect", True))
+    low_cut_hz = float(cfg.get("low_cut_hz", 30.0))
+    soft_limit = bool(cfg.get("soft_limit", False))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+
+    sources = []
+    min_peak_hz = max(20.0, low_cut_hz if clarity_protect else 20.0)
+    for index in range(1, source_count + 1):
+        path = cfg.get(f"source{index}_path", "")
+        if not path:
+            continue
+        peak_frames = analyze_peak_frames(
+            path,
+            float(cfg.get(f"source{index}_start", 0.0)),
+            float(cfg.get(f"source{index}_duration", duration)),
+            sample_rate,
+            fft_size,
+            hop,
+            floor_db,
+            pitch_scale,
+            min_peak_hz,
+        )
+        sources.append({"path": path, "frames": peak_frames})
+    if len(sources) < 2:
+        raise RuntimeError("Fata Morgana Resynth needs at least two readable WAV sources.")
+
+    def source_frame(source_index, u):
+        frames_for_source = sources[source_index]["frames"]
+        frame_index = int(round(float(np.clip(u, 0.0, 1.0)) * max(0, len(frames_for_source) - 1)))
+        return frames_for_source[frame_index] if frames_for_source else []
+
+    def spectral_position(freq, rank, count, u, source_index):
+        freq_pos = math.log2(max(20.0, freq) / 20.0) / math.log2(max(21.0, sample_rate * 0.45) / 20.0)
+        src_pos = source_index / max(1, len(sources) - 1)
+        rank_pos = rank / max(1, count - 1)
+        return (freq_pos * 0.52 + src_pos * 0.28 + rank_pos * 0.12 + u * 0.08) * max(0, channels - 1)
+
+    def choose_source(base, u, role):
+        if hybrid_mode == "mirage":
+            if role in ("time", "amp") and rng.random() > mutation:
+                return 0
+            return int(rng.integers(0, len(sources)))
+        if hybrid_mode == "graft":
+            if role == "time":
+                return 0
+            if role == "pitch":
+                return min(1, len(sources) - 1)
+            return int(rng.integers(0, len(sources))) if rng.random() < mutation else base
+        if hybrid_mode == "mask":
+            return 0 if role in ("time", "amp") else min(1, len(sources) - 1)
+        if hybrid_mode == "swarm":
+            return int((u * len(sources) + rng.integers(0, 2)) % len(sources))
+        return int(rng.integers(0, len(sources))) if rng.random() < mutation else base
+
+    def add_trace(start_u, freq0, amp0, rank, count, source_index, length_mult):
+        local_gain = env_value(cfg, "trace_gain", start_u, trace_gain)
+        local_drift = env_value(cfg, "drift", start_u, drift)
+        local_spatial_width = env_value(cfg, "spatial_width", start_u, spatial_width) * (1.0 + texture_bias * 1.7)
+        out_start = int(round(start_u * max(0, frames - 1)))
+        length_scale = 1.0 - texture_bias * 0.58
+        length = max(32, int(round(partial_ms * length_mult * length_scale * sample_rate / 1000.0 * rng.uniform(0.65, 1.25))))
+        if out_start + length > frames:
+            length = frames - out_start
+        if length < 16:
+            return 0
+        mag_curve = max(0.35, brightness * (1.0 - texture_bias * 0.35))
+        amp = (amp0 ** mag_curve) * local_gain * 0.080 / math.sqrt(max(1.0, partials_per_frame / 6.0))
+        if amp <= 1e-7:
+            return 0
+        env_power = 0.85 if length_mult > 1.5 else 1.35
+        env = np.sin(np.linspace(0.0, math.pi, length, dtype=np.float64)) ** env_power
+        random_walk = np.cumsum(rng.normal(0.0, 1.0, length))
+        random_walk /= max(1e-9, np.max(np.abs(random_walk)))
+        bend = 1.0 + local_drift * rng.normal(0.0, 0.55) * np.linspace(0.0, 1.0, length)
+        bend += texture_bias * 0.018 * random_walk
+        phase = rng.uniform(0.0, 2.0 * math.pi) + 2.0 * math.pi * np.cumsum(freq0 * bend) / sample_rate
+        sine = np.sin(phase)
+        residual = rng.normal(0.0, 1.0, length)
+        smooth = max(3, int(round(sample_rate * (0.0015 + texture_bias * 0.005))))
+        kernel = np.ones(smooth, dtype=np.float64) / float(smooth)
+        residual = np.convolve(residual, kernel, mode="same")
+        residual_peak = np.max(np.abs(residual))
+        if residual_peak > 1e-9:
+            residual /= residual_peak
+        tonal_mix = 1.0 - texture_bias * 0.72
+        residual_mix = texture_bias * 0.58
+        tone = ((sine * tonal_mix + residual * residual_mix) * env * amp).astype(np.float32)
+        pos0 = spectral_position(freq0, rank, count, start_u, source_index)
+        pos1 = (pos0 + rng.normal(0.0, channels * (0.08 + local_drift * 0.65))) % max(1, channels)
+        w0 = pan_weights(pos0, channels, local_spatial_width)
+        w1 = pan_weights(pos1, channels, local_spatial_width)
+        motion = np.linspace(0.0, 1.0, length, dtype=np.float32)[:, None]
+        weights = w0[None, :] * (1.0 - motion) + w1[None, :] * motion
+        weights /= np.sqrt(np.sum(weights * weights, axis=1, keepdims=True) + 1e-12)
+        out[out_start:out_start + length, :] += tone[:, None] * weights.astype(np.float32, copy=False)
+        return 1
+
+    reference_frames = max(len(src["frames"]) for src in sources)
+    if trace_behavior == "smear":
+        length_mult = 2.8
+        stride = 1
+    elif trace_behavior == "freeze":
+        length_mult = 7.5
+        stride = max(1, int(round(700.0 / max(1.0, partial_ms))))
+    else:
+        length_mult = 1.0
+        stride = 1
+
+    admitted = 0
+    traces = 0
+    for frame_index in range(reference_frames):
+        if frame_index % stride != 0:
+            continue
+        u = frame_index / max(1, reference_frames - 1)
+        local_density = float(np.clip(env_value(cfg, "density", u, density), 0.0, 1.0))
+        n = int(round(partials_per_frame * local_density * (1.0 - texture_bias * 0.25)))
+        if n < 1:
+            continue
+        time_source = choose_source(frame_index % len(sources), u, "time")
+        base_peaks = source_frame(time_source, u)
+        if not base_peaks:
+            continue
+        if hybrid_mode == "mask" and len(sources) > 1:
+            mask_peaks = source_frame(1, u)
+            if mask_peaks:
+                mask_freqs = np.array([p["freq"] for p in mask_peaks[:partials_per_frame * 2]], dtype=np.float64)
+                filtered = []
+                for peak in base_peaks:
+                    cents = np.min(np.abs(1200.0 * np.log2(np.maximum(1e-9, mask_freqs) / max(1e-9, peak["freq"]))))
+                    if cents < 180.0:
+                        filtered.append(peak)
+                base_peaks = filtered
+        if not base_peaks:
+            continue
+        for rank, base_peak in enumerate(base_peaks[:n]):
+            pitch_source = choose_source(time_source, u, "pitch")
+            amp_source = choose_source(time_source, u, "amp")
+            pitch_peaks = source_frame(pitch_source, u)
+            amp_peaks = source_frame(amp_source, u)
+            pitch_peak = pitch_peaks[min(rank, len(pitch_peaks) - 1)] if pitch_peaks else base_peak
+            amp_peak = amp_peaks[min(rank, len(amp_peaks) - 1)] if amp_peaks else base_peak
+            freq = pitch_peak["freq"]
+            amp = (base_peak["mag"] * 0.35 + amp_peak["mag"] * 0.65)
+            admitted += 1
+            traces += add_trace(u, freq, amp, rank, max(1, n), pitch_source, length_mult)
+
+    if clarity_protect:
+        out -= np.mean(out, axis=0, keepdims=True)
+        if low_cut_hz > 0.0:
+            # Reuse the same one-pole high-pass shape as Partial Trace.
+            cutoff_hz = min(float(low_cut_hz), sample_rate * 0.24)
+            rc = 1.0 / (2.0 * math.pi * cutoff_hz)
+            dt = 1.0 / sample_rate
+            alpha = rc / (rc + dt)
+            wet = np.empty_like(out)
+            wet[0, :] = out[0, :]
+            for index in range(1, out.shape[0]):
+                wet[index, :] = alpha * (wet[index - 1, :] + out[index, :] - out[index - 1, :])
+            out = wet.astype(np.float32)
+        if soft_limit:
+            protect_peak = float(np.max(np.abs(out))) if out.size else 0.0
+            if protect_peak > 1.20:
+                ceiling = 0.88
+                out = (ceiling * np.tanh(out / ceiling)).astype(np.float32)
+    out = apply_output_envelope(out, cfg, "amplitude")
+    corr = mean_neighbor_correlation(out)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print(f"Hybrid mode: {hybrid_mode}")
+    print(f"Trace behavior: {trace_behavior}")
+    print(f"Sources: {len(sources)}")
+    print(f"Admitted hybrid peaks: {admitted}")
+    print(f"Oscillator traces: {traces}")
+    print(f"Density: {density:.3f}")
+    print(f"Mutation: {mutation:.3f}")
+    print(f"Texture bias: {texture_bias:.3f}")
+    print(f"FFT size: {fft_size}")
+    print(f"Hop: {hop}")
+    print(f"Output channels: {channels}")
+    print(f"Clarity protect: {clarity_protect}")
+    if clarity_protect:
+        print(f"Low cut: {low_cut_hz:.1f} Hz")
+        print(f"Soft limit: {soft_limit}")
+    print(f"Mean neighbor correlation: {corr:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -751,6 +1015,8 @@ def main():
         render_resonant_terrain(cfg)
     elif mode == "partial_trace_resynth":
         render_partial_trace_resynth(cfg)
+    elif mode == "fata_morgana":
+        render_fata_morgana(cfg)
     else:
         raise RuntimeError(f"Unknown render mode: {mode}")
 

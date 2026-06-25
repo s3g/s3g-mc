@@ -483,6 +483,7 @@ local function render_texture(settings)
             "MC Carto Synth render (" .. tostring(channels) .. "ch)", true)
           reaper.SetMediaTrackInfo_Value(render_track, "I_NCHAN", mc.reaper_track_channel_count(channels))
           reaper.SetMediaTrackInfo_Value(render_track, "B_MAINSEND", 1)
+          reaper.SetMediaTrackInfo_Value(render_track, "D_VOL", settings.insert_gain or 0.25)
           mc.set_track_items_length(render_track, duration)
           local rendered_start = mc.track_items_bounds({ render_track })
           mc.move_track_items_by(render_track, start_pos - rendered_start)
@@ -514,6 +515,7 @@ local function render_texture(settings)
       "Duration: " .. string.format("%.3f sec", duration),
       "Output channels: " .. tostring(channels),
       "Print gain: " .. string.format("%.1f dB", settings.gain_db),
+      "Inserted track gain: " .. string.format("%.1f dB", amp_to_db(settings.insert_gain or 0.25)),
       "Active routes: " .. active_route_names(settings.routes),
       "Seed: " .. tostring(settings.seed),
       "Render bounds: " .. string.format("%.3f to %.3f sec", start_pos, start_pos + duration),
@@ -1019,7 +1021,8 @@ local drift = 0.18
 local crush = 0.0
 local gain_db = -18.0
 local normalize = true
-local normalize_db = -6.0
+local normalize_db = -12.0
+local insert_gain = 0.25
 local seed = 1
 local should_render = false
 local selected_route = 2 -- Density
@@ -1095,6 +1098,7 @@ local function save_last_settings()
     "gain_db=" .. tostring(gain_db),
     "normalize=" .. (normalize and "1" or "0"),
     "normalize_db=" .. tostring(normalize_db),
+    "insert_gain=" .. tostring(insert_gain),
     "seed=" .. tostring(seed),
     "selected_route=" .. tostring(selected_route),
     "random_point_count=" .. tostring(random_point_count),
@@ -1137,6 +1141,7 @@ local function load_last_settings()
   gain_db = math.max(-60, math.min(0, number_value("gain_db", gain_db)))
   normalize = values.normalize == nil and normalize or values.normalize == "1"
   normalize_db = math.max(-24, math.min(0, number_value("normalize_db", normalize_db)))
+  insert_gain = math.max(0.05, math.min(1.0, number_value("insert_gain", insert_gain)))
   seed = math.max(1, math.min(9999, math.floor(number_value("seed", seed) + 0.5)))
   selected_route = math.max(1, math.min(#ROUTE_DEFS, math.floor(number_value("selected_route", selected_route) + 0.5)))
   random_point_count = math.max(4, math.min(MAX_ROUTE_POINTS, math.floor(number_value("random_point_count", random_point_count) + 0.5)))
@@ -1257,8 +1262,9 @@ local function loop()
     changed, gain_db = ImGui.SliderDouble(ctx, "Print gain", gain_db, -60, 0, "%.1f dB")
     changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
     if normalize then
-      changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f")
+      changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -36, -3, "%.1f")
     end
+    changed, insert_gain = ImGui.SliderDouble(ctx, "Inserted track gain", insert_gain, 0.05, 1.0, "%.2f")
     changed, seed = ImGui.SliderInt(ctx, "Seed", seed, 1, 9999)
     ImGui.Separator(ctx)
     if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
@@ -1288,6 +1294,7 @@ local function loop()
       gain_db = gain_db,
       normalize = normalize,
       normalize_db = normalize_db,
+      insert_gain = insert_gain,
       routes = copy_routes(route_points, route_enabled),
       seed = seed,
     })
