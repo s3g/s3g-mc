@@ -1,6 +1,11 @@
 ---
 layout: default
 title: Installation
+toc:
+  - title: Installation
+    href: "#installation"
+  - title: Python Path
+    href: "#python-path"
 ---
 
 # Installation

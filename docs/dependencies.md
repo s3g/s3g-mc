@@ -1,6 +1,11 @@
 ---
 layout: default
 title: Dependencies
+toc:
+  - title: Dependencies
+    href: "#dependencies"
+  - title: Notes
+    href: "#notes"
 ---
 
 # Dependencies

@@ -1,6 +1,13 @@
 ---
 layout: default
 title: s3g-mc
+toc:
+  - title: Start Here
+    href: "#start-here"
+  - title: Highlights
+    href: "#highlights"
+  - title: License
+    href: "#license"
 ---
 
 # s3g-mc

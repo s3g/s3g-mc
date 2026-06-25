@@ -1,6 +1,23 @@
 ---
 layout: default
 title: Tools
+toc:
+  - title: Channel Mixing
+    href: "#channel-mixing--automation"
+  - title: Procedural Synthesis
+    href: "#procedural-synthesis"
+  - title: Offline Synthesis / IR
+    href: "#offline-synthesis--ir"
+  - title: Spatial / HOA
+    href: "#spatial--hoa"
+  - title: Spectral / Convolution
+    href: "#spectral--convolution"
+  - title: Item Transforms
+    href: "#item-channel-transforms"
+  - title: Texture / Montage
+    href: "#multichannel-texture--montage"
+  - title: Track Routing
+    href: "#track-building--routing"
 ---
 
 # Tools

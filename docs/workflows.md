@@ -1,6 +1,11 @@
 ---
 layout: default
 title: Workflows
+toc:
+  - title: 3OA / SPARTA Setup
+    href: "#3oa--sparta-setup"
+  - title: Package Browser
+    href: "#package-browser"
 ---
 
 # Workflows
