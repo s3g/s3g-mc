@@ -200,7 +200,7 @@ a:focus-visible {
   color: #eef4ef;
   font-family: "Menlo", "Monaco", "Courier New", monospace;
   font-size: 0.9em;
-  font-weight: 700;
+  font-weight: 400;
 }
 
 .content pre {
