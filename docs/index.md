@@ -39,7 +39,9 @@ The code is released under 0BSD. Many of these tools are inspired by or extend e
 - Procedural synth engines rendered offline from controller actions
 
 <figure>
-  <img src="assets/images/s3g-mc-screenshot-montage.png" alt="Montage of s3g-mc REAPER controllers and render tools">
+  <a href="assets/images/s3g-mc-screenshot-montage.png" target="_blank" rel="noopener noreferrer">
+    <img src="assets/images/s3g-mc-screenshot-montage.png" alt="Montage of s3g-mc REAPER controllers and render tools">
+  </a>
   <figcaption>Controllers and render tools from the s3g-mc package.</figcaption>
 </figure>
 

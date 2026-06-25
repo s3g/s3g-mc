@@ -229,6 +229,10 @@ a:focus-visible {
   border: 1px solid var(--soft-line);
 }
 
+.content figure a {
+  display: block;
+}
+
 .content figcaption {
   margin-top: 8px;
   color: var(--muted);
