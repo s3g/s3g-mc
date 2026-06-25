@@ -7,6 +7,8 @@ It includes Lua actions, ReaImGui controllers, and JSFX for channel editing,
 automation, fold-down monitoring, dome panning, 3OA send/return routing, and
 render-based multichannel processes.
 
+Documentation and workflow notes: <a href="https://s3g.github.io/s3g-mc/" target="_blank" rel="noopener noreferrer">s3g-mc docs site</a>.
+
 The code is released under 0BSD. Many of these tools are inspired by or extend  existing computer music practices, with references mentioned in the documentation where they are useful.
 
 ## Tools
