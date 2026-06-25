@@ -86,12 +86,14 @@ These offline processes are informed by spectral tool families such as
 <a href="https://www.composersdesktop.com/" target="_blank" rel="noopener noreferrer">CDP</a>,
 <a href="https://www.soundhack.com/freeware/the-boneyard/" target="_blank" rel="noopener noreferrer">SoundHack</a>,
 <a href="https://github.com/ericlyon/FFTease3.0-MaxMSP" target="_blank" rel="noopener noreferrer">FFTease</a>, and
-<a href="https://www.michaelnorris.info/software/soundmagic-spectral" target="_blank" rel="noopener noreferrer">SoundMagic Spectral</a>.
+<a href="https://www.michaelnorris.info/software/soundmagic-spectral" target="_blank" rel="noopener noreferrer">SoundMagic Spectral</a>,
+and run from the package's Python/NumPy backend.
 
 - `Convolve selected items`: convolution of two selected media items, including
   mono, stereo, multichannel pairing, and summed matrix modes.
 - `Cross Synthesis`: offline STFT cross-synthesis for two WAV-backed media
-  items.
+  items. The first selected item keeps phase and timing while its spectral
+  magnitudes are blended toward the second item's magnitudes.
 - `Render MC Impulse Field`: procedural multichannel impulse fields for
   convolution.
 - `Spectral Accumulate`: spectral sustain where each frequency band holds until
@@ -104,7 +106,9 @@ These offline processes are informed by spectral tool families such as
 - `Spectral Morph`: live or frozen spectral morph between two WAV-backed media
   items.
 - `Spectral Shaper`: offline spectral envelope transfer for two WAV-backed
-  media items, with an alternate formant-vocode algorithm.
+  media items, with an alternate formant-vocode algorithm. The first selected
+  item is the carrier/tune/timing source; the second supplies the spectral
+  envelope or broad formant contour.
 - `Spectral Spatializer`: distributes frequency bins across even output channel
   counts from 2 to 64.
 - `Spectral Step Drunk Freeze`: stepped freeze or random-walk freeze through
@@ -131,24 +135,39 @@ Native REAPER variations inspired by
 <a href="https://www.composersdesktop.com/docs/html/cgromc.htm" target="_blank" rel="noopener noreferrer">CDP multichannel processes</a>.
 These scripts do not require CDP.
 
-- `Brownian Walk`
-- `Cascade Spatial Echo`
-- `Channel Orbit Delay`
-- `Channel Smear`
-- `Crumble Spatial Groups`
-- `Flutter Gate`
-- `Fracture`
-- `Frame Gate`
-- `Frame Shift`
-- `Marker Spatial Montage`
-- `Mono Fill`
-- `Scatter Slices`
-- `Shred / Slice`
-- `Spatial Repeater`
-- `Spatial Stutter`
-- `Stereo Spin`
-- `Texture Clouds`
-- `Zigzag Channel Walker`
+- `Brownian Walk`: short fragments follow a bounded random walk through source
+  time and output channels.
+- `Cascade Spatial Echo`: equal segments print decaying echoes through space.
+- `Channel Orbit Delay`: whole-item delay repeats orbit around output channels.
+- `Channel Smear`: slices duplicate to neighboring channels with gain
+  compensation.
+- `Crumble Spatial Groups`: slices move through progressively smaller channel
+  groups.
+- `Flutter Gate`: moving active-channel groups create flutter patterns.
+- `Fracture`: ordered slices from one source channel disperse across a channel
+  path, with jitter, drop, and spread voices.
+- `Frame Gate`: rotating active-channel groups print gate patterns.
+- `Frame Shift`: channel-frame rotation, mirror, odd/even split, pair
+  interleave, or half-swap render.
+- `Marker Spatial Montage`: project markers or active-take markers inside the
+  selected item define chunks for ordered or shuffled montage.
+- `Mono Fill`: one source channel fills every output channel with optional gain
+  compensation and slice rotation.
+- `Scatter Slices`: multiple selected items are sliced by equal divisions,
+  project markers, or active-take markers, then randomly arranged across a
+  target multichannel duration with scatter, ordered-walk, stutter, repeater,
+  channel-smear, channel-motion, shape, and breakpoint-density variations.
+- `Shred / Slice`: equal, project-marker, or active-take-marker slices with
+  ordered mono spread, random mono scatter, and multichannel reorientation
+  modes.
+- `Spatial Repeater`: one source channel repeats around clockwise, ping-pong,
+  or random channel paths.
+- `Spatial Stutter`: repeated short slices advance through a spatial path.
+- `Stereo Spin`: sliced stereo images rotate around a multichannel output field.
+- `Texture Clouds`: dense short fragments from one source channel scattered
+  across an output field.
+- `Zigzag Channel Walker`: equal slices walk back and forth across output
+  channels, with optional reverse source-slice order.
 
 ## Track Building / Routing
 
