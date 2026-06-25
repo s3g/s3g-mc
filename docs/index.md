@@ -24,9 +24,9 @@ The code is released under 0BSD. Many of these tools are inspired by or extend e
 ## Start Here
 
 - [Installation](installation.md)
-- [Tools](tools.md)
-- [3OAFX](workflows.md)
 - [Dependencies](dependencies.md)
+- [Tools](tools.md)
+- [Workflows](workflows.md)
 
 ## Highlights
 
