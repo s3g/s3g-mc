@@ -1,6 +1,9 @@
 ---
 layout: default
 title: s3g-mc
+next_page:
+  title: Installation
+  url: /installation.html
 toc:
   - title: Start Here
     href: "#start-here"
@@ -12,16 +15,11 @@ toc:
 
 # s3g-mc
 
-s3g-mc is a collection of REAPER tools for multichannel composition, spatial
-audio, offline sound transformation, and procedural synthesis.
+s3g-mc is a collection of REAPER tools for multichannel composition, spatial audio, offline sound transformation, and procedural synthesis.
 
-It includes Lua actions, ReaImGui controllers, JSFX, and Python/NumPy renderers
-for channel editing, automation, fold-down monitoring, dome panning, 3OA
-send/return routing, spectral processing, convolution, and multichannel render
-workflows.
+It includes Lua actions, ReaImGui controllers, and JSFX for channel editing, automation, fold-down monitoring, dome panning, 3OA send/return routing, and render-based multichannel processes.
 
-The package is designed around practical REAPER actions: select media or tracks,
-run a tool, and get a clear multichannel result back in the session.
+The code is released under 0BSD. Many of these tools are inspired by or extend existing computer music practices, with references mentioned in the documentation where they are useful.
 
 ## Start Here
 
@@ -40,4 +38,7 @@ run a tool, and get a clear multichannel result back in the session.
 
 ## License
 
-Zero-Clause BSD. See the package `LICENSE`.
+Zero-Clause BSD. See the package
+<a href="https://github.com/s3g/s3g-mc?tab=License-1-ov-file" target="_blank" rel="noopener noreferrer">LICENSE</a>.
+
+Development assistance: OpenAI Codex.

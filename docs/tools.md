@@ -1,6 +1,12 @@
 ---
 layout: default
 title: Tools
+prev_page:
+  title: Dependencies
+  url: /dependencies.html
+next_page:
+  title: Workflows
+  url: /workflows.html
 toc:
   - title: Channel Mixing
     href: "#channel-mixing--automation"

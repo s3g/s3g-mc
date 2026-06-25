@@ -218,6 +218,42 @@ a:focus-visible {
   font-family: inherit;
 }
 
+.page-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 42px;
+  padding-top: 20px;
+  border-top: 1px solid var(--soft-line);
+}
+
+.page-nav-link {
+  display: block;
+  min-height: 58px;
+  padding: 12px 14px;
+  background: var(--panel-alt);
+  border: 1px solid var(--soft-line);
+  color: var(--ink);
+}
+
+.page-nav-link:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.page-nav-link span {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.page-nav-link.next {
+  text-align: right;
+}
+
 @media (max-width: 1120px) {
   .page-shell {
     grid-template-columns: 230px minmax(0, 1fr);
@@ -247,14 +283,9 @@ a:focus-visible {
     padding: 18px;
   }
 
-  .sidebar {
-    position: static;
-    max-height: none;
-    margin-bottom: 18px;
-    padding: 18px;
-    background: var(--panel);
-    border: 1px solid var(--soft-line);
-    border-radius: 0;
+  .sidebar,
+  .toc {
+    display: none;
   }
 
   .sidebar-section {
@@ -263,5 +294,13 @@ a:focus-visible {
 
   .content {
     padding: 24px 22px 34px;
+  }
+
+  .page-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .page-nav-link.next {
+    text-align: left;
   }
 }

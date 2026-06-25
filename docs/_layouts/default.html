@@ -46,6 +46,24 @@
 
       <main class="content" id="content">
         {{ content }}
+        {% if page.prev_page or page.next_page %}
+        <nav class="page-nav" aria-label="Page navigation">
+          {% if page.prev_page %}
+          <a class="page-nav-link" href="{{ page.prev_page.url | relative_url }}">
+            <span>Previous</span>
+            {{ page.prev_page.title }}
+          </a>
+          {% else %}
+          <span></span>
+          {% endif %}
+          {% if page.next_page %}
+          <a class="page-nav-link next" href="{{ page.next_page.url | relative_url }}">
+            <span>Next</span>
+            {{ page.next_page.title }}
+          </a>
+          {% endif %}
+        </nav>
+        {% endif %}
       </main>
 
       {% if page.toc %}
@@ -59,4 +77,3 @@
     </div>
   </body>
 </html>
-

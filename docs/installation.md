@@ -1,6 +1,12 @@
 ---
 layout: default
 title: Installation
+prev_page:
+  title: Overview
+  url: /
+next_page:
+  title: Dependencies
+  url: /dependencies.html
 toc:
   - title: Installation
     href: "#installation"

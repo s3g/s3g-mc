@@ -252,6 +252,7 @@ More detail is in `Scripts/s3g-mc/s3g_3oa_fx_workflow.md`.
 
 ## License
 
-Zero-Clause BSD. See `LICENSE`.
+Zero-Clause BSD. See
+<a href="https://github.com/s3g/s3g-mc?tab=License-1-ov-file" target="_blank" rel="noopener noreferrer">LICENSE</a>.
 
 Development assistance: OpenAI Codex.

@@ -1,6 +1,9 @@
 ---
 layout: default
 title: Workflows
+prev_page:
+  title: Tools
+  url: /tools.html
 toc:
   - title: 3OA / SPARTA Setup
     href: "#3oa--sparta-setup"
@@ -30,6 +33,14 @@ This workflow processes a 24-channel third-order ambisonic speaker feed inside
 a 72-channel REAPER track. The extra channels carry a protected dry copy and a
 return mask so one inserted effect can be moved, shaped, and mixed without
 destroying the original signal.
+
+The workflow inherits ideas from
+<a href="https://github.com/risdsound/foafx" target="_blank" rel="noopener noreferrer">FOAFX</a>:
+decode an ambisonic signal to a controlled virtual speaker layer, process a
+spatially selected wet path, then recombine or re-encode the result. In
+`s3g-mc`, that logic is adapted for third-order ambisonics, a 24-point virtual
+speaker layout, and a REAPER workflow built around JSFX lanes, plugin pinning,
+and an ImGui controller.
 
 ## Required Files
 
