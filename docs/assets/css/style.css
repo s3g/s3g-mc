@@ -218,6 +218,23 @@ a:focus-visible {
   font-family: inherit;
 }
 
+.content figure {
+  margin: 28px 0;
+}
+
+.content img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--soft-line);
+}
+
+.content figcaption {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .page-nav {
   display: grid;
   grid-template-columns: 1fr 1fr;
