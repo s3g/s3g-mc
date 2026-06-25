@@ -5,27 +5,76 @@ prev_page:
   title: Tools
   url: /tools.html
 toc:
-  - title: 3OAFX
-    href: "#3oafx"
-  - title: Required Files
-    href: "#required-files"
-  - title: Basic Chain
-    href: "#basic-chain"
-  - title: Channel Layout
-    href: "#channel-layout"
-  - title: Controller Workflow
-    href: "#controller-workflow"
-  - title: Mixing Behavior
-    href: "#mixing-behavior"
-  - title: Insert Effects
-    href: "#insert-effects"
-  - title: Troubleshooting
-    href: "#troubleshooting"
   - title: Package Browser
     href: "#package-browser"
+  - title: Track-Level Channel Mixing
+    href: "#track-level-channel-mixing"
+  - title: Item and Stem Workflows
+    href: "#item-and-stem-workflows"
+  - title: Offline Render Workflows
+    href: "#offline-render-workflows"
+  - title: Texture / Montage
+    href: "#texture--montage"
+  - title: 3OAFX
+    href: "#3oafx"
+  - title: 25ch Dome Panners
+    href: "#25ch-dome-panners"
 ---
 
 # Workflows
+
+## Package Browser
+
+The package browser is the easiest way to run the tools and install or refresh
+the individual REAPER actions. It groups scripts by use: channel mixing,
+spatial/HOA, spectral/convolution, offline synthesis, item transforms,
+multichannel montage, and track routing.
+
+## Track-Level Channel Mixing
+
+Use the `128ch Automation Mixer` on high-channel tracks and buses when you need
+track-style control over many channels at once. It gives you faders, mute/solo,
+meters, quick groups, selection behavior, and a compact plugin pin connector
+for tracks up to REAPER's 128-channel limit.
+
+Use `MC to Stereo Autogain` when a multichannel track needs a practical stereo
+fold-down for monitoring, previewing, or rendering. The controller exposes
+layout, width, rotation, weighting, output trim, and autogain controls so the
+fold-down can be shaped without losing the multichannel source.
+
+## Item and Stem Workflows
+
+The item and stem tools are for changing the channel structure of existing
+material. They can explode multichannel items, rebuild stems from selected
+tracks, cycle mono tracks into multichannel layouts, and prepare channel counts
+for later spatial or spectral work.
+
+These actions are intended to leave obvious new media items or tracks behind,
+rather than silently changing the source. When a process renders audio, it is
+bounded to the selected item, selected track material, or requested output
+duration wherever possible.
+
+## Offline Render Workflows
+
+The spectral, convolution, resynthesis, and offline synth tools are
+non-realtime processes. Select media items, choose the render settings, and the
+script writes a new media item into the project.
+
+Python and NumPy are used where Lua or JSFX would be too slow or too limited:
+FFT processing, convolution, spectral recombination, dense grain rendering, and
+oscillator-bank resynthesis. The included JSFX synth engines are also rendered
+offline when a process benefits from REAPER's audio engine and automation.
+
+## Texture / Montage
+
+The montage tools create multichannel structures from slices, impulses, grains,
+and channel motion. They are useful for turning mono or stereo source material
+into spatial material with controlled randomness.
+
+Many of these actions can use even slicing, project markers, or take markers.
+The result is usually a new multichannel item: slices can be scattered, repeated,
+spread across channels, moved between channels, or constrained into denser and
+thinner regions over time.
 
 ## 3OAFX
 
@@ -199,9 +248,29 @@ make sure `JS: s3g 3OA Return Mask` is present in the chain and enabled.
 If an insert effect processes the dry path, click `Pin inserts 1-24`. REAPER may
 auto-wire a newly inserted FX too broadly on a 72-channel track.
 
-## Package Browser
+## 25ch Dome Panners
 
-The package browser is the easiest way to run the tools and install or refresh
-the individual REAPER actions. It groups scripts by use: channel mixing,
-spatial/HOA, spectral/convolution, offline synthesis, item transforms,
-multichannel montage, and track routing.
+The 25ch panners are intended for use with the RISD Studio for Research in Sound
+& Technology (SRST) 25-channel loudspeaker array. The shared speaker layout in
+these panners follows that array arrangement.
+
+In REAPER, the primary use is on an 8-channel track or bus before the master
+send. Each panner can take up to 8 mono source channels and distribute them
+across the 25-channel dome output. This makes the panners useful as a spatial
+bus: route source material into channels `1-8`, place or automate the sources
+with the controller, then send the resulting 25-channel output onward to the
+session's multichannel monitoring or routing path.
+
+Each panner has an associated JSFX engine, and the companion controller script
+is the intended way to load and control it. The JSFX parameters remain
+automatable in REAPER, but the controller gives direct access to the spatial
+map, source positions, and panner-specific controls.
+
+The package includes several panning methods for the same speaker layout:
+
+- `25ch LBAP Dome Panner`
+- `25ch VBAP Dome Panner`
+- `25ch DBAP Dome Panner`
+- `25ch Cosine Dome Panner`
+- `25ch Region Dome Panner`
+- `25ch Vector Morph Dome Panner`
