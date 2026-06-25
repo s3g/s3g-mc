@@ -5,8 +5,8 @@ prev_page:
   title: Tools
   url: /tools.html
 toc:
-  - title: 3OA / SPARTA Setup
-    href: "#3oa--sparta-setup"
+  - title: 3OAFX
+    href: "#3oafx"
   - title: Required Files
     href: "#required-files"
   - title: Basic Chain
@@ -27,7 +27,7 @@ toc:
 
 # Workflows
 
-## 3OA / SPARTA Setup
+## 3OAFX
 
 This workflow processes a 24-channel third-order ambisonic speaker feed inside
 a 72-channel REAPER track. The extra channels carry a protected dry copy and a
@@ -42,7 +42,7 @@ spatially selected wet path, then recombine or re-encode the result. In
 speaker layout, and a REAPER workflow built around JSFX lanes, plugin pinning,
 and an ImGui controller.
 
-## Required Files
+### Required Files
 
 JSFX install to:
 
@@ -60,7 +60,7 @@ Controller:
 
 - `3OA Send Return FX Controller.lua`
 
-## Basic Chain
+### Basic Chain
 
 On one REAPER track, use this order:
 
@@ -90,7 +90,7 @@ Load the included JSON layouts from `sparta_json/`:
 irregular 24-point virtual speaker cloud before re-encoding, rather than to a
 standard symmetric speaker preset.
 
-## Channel Layout
+### Channel Layout
 
 The 72-channel bus is divided into three 24-channel lanes:
 
@@ -123,7 +123,7 @@ no fresh meter data is available, the map falls back to a predicted mask
 calculated from the Return/Mask direction, width, focus, floor, and rear-reject
 controls.
 
-## Controller Workflow
+### Controller Workflow
 
 1. Select the 3OA FX track.
 2. Run `3OA Send Return FX Controller.lua`.
@@ -150,7 +150,7 @@ For a simple test, unlock send/return azimuth, put `Send` on a source, put
 `Return` somewhere else, and enable `Re-place wet through return mask`. The
 effect should be fed by the send position and heard from the return position.
 
-## Mixing Behavior
+### Mixing Behavior
 
 In `s3g 3OA Mixer`:
 
@@ -171,7 +171,7 @@ Recommended starting defaults:
 If dry still sounds effected, click `Pin inserts 1-24` and verify the insert
 effect is physically between `s3g 3OA Send` and `s3g 3OA Return Mask`.
 
-## Insert Effects
+### Insert Effects
 
 This public package does not include a dedicated 3OA insert effect. Use a
 third-party or custom effect that can process the 24-channel wet lane on
@@ -179,7 +179,7 @@ channels `1-24`. After adding or moving the insert, click `Pin inserts 1-24` in
 the controller so the insert does not process the protected dry copy or return
 mask lanes.
 
-## Troubleshooting
+### Troubleshooting
 
 If the `s3g` JSFX do not appear, confirm that this package's `Effects/s3g`
 folder was copied or symlinked to `REAPER/Effects/s3g`, then rescan JSFX or
