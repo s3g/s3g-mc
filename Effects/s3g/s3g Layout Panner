@@ -183,6 +183,7 @@ loop(NUM_SOURCES * MAX_SPEAKERS,
   i += 1;
 );
 current_layout = -1;
+layout_flat = 0;
 
 function wrap_degrees(deg) local(wrapped)
 (
@@ -203,6 +204,15 @@ function distance_amp(distance)
   distance_rolloff_db == 12 ? 1 / (distance * distance) :
   distance_rolloff_db == 18 ? 1 / (distance * distance * distance) :
   1 / (distance ^ (distance_rolloff_db / 6));
+);
+
+function flat_elevation_amp(elevation_degrees) local(v, effective_distance)
+(
+  layout_flat ? (
+    v = abs(elevation_degrees) / 90;
+    effective_distance = 1 + v * 2;
+    distance_amp(effective_distance);
+  ) : 1;
 );
 
 function source_gain(speaker_index, source_x, source_y, source_z)
@@ -230,6 +240,7 @@ layout_index = floor(slider1 + 0.5);
 layout_index != current_layout ? (
   current_layout = layout_index;
   build_layout(layout_index);
+  layout_flat = layout_index == 0 || layout_index == 1 || layout_index == 3 || layout_index == 4;
   clear_smooth_gains();
 );
 
@@ -265,6 +276,7 @@ src_level[7] = 10 ^ (slider55 / 20); src_mute[7] = slider56 >= 0.5; src_solo[7] 
 layout_index != current_layout ? (
   current_layout = layout_index;
   build_layout(layout_index);
+  layout_flat = layout_index == 0 || layout_index == 1 || layout_index == 3 || layout_index == 4;
   clear_smooth_gains();
 );
 
@@ -293,7 +305,7 @@ loop(NUM_SOURCES,
     dist_z[src] = source_dist_target + (dist_z[src] - source_dist_target) * distance_coef;
     source_dist = dist_z[src];
     source_radius = clamp_distance(source_dist);
-    source_amp = distance_amp(source_dist);
+    source_amp = distance_amp(source_dist) * flat_elevation_amp(source_el);
     wrapped_az = wrap_degrees(source_az);
     source_azr = wrapped_az * deg2rad;
     source_elr = source_el * deg2rad;

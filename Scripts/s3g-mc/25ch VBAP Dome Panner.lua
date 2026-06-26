@@ -33,6 +33,27 @@ local view_zoom = 1.0
 local dragging_source = 0
 local load_error = ""
 local auto_load_attempted_guid = ""
+local EXT = "s3g_mc_25ch_vbap_dome_panner"
+
+local function ext_bool(key, fallback)
+  local value = reaper.GetExtState(EXT, key)
+  if value == "" then return fallback end
+  return value ~= "0"
+end
+
+local legacy_writes = ext_bool("controller_writes", true)
+local spatial_writes = ext_bool("spatial_writes", legacy_writes)
+local mix_writes = ext_bool("mix_writes", legacy_writes)
+local automation_status = ""
+
+local AUTO_MODE_NAMES = {
+  [0] = "Trim/Read",
+  [1] = "Read",
+  [2] = "Touch",
+  [3] = "Write",
+  [4] = "Latch",
+  [5] = "Latch Preview",
+}
 
 local speakers = {
   { id = 1, az = 30, el = 0 }, { id = 2, az = 60, el = 0 }, { id = 3, az = 90, el = 0 },
@@ -221,20 +242,147 @@ local function get_param(track, fx, param, fallback)
   return value == nil and fallback or value
 end
 
-local function set_param(track, fx, param, value)
-  if track and fx >= 0 then
+local function set_param(track, fx, param, value, write_enabled)
+  if write_enabled and track and fx >= 0 then
     reaper.TrackFX_SetParam(track, fx, param, value)
   end
 end
 
-local function slider_double(track, fx, label, param, lo, hi, fmt)
+local function set_spatial_param(track, fx, param, value)
+  set_param(track, fx, param, value, spatial_writes)
+end
+
+local function set_mix_param(track, fx, param, value)
+  set_param(track, fx, param, value, mix_writes)
+end
+
+local function begin_write_disabled(write_enabled)
+  if write_enabled or not ImGui.BeginDisabled then return false end
+  ImGui.BeginDisabled(ctx, true)
+  return true
+end
+
+local function end_write_disabled(disabled)
+  if disabled and ImGui.EndDisabled then ImGui.EndDisabled(ctx) end
+end
+
+local function automation_mode_name(track)
+  if not track or not reaper.GetTrackAutomationMode then return "Unknown" end
+  local mode = reaper.GetTrackAutomationMode(track)
+  return AUTO_MODE_NAMES[mode] or ("Mode " .. tostring(mode))
+end
+
+local function set_track_write_mode(track, write_enabled)
+  if not track or not reaper.SetTrackAutomationMode then return false end
+  reaper.SetTrackAutomationMode(track, write_enabled and 3 or 0)
+  spatial_writes = write_enabled
+  mix_writes = write_enabled
+  reaper.SetExtState(EXT, "spatial_writes", spatial_writes and "1" or "0", true)
+  reaper.SetExtState(EXT, "mix_writes", mix_writes and "1" or "0", true)
+  automation_status = write_enabled
+    and "Track set to Write; GUI moves will write automation."
+    or "Track set to Trim/Read; GUI editing is automation-safe."
+  reaper.TrackList_AdjustWindows(false)
+  reaper.UpdateArrange()
+  return true
+end
+
+local set_envelope_chunk_visibility
+
+local function show_arm_fx_envelope(track, fx, param)
+  if not track or fx < 0 then return false end
+  local env = reaper.GetFXEnvelope(track, fx, param, true)
+  if not env then return false end
+  if reaper.SetEnvelopeInfo_Value then
+    pcall(reaper.SetEnvelopeInfo_Value, env, "B_VISIBLE", 1)
+    pcall(reaper.SetEnvelopeInfo_Value, env, "B_ACTIVE", 1)
+    pcall(reaper.SetEnvelopeInfo_Value, env, "B_ARM", 1)
+    pcall(reaper.SetEnvelopeInfo_Value, env, "I_TCPH", 72)
+  end
+  set_envelope_chunk_visibility(env, true)
+  return true
+end
+
+set_envelope_chunk_visibility = function(env, visible)
+  if not env or not reaper.GetEnvelopeStateChunk or not reaper.SetEnvelopeStateChunk then return false end
+  local ok, chunk = reaper.GetEnvelopeStateChunk(env, "", false)
+  if not ok or chunk == "" then return false end
+  local vis = visible and "1" or "0"
+  local changed = false
+  chunk = chunk:gsub("(\nVIS%s+)%d", function(prefix)
+    changed = true
+    return prefix .. vis
+  end, 1)
+  if not changed then
+    chunk = chunk:gsub("^(VIS%s+)%d", function(prefix)
+      changed = true
+      return prefix .. vis
+    end, 1)
+  end
+  if not changed then return false end
+  return reaper.SetEnvelopeStateChunk(env, chunk, false)
+end
+
+local function show_arm_source_aed(track, fx, source_index)
+  local count = 0
+  for offset = 0, 2 do
+    if show_arm_fx_envelope(track, fx, source_param(source_index, offset)) then count = count + 1 end
+  end
+  reaper.TrackList_AdjustWindows(false)
+  reaper.UpdateArrange()
+  return count
+end
+
+local function show_arm_all_source_aed(track, fx)
+  local count = 0
+  for source = 1, 8 do
+    count = count + show_arm_source_aed(track, fx, source)
+  end
+  reaper.TrackList_AdjustWindows(false)
+  reaper.UpdateArrange()
+  return count
+end
+
+local function hide_fx_envelope(track, fx, param)
+  if not track or fx < 0 then return false end
+  local env = reaper.GetFXEnvelope(track, fx, param, false)
+  if not env then return false end
+  if reaper.SetEnvelopeInfo_Value then
+    pcall(reaper.SetEnvelopeInfo_Value, env, "B_VISIBLE", 0)
+    pcall(reaper.SetEnvelopeInfo_Value, env, "I_TCPH", 0)
+  end
+  set_envelope_chunk_visibility(env, false)
+  return true
+end
+
+local function hide_source_aed(track, fx, source_index)
+  local count = 0
+  for offset = 0, 2 do
+    if hide_fx_envelope(track, fx, source_param(source_index, offset)) then count = count + 1 end
+  end
+  reaper.TrackList_AdjustWindows(false)
+  reaper.UpdateArrange()
+  return count
+end
+
+local function hide_all_source_aed(track, fx)
+  local count = 0
+  for source = 1, 8 do
+    count = count + hide_source_aed(track, fx, source)
+  end
+  reaper.TrackList_AdjustWindows(false)
+  reaper.UpdateArrange()
+  return count
+end
+
+local function slider_double(track, fx, label, param, lo, hi, fmt, write_enabled)
   local value = get_param(track, fx, param, lo)
   local changed, new_value = ImGui.SliderDouble(ctx, label, value, lo, hi, fmt or "%.2f")
-  if changed then set_param(track, fx, param, new_value) end
+  if changed then set_param(track, fx, param, new_value, write_enabled) end
   return new_value
 end
 
-local function toggle_param(track, fx, label, param)
+local function toggle_param(track, fx, label, param, write_enabled)
   local value = get_param(track, fx, param, 0)
   local enabled = value >= 0.5
   local visible, id = label:match("^(.-)(##.*)$")
@@ -242,7 +390,7 @@ local function toggle_param(track, fx, label, param)
   id = id or ""
   local text = visible .. (enabled and ": on" or ": off") .. id
   if ImGui.Button(ctx, text) then
-    set_param(track, fx, param, enabled and 0 or 1)
+    set_param(track, fx, param, enabled and 0 or 1, write_enabled)
     enabled = not enabled
   end
   return enabled
@@ -484,27 +632,27 @@ end
 local function update_source_from_mouse(track, fx, source_index, mx, my, cx, cy, radius, global_az, global_el, global_dist)
   if source_index < 1 or source_index > 8 then return end
   local az, el, distance = source_aed_from_screen(mx, my, cx, cy, radius)
-  set_param(track, fx, source_param(source_index, 0), az - global_az)
-  set_param(track, fx, source_param(source_index, 1), clamp(el - global_el, 0, 90))
-  set_param(track, fx, source_param(source_index, 2), clamp(distance - global_dist, 0.1, 3))
+  set_spatial_param(track, fx, source_param(source_index, 0), az - global_az)
+  set_spatial_param(track, fx, source_param(source_index, 1), clamp(el - global_el, 0, 90))
+  set_spatial_param(track, fx, source_param(source_index, 2), clamp(distance - global_dist, 0.1, 3))
 end
 
 local function reset_source_distances(track, fx)
   for source = 1, 8 do
-    set_param(track, fx, source_param(source, 2), 1)
+    set_spatial_param(track, fx, source_param(source, 2), 1)
   end
-  set_param(track, fx, PARAM.global_dist, 0)
+  set_spatial_param(track, fx, PARAM.global_dist, 0)
 end
 
 local function clear_mutes(track, fx)
   for source = 1, 8 do
-    set_param(track, fx, source_control_param(source, 1), 0)
+    set_mix_param(track, fx, source_control_param(source, 1), 0)
   end
 end
 
 local function clear_solos(track, fx)
   for source = 1, 8 do
-    set_param(track, fx, source_control_param(source, 2), 0)
+    set_mix_param(track, fx, source_control_param(source, 2), 0)
   end
 end
 
@@ -638,11 +786,11 @@ local function draw_dome(track, fx)
       local hit = hit_test_source(sources, mx, my)
       if hit > 0 then
         selected_source = hit
-        dragging_source = hit
+        if spatial_writes then dragging_source = hit end
       end
     end
 
-    if dragging_source > 0 and ImGui.IsMouseDown(ctx, 0) then
+    if spatial_writes and dragging_source > 0 and ImGui.IsMouseDown(ctx, 0) then
       update_source_from_mouse(track, fx, dragging_source, mx, my, cx, cy, radius, global_az, global_el, global_dist)
     end
 
@@ -665,7 +813,8 @@ local function draw_dome(track, fx)
 
   ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 14, COLORS.text, "25ch VBAP Dome Panner")
   ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 34, COLORS.muted, "25 speakers / 8 mono sources / distance 1.0 = dome edge")
-  ImGui.DrawList_AddText(draw_list, x0 + canvas_width - 300, y0 + 14, COLORS.muted, "drag source dots to edit az / el / radius")
+  ImGui.DrawList_AddText(draw_list, x0 + canvas_width - 300, y0 + 14, COLORS.muted,
+    spatial_writes and "drag source dots to edit az / el / radius" or "spatial safe: click dots to select")
   if controls_inline then
     ImGui.SameLine(ctx)
     ImGui.Dummy(ctx, control_gap, 1)
@@ -678,21 +827,29 @@ local function draw_source_controls(track, fx)
   local changed
   changed, selected_source = ImGui.SliderInt(ctx, "Selected source", selected_source, 1, 8)
   ImGui.SameLine(ctx)
+  local disabled = begin_write_disabled(spatial_writes)
   if ImGui.Button(ctx, "Reset distances") then reset_source_distances(track, fx) end
+  end_write_disabled(disabled)
   local base_label = "S" .. tostring(selected_source)
-  slider_double(track, fx, base_label .. " azimuth (deg)", source_param(selected_source, 0), -360, 360, "%.1f")
-  slider_double(track, fx, base_label .. " elevation (deg)", source_param(selected_source, 1), 0, 90, "%.1f")
-  slider_double(track, fx, base_label .. " distance (dome radius, edge=1)", source_param(selected_source, 2), 0.1, 3, "%.2f")
-  slider_double(track, fx, base_label .. " gain (dB)", source_control_param(selected_source, 0), -60, 24, "%.1f")
-  toggle_param(track, fx, "Mute " .. base_label, source_control_param(selected_source, 1))
+  disabled = begin_write_disabled(spatial_writes)
+  slider_double(track, fx, base_label .. " azimuth (deg)", source_param(selected_source, 0), -360, 360, "%.1f", spatial_writes)
+  slider_double(track, fx, base_label .. " elevation (deg)", source_param(selected_source, 1), 0, 90, "%.1f", spatial_writes)
+  slider_double(track, fx, base_label .. " distance (dome radius, edge=1)", source_param(selected_source, 2), 0.1, 3, "%.2f", spatial_writes)
+  end_write_disabled(disabled)
+  disabled = begin_write_disabled(mix_writes)
+  slider_double(track, fx, base_label .. " gain (dB)", source_control_param(selected_source, 0), -60, 24, "%.1f", mix_writes)
+  toggle_param(track, fx, "Mute " .. base_label, source_control_param(selected_source, 1), mix_writes)
   ImGui.SameLine(ctx)
-  toggle_param(track, fx, "Solo " .. base_label, source_control_param(selected_source, 2))
+  toggle_param(track, fx, "Solo " .. base_label, source_control_param(selected_source, 2), mix_writes)
+  end_write_disabled(disabled)
 end
 
 local function draw_source_mixer(track, fx)
+  local disabled = begin_write_disabled(mix_writes)
   if ImGui.Button(ctx, "Clear mutes") then clear_mutes(track, fx) end
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, "Clear solos") then clear_solos(track, fx) end
+  end_write_disabled(disabled)
 
   for source = 1, 8 do
     local label = "S" .. tostring(source)
@@ -700,11 +857,13 @@ local function draw_source_mixer(track, fx)
       selected_source = source
     end
     ImGui.SameLine(ctx)
-    toggle_param(track, fx, "M##mix" .. tostring(source), source_control_param(source, 1))
+    disabled = begin_write_disabled(mix_writes)
+    toggle_param(track, fx, "M##mix" .. tostring(source), source_control_param(source, 1), mix_writes)
     ImGui.SameLine(ctx)
-    toggle_param(track, fx, "S##mix" .. tostring(source), source_control_param(source, 2))
+    toggle_param(track, fx, "S##mix" .. tostring(source), source_control_param(source, 2), mix_writes)
     ImGui.SameLine(ctx)
-    slider_double(track, fx, "Gain##mix" .. tostring(source), source_control_param(source, 0), -60, 24, "%.1f dB")
+    slider_double(track, fx, "Gain##mix" .. tostring(source), source_control_param(source, 0), -60, 24, "%.1f dB", mix_writes)
+    end_write_disabled(disabled)
   end
 end
 
@@ -733,14 +892,62 @@ local function loop()
       else
         draw_dome(track, fx)
 
+        if ImGui.CollapsingHeader(ctx, "Automation", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+          local changed
+          local mode_name = automation_mode_name(track)
+          ImGui.Text(ctx, "Track automation: " .. mode_name)
+          ImGui.SameLine(ctx)
+          local write_mode = mode_name == "Write"
+          local mode_label = write_mode and "Set Trim/Read + safe" or "Set Write + GUI"
+          if ImGui.Button(ctx, mode_label) then
+            set_track_write_mode(track, not write_mode)
+          end
+          local spatial_label = write_mode and "Write spatial" or "Control spatial"
+          local mix_label = write_mode and "Write mix" or "Control mix"
+          changed, spatial_writes = ImGui.Checkbox(ctx, spatial_label, spatial_writes)
+          if changed then reaper.SetExtState(EXT, "spatial_writes", spatial_writes and "1" or "0", true) end
+          ImGui.SameLine(ctx)
+          changed, mix_writes = ImGui.Checkbox(ctx, mix_label, mix_writes)
+          if changed then reaper.SetExtState(EXT, "mix_writes", mix_writes and "1" or "0", true) end
+          ImGui.SameLine(ctx)
+          if ImGui.Button(ctx, "Show selected position lanes") then
+            automation_status = "Shown/armed " .. tostring(show_arm_source_aed(track, fx, selected_source)) ..
+              " position envelopes for S" .. tostring(selected_source)
+          end
+          ImGui.SameLine(ctx)
+          if ImGui.Button(ctx, "Hide selected") then
+            automation_status = "Hidden " .. tostring(hide_source_aed(track, fx, selected_source)) ..
+              " position lanes for S" .. tostring(selected_source)
+          end
+          ImGui.SameLine(ctx)
+          if ImGui.Button(ctx, "Show all position lanes") then
+            automation_status = "Shown/armed " .. tostring(show_arm_all_source_aed(track, fx)) .. " source position envelopes"
+          end
+          ImGui.SameLine(ctx)
+          if ImGui.Button(ctx, "Hide all") then
+            automation_status = "Hidden " .. tostring(hide_all_source_aed(track, fx)) .. " source position lanes"
+          end
+          ImGui.TextColored(ctx, COLORS.muted,
+            write_mode
+              and ("Write mode: enabled layers write automation. Spatial " ..
+                (spatial_writes and "on" or "off") .. " / Mix " .. (mix_writes and "on" or "off") .. ".")
+              or ("Trim/Read: enabled layers control the JSFX live, but do not write automation. Spatial " ..
+                (spatial_writes and "control" or "safe") .. " / Mix " .. (mix_writes and "control" or "safe") .. "."))
+          if automation_status ~= "" then ImGui.TextColored(ctx, COLORS.muted, automation_status) end
+        end
+
         if ImGui.CollapsingHeader(ctx, "Global", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-          slider_double(track, fx, "VBAP sharpness", PARAM.sharpness, 0.25, 4, "%.2f")
-          slider_double(track, fx, "Distance rolloff", PARAM.rolloff, 0, 48, "%.1f dB/oct")
-          slider_double(track, fx, "Motion smoothing", PARAM.smoothing, 1, 250, "%.0f ms")
-          slider_double(track, fx, "Global azimuth (deg)", PARAM.global_az, -360, 360, "%.1f")
-          slider_double(track, fx, "Global elevation (deg)", PARAM.global_el, 0, 90, "%.1f")
-          slider_double(track, fx, "Global distance offset (dome radius)", PARAM.global_dist, -3, 3, "%.2f")
-          slider_double(track, fx, "Output gain", PARAM.out_gain, -48, 24, "%.1f dB")
+          local disabled = begin_write_disabled(spatial_writes)
+          slider_double(track, fx, "VBAP sharpness", PARAM.sharpness, 0.25, 4, "%.2f", spatial_writes)
+          slider_double(track, fx, "Distance rolloff", PARAM.rolloff, 0, 48, "%.1f dB/oct", spatial_writes)
+          slider_double(track, fx, "Motion smoothing", PARAM.smoothing, 1, 250, "%.0f ms", spatial_writes)
+          slider_double(track, fx, "Global azimuth (deg)", PARAM.global_az, -360, 360, "%.1f", spatial_writes)
+          slider_double(track, fx, "Global elevation (deg)", PARAM.global_el, 0, 90, "%.1f", spatial_writes)
+          slider_double(track, fx, "Global distance offset (dome radius)", PARAM.global_dist, -3, 3, "%.2f", spatial_writes)
+          end_write_disabled(disabled)
+          disabled = begin_write_disabled(mix_writes)
+          slider_double(track, fx, "Output gain", PARAM.out_gain, -48, 24, "%.1f dB", mix_writes)
+          end_write_disabled(disabled)
         end
 
         if ImGui.CollapsingHeader(ctx, "Selected Source", nil, ImGui.TreeNodeFlags_DefaultOpen) then
