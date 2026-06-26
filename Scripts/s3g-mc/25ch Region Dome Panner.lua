@@ -748,19 +748,71 @@ local function set_constellation(track, fx, source, mode)
   set_param(track, fx, constellation_mask_param(source), mask)
 end
 
+local function nudge_camera(label, width, height, apply)
+  if ImGui.Button(ctx, label, width, height) or ImGui.IsItemActive(ctx) then
+    apply()
+  end
+end
+
+local function reset_camera(yaw, pitch)
+  view_yaw_deg = yaw
+  view_pitch_deg = pitch
+  view_roll_deg = 0
+  view_zoom = 1.0
+end
+
+local function draw_camera_controls()
+  ImGui.BeginGroup(ctx)
+  ImGui.Text(ctx, "Camera")
+  nudge_camera("up##cam", 68, 24, function()
+    view_pitch_deg = clamp(view_pitch_deg + 4, -180, 180)
+  end)
+  nudge_camera("left##cam", 32, 24, function()
+    view_yaw_deg = view_yaw_deg - 4
+  end)
+  ImGui.SameLine(ctx)
+  nudge_camera("right##cam", 32, 24, function()
+    view_yaw_deg = view_yaw_deg + 4
+  end)
+  nudge_camera("down##cam", 68, 24, function()
+    view_pitch_deg = clamp(view_pitch_deg - 4, -180, 180)
+  end)
+  nudge_camera("-##camzoom", 32, 24, function()
+    view_zoom = clamp(view_zoom - 0.025, 0.45, 2.5)
+  end)
+  ImGui.SameLine(ctx)
+  nudge_camera("+##camzoom", 32, 24, function()
+    view_zoom = clamp(view_zoom + 0.025, 0.45, 2.5)
+  end)
+  if ImGui.Button(ctx, "3/4##cam", 68, 24) then
+    reset_camera(-35, -42)
+  end
+  if ImGui.Button(ctx, "top##cam", 68, 24) then
+    reset_camera(0, 0)
+  end
+  if ImGui.Button(ctx, "front##cam", 68, 24) then
+    reset_camera(0, -90)
+  end
+  ImGui.EndGroup(ctx)
+end
+
 local function draw_dome(track, fx)
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x0, y0 = ImGui.GetCursorScreenPos(ctx)
   local width = ImGui.GetContentRegionAvail(ctx)
+  local control_width = 82
+  local control_gap = 10
+  local controls_inline = width >= 430
+  local canvas_width = controls_inline and math.max(320, width - control_width - control_gap) or width
   local height = 430
-  local cx = x0 + width * 0.5
+  local cx = x0 + canvas_width * 0.5
   local cy = y0 + height * 0.56
-  local radius = math.min(width, height) * 0.36
-  ImGui.InvisibleButton(ctx, "dome_canvas", width, height)
+  local radius = math.min(canvas_width, height) * 0.36
+  ImGui.InvisibleButton(ctx, "dome_canvas", canvas_width, height)
   local canvas_hovered = ImGui.IsItemHovered(ctx)
   local canvas_active = ImGui.IsItemActive(ctx)
 
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + width, y0 + height, COLORS.bg)
+  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + canvas_width, y0 + height, COLORS.bg)
 
   local projected = {}
   local projected_by_id = {}
@@ -869,7 +921,13 @@ local function draw_dome(track, fx)
 
   ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 14, COLORS.text, "25ch Region Dome Panner")
   ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 34, COLORS.muted, "speaker-defined rings, arcs, ribs, triangles, and caps")
-  ImGui.DrawList_AddText(draw_list, x0 + width - 330, y0 + 14, COLORS.muted, "dots follow shape / position / depth")
+  ImGui.DrawList_AddText(draw_list, x0 + canvas_width - 330, y0 + 14, COLORS.muted, "dots follow shape / position / depth")
+  if controls_inline then
+    ImGui.SameLine(ctx)
+    ImGui.Dummy(ctx, control_gap, 1)
+    ImGui.SameLine(ctx)
+  end
+  draw_camera_controls()
 end
 
 local function draw_source_controls(track, fx)
@@ -967,24 +1025,15 @@ local function loop()
 
         if ImGui.CollapsingHeader(ctx, "View") then
           if ImGui.Button(ctx, "3/4 view") then
-            view_yaw_deg = -35
-            view_pitch_deg = -42
-            view_roll_deg = 0
-            view_zoom = 1.0
+            reset_camera(-35, -42)
           end
           ImGui.SameLine(ctx)
           if ImGui.Button(ctx, "Top") then
-            view_yaw_deg = 0
-            view_pitch_deg = 0
-            view_roll_deg = 0
-            view_zoom = 1.0
+            reset_camera(0, 0)
           end
           ImGui.SameLine(ctx)
           if ImGui.Button(ctx, "Front") then
-            view_yaw_deg = 0
-            view_pitch_deg = -90
-            view_roll_deg = 0
-            view_zoom = 1.0
+            reset_camera(0, -90)
           end
           local changed
           changed, view_yaw_deg = ImGui.SliderDouble(ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg")

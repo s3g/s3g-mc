@@ -32,7 +32,7 @@ Many of these tools are inspired by or extend existing computer music practices,
 
 ## Highlights
 
-- 25-channel dome panners for up to 8 mono sources
+- common-layout panning plus 12ch, 17ch, and 25ch panners for RISD SRST arrays
 - 3OAFX ambisonic send/return workflow for 24-channel effect inserts
 - track-level automation mixer for up to 128 channels, with plugin pin control
 - multichannel workflow helpers for item transforms, track routing, and stems

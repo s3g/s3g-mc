@@ -6,9 +6,10 @@ slider2:100<0,200,1>Spread/width (%)
 slider3:0<-180,180,1>Rotation (degrees)
 slider4:1<0,2,1{Off,Power/sqrt(N),Energy sum}>Autogain
 slider5:0<-24,24,0.1>Output gain (dB)
-slider6:0<0,4,1{Ring projection,Linear left-right,Odd/even stereo,Center-out,Pair-preserving}>Layout
+slider6:0<0,7,1{Ring projection,Linear left-right,Odd/even stereo,Center-out,Pair-preserving,Sphere projection,Hemisphere projection,Cube projection}>Layout
 slider7:1<0,1,1{Keep extra channels,Clear extra channels}>Extra channel output
 slider8:100<0,100,1>Layout weighting (%)
+slider9:45<0,100,1>3D attenuation (%)
 
 @init
 two_pi = 2 * $pi;
@@ -20,14 +21,128 @@ rotation = slider3 * $pi / 180;
 autogain = floor(slider4 + 0.5);
 out_gain = 10 ^ (slider5 / 20);
 raw_layout = floor(slider6 + 0.5);
-layout = raw_layout > 4 ? 0 : raw_layout;
+layout = raw_layout > 7 ? 0 : raw_layout;
 clear_extra = floor(slider7 + 0.5);
 layout_weight = max(0, min(1, slider8 / 100));
+projection_atten = max(0, min(1, slider9 / 100));
 
 auto =
   autogain == 1 ? 1 / sqrt(chan_count) :
   autogain == 2 ? 1 / chan_count :
   1;
+
+function wrap_deg(deg) local(wrapped)
+(
+  wrapped = deg - floor(deg / 360) * 360;
+  wrapped > 180 ? wrapped -= 360;
+  wrapped;
+);
+
+function ring_pos(index, count, start_az, el) local(step)
+(
+  step = 360 / max(1, count);
+  proj_az = wrap_deg(start_az + index * step);
+  proj_el = el;
+);
+
+function cube_pos(index) local(slot, az, el)
+(
+  slot = index % 8;
+  az = slot == 0 ? 45 :
+       slot == 1 ? 135 :
+       slot == 2 ? -135 :
+       slot == 3 ? -45 :
+       slot == 4 ? 45 :
+       slot == 5 ? 135 :
+       slot == 6 ? -135 : -45;
+  el = slot < 4 ? -35.2644 : 35.2644;
+  proj_az = az;
+  proj_el = el;
+);
+
+function dodeca_pos(index) local(slot)
+(
+  slot = index % 12;
+  slot == 0 ? (proj_az = -31.717474; proj_el = 0;) :
+  slot == 1 ? (proj_az = 31.717474; proj_el = 0;) :
+  slot == 2 ? (proj_az = -148.282526; proj_el = 0;) :
+  slot == 3 ? (proj_az = 148.282526; proj_el = 0;) :
+  slot == 4 ? (proj_az = 180; proj_el = 58.282526;) :
+  slot == 5 ? (proj_az = 0; proj_el = 58.282526;) :
+  slot == 6 ? (proj_az = 180; proj_el = -58.282526;) :
+  slot == 7 ? (proj_az = 0; proj_el = -58.282526;) :
+  slot == 8 ? (proj_az = 90; proj_el = -31.717474;) :
+  slot == 9 ? (proj_az = 90; proj_el = 31.717474;) :
+  slot == 10 ? (proj_az = -90; proj_el = -31.717474;) :
+  (proj_az = -90; proj_el = 31.717474;);
+);
+
+function dome24_pos(index) local(slot)
+(
+  slot = index % 24;
+  slot < 12 ? (
+    ring_pos(slot, 12, 30, 0);
+  ) : slot < 20 ? (
+    ring_pos(slot - 12, 8, 45, 32);
+  ) : (
+    ring_pos(slot - 20, 4, 90, 66.6);
+  );
+);
+
+function sphere_pos(index, count) local(frac, z)
+(
+  count == 8 ? cube_pos(index) :
+  count == 12 ? dodeca_pos(index) :
+  count == 16 ? (
+    index < 8 ? ring_pos(index, 8, 30, -32) : ring_pos(index - 8, 8, 30, 32);
+  ) :
+  count == 24 ? dome24_pos(index) :
+  count == 25 ? (
+    index < 24 ? dome24_pos(index) : (proj_az = 0; proj_el = 90;);
+  ) : (
+    frac = (index + 0.5) / max(1, count);
+    z = 1 - 2 * frac;
+    proj_el = asin(z) / $pi * 180;
+    proj_az = wrap_deg(30 + index * 137.507764);
+  );
+);
+
+function hemisphere_pos(index, count) local(frac)
+(
+  count == 16 ? (
+    index < 8 ? ring_pos(index, 8, 30, 0) : ring_pos(index - 8, 8, 30, 45);
+  ) :
+  count == 24 || count == 25 ? dome24_pos(index) :
+  (
+    frac = (index + 0.5) / max(1, count);
+    proj_el = 65 * frac;
+    proj_az = wrap_deg(30 + index * 360 / max(1, count));
+  );
+);
+
+function projection_pan_gain(layout_mode, index, count)
+local(azr, frontness, heightness, rear, atten)
+(
+  layout_mode == 5 ? sphere_pos(index, count) :
+  layout_mode == 6 ? hemisphere_pos(index, count) :
+  cube_pos(index);
+
+  azr = (proj_az * $pi / 180) + rotation;
+  frontness = (cos(azr) + 1) * 0.5;
+  rear = 1 - frontness;
+  heightness = abs(proj_el) / 90;
+  atten = projection_atten * layout_weight;
+
+  layout_mode == 6 ? (
+    proj_gain = 1 - atten * (heightness * 0.55 + rear * 0.22);
+  ) : layout_mode == 7 ? (
+    proj_gain = 1 - atten * (heightness * 0.38 + rear * 0.30);
+  ) : (
+    proj_gain = 1 - atten * (heightness * 0.42 + rear * 0.24);
+  );
+  proj_gain = max(0.15, min(1, proj_gain));
+  proj_pan = sin(azr) * width * (frontness + (1 - frontness) * layout_weight);
+);
 
 @sample
 left = 0;
@@ -54,6 +169,10 @@ loop(chan_count,
     rank = floor(abs(offset) + 0.5);
     side = offset < 0 ? -1 : 1;
     pan = rank <= 0 ? 0 : side * (rank / max(1, center)) * width * layout_weight;
+  ) : layout == 5 || layout == 6 || layout == 7 ? (
+    projection_pan_gain(layout, i, chan_count);
+    pan = proj_pan;
+    input *= proj_gain;
   ) : (
     pair = floor(i / 2);
     pair_count = max(1, floor((chan_count + 1) / 2));

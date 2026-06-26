@@ -3,11 +3,11 @@
 -- @version 0.1
 -- @requires ReaImGui; JSFX: s3g MC to Stereo Autogain
 -- @category Channel Mixing / Automation
--- @method Auto-loads the JSFX and folds a multichannel track to stereo using selectable layouts, width/rotation, layout weighting, autogain, and output gain.
+-- @method Auto-loads the JSFX and folds a multichannel track to stereo using selectable 2D and 3D projection layouts, width/rotation, layout weighting, 3D attenuation, autogain, and output gain.
 -- @about
 --   ReaImGui control surface for JS: s3g MC to Stereo Autogain. Downmixes a
 --   multichannel track to stereo with width, rotation, layout, output gain,
---   and autogain controls.
+--   3D attenuation, and autogain controls.
 
 if not reaper.APIExists("ImGui_GetVersion") then
   reaper.MB("ReaImGui is not installed or not loaded.", "MC to Stereo Autogain", 0)
@@ -33,6 +33,7 @@ local PARAM = {
   layout = 5,
   extra = 6,
   weight = 7,
+  attenuation = 8,
 }
 
 local AUTOGAIN = { "Off", "Power/sqrt(N)", "Energy sum" }
@@ -42,6 +43,9 @@ local LAYOUT = {
   "Odd/even stereo",
   "Center-out",
   "Pair-preserving",
+  "Sphere projection",
+  "Hemisphere projection",
+  "Cube projection",
 }
 local EXTRA = { "Keep extra channels", "Clear extra channels" }
 
@@ -185,14 +189,123 @@ local function draw_stereo_meter(track, x, y, w, h)
 end
 
 local function layout_label(layout)
-  if layout > 4 then return LAYOUT[1] end
+  if layout > 7 then return LAYOUT[1] end
   return LAYOUT[layout + 1] or LAYOUT[1]
 end
 
-local function pan_for_channel(index, count, width_percent, rotation_deg, layout, weight_percent)
-  if layout > 4 then layout = 0 end
+local function wrap_degrees(deg)
+  local wrapped = deg - math.floor(deg / 360) * 360
+  if wrapped > 180 then wrapped = wrapped - 360 end
+  return wrapped
+end
+
+local function ring_pos(index, count, start_az, el)
+  return wrap_degrees(start_az + index * 360 / math.max(1, count)), el
+end
+
+local function cube_pos(index)
+  local slot = index % 8
+  local az = ({ 45, 135, -135, -45, 45, 135, -135, -45 })[slot + 1]
+  local el = slot < 4 and -35.2644 or 35.2644
+  return az, el
+end
+
+local function dodeca_pos(index)
+  local points = {
+    { -31.717474, 0 }, { 31.717474, 0 }, { -148.282526, 0 }, { 148.282526, 0 },
+    { 180, 58.282526 }, { 0, 58.282526 }, { 180, -58.282526 }, { 0, -58.282526 },
+    { 90, -31.717474 }, { 90, 31.717474 }, { -90, -31.717474 }, { -90, 31.717474 },
+  }
+  local point = points[(index % 12) + 1]
+  return point[1], point[2]
+end
+
+local function dome24_pos(index)
+  local slot = index % 24
+  if slot < 12 then return ring_pos(slot, 12, 30, 0) end
+  if slot < 20 then return ring_pos(slot - 12, 8, 45, 32) end
+  return ring_pos(slot - 20, 4, 90, 66.6)
+end
+
+local function sphere_pos(index, count)
+  if count == 8 then return cube_pos(index) end
+  if count == 12 then return dodeca_pos(index) end
+  if count == 16 then
+    if index < 8 then return ring_pos(index, 8, 30, -32) end
+    return ring_pos(index - 8, 8, 30, 32)
+  end
+  if count == 24 then return dome24_pos(index) end
+  if count == 25 then
+    if index < 24 then return dome24_pos(index) end
+    return 0, 90
+  end
+  local frac = (index + 0.5) / math.max(1, count)
+  local z = 1 - 2 * frac
+  return wrap_degrees(30 + index * 137.507764), math.deg(math.asin(z))
+end
+
+local function hemisphere_pos(index, count)
+  if count == 16 then
+    if index < 8 then return ring_pos(index, 8, 30, 0) end
+    return ring_pos(index - 8, 8, 30, 45)
+  end
+  if count == 24 or count == 25 then return dome24_pos(index) end
+  local frac = (index + 0.5) / math.max(1, count)
+  return wrap_degrees(30 + index * 360 / math.max(1, count)), 65 * frac
+end
+
+local function projection_pan_gain(index, count, width, rotation_deg, layout, weight, attenuation)
+  local az, el
+  if layout == 5 then
+    az, el = sphere_pos(index, count)
+  elseif layout == 6 then
+    az, el = hemisphere_pos(index, count)
+  else
+    az, el = cube_pos(index)
+  end
+
+  local azr = math.rad(az + rotation_deg)
+  local frontness = (math.cos(azr) + 1) * 0.5
+  local rear = 1 - frontness
+  local heightness = math.abs(el) / 90
+  local atten = attenuation * weight
+  local gain
+  if layout == 6 then
+    gain = 1 - atten * (heightness * 0.55 + rear * 0.22)
+  elseif layout == 7 then
+    gain = 1 - atten * (heightness * 0.38 + rear * 0.30)
+  else
+    gain = 1 - atten * (heightness * 0.42 + rear * 0.24)
+  end
+  local pan = math.sin(azr) * width * (frontness + (1 - frontness) * weight)
+  return clamp(pan, -1, 1), clamp(gain, 0.15, 1)
+end
+
+local function projection_position(index, count, layout, rotation_deg)
+  local zero_index = index - 1
+  local az, el
+  if layout == 5 then
+    az, el = sphere_pos(zero_index, count)
+  elseif layout == 6 then
+    az, el = hemisphere_pos(zero_index, count)
+  elseif layout == 7 then
+    az, el = cube_pos(zero_index)
+  else
+    return nil
+  end
+  local azr = math.rad(az + rotation_deg)
+  return {
+    az = az,
+    el = el,
+    frontness = (math.cos(azr) + 1) * 0.5,
+  }
+end
+
+local function pan_gain_for_channel(index, count, width_percent, rotation_deg, layout, weight_percent, attenuation_percent)
+  if layout > 7 then layout = 0 end
   local width = math.max(0, width_percent / 100)
   local weight = clamp((weight_percent or 100) / 100, 0, 1)
+  local attenuation = clamp((attenuation_percent or 45) / 100, 0, 1)
   local zero_index = index - 1
   local angle = math.rad(rotation_deg) + ((2 * math.pi * zero_index) / count)
   local pan
@@ -221,15 +334,29 @@ local function pan_for_channel(index, count, width_percent, rotation_deg, layout
     else
       pan = side * (rank / math.max(1, center)) * width * weight
     end
-  else
+  elseif layout == 4 then
     local pair = math.floor(zero_index / 2)
     local pair_count = math.max(1, math.floor((count + 1) / 2))
     local pair_pos = pair_count <= 1 and 0 or -1 + ((2 * pair) / (pair_count - 1))
     local pair_width = zero_index % 2 == 0 and -0.16 or 0.16
     pan = (pair_pos * 0.82 + pair_width) * width * weight
+  else
+    return projection_pan_gain(zero_index, count, width, rotation_deg, layout, weight, attenuation)
   end
 
-  return clamp(pan, -1, 1)
+  return clamp(pan, -1, 1), 1
+end
+
+local function label_interval(count)
+  if count <= 24 then return 1 end
+  if count <= 32 then return 4 end
+  if count <= 48 then return 6 end
+  return 8
+end
+
+local function should_label_channel(index, count)
+  local interval = label_interval(count)
+  return index == 1 or index == count or ((index - 1) % interval == 0)
 end
 
 local function equal_power_lr(pan)
@@ -247,12 +374,13 @@ local function draw_downmix_map(track, fx)
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = math.max(520, ImGui.GetContentRegionAvail(ctx))
-  local h = 190
+  local h = 220
   local input_count = math.floor(get_param(track, fx, PARAM.input_channels, 8) + 0.5)
   local width_percent = get_param(track, fx, PARAM.width, 100)
   local rotation_deg = get_param(track, fx, PARAM.rotation, 0)
   local layout = math.floor(get_param(track, fx, PARAM.layout, 0) + 0.5)
   local weight_percent = get_param(track, fx, PARAM.weight, 100)
+  local attenuation_percent = get_param(track, fx, PARAM.attenuation, 45)
   local autogain = math.floor(get_param(track, fx, PARAM.autogain, 1) + 0.5)
 
   ImGui.InvisibleButton(ctx, "##downmix_map", w, h)
@@ -260,9 +388,9 @@ local function draw_downmix_map(track, fx)
   ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, COLORS.edge)
   ImGui.DrawList_AddText(draw_list, x + 12, y + 10, COLORS.text, "Downmix map")
   ImGui.DrawList_AddText(draw_list, x + 120, y + 10, COLORS.muted,
-    string.format("%d inputs / %s / width %.0f%% / weight %.0f%% / rot %.0f / %s",
-      input_count, layout_label(layout), width_percent, weight_percent, rotation_deg,
-      autogain_label(autogain, input_count)))
+    string.format("%d inputs / %s / width %.0f%% / weight %.0f%% / 3D %.0f%% / rot %.0f / %s",
+      input_count, layout_label(layout), width_percent, weight_percent, attenuation_percent,
+      rotation_deg, autogain_label(autogain, input_count)))
 
   local left_x = x + 58
   local right_x = x + w - 58
@@ -271,6 +399,7 @@ local function draw_downmix_map(track, fx)
   local map_y = y + 76
   local map_w = w - 150
   local map_left = x + 75
+  local projection_mode = layout >= 5 and layout <= 7
 
   ImGui.DrawList_AddCircleFilled(draw_list, left_x, speaker_y, 18, color(0.18, 0.36, 0.46, 1), 32)
   ImGui.DrawList_AddCircleFilled(draw_list, right_x, speaker_y, 18, color(0.18, 0.36, 0.46, 1), 32)
@@ -278,23 +407,61 @@ local function draw_downmix_map(track, fx)
   ImGui.DrawList_AddText(draw_list, right_x - 4, speaker_y - 8, COLORS.text, "R")
   ImGui.DrawList_AddLine(draw_list, map_left, map_y, map_left + map_w, map_y, color(0.54, 0.60, 0.62, 0.22), 1)
   ImGui.DrawList_AddLine(draw_list, center_x, map_y - 22, center_x, map_y + 22, color(0.54, 0.60, 0.62, 0.18), 1)
+  if projection_mode then
+    ImGui.DrawList_AddLine(draw_list, map_left, map_y - 54, map_left + map_w, map_y - 54, color(0.54, 0.60, 0.62, 0.10), 1)
+    ImGui.DrawList_AddLine(draw_list, map_left, map_y + 54, map_left + map_w, map_y + 54, color(0.54, 0.60, 0.62, 0.10), 1)
+    ImGui.DrawList_AddText(draw_list, map_left - 42, map_y - 61, COLORS.muted, "high")
+    ImGui.DrawList_AddText(draw_list, map_left - 38, map_y - 7, COLORS.muted, "mid")
+    ImGui.DrawList_AddText(draw_list, map_left - 38, map_y + 47, COLORS.muted, "low")
+  end
+
+  local weight_norm = clamp(weight_percent / 100, 0, 1)
+  local atten_norm = clamp(attenuation_percent / 100, 0, 1)
+  local rail_y = y + h - 67
+  local rail_x = map_left
+  local rail_w = map_w
+  ImGui.DrawList_AddText(draw_list, rail_x, rail_y - 26, COLORS.muted, "layout weight")
+  ImGui.DrawList_AddRect(draw_list, rail_x, rail_y - 9, rail_x + rail_w * 0.45, rail_y - 2, color(0.54, 0.60, 0.62, 0.20))
+  ImGui.DrawList_AddRectFilled(draw_list, rail_x, rail_y - 9, rail_x + rail_w * 0.45 * weight_norm, rail_y - 2, color(0.24, 0.58, 0.66, 0.65))
+  ImGui.DrawList_AddText(draw_list, rail_x + rail_w * 0.52, rail_y - 26, COLORS.muted, "3D attenuation")
+  ImGui.DrawList_AddRect(draw_list, rail_x + rail_w * 0.52, rail_y - 9, rail_x + rail_w * 0.97, rail_y - 2, color(0.54, 0.60, 0.62, 0.20))
+  ImGui.DrawList_AddRectFilled(draw_list, rail_x + rail_w * 0.52, rail_y - 9, rail_x + rail_w * (0.52 + 0.45 * atten_norm), rail_y - 2, color(0.95, 0.46, 0.34, 0.58))
 
   for index = 1, input_count do
-    local pan = pan_for_channel(index, input_count, width_percent, rotation_deg, layout, weight_percent)
+    local pan, projection_gain = pan_gain_for_channel(index, input_count, width_percent, rotation_deg, layout, weight_percent, attenuation_percent)
+    local reference_pan = pan_gain_for_channel(index, input_count, width_percent, rotation_deg, layout, 100, 0)
     local left_gain, right_gain = equal_power_lr(pan)
     local src_x = map_left + ((pan + 1) * 0.5) * map_w
+    local ref_x = map_left + ((reference_pan + 1) * 0.5) * map_w
     local row = (index - 1) % 3
     local src_y = map_y - 22 + row * 18
-    local dot = input_count <= 16 and 5 or 3.5
-    local alpha = input_count <= 24 and 0.42 or 0.24
+    local info = projection_position(index, input_count, layout, rotation_deg)
+    if info then
+      local rear_offset = (1 - info.frontness) * 14
+      src_y = map_y - (info.el / 90) * 54 + rear_offset
+    end
+    local dot = input_count <= 16 and 5 or (input_count <= 32 and 4.2 or 3.4)
+    local attenuation_visibility = projection_mode and (projection_gain ^ 1.8) or projection_gain
+    local alpha = (input_count <= 24 and 0.42 or 0.24) * attenuation_visibility
+    local labeled = should_label_channel(index, input_count)
+    local label_color = labeled and COLORS.text or COLORS.muted
 
+    ImGui.DrawList_AddCircle(draw_list, ref_x, src_y, dot + 2, color(0.84, 0.88, 0.90, 0.16), 12, 1)
+    if math.abs(ref_x - src_x) > 2 then
+      ImGui.DrawList_AddLine(draw_list, ref_x, src_y, src_x, src_y, color(0.84, 0.88, 0.90, 0.16), 1)
+    end
     ImGui.DrawList_AddLine(draw_list, src_x, src_y + 5, left_x, speaker_y - 18,
       color(0.24, 0.58, 0.66, alpha * left_gain), 1 + left_gain * 1.5)
     ImGui.DrawList_AddLine(draw_list, src_x, src_y + 5, right_x, speaker_y - 18,
       color(0.46, 0.86, 0.56, alpha * right_gain), 1 + right_gain * 1.5)
-    ImGui.DrawList_AddCircleFilled(draw_list, src_x, src_y, dot, COLORS.fill, 16)
-    if input_count <= 24 then
-      ImGui.DrawList_AddText(draw_list, src_x + 5, src_y - 7, COLORS.muted, tostring(index))
+    local dot_scale = projection_mode and (0.18 + 0.82 * (projection_gain ^ 1.65)) or (0.72 + projection_gain * 0.28)
+    ImGui.DrawList_AddCircleFilled(draw_list, src_x, src_y, dot * dot_scale, COLORS.fill, 16)
+    if projection_mode and projection_gain < 0.82 then
+      ImGui.DrawList_AddCircle(draw_list, src_x, src_y, dot + 3, color(0.95, 0.46, 0.34, 0.28 * (1 - projection_gain)), 16, 1.2)
+    end
+    if labeled then
+      local label_y = src_y + (row == 2 and 8 or -14)
+      ImGui.DrawList_AddText(draw_list, src_x + 5, label_y, label_color, tostring(index))
     end
   end
 
@@ -371,6 +538,7 @@ local function loop()
           slider_param(track, fx, "Rotation", PARAM.rotation, -180, 180, "%.0f deg")
           option_buttons(track, fx, "Layout", PARAM.layout, LAYOUT, 2)
           slider_param(track, fx, "Layout weighting", PARAM.weight, 0, 100, "%.0f%%")
+          slider_param(track, fx, "3D attenuation", PARAM.attenuation, 0, 100, "%.0f%%")
           option_buttons(track, fx, "Autogain", PARAM.autogain, AUTOGAIN)
           option_buttons(track, fx, "Extra channel output", PARAM.extra, EXTRA)
           ImGui.Spacing(ctx)

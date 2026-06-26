@@ -1,0 +1,239 @@
+desc:s3g 17ch Cube XYZ Panner
+tags: multichannel spatial XYZ cube panner
+
+slider1:0.45<0.05,4,0.01>XYZ spread radius
+slider2:0.65<0,1,0.01>Focus amount
+slider3:35<1,250,1>Position smoothing (ms)
+slider4:0<-4,4,0.01>Global X offset
+slider5:0<-4,4,0.01>Global Y offset
+slider6:0<-4,4,0.01>Global Z offset
+slider7:0<-48,24,0.1>Output gain (dB)
+slider8:0<0,1,1>Reserved 1
+slider9:0<0,1,1>Reserved 2
+
+slider10:1<-2,2,0.01>S1 X
+slider11:1<-2,2,0.01>S1 Y
+slider12:-1<-2,2,0.01>S1 Z
+slider13:1<-2,2,0.01>S2 X
+slider14:-1<-2,2,0.01>S2 Y
+slider15:-1<-2,2,0.01>S2 Z
+slider16:-1<-2,2,0.01>S3 X
+slider17:-1<-2,2,0.01>S3 Y
+slider18:-1<-2,2,0.01>S3 Z
+slider19:-1<-2,2,0.01>S4 X
+slider20:1<-2,2,0.01>S4 Y
+slider21:-1<-2,2,0.01>S4 Z
+slider22:1<-2,2,0.01>S5 X
+slider23:1<-2,2,0.01>S5 Y
+slider24:1<-2,2,0.01>S5 Z
+slider25:1<-2,2,0.01>S6 X
+slider26:-1<-2,2,0.01>S6 Y
+slider27:1<-2,2,0.01>S6 Z
+slider28:-1<-2,2,0.01>S7 X
+slider29:-1<-2,2,0.01>S7 Y
+slider30:1<-2,2,0.01>S7 Z
+slider31:-1<-2,2,0.01>S8 X
+slider32:1<-2,2,0.01>S8 Y
+slider33:1<-2,2,0.01>S8 Z
+
+slider34:0<-60,24,0.1>S1 gain (dB)
+slider35:0<0,1,1>S1 mute
+slider36:0<0,1,1>S1 solo
+slider37:0<-60,24,0.1>S2 gain (dB)
+slider38:0<0,1,1>S2 mute
+slider39:0<0,1,1>S2 solo
+slider40:0<-60,24,0.1>S3 gain (dB)
+slider41:0<0,1,1>S3 mute
+slider42:0<0,1,1>S3 solo
+slider43:0<-60,24,0.1>S4 gain (dB)
+slider44:0<0,1,1>S4 mute
+slider45:0<0,1,1>S4 solo
+slider46:0<-60,24,0.1>S5 gain (dB)
+slider47:0<0,1,1>S5 mute
+slider48:0<0,1,1>S5 solo
+slider49:0<-60,24,0.1>S6 gain (dB)
+slider50:0<0,1,1>S6 mute
+slider51:0<0,1,1>S6 solo
+slider52:0<-60,24,0.1>S7 gain (dB)
+slider53:0<0,1,1>S7 mute
+slider54:0<0,1,1>S7 solo
+slider55:0<-60,24,0.1>S8 gain (dB)
+slider56:0<0,1,1>S8 mute
+slider57:0<0,1,1>S8 solo
+
+@init
+NUM_SPEAKERS = 17;
+NUM_SOURCES = 8;
+EPS = 0.000001;
+spk_x = 0;
+spk_y = 64;
+spk_z = 128;
+x_z = 192;
+y_z = 256;
+z_z = 320;
+src_x = 384;
+src_y = 448;
+src_z = 512;
+mix = 576;
+src_gain = 640;
+gain_z = 832;
+src_level = 1024;
+src_mute = 1088;
+src_solo = 1152;
+
+spk_x[0] = 1;   spk_y[0] = 1;   spk_z[0] = -1;
+spk_x[1] = 1;   spk_y[1] = -1;  spk_z[1] = -1;
+spk_x[2] = -1;  spk_y[2] = -1;  spk_z[2] = -1;
+spk_x[3] = -1;  spk_y[3] = 1;   spk_z[3] = -1;
+
+spk_x[4] = 1;   spk_y[4] = 1;   spk_z[4] = 0;
+spk_x[5] = 1;   spk_y[5] = 0;   spk_z[5] = 0;
+spk_x[6] = 1;   spk_y[6] = -1;  spk_z[6] = 0;
+spk_x[7] = 0;   spk_y[7] = -1;  spk_z[7] = 0;
+spk_x[8] = -1;  spk_y[8] = -1;  spk_z[8] = 0;
+spk_x[9] = -1;  spk_y[9] = 0;   spk_z[9] = 0;
+spk_x[10] = -1; spk_y[10] = 1;  spk_z[10] = 0;
+spk_x[11] = 0;  spk_y[11] = 1;  spk_z[11] = 0;
+
+spk_x[12] = 1;  spk_y[12] = 1;  spk_z[12] = 1;
+spk_x[13] = 1;  spk_y[13] = -1; spk_z[13] = 1;
+spk_x[14] = -1; spk_y[14] = -1; spk_z[14] = 1;
+spk_x[15] = -1; spk_y[15] = 1;  spk_z[15] = 1;
+
+spk_x[16] = 0; spk_y[16] = 0; spk_z[16] = 1;
+
+x_z[0] = 1;  y_z[0] = 1;  z_z[0] = -1;
+x_z[1] = 1;  y_z[1] = -1; z_z[1] = -1;
+x_z[2] = -1; y_z[2] = -1; z_z[2] = -1;
+x_z[3] = -1; y_z[3] = 1;  z_z[3] = -1;
+x_z[4] = 1;  y_z[4] = 1;  z_z[4] = 1;
+x_z[5] = 1;  y_z[5] = -1; z_z[5] = 1;
+x_z[6] = -1; y_z[6] = -1; z_z[6] = 1;
+x_z[7] = -1; y_z[7] = 1;  z_z[7] = 1;
+
+@slider
+spread_radius = max(0.05, slider1);
+focus_amount = min(1, max(0, slider2));
+position_smoothing_ms = max(1, slider3);
+gain_smoothing_ms = max(8, position_smoothing_ms);
+spread_sq = spread_radius * spread_radius;
+global_x = slider4;
+global_y = slider5;
+global_z = slider6;
+out_gain = 10 ^ (slider7 / 20);
+position_coef = exp(-1000 / (position_smoothing_ms * srate));
+gain_coef = exp(-1000 / (gain_smoothing_ms * srate));
+
+src_x[0] = slider10; src_y[0] = slider11; src_z[0] = slider12;
+src_x[1] = slider13; src_y[1] = slider14; src_z[1] = slider15;
+src_x[2] = slider16; src_y[2] = slider17; src_z[2] = slider18;
+src_x[3] = slider19; src_y[3] = slider20; src_z[3] = slider21;
+src_x[4] = slider22; src_y[4] = slider23; src_z[4] = slider24;
+src_x[5] = slider25; src_y[5] = slider26; src_z[5] = slider27;
+src_x[6] = slider28; src_y[6] = slider29; src_z[6] = slider30;
+src_x[7] = slider31; src_y[7] = slider32; src_z[7] = slider33;
+
+src_level[0] = 10 ^ (slider34 / 20); src_mute[0] = slider35 >= 0.5; src_solo[0] = slider36 >= 0.5;
+src_level[1] = 10 ^ (slider37 / 20); src_mute[1] = slider38 >= 0.5; src_solo[1] = slider39 >= 0.5;
+src_level[2] = 10 ^ (slider40 / 20); src_mute[2] = slider41 >= 0.5; src_solo[2] = slider42 >= 0.5;
+src_level[3] = 10 ^ (slider43 / 20); src_mute[3] = slider44 >= 0.5; src_solo[3] = slider45 >= 0.5;
+src_level[4] = 10 ^ (slider46 / 20); src_mute[4] = slider47 >= 0.5; src_solo[4] = slider48 >= 0.5;
+src_level[5] = 10 ^ (slider49 / 20); src_mute[5] = slider50 >= 0.5; src_solo[5] = slider51 >= 0.5;
+src_level[6] = 10 ^ (slider52 / 20); src_mute[6] = slider53 >= 0.5; src_solo[6] = slider54 >= 0.5;
+src_level[7] = 10 ^ (slider55 / 20); src_mute[7] = slider56 >= 0.5; src_solo[7] = slider57 >= 0.5;
+
+@sample
+i = 0;
+loop(NUM_SPEAKERS,
+  mix[i] = 0;
+  i += 1;
+);
+
+solo_count = 0;
+src = 0;
+loop(NUM_SOURCES,
+  src_solo[src] ? solo_count += 1;
+  src += 1;
+);
+
+src = 0;
+loop(NUM_SOURCES,
+  active_source = src < num_ch && !src_mute[src] && (solo_count == 0 || src_solo[src]);
+  active_source ? (
+    input = spl(src);
+
+    target_x = min(2, max(-2, src_x[src] + global_x));
+    target_y = min(2, max(-2, src_y[src] + global_y));
+    target_z = min(2, max(-2, src_z[src] + global_z));
+    x_z[src] = target_x + (x_z[src] - target_x) * position_coef;
+    y_z[src] = target_y + (y_z[src] - target_y) * position_coef;
+    z_z[src] = target_z + (z_z[src] - target_z) * position_coef;
+
+    scale = 0;
+    nearest_spk = 0;
+    nearest_d2 = 1000000;
+    spk = 0;
+    loop(NUM_SPEAKERS,
+      gain_idx = src * NUM_SPEAKERS + spk;
+      dx = x_z[src] - spk_x[spk];
+      dy = y_z[src] - spk_y[spk];
+      dz = z_z[src] - spk_z[spk];
+      d2 = dx * dx + dy * dy + dz * dz;
+      d2 < nearest_d2 ? (
+        nearest_d2 = d2;
+        nearest_spk = spk;
+      );
+      inside = 1 - d2 / spread_sq;
+      target_g = inside <= 0 ? 0 : (
+        smooth_g = inside * inside * (3 - 2 * inside);
+        tight_g = smooth_g * smooth_g * smooth_g * smooth_g;
+        smooth_g + (tight_g - smooth_g) * focus_amount;
+      );
+      gain_z[gain_idx] = target_g + (gain_z[gain_idx] - target_g) * gain_coef;
+      g = gain_z[gain_idx];
+      src_gain[spk] = g;
+      scale += g * g;
+      spk += 1;
+    );
+
+    scale < EPS ? (
+      spk = 0;
+      loop(NUM_SPEAKERS,
+        gain_idx = src * NUM_SPEAKERS + spk;
+        target_g = spk == nearest_spk ? 1 : 0;
+        gain_z[gain_idx] = target_g + (gain_z[gain_idx] - target_g) * gain_coef;
+        src_gain[spk] = gain_z[gain_idx];
+        spk += 1;
+      );
+      scale = 0;
+      spk = 0;
+      loop(NUM_SPEAKERS,
+        scale += src_gain[spk] * src_gain[spk];
+        spk += 1;
+      );
+      scale = scale < EPS ? 1 : sqrt(scale);
+    ) : (
+      scale = sqrt(scale);
+    );
+    weighted = input * src_level[src] / scale;
+    spk = 0;
+    loop(NUM_SPEAKERS,
+      mix[spk] += weighted * src_gain[spk];
+      spk += 1;
+    );
+  );
+
+  src += 1;
+);
+
+i = 0;
+loop(NUM_SPEAKERS,
+  spl(i) = mix[i] * out_gain;
+  i += 1;
+);
+
+i = NUM_SPEAKERS;
+loop(64 - NUM_SPEAKERS,
+  spl(i) = 0;
+  i += 1;
+);

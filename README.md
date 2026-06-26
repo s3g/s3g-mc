@@ -24,7 +24,7 @@ useful.
 - `128ch Automation Mixer`: faders, mute/solo, channel groups, meters, and
   plugin pin remapping for high-channel-count tracks.
 - `MC to Stereo Autogain`: multichannel fold-down with layout modes, width,
-  rotation, weighting, autogain, and output trim.
+  rotation, weighting, 3D projection attenuation, autogain, and output trim.
 
 ### Procedural Synthesis
 
@@ -59,6 +59,17 @@ modulation afterward.
 
 ### Spatial / HOA
 
+- `12ch Dodeca Panner`: AED-native panning for up to 8 mono sources across a
+  12-channel dodecahedron loudspeaker layout, with a dodecahedron controller
+  view.
+- `17ch Cube XYZ Panner`: 3D DBAP-style Cartesian amplitude panning for up to
+  8 mono sources across a 17-speaker cube layout, with native XYZ controls and
+  a mirrored AED editing view. Small spread values can isolate a source to one
+  speaker.
+- `Layout Panner`: a general-purpose panner for quad, octophonic ring, 8ch
+  cube, 12ch ring, 16ch ring, 16ch double ring, 20ch double ring, and 24ch dome
+  without overhead. Speaker numbering starts near the stereo-right position and
+  proceeds clockwise.
 - `25ch Cosine Dome Panner`: soft angular-focus panning for up to 8 mono
   sources across the 25-speaker dome.
 - `25ch DBAP Dome Panner`: distance-weighted amplitude panning for up to 8 mono
@@ -73,9 +84,15 @@ modulation afterward.
   sources across the 25-speaker dome.
 - `3OAFX Send Return Controller`: places a 24-channel insert lane inside an
   ambisonic decode/encode chain.
+- `Spatial Automation Composer`: previews algorithmic AED or XYZ motion, then
+  writes editable automation lanes for supported 8-source s3g panners.
 
-The shared 25ch dome layout is based on the speaker array layout of RISD SRST
-Spatial Audio Studio.
+The included panners are intended for use with loudspeaker arrays available in
+the RISD Studio for Research in Sound & Technology (SRST). They include a
+12-channel dodecahedron layout, a 17-channel cube layout, and the shared
+25-channel dome layout. The 25ch dome panners offer several approaches to the
+same array, giving composers room to compare and work with different spatial
+behaviors.
 
 See the 3OA / SPARTA setup section for the ambisonic send/return workflow.
 

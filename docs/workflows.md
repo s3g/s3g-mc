@@ -17,8 +17,8 @@ toc:
     href: "#texture--montage"
   - title: 3OAFX
     href: "#3oafx"
-  - title: 25ch Dome Panners
-    href: "#25ch-dome-panners"
+  - title: Spatial Panners
+    href: "#spatial-panners"
 ---
 
 # Workflows
@@ -39,8 +39,9 @@ for tracks up to REAPER's 128-channel limit.
 
 Use `MC to Stereo Autogain` when a multichannel track needs a practical stereo
 fold-down for monitoring, previewing, or rendering. The controller exposes
-layout, width, rotation, weighting, output trim, and autogain controls so the
-fold-down can be shaped without losing the multichannel source.
+layout, width, rotation, weighting, 3D projection attenuation, output trim, and
+autogain controls so the fold-down can be shaped without losing the
+multichannel source.
 
 ## Item and Stem Workflows
 
@@ -248,26 +249,49 @@ make sure `JS: s3g 3OA Return Mask` is present in the chain and enabled.
 If an insert effect processes the dry path, click `Pin inserts 1-24`. REAPER may
 auto-wire a newly inserted FX too broadly on a 72-channel track.
 
-## 25ch Dome Panners
+## Spatial Panners
 
-The 25ch panners are intended for use with the RISD Studio for Research in Sound
-& Technology (SRST) 25-channel loudspeaker array. The shared speaker layout in
-these panners follows that array arrangement.
+The included panners are intended for use with loudspeaker arrays available in
+the RISD Studio for Research in Sound & Technology (SRST). The package includes
+controllers for a 12-channel dodecahedron layout, a 17-channel cube layout, and
+the shared 25-channel dome layout. The 25ch dome panners offer several
+approaches to the same array, giving composers room to compare and work with
+different spatial behaviors.
+
+The `12ch Dodeca Panner` is AED-native and draws a dodecahedron controller view
+for the 12-channel array. The `17ch Cube XYZ Panner` uses 3D DBAP-style
+Cartesian amplitude panning, so straight-line XYZ automation is also the audio
+model. Its controller exposes native XYZ source controls and a mirrored AED
+editing view.
+
+The `Layout Panner` is the more general option. It covers quad, octophonic
+ring, 8ch cube, 12ch ring, 16ch ring, 16ch double ring, 20ch double ring, and
+24ch dome without overhead. LFE formats are intentionally left out. Speaker
+numbering starts near the stereo-right position and proceeds clockwise,
+matching the orientation used in the SRST dome tools.
 
 In REAPER, the primary use is on an 8-channel track or bus before the master
 send. Each panner can take up to 8 mono source channels and distribute them
-across the 25-channel dome output. This makes the panners useful as a spatial
-bus: route source material into channels `1-8`, place or automate the sources
-with the controller, then send the resulting 25-channel output onward to the
-session's multichannel monitoring or routing path.
+across its target loudspeaker layout. This makes the panners useful as spatial
+buses: route source material into channels `1-8`, place or automate the sources
+with the controller, then send the resulting multichannel output onward to the
+session's monitoring or routing path.
 
 Each panner has an associated JSFX engine, and the companion controller script
 is the intended way to load and control it. The JSFX parameters remain
 automatable in REAPER, but the controller gives direct access to the spatial
 map, source positions, and panner-specific controls.
 
-The package includes several panning methods for the same speaker layout:
+Use `Spatial Automation Composer` when a spatial movement should be composed
+offline as editable REAPER automation. It detects supported 8-source AED and XYZ
+s3g panners on the selected track, previews the intended motion, and writes
+automation points across the time selection or selected item range.
 
+The package includes these spatial panners:
+
+- `12ch Dodeca Panner`
+- `17ch Cube XYZ Panner`
+- `Layout Panner`
 - `25ch LBAP Dome Panner`
 - `25ch VBAP Dome Panner`
 - `25ch DBAP Dome Panner`

@@ -1,162 +1,66 @@
--- @description 25ch Cosine Dome Panner
+-- @description 17ch Cube XYZ Panner
 -- @author s3g
--- @version 0.9
--- @requires ReaImGui; JSFX: s3g 25ch Cosine Dome Panner
+-- @version 0.4
+-- @requires ReaImGui; JSFX: s3g 17ch Cube XYZ Panner
 -- @category Spatial / HOA
--- @method Auto-loads the JSFX on the selected track and pans up to 8 mono source channels across the 25-speaker dome layout of the RISD SRST Spatial Audio Studio using cosine angular weighting.
+-- @method Auto-loads the JSFX on the selected track and pans up to 8 mono source channels across a 17-speaker cube layout using 3D DBAP-style Cartesian amplitude panning.
 -- @about
---   ReaImGui companion controller for JS: s3g 25ch Cosine Dome Panner.
+--   ReaImGui companion controller for JS: s3g 17ch Cube XYZ Panner.
 --   Automatically loads or repairs the JSFX on the selected track. The track
 --   carries 8 source channels into the panner and the JSFX distributes them
---   across the 25-channel dome output. The speaker layout models the
---   loudspeaker array of the RISD SRST Spatial Audio Studio.
+--   across the 17-channel cube output. Source positions are stored as XYZ
+--   parameters; AED controls are provided as a mirrored editing view. The
+--   panning model is 3D DBAP-style Cartesian amplitude panning with a compact
+--   spread radius, so focused settings can isolate a source to one speaker.
+--   The cube edge is +/-1; source controls extend to +/-2 for outside-cube
+--   distance effects. Global offsets extend to +/-4, while the final source
+--   position after source + global offset is hard-clamped to +/-2.
 
 if not reaper.APIExists("ImGui_GetVersion") then
-  reaper.MB("ReaImGui is not installed or not loaded.", "25ch Cosine Dome Panner", 0)
+  reaper.MB("ReaImGui is not installed or not loaded.", "17ch Cube XYZ Panner", 0)
   return
 end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
 
-local ctx = ImGui.CreateContext("25ch Cosine Dome Panner")
+local ctx = ImGui.CreateContext("17ch Cube XYZ Panner")
 local open = true
 local PROJECT = 0
-local FX_NAME = "s3g 25ch Cosine Dome Panner"
-local FX_NAME_CLEAN = "25ch Cosine Dome Panner"
-local FX_NAME_LEGACY = "s3g/25ch Cosine Dome Panner"
+local FX_NAME = "s3g 17ch Cube XYZ Panner"
+local FX_NAME_CLEAN = "17ch Cube XYZ Panner"
+local FX_NAME_LEGACY = "s3g/17ch Cube XYZ Panner"
 local selected_source = 1
 local view_yaw_deg = -35
 local view_pitch_deg = -42
 local view_roll_deg = 0
-local view_zoom = 1.0
+local view_zoom = 0.72
 local dragging_source = 0
 local load_error = ""
 local auto_load_attempted_guid = ""
+local CUBE_EDGE_RADIUS = 1.55
+local SOURCE_LIMIT = 2
+local GLOBAL_OFFSET_LIMIT = 4
 
 local speakers = {
-  { id = 1, az = 30, el = 0 }, { id = 2, az = 60, el = 0 }, { id = 3, az = 90, el = 0 },
-  { id = 4, az = 120, el = 0 }, { id = 5, az = 150, el = 0 }, { id = 6, az = 180, el = 0 },
-  { id = 7, az = -150, el = 0 }, { id = 8, az = -120, el = 0 }, { id = 9, az = -90, el = 0 },
-  { id = 10, az = -60, el = 0 }, { id = 11, az = -30, el = 0 }, { id = 12, az = 0, el = 0 },
-  { id = 13, az = 45, el = 32 }, { id = 14, az = 90, el = 32 }, { id = 15, az = 135, el = 32 },
-  { id = 16, az = 180, el = 32 }, { id = 17, az = -135, el = 32 }, { id = 18, az = -90, el = 32 },
-  { id = 19, az = -45, el = 32 }, { id = 20, az = 0, el = 32 },
-  { id = 21, az = 90, el = 66.6 }, { id = 22, az = 180, el = 66.6 },
-  { id = 23, az = -90, el = 66.6 }, { id = 24, az = 0, el = 66.6 },
-  { id = 25, az = 0, el = 90 },
+  { id = 1, az = 45, el = -35.2644, r = 2.68468 },
+  { id = 2, az = 135, el = -35.2644, r = 2.68468 },
+  { id = 3, az = -135, el = -35.2644, r = 2.68468 },
+  { id = 4, az = -45, el = -35.2644, r = 2.68468 },
+  { id = 5, az = 45, el = 0, r = 2.19203 },
+  { id = 6, az = 90, el = 0, r = 1.55 },
+  { id = 7, az = 135, el = 0, r = 2.19203 },
+  { id = 8, az = 180, el = 0, r = 1.55 },
+  { id = 9, az = -135, el = 0, r = 2.19203 },
+  { id = 10, az = -90, el = 0, r = 1.55 },
+  { id = 11, az = -45, el = 0, r = 2.19203 },
+  { id = 12, az = 0, el = 0, r = 1.55 },
+  { id = 13, az = 45, el = 35.2644, r = 2.68468 },
+  { id = 14, az = 135, el = 35.2644, r = 2.68468 },
+  { id = 15, az = -135, el = 35.2644, r = 2.68468 },
+  { id = 16, az = -45, el = 35.2644, r = 2.68468 },
+  { id = 17, az = 0, el = 90, r = 1.55 },
 }
-
-local function az_key(az)
-  return az < 0 and az + 360 or az
-end
-
-local function speakers_for_elevation(el)
-  local result = {}
-  for _, speaker in ipairs(speakers) do
-    if math.abs(speaker.el - el) < 0.01 then
-      result[#result + 1] = speaker
-    end
-  end
-  table.sort(result, function(a, b) return az_key(a.az) < az_key(b.az) end)
-  return result
-end
-
-local function ids_for_elevation(el)
-  local result = {}
-  for _, speaker in ipairs(speakers_for_elevation(el)) do
-    result[#result + 1] = speaker.id
-  end
-  return result
-end
-
-local function speaker_az(id)
-  for _, speaker in ipairs(speakers) do
-    if speaker.id == id then return speaker.az end
-  end
-  return 0
-end
-
-local function lower_bracket_ids(upper_id, lower_ids)
-  local upper_az = az_key(speaker_az(upper_id))
-  local lower = {}
-  for i, id in ipairs(lower_ids) do lower[i] = id end
-  table.sort(lower, function(a, b) return az_key(speaker_az(a)) < az_key(speaker_az(b)) end)
-
-  for i, id in ipairs(lower) do
-    if math.abs(az_key(speaker_az(id)) - upper_az) < 0.01 then
-      return {
-        lower[((i - 2) % #lower) + 1],
-        lower[i],
-        lower[(i % #lower) + 1],
-      }
-    end
-  end
-
-  for i, a in ipairs(lower) do
-    local b = lower[(i % #lower) + 1]
-    local a_az = az_key(speaker_az(a))
-    local b_az = az_key(speaker_az(b))
-    if b_az < a_az then b_az = b_az + 360 end
-    local test_az = upper_az < a_az and upper_az + 360 or upper_az
-    if test_az > a_az and test_az < b_az then
-      return { a, b }
-    end
-  end
-  return { lower[1], lower[2] }
-end
-
-local function add_fan_facets(facets, lower_ids, upper_ids)
-  if #lower_ids < 2 or #upper_ids < 1 then return end
-  if #upper_ids == 1 then
-    for i, id in ipairs(lower_ids) do
-      facets[#facets + 1] = { id, lower_ids[(i % #lower_ids) + 1], upper_ids[1] }
-    end
-    return
-  end
-
-  for _, upper_id in ipairs(upper_ids) do
-    local bracket = lower_bracket_ids(upper_id, lower_ids)
-    if #bracket == 2 then
-      facets[#facets + 1] = { bracket[1], bracket[2], upper_id }
-    elseif #bracket == 3 then
-      facets[#facets + 1] = { bracket[1], bracket[2], upper_id }
-      facets[#facets + 1] = { bracket[2], bracket[3], upper_id }
-    end
-  end
-end
-
-local function build_speaker_facets()
-  local facets = {}
-  add_fan_facets(facets, ids_for_elevation(0), ids_for_elevation(32))
-  add_fan_facets(facets, ids_for_elevation(32), ids_for_elevation(66.6))
-  add_fan_facets(facets, ids_for_elevation(66.6), ids_for_elevation(90))
-  return facets
-end
-
-local function add_unique_edge(edges, seen, a, b)
-  local lo = math.min(a, b)
-  local hi = math.max(a, b)
-  local key = tostring(lo) .. ":" .. tostring(hi)
-  if not seen[key] then
-    edges[#edges + 1] = { a, b }
-    seen[key] = true
-  end
-end
-
-local function build_speaker_edges(facets)
-  local edges = {}
-  local seen = {}
-  for _, facet in ipairs(facets) do
-    add_unique_edge(edges, seen, facet[1], facet[2])
-    add_unique_edge(edges, seen, facet[2], facet[3])
-    add_unique_edge(edges, seen, facet[3], facet[1])
-  end
-  return edges
-end
-
-local speaker_facets = build_speaker_facets()
-local speaker_edges = build_speaker_edges(speaker_facets)
 
 local source_colors = {
   { 0.98, 0.36, 0.28 }, { 0.98, 0.58, 0.18 }, { 0.90, 0.74, 0.18 }, { 0.45, 0.78, 0.22 },
@@ -181,12 +85,12 @@ local COLORS = {
 }
 
 local PARAM = {
-  sharpness = 0,
-  rolloff = 1,
+  spread = 0,
+  focus = 1,
   smoothing = 2,
-  global_az = 3,
-  global_el = 4,
-  global_dist = 5,
+  global_x = 3,
+  global_y = 4,
+  global_z = 5,
   out_gain = 6,
 }
 
@@ -234,6 +138,10 @@ local function slider_double(track, fx, label, param, lo, hi, fmt)
   return new_value
 end
 
+local function slider_value(label, value, lo, hi, fmt)
+  return ImGui.SliderDouble(ctx, label, value, lo, hi, fmt or "%.2f")
+end
+
 local function toggle_param(track, fx, label, param)
   local value = get_param(track, fx, param, 0)
   local enabled = value >= 0.5
@@ -250,7 +158,7 @@ end
 
 local function maybe_load(track, force)
   if not track then return -1 end
-  reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", 26)
+  reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", 18)
   local fx = find_fx(track)
   local guid = reaper.GetTrackGUID(track)
   if fx < 0 and not force and auto_load_attempted_guid == guid then return -1 end
@@ -281,6 +189,37 @@ local function point_from_az_el(az, el)
   }
 end
 
+local function aed_to_xyz(az, el, distance)
+  local p = point_from_az_el(az, el)
+  return p.x * distance, p.y * distance, p.z * distance
+end
+
+local function xyz_to_aed(x, y, z)
+  local distance = math.sqrt(x * x + y * y + z * z)
+  if distance < 0.000001 then
+    return 0, 0, 0.1
+  end
+  local az = math.deg(math.atan(x, y))
+  local horizontal = math.sqrt(x * x + y * y)
+  local el = math.deg(math.atan(z, horizontal))
+  return az, el, clamp(distance, 0.1, 3)
+end
+
+local function source_default_xyz(source_index)
+  local corners = {
+    { 1, 1, -1 },
+    { 1, -1, -1 },
+    { -1, -1, -1 },
+    { -1, 1, -1 },
+    { 1, 1, 1 },
+    { 1, -1, 1 },
+    { -1, -1, 1 },
+    { -1, 1, 1 },
+  }
+  local corner = corners[source_index] or corners[1]
+  return corner[1], corner[2], corner[3]
+end
+
 local function rotate_point(p)
   local yaw = math.rad(view_yaw_deg)
   local pitch = math.rad(view_pitch_deg)
@@ -305,18 +244,6 @@ local function rotate_point(p)
     y = x2 * sr + y2 * cr,
     z = z2,
   }
-end
-
-local function distance_projection(distance)
-  local d = math.max(0, distance)
-  if d <= 1 then return d end
-  return 1 + (d - 1) * 0.55
-end
-
-local function inverse_distance_projection(projected_distance)
-  local d = math.max(0, projected_distance)
-  if d <= 1 then return d end
-  return 1 + (d - 1) / 0.55
 end
 
 local function source_dot_size(distance)
@@ -348,7 +275,7 @@ local function source_aed_from_screen(mx, my, cx, cy, radius)
     end
   end
 
-  for el = 0, 90, 5 do
+  for el = -90, 90, 5 do
     for az = -180, 175, 5 do
       test_candidate(az, el)
     end
@@ -356,7 +283,7 @@ local function source_aed_from_screen(mx, my, cx, cy, radius)
 
   local coarse_az = best_az
   local coarse_el = best_el
-  for el = math.max(0, coarse_el - 6), math.min(90, coarse_el + 6), 1 do
+  for el = math.max(-90, coarse_el - 6), math.min(90, coarse_el + 6), 1 do
     for az = coarse_az - 6, coarse_az + 6, 1 do
       test_candidate(az, el)
     end
@@ -370,13 +297,36 @@ local function source_aed_from_screen(mx, my, cx, cy, radius)
   local mouse_len = math.sqrt(mouse_dx * mouse_dx + mouse_dy * mouse_dy)
   local projected_distance = shell_len > 0.000001 and mouse_len / shell_len or 1
   if math.abs(projected_distance - 1) < 0.055 then projected_distance = 1 end
-  local distance = clamp(inverse_distance_projection(projected_distance), 0.1, 3)
+  local distance = clamp(projected_distance, 0.1, 3)
   return best_az, best_el, distance
 end
 
 function projected_point(az, el, distance, cx, cy, radius)
   local p = point_from_az_el(az, el)
-  local scale = distance and distance_projection(distance) or 1
+  local scale = distance or 1
+  p.x = p.x * scale
+  p.y = p.y * scale
+  p.z = p.z * scale
+  local r = rotate_point(p)
+  return {
+    x = cx + r.x * radius * view_zoom,
+    y = cy - r.y * radius * view_zoom,
+    z = r.z,
+  }
+end
+
+local function projected_xyz(x, y, z, cx, cy, radius)
+  local r = rotate_point({ x = x, y = y, z = z })
+  return {
+    x = cx + r.x * radius * view_zoom,
+    y = cy - r.y * radius * view_zoom,
+    z = r.z,
+  }
+end
+
+local function speaker_projected_point(speaker, cx, cy, radius)
+  local p = point_from_az_el(speaker.az, speaker.el)
+  local scale = (speaker.r or CUBE_EDGE_RADIUS) / CUBE_EDGE_RADIUS
   p.x = p.x * scale
   p.y = p.y * scale
   p.z = p.z * scale
@@ -393,75 +343,67 @@ local function source_color(index, alpha)
   return color(c[1], c[2], c[3], alpha or 1)
 end
 
-local function draw_speaker_geometry(draw_list, by_id)
+local function draw_quad_filled(draw_list, a, b, c, d, col)
   local can_draw_filled_triangles, draw_triangle_filled = pcall(function()
     return ImGui.DrawList_AddTriangleFilled
   end)
-  if can_draw_filled_triangles and draw_triangle_filled then
-    for _, facet in ipairs(speaker_facets) do
-      local a = by_id[facet[1]]
-      local b = by_id[facet[2]]
-      local c = by_id[facet[3]]
-      if a and b and c then
-        local front = clamp(((a.z + b.z + c.z) / 3 + 1) * 0.5, 0, 1)
-        draw_triangle_filled(
-          draw_list,
-          a.x, a.y,
-          b.x, b.y,
-          c.x, c.y,
-          color(0.46, 0.48, 0.50, 0.035 + 0.055 * front)
-        )
-      end
-    end
-  end
-
-  for _, edge in ipairs(speaker_edges) do
-    local a = by_id[edge[1]]
-    local b = by_id[edge[2]]
-    if a and b then
-      local front = clamp(((a.z + b.z) * 0.5 + 1) * 0.5, 0, 1)
-      ImGui.DrawList_AddLine(
-        draw_list,
-        a.x, a.y,
-        b.x, b.y,
-        color(0.66, 0.68, 0.70, 0.10 + 0.18 * front),
-        1
-      )
-    end
+  if can_draw_filled_triangles and draw_triangle_filled and a and b and c and d then
+    draw_triangle_filled(draw_list, a.x, a.y, b.x, b.y, c.x, c.y, col)
+    draw_triangle_filled(draw_list, a.x, a.y, c.x, c.y, d.x, d.y, col)
   end
 end
 
-local function bottom_tier_points(by_id, cx, cy)
-  local points = {}
-  for _, speaker in ipairs(speakers_for_elevation(0)) do
-    local p = by_id[speaker.id]
-    if p then points[#points + 1] = p end
+local function draw_edge(draw_list, by_id, a_id, b_id, thickness)
+  local a = by_id[a_id]
+  local b = by_id[b_id]
+  if a and b then
+    local front = clamp(((a.z + b.z) * 0.5 + 1) * 0.5, 0, 1)
+    ImGui.DrawList_AddLine(
+      draw_list,
+      a.x, a.y,
+      b.x, b.y,
+      color(0.66, 0.68, 0.70, 0.12 + 0.22 * front),
+      thickness or 1.25
+    )
   end
-  table.sort(points, function(a, b)
-    return math.atan(a.y - cy, a.x - cx) < math.atan(b.y - cy, b.x - cx)
-  end)
-  return points
 end
 
-local function draw_shell_edge(draw_list, by_id, cx, cy)
-  local points = bottom_tier_points(by_id, cx, cy)
-  if #points < 3 then return end
+local function draw_cube_surface(draw_list, by_id)
+  local faces = {
+    { 1, 2, 3, 4 },
+    { 13, 14, 15, 16 },
+    { 1, 2, 14, 13 },
+    { 2, 3, 15, 14 },
+    { 3, 4, 16, 15 },
+    { 4, 1, 13, 16 },
+  }
 
-  local can_draw_filled_triangles, draw_triangle_filled = pcall(function()
-    return ImGui.DrawList_AddTriangleFilled
-  end)
-  if can_draw_filled_triangles and draw_triangle_filled then
-    for i = 1, #points do
-      local a = points[i]
-      local b = points[(i % #points) + 1]
-      draw_triangle_filled(draw_list, cx, cy, a.x, a.y, b.x, b.y, color(0.22, 0.23, 0.24, 0.18))
+  for _, face in ipairs(faces) do
+    local a, b, c, d = by_id[face[1]], by_id[face[2]], by_id[face[3]], by_id[face[4]]
+    if a and b and c and d then
+      local front = clamp(((a.z + b.z + c.z + d.z) * 0.25 + 1) * 0.5, 0, 1)
+      draw_quad_filled(draw_list, a, b, c, d, color(0.42, 0.45, 0.48, 0.025 + 0.055 * front))
     end
   end
 
-  for i = 1, #points do
-    local a = points[i]
-    local b = points[(i % #points) + 1]
-    ImGui.DrawList_AddLine(draw_list, a.x, a.y, b.x, b.y, COLORS.shell_line, 1.5)
+  local edges = {
+    { 1, 2 }, { 2, 3 }, { 3, 4 }, { 4, 1 },
+    { 13, 14 }, { 14, 15 }, { 15, 16 }, { 16, 13 },
+    { 1, 13 }, { 2, 14 }, { 3, 15 }, { 4, 16 },
+    { 13, 17 }, { 14, 17 }, { 15, 17 }, { 16, 17 },
+  }
+
+  for _, edge in ipairs(edges) do
+    draw_edge(draw_list, by_id, edge[1], edge[2], 1.4)
+  end
+
+  local middle_tier_edges = {
+    { 5, 6 }, { 6, 7 }, { 7, 8 }, { 8, 9 },
+    { 9, 10 }, { 10, 11 }, { 11, 12 }, { 12, 5 },
+  }
+
+  for _, edge in ipairs(middle_tier_edges) do
+    draw_edge(draw_list, by_id, edge[1], edge[2], 2.1)
   end
 end
 
@@ -481,19 +423,25 @@ local function hit_test_source(sources, mx, my)
   return best_source
 end
 
-local function update_source_from_mouse(track, fx, source_index, mx, my, cx, cy, radius, global_az, global_el, global_dist)
+local function update_source_from_mouse(track, fx, source_index, mx, my, cx, cy, radius, global_x, global_y, global_z)
   if source_index < 1 or source_index > 8 then return end
   local az, el, distance = source_aed_from_screen(mx, my, cx, cy, radius)
-  set_param(track, fx, source_param(source_index, 0), az - global_az)
-  set_param(track, fx, source_param(source_index, 1), clamp(el - global_el, 0, 90))
-  set_param(track, fx, source_param(source_index, 2), clamp(distance - global_dist, 0.1, 3))
+  local x, y, z = aed_to_xyz(az, el, distance)
+  set_param(track, fx, source_param(source_index, 0), clamp(x - global_x, -SOURCE_LIMIT, SOURCE_LIMIT))
+  set_param(track, fx, source_param(source_index, 1), clamp(y - global_y, -SOURCE_LIMIT, SOURCE_LIMIT))
+  set_param(track, fx, source_param(source_index, 2), clamp(z - global_z, -SOURCE_LIMIT, SOURCE_LIMIT))
 end
 
-local function reset_source_distances(track, fx)
+local function reset_source_positions(track, fx)
   for source = 1, 8 do
-    set_param(track, fx, source_param(source, 2), 1)
+    local x, y, z = source_default_xyz(source)
+    set_param(track, fx, source_param(source, 0), x)
+    set_param(track, fx, source_param(source, 1), y)
+    set_param(track, fx, source_param(source, 2), z)
   end
-  set_param(track, fx, PARAM.global_dist, 0)
+  set_param(track, fx, PARAM.global_x, 0)
+  set_param(track, fx, PARAM.global_y, 0)
+  set_param(track, fx, PARAM.global_z, 0)
 end
 
 local function clear_mutes(track, fx)
@@ -518,7 +466,7 @@ local function reset_camera(yaw, pitch)
   view_yaw_deg = yaw
   view_pitch_deg = pitch
   view_roll_deg = 0
-  view_zoom = 1.0
+  view_zoom = 0.72
 end
 
 local function draw_camera_controls()
@@ -538,11 +486,11 @@ local function draw_camera_controls()
     view_pitch_deg = clamp(view_pitch_deg - 4, -180, 180)
   end)
   nudge_camera("-##camzoom", 32, 24, function()
-    view_zoom = clamp(view_zoom - 0.025, 0.45, 2.5)
+    view_zoom = clamp(view_zoom - 0.025, 0.35, 2.5)
   end)
   ImGui.SameLine(ctx)
   nudge_camera("+##camzoom", 32, 24, function()
-    view_zoom = clamp(view_zoom + 0.025, 0.45, 2.5)
+    view_zoom = clamp(view_zoom + 0.025, 0.35, 2.5)
   end)
   if ImGui.Button(ctx, "3/4##cam", 68, 24) then
     reset_camera(-35, -42)
@@ -556,7 +504,7 @@ local function draw_camera_controls()
   ImGui.EndGroup(ctx)
 end
 
-local function draw_dome(track, fx)
+local function draw_cube(track, fx)
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x0, y0 = ImGui.GetCursorScreenPos(ctx)
   local width = ImGui.GetContentRegionAvail(ctx)
@@ -568,7 +516,7 @@ local function draw_dome(track, fx)
   local cx = x0 + canvas_width * 0.5
   local cy = y0 + height * 0.56
   local radius = math.min(canvas_width, height) * 0.36
-  ImGui.InvisibleButton(ctx, "dome_canvas", canvas_width, height)
+  ImGui.InvisibleButton(ctx, "cube_canvas", canvas_width, height)
   local canvas_hovered = ImGui.IsItemHovered(ctx)
   local canvas_active = ImGui.IsItemActive(ctx)
 
@@ -577,7 +525,7 @@ local function draw_dome(track, fx)
   local projected = {}
   local projected_by_id = {}
   for _, speaker in ipairs(speakers) do
-    local p = projected_point(speaker.az, speaker.el, nil, cx, cy, radius)
+    local p = speaker_projected_point(speaker, cx, cy, radius)
     local item = {
       id = speaker.id,
       x = p.x,
@@ -591,8 +539,7 @@ local function draw_dome(track, fx)
   end
   table.sort(projected, function(a, b) return a.z < b.z end)
 
-  draw_shell_edge(draw_list, projected_by_id, cx, cy)
-  draw_speaker_geometry(draw_list, projected_by_id)
+  draw_cube_surface(draw_list, projected_by_id)
 
   for _, speaker in ipairs(projected) do
     local front = clamp((speaker.z + 1) * 0.5, 0, 1)
@@ -602,9 +549,9 @@ local function draw_dome(track, fx)
     ImGui.DrawList_AddText(draw_list, speaker.x + size + 3, speaker.y - 6, color(0.82, 0.88, 0.9, 0.48 + 0.36 * front), tostring(speaker.id))
   end
 
-  local global_az = get_param(track, fx, PARAM.global_az, 0)
-  local global_el = get_param(track, fx, PARAM.global_el, 0)
-  local global_dist = get_param(track, fx, PARAM.global_dist, 0)
+  local global_x = get_param(track, fx, PARAM.global_x, 0)
+  local global_y = get_param(track, fx, PARAM.global_y, 0)
+  local global_z = get_param(track, fx, PARAM.global_z, 0)
   local solo_count = 0
   for source = 1, 8 do
     if get_param(track, fx, source_control_param(source, 2), 0) >= 0.5 then
@@ -614,13 +561,15 @@ local function draw_dome(track, fx)
 
   local sources = {}
   for source = 1, 8 do
-    local az = get_param(track, fx, source_param(source, 0), (source - 1) * 45) + global_az
-    local el = clamp(get_param(track, fx, source_param(source, 1), 0) + global_el, 0, 90)
-    local dist = clamp(get_param(track, fx, source_param(source, 2), 1) + global_dist, 0.1, 3)
+    local default_x, default_y, default_z = source_default_xyz(source)
+    local x = clamp(get_param(track, fx, source_param(source, 0), default_x) + global_x, -SOURCE_LIMIT, SOURCE_LIMIT)
+    local y = clamp(get_param(track, fx, source_param(source, 1), default_y) + global_y, -SOURCE_LIMIT, SOURCE_LIMIT)
+    local z = clamp(get_param(track, fx, source_param(source, 2), default_z) + global_z, -SOURCE_LIMIT, SOURCE_LIMIT)
+    local dist = clamp(math.sqrt(x * x + y * y + z * z), 0.1, 3.464)
     local mute = get_param(track, fx, source_control_param(source, 1), 0) >= 0.5
     local solo = get_param(track, fx, source_control_param(source, 2), 0) >= 0.5
     local gain_db = get_param(track, fx, source_control_param(source, 0), 0)
-    local p = projected_point(az, el, dist, cx, cy, radius)
+    local p = projected_xyz(x, y, z, cx, cy, radius)
     p.id = source
     p.distance = dist
     p.gain_db = gain_db
@@ -643,7 +592,7 @@ local function draw_dome(track, fx)
     end
 
     if dragging_source > 0 and ImGui.IsMouseDown(ctx, 0) then
-      update_source_from_mouse(track, fx, dragging_source, mx, my, cx, cy, radius, global_az, global_el, global_dist)
+      update_source_from_mouse(track, fx, dragging_source, mx, my, cx, cy, radius, global_x, global_y, global_z)
     end
 
     if ImGui.IsMouseReleased(ctx, 0) then
@@ -663,9 +612,9 @@ local function draw_dome(track, fx)
     ImGui.DrawList_AddText(draw_list, source.x - 4, source.y - 8, color(0.04, 0.045, 0.05, 1), tostring(source.id))
   end
 
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 14, COLORS.text, "25ch Cosine Dome Panner")
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 34, COLORS.muted, "25 speakers / 8 mono sources / distance 1.0 = dome edge")
-  ImGui.DrawList_AddText(draw_list, x0 + canvas_width - 300, y0 + 14, COLORS.muted, "drag source dots to edit az / el / radius")
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 14, COLORS.text, "17ch Cube XYZ Panner")
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 34, COLORS.muted, "17 speakers / 8 mono sources / distance 1.0 = cube edge")
+  ImGui.DrawList_AddText(draw_list, x0 + canvas_width - 300, y0 + 14, COLORS.muted, "drag source dots to edit position")
   if controls_inline then
     ImGui.SameLine(ctx)
     ImGui.Dummy(ctx, control_gap, 1)
@@ -678,11 +627,30 @@ local function draw_source_controls(track, fx)
   local changed
   changed, selected_source = ImGui.SliderInt(ctx, "Selected source", selected_source, 1, 8)
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Reset distances") then reset_source_distances(track, fx) end
+  if ImGui.Button(ctx, "Reset positions") then reset_source_positions(track, fx) end
   local base_label = "S" .. tostring(selected_source)
-  slider_double(track, fx, base_label .. " azimuth (deg)", source_param(selected_source, 0), -360, 360, "%.1f")
-  slider_double(track, fx, base_label .. " elevation (deg)", source_param(selected_source, 1), 0, 90, "%.1f")
-  slider_double(track, fx, base_label .. " distance (dome radius, edge=1)", source_param(selected_source, 2), 0.1, 3, "%.2f")
+  local x_param = source_param(selected_source, 0)
+  local y_param = source_param(selected_source, 1)
+  local z_param = source_param(selected_source, 2)
+  local default_x, default_y, default_z = source_default_xyz(selected_source)
+  local x = slider_double(track, fx, base_label .. " X", x_param, -SOURCE_LIMIT, SOURCE_LIMIT, "%.2f")
+  local y = slider_double(track, fx, base_label .. " Y", y_param, -SOURCE_LIMIT, SOURCE_LIMIT, "%.2f")
+  local z = slider_double(track, fx, base_label .. " Z", z_param, -SOURCE_LIMIT, SOURCE_LIMIT, "%.2f")
+  if x == nil then x = default_x end
+  if y == nil then y = default_y end
+  if z == nil then z = default_z end
+
+  local az, el, dist = xyz_to_aed(x, y, z)
+  local az_changed, new_az = slider_value(base_label .. " azimuth (deg)##aed", az, -360, 360, "%.1f")
+  local el_changed, new_el = slider_value(base_label .. " elevation (deg)##aed", el, -90, 90, "%.1f")
+  local dist_changed, new_dist = slider_value(base_label .. " distance (cube radius, edge=1)##aed", dist, 0.1, 3.464, "%.2f")
+  if az_changed or el_changed or dist_changed then
+    local new_x, new_y, new_z = aed_to_xyz(new_az, new_el, new_dist)
+    set_param(track, fx, x_param, clamp(new_x, -SOURCE_LIMIT, SOURCE_LIMIT))
+    set_param(track, fx, y_param, clamp(new_y, -SOURCE_LIMIT, SOURCE_LIMIT))
+    set_param(track, fx, z_param, clamp(new_z, -SOURCE_LIMIT, SOURCE_LIMIT))
+  end
+
   slider_double(track, fx, base_label .. " gain (dB)", source_control_param(selected_source, 0), -60, 24, "%.1f")
   toggle_param(track, fx, "Mute " .. base_label, source_control_param(selected_source, 1))
   ImGui.SameLine(ctx)
@@ -711,7 +679,7 @@ end
 local function loop()
   ImGui.SetNextWindowSize(ctx, 820, 760, ImGui.Cond_FirstUseEver)
   local visible
-  visible, open = ImGui.Begin(ctx, "25ch Cosine Dome Panner", open)
+  visible, open = ImGui.Begin(ctx, "17ch Cube XYZ Panner", open)
   if visible then
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     local fx = find_fx(track)
@@ -731,15 +699,15 @@ local function loop()
       if fx < 0 then
         ImGui.Text(ctx, load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " is not on the selected track."))
       else
-        draw_dome(track, fx)
+        draw_cube(track, fx)
 
         if ImGui.CollapsingHeader(ctx, "Global", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-          slider_double(track, fx, "Cosine focus", PARAM.sharpness, 0.25, 4, "%.2f")
-          slider_double(track, fx, "Distance rolloff", PARAM.rolloff, 0, 48, "%.1f dB/oct")
-          slider_double(track, fx, "Distance smoothing", PARAM.smoothing, 1, 250, "%.0f ms")
-          slider_double(track, fx, "Global azimuth (deg)", PARAM.global_az, -360, 360, "%.1f")
-          slider_double(track, fx, "Global elevation (deg)", PARAM.global_el, 0, 90, "%.1f")
-          slider_double(track, fx, "Global distance offset (dome radius)", PARAM.global_dist, -3, 3, "%.2f")
+          slider_double(track, fx, "XYZ spread radius", PARAM.spread, 0.05, 4, "%.2f")
+          slider_double(track, fx, "Focus amount", PARAM.focus, 0, 1, "%.2f")
+          slider_double(track, fx, "Position smoothing", PARAM.smoothing, 1, 250, "%.0f ms")
+          slider_double(track, fx, "Global X offset", PARAM.global_x, -GLOBAL_OFFSET_LIMIT, GLOBAL_OFFSET_LIMIT, "%.2f")
+          slider_double(track, fx, "Global Y offset", PARAM.global_y, -GLOBAL_OFFSET_LIMIT, GLOBAL_OFFSET_LIMIT, "%.2f")
+          slider_double(track, fx, "Global Z offset", PARAM.global_z, -GLOBAL_OFFSET_LIMIT, GLOBAL_OFFSET_LIMIT, "%.2f")
           slider_double(track, fx, "Output gain", PARAM.out_gain, -48, 24, "%.1f dB")
         end
 
@@ -767,7 +735,7 @@ local function loop()
           changed, view_yaw_deg = ImGui.SliderDouble(ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg")
           changed, view_pitch_deg = ImGui.SliderDouble(ctx, "Pitch", view_pitch_deg, -180, 180, "%.0f deg")
           changed, view_roll_deg = ImGui.SliderDouble(ctx, "Roll", view_roll_deg, -180, 180, "%.0f deg")
-          changed, view_zoom = ImGui.SliderDouble(ctx, "Zoom", view_zoom, 0.45, 2.5, "%.2f")
+          changed, view_zoom = ImGui.SliderDouble(ctx, "Zoom", view_zoom, 0.35, 2.5, "%.2f")
         end
       end
     end

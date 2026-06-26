@@ -8,7 +8,7 @@ authors:
 version: "0.1.0"
 date-released: "2026-06-25"
 license: "0BSD"
-abstract: "A collection of REAPER Lua, ReaImGui, JSFX, and NumPy-backed tools for multichannel composition, spatial audio, offline sound transformation, procedural synthesis, and channel workflow support."
+abstract: "A collection of REAPER Lua, ReaImGui, JSFX, and NumPy-backed tools for multichannel composition, spatial audio, offline sound transformation, procedural synthesis, and multichannel routing and channel-management workflows."
 keywords:
   - "REAPER"
   - "ReaImGui"
