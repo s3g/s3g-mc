@@ -308,6 +308,9 @@ local function draw_preview(settings, env_points, env_enabled, entry)
   end
   local p0 = path[1]
   local p1 = path[#path]
+  local end_focus_az = p1 and p1.az or settings.azimuth or 0
+  local end_focus_el = p1 and p1.el or settings.elevation or 0
+  local end_width = p1 and p1.width or settings.focus_width or 38
   ImGui.DrawList_AddCircleFilled(dl, p0.x, p0.y, 5, color_rgba(0.45, 0.90, 0.48, 0.95), 24)
   ImGui.DrawList_AddCircleFilled(dl, p1.x, p1.y, 6, COLOR_FOCUS, 24)
 
@@ -320,9 +323,9 @@ local function draw_preview(settings, env_points, env_enabled, entry)
     tostring(#layout) .. " virtual speakers / " .. string.format("%.2f sec", entry.length * math.max(0.000001, entry.playrate)))
   ImGui.DrawList_AddText(dl, panel_x0, y0 + 18, COLOR_TEXT, EFFECT_NAMES[settings.effect_index] or "Focus gain")
   ImGui.DrawList_AddText(dl, panel_x0, y0 + 40, COLOR_MUTED,
-    string.format("End focus: %.1f az / %.1f el", last_focus_az, last_focus_el))
+    string.format("End focus: %.1f az / %.1f el", end_focus_az, end_focus_el))
   ImGui.DrawList_AddText(dl, panel_x0, y0 + 58, COLOR_MUTED,
-    string.format("Width %.1f deg", last_width))
+    string.format("Width %.1f deg", end_width))
 
   local function draw_strip(label, y, key, col, lo, hi)
     ImGui.DrawList_AddText(dl, panel_x0, y - 3, COLOR_MUTED, label)
