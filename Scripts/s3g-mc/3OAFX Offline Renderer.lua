@@ -22,6 +22,19 @@ local ImGui = require("imgui")("0.10")
 local WINDOW_OPEN_COND = ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver
 local EXT = "s3g_mc_3oafx_offline_renderer_v1"
 local COLOR_WARN = ImGui.ColorConvertDouble4ToU32(1.0, 0.35, 0.22, 1.0)
+local COLOR_BG = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0)
+local COLOR_GRID = ImGui.ColorConvertDouble4ToU32(0.58, 0.63, 0.63, 0.13)
+local COLOR_EDGE = ImGui.ColorConvertDouble4ToU32(0.62, 0.66, 0.66, 0.32)
+local COLOR_TEXT = ImGui.ColorConvertDouble4ToU32(0.76, 0.80, 0.78, 1.0)
+local COLOR_MUTED = ImGui.ColorConvertDouble4ToU32(0.50, 0.56, 0.56, 1.0)
+local COLOR_PATH = ImGui.ColorConvertDouble4ToU32(0.98, 0.74, 0.26, 0.94)
+local COLOR_PATH_FADE = ImGui.ColorConvertDouble4ToU32(0.98, 0.74, 0.26, 0.24)
+local COLOR_FOCUS = ImGui.ColorConvertDouble4ToU32(0.20, 0.72, 0.95, 0.90)
+local COLOR_FOCUS_SOFT = ImGui.ColorConvertDouble4ToU32(0.20, 0.72, 0.95, 0.18)
+local COLOR_DRY = ImGui.ColorConvertDouble4ToU32(0.95, 0.36, 0.22, 0.76)
+local COLOR_WET = ImGui.ColorConvertDouble4ToU32(0.30, 0.72, 0.95, 0.78)
+local COLOR_WIDTH = ImGui.ColorConvertDouble4ToU32(0.92, 0.82, 0.38, 0.72)
+local COLOR_SHARP = ImGui.ColorConvertDouble4ToU32(0.72, 0.58, 0.98, 0.82)
 
 local ORDER_NAMES = { "1OA / 4ch", "2OA / 9ch", "3OA / 16ch" }
 local ORDER_VALUES = { 1, 2, 3 }
@@ -56,6 +69,7 @@ local ENV_DEFS = {
   { key = "azimuth", label = "Azimuth", min = -180.0, max = 180.0, default = 0.0, fmt = "%.1f deg" },
   { key = "elevation", label = "Elevation", min = -90.0, max = 90.0, default = 0.0, fmt = "%.1f deg" },
   { key = "focus_width", label = "Focus width", min = 2.0, max = 140.0, default = 38.0, fmt = "%.1f deg" },
+  { key = "focus_sharpness", label = "Focus sharpness", min = 0.0, max = 1.0, default = 0.65, fmt = "%.2f" },
   { key = "wet", label = "Wet amount", min = 0.0, max = 2.0, default = 1.0, fmt = "%.2f" },
   { key = "dry_attenuation", label = "Dry attenuation", min = 0.0, max = 1.0, default = 0.18, fmt = "%.2f" },
   { key = "amplitude", label = "Output amp", min = 0.0, max = 1.5, default = 1.0, fmt = "%.2f" },
@@ -138,6 +152,182 @@ local function effect_uses_feedback(effect_index)
   return key == "delay" or key == "comb" or key == "diffusion"
 end
 
+local VIRTUAL_LAYOUTS = {
+  {
+    { 0.0, 0.0 }, { 90.0, 0.0 }, { 180.0, 0.0 }, { -90.0, 0.0 },
+    { 0.0, 90.0 }, { 0.0, -90.0 },
+  },
+  {
+    { 0.0, 0.0 }, { 45.0, 0.0 }, { 90.0, 0.0 }, { 135.0, 0.0 },
+    { 180.0, 0.0 }, { -135.0, 0.0 }, { -90.0, 0.0 }, { -45.0, 0.0 },
+    { 45.0, 45.0 }, { 135.0, 45.0 }, { -135.0, -45.0 }, { -45.0, -45.0 },
+  },
+  {
+    { 0.000000, 73.402158 }, { 137.507764, 61.044976 }, { -84.984472, 52.341538 },
+    { 52.523292, 45.099472 }, { -169.968944, 38.682187 }, { -32.461180, 32.797168 },
+    { 105.046584, 27.279613 }, { -117.445652, 22.024313 }, { 20.062112, 16.957763 },
+    { 157.569876, 12.024699 }, { -64.922360, 7.180756 }, { 72.585405, 2.388015 },
+    { -149.906831, -2.388015 }, { -12.399067, -7.180756 }, { 125.108697, -12.024699 },
+    { -97.383539, -16.957763 }, { 40.124225, -22.024313 }, { 177.631989, -27.279613 },
+    { -44.860247, -32.797168 }, { 92.647517, -38.682187 }, { -129.844719, -45.099472 },
+    { 7.663045, -52.341538 }, { 145.170809, -61.044976 }, { -77.321427, -73.402158 },
+  },
+}
+
+local function color_rgba(r, g, b, a)
+  return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1.0)
+end
+
+local function env_index_for_key(key)
+  for index, def in ipairs(ENV_DEFS) do
+    if def.key == key then return index, def end
+  end
+  return nil, nil
+end
+
+local function sample_env_value(key, t, settings, env_points, env_enabled)
+  local index, def = env_index_for_key(key)
+  if not index or not def then return settings[key] or 0 end
+  if not env_enabled[index] then return settings[key] or def.default or def.min end
+  local points = env_points[index]
+  if not points or #points < 2 then return settings[key] or def.default or def.min end
+  be.sort(points)
+  if t <= points[1].x then return be.value(def, points[1].y) end
+  for point_index = 1, #points - 1 do
+    local a = points[point_index]
+    local b = points[point_index + 1]
+    if t <= b.x then
+      local span = math.max(0.000001, b.x - a.x)
+      local u = clamp((t - a.x) / span, 0, 1)
+      return be.value(def, be.lerp(a.y, b.y, u))
+    end
+  end
+  return be.value(def, points[#points].y)
+end
+
+local function project_aed(az, el, cx, cy, radius)
+  local azr = math.rad(az or 0)
+  local eln = clamp((el or 0) / 90.0, -1, 1)
+  local r = radius * (0.18 + 0.78 * math.cos(math.asin(eln)))
+  local x = cx + math.sin(azr) * r
+  local y = cy - math.cos(azr) * r * 0.62 - eln * radius * 0.35
+  return x, y
+end
+
+local function angular_distance(a_az, a_el, b_az, b_el)
+  local function unit(az, el)
+    local azr = math.rad(az)
+    local elr = math.rad(el)
+    local ce = math.cos(elr)
+    return ce * math.cos(azr), ce * math.sin(azr), math.sin(elr)
+  end
+  local ax, ay, az = unit(a_az or 0, a_el or 0)
+  local bx, by, bz = unit(b_az or 0, b_el or 0)
+  local dot = clamp(ax * bx + ay * by + az * bz, -1, 1)
+  return math.deg(math.acos(dot))
+end
+
+local function draw_preview(settings, env_points, env_enabled, entry)
+  local width = math.max(420, ImGui.GetContentRegionAvail(ctx) - 2)
+  local height = 270
+  ImGui.InvisibleButton(ctx, "##foafx_preview", width, height)
+  local x0, y0 = ImGui.GetItemRectMin(ctx)
+  local x1, y1 = ImGui.GetItemRectMax(ctx)
+  local dl = ImGui.GetWindowDrawList(ctx)
+  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, COLOR_BG)
+  ImGui.DrawList_AddRect(dl, x0, y0, x1, y1, COLOR_EDGE)
+
+  local cx = x0 + width * 0.38
+  local cy = y0 + height * 0.50
+  local radius = math.min(width * 0.36, height * 0.43)
+  ImGui.DrawList_AddCircle(dl, cx, cy, radius, COLOR_GRID, 96, 1)
+  ImGui.DrawList_AddCircle(dl, cx, cy, radius * 0.62, COLOR_GRID, 96, 1)
+  ImGui.DrawList_AddLine(dl, cx - radius, cy, cx + radius, cy, COLOR_GRID, 1)
+  ImGui.DrawList_AddLine(dl, cx, cy - radius, cx, cy + radius, COLOR_GRID, 1)
+
+  local layout = VIRTUAL_LAYOUTS[settings.order_index] or VIRTUAL_LAYOUTS[3]
+  local last_focus_az = sample_env_value("azimuth", 1.0, settings, env_points, env_enabled)
+  local last_focus_el = sample_env_value("elevation", 1.0, settings, env_points, env_enabled)
+  local last_width = sample_env_value("focus_width", 1.0, settings, env_points, env_enabled)
+  local last_sharpness = sample_env_value("focus_sharpness", 1.0, settings, env_points, env_enabled)
+  for index, speaker in ipairs(layout) do
+    local sx, sy = project_aed(speaker[1], speaker[2], cx, cy, radius)
+    local dist = angular_distance(last_focus_az, last_focus_el, speaker[1], speaker[2])
+    local mask = math.exp(-0.5 * (dist / math.max(2.0, last_width)) ^ 2)
+    mask = mask ^ (1.0 + clamp(last_sharpness, 0, 1) * 5.0)
+    local alpha = 0.24 + 0.70 * clamp(mask, 0, 1)
+    local size = 2.6 + 4.6 * clamp(mask, 0, 1)
+    ImGui.DrawList_AddCircleFilled(dl, sx, sy, size + 2, color_rgba(0.10, 0.12, 0.13, 0.75), 18)
+    ImGui.DrawList_AddCircleFilled(dl, sx, sy, size, color_rgba(0.70, 0.76, 0.77, alpha), 18)
+    ImGui.DrawList_AddText(dl, sx + 6, sy - 6, color_rgba(0.72, 0.78, 0.78, 0.52 + 0.35 * mask), tostring(index))
+  end
+
+  local samples = 48
+  local path = {}
+  for i = 1, samples do
+    local t = (i - 1) / (samples - 1)
+    local az = sample_env_value("azimuth", t, settings, env_points, env_enabled)
+    local el = sample_env_value("elevation", t, settings, env_points, env_enabled)
+    local fw = sample_env_value("focus_width", t, settings, env_points, env_enabled)
+    local wet = sample_env_value("wet", t, settings, env_points, env_enabled)
+    local dry = sample_env_value("dry_attenuation", t, settings, env_points, env_enabled)
+    local amp = sample_env_value("amplitude", t, settings, env_points, env_enabled)
+    local sharp = sample_env_value("focus_sharpness", t, settings, env_points, env_enabled)
+    local px, py = project_aed(az, el, cx, cy, radius)
+    path[#path + 1] = { x = px, y = py, az = az, el = el, width = fw, wet = wet, dry = dry, amp = amp, sharp = sharp, t = t }
+  end
+  for i = 2, #path do
+    ImGui.DrawList_AddLine(dl, path[i - 1].x, path[i - 1].y, path[i].x, path[i].y, COLOR_PATH_FADE, 5)
+    ImGui.DrawList_AddLine(dl, path[i - 1].x, path[i - 1].y, path[i].x, path[i].y, COLOR_PATH, 2)
+  end
+  for i = 1, #path, 8 do
+    local p = path[i]
+    local circle_r = 4 + clamp(p.width, 2, 140) / 140 * 34
+    ImGui.DrawList_AddCircle(dl, p.x, p.y, circle_r, COLOR_FOCUS_SOFT, 48, 1.5)
+  end
+  local p0 = path[1]
+  local p1 = path[#path]
+  ImGui.DrawList_AddCircleFilled(dl, p0.x, p0.y, 5, color_rgba(0.45, 0.90, 0.48, 0.95), 24)
+  ImGui.DrawList_AddCircleFilled(dl, p1.x, p1.y, 6, COLOR_FOCUS, 24)
+
+  local panel_x0 = x0 + width * 0.72
+  local panel_x1 = x1 - 14
+  local strip_y0 = y0 + 86
+  local strip_h = 18
+  ImGui.DrawList_AddText(dl, x0 + 12, y0 + 10, COLOR_TEXT, "Offline 3OAFX focus preview")
+  ImGui.DrawList_AddText(dl, x0 + 12, y0 + 30, COLOR_MUTED,
+    tostring(#layout) .. " virtual speakers / " .. string.format("%.2f sec", entry.length * math.max(0.000001, entry.playrate)))
+  ImGui.DrawList_AddText(dl, panel_x0, y0 + 18, COLOR_TEXT, EFFECT_NAMES[settings.effect_index] or "Focus gain")
+  ImGui.DrawList_AddText(dl, panel_x0, y0 + 40, COLOR_MUTED,
+    string.format("End focus: %.1f az / %.1f el", last_focus_az, last_focus_el))
+  ImGui.DrawList_AddText(dl, panel_x0, y0 + 58, COLOR_MUTED,
+    string.format("Width %.1f deg", last_width))
+
+  local function draw_strip(label, y, key, col, lo, hi)
+    ImGui.DrawList_AddText(dl, panel_x0, y - 3, COLOR_MUTED, label)
+    local sx0 = panel_x0 + 86
+    local sx1 = panel_x1
+    ImGui.DrawList_AddRect(dl, sx0, y, sx1, y + strip_h, COLOR_GRID)
+    local last_x, last_y
+    for i = 1, samples do
+      local t = (i - 1) / (samples - 1)
+      local v = sample_env_value(key, t, settings, env_points, env_enabled)
+      local n = clamp((v - lo) / math.max(0.000001, hi - lo), 0, 1)
+      local px = be.lerp(sx0 + 2, sx1 - 2, t)
+      local py = be.lerp(y + strip_h - 3, y + 3, n)
+      if last_x then ImGui.DrawList_AddLine(dl, last_x, last_y, px, py, col, 2) end
+      last_x, last_y = px, py
+    end
+  end
+  draw_strip("wet", strip_y0, "wet", COLOR_WET, 0.0, 2.0)
+  draw_strip("dry duck", strip_y0 + 34, "dry_attenuation", COLOR_DRY, 0.0, 1.0)
+  draw_strip("width", strip_y0 + 68, "focus_width", COLOR_WIDTH, 2.0, 140.0)
+  draw_strip("sharp", strip_y0 + 102, "focus_sharpness", COLOR_SHARP, 0.0, 1.0)
+
+  ImGui.DrawList_AddText(dl, panel_x0, y1 - 38, COLOR_MUTED, "green=start / blue=end")
+  ImGui.DrawList_AddText(dl, panel_x0, y1 - 20, COLOR_MUTED, "rings show focus width samples")
+end
+
 local function render(entry, settings, env_points, env_enabled)
   local needed_channels = order_channels(settings.order_index)
   if entry.filename == "" or not nr.file_exists(entry.filename) then
@@ -165,6 +355,7 @@ local function render(entry, settings, env_points, env_enabled)
     azimuth = settings.azimuth,
     elevation = settings.elevation,
     focus_width = settings.focus_width,
+    focus_sharpness = settings.focus_sharpness,
     wet = settings.wet,
     dry_attenuation = settings.dry_attenuation,
     amplitude = settings.amplitude,
@@ -223,6 +414,7 @@ function main()
     azimuth = get_number("azimuth", 0.0),
     elevation = get_number("elevation", 0.0),
     focus_width = get_number("focus_width", 38.0),
+    focus_sharpness = get_number("focus_sharpness", 0.65),
     wet = get_number("wet", 1.0),
     dry_attenuation = get_number("dry_attenuation", 0.18),
     amplitude = get_number("amplitude", 1.0),
@@ -256,7 +448,7 @@ function main()
   local env_opts = { height = 150, overview_lane_h = 54, random_amount = 0.28, random_count = 10, random_dispersion = 0.25, random_smooth = true }
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 760, 900, WINDOW_OPEN_COND)
+    ImGui.SetNextWindowSize(ctx, 880, 980, WINDOW_OPEN_COND)
     local visible
     visible, open = ImGui.Begin(ctx, "3OAFX Offline Renderer", open)
     if visible then
@@ -272,6 +464,7 @@ function main()
       changed, settings.azimuth = ImGui.SliderDouble(ctx, "Azimuth", settings.azimuth, -180.0, 180.0, "%.1f deg")
       changed, settings.elevation = ImGui.SliderDouble(ctx, "Elevation", settings.elevation, -90.0, 90.0, "%.1f deg")
       changed, settings.focus_width = ImGui.SliderDouble(ctx, "Focus width", settings.focus_width, 2.0, 140.0, "%.1f deg")
+      changed, settings.focus_sharpness = ImGui.SliderDouble(ctx, "Focus sharpness", settings.focus_sharpness, 0.0, 1.0, "%.2f")
       changed, settings.wet = ImGui.SliderDouble(ctx, "Wet amount", settings.wet, 0.0, 2.0, "%.2f")
       changed, settings.dry_attenuation = ImGui.SliderDouble(ctx, "Dry attenuation at focus", settings.dry_attenuation, 0.0, 1.0, "%.2f")
       changed, settings.amplitude = ImGui.SliderDouble(ctx, "Output amp", settings.amplitude, 0.0, 1.5, "%.2f")
@@ -292,6 +485,8 @@ function main()
       changed, settings.soft_limit = ImGui.Checkbox(ctx, "Soft limit", settings.soft_limit)
       ImGui.Separator(ctx)
       ImGui.Text(ctx, "Dry attenuation is always part of the render: the focus region ducks the dry decode before the effected region is re-encoded.")
+      draw_preview(settings, env_points, env_enabled, entry)
+      ImGui.Separator(ctx)
       selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
         selected_env_point, settings, env_opts)
       if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end

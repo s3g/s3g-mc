@@ -1768,6 +1768,7 @@ def render_foafx_offline(cfg):
         processed = (virtual * effect_gain * focus_boost).astype(np.float32)
 
     focus_width = env_array(cfg, "focus_width", frames, float(cfg.get("focus_width", 38.0)))
+    focus_sharpness = env_array(cfg, "focus_sharpness", frames, float(cfg.get("focus_sharpness", 0.65)))
     wet_amount = env_array(cfg, "wet", frames, float(cfg.get("wet", 1.0)))
     dry_atten = env_array(cfg, "dry_attenuation", frames, float(cfg.get("dry_attenuation", 0.18)))
     az_env = env_array(cfg, "azimuth", frames, float(cfg.get("azimuth", 0.0)))
@@ -1785,6 +1786,8 @@ def render_foafx_offline(cfg):
         angle = np.degrees(np.arccos(cosang))
         width = np.maximum(2.0, focus_width[start:end])[:, None]
         mask = np.exp(-0.5 * (angle / width) ** 2).astype(np.float32)
+        sharpness = np.clip(focus_sharpness[start:end, None], 0.0, 1.0).astype(np.float32)
+        mask = mask ** (1.0 + sharpness * 5.0)
         mask = np.clip(mask, 0.0, 1.0)
         wet = wet_amount[start:end, None].astype(np.float32)
         dry = np.clip(dry_atten[start:end, None], 0.0, 1.0).astype(np.float32)
@@ -1811,6 +1814,7 @@ def render_foafx_offline(cfg):
     print(f"Effect: {effect}")
     print(f"Dry attenuation at focus: {float(cfg.get('dry_attenuation', 0.18)):.3f}")
     print(f"Focus width: {float(cfg.get('focus_width', 38.0)):.2f} deg")
+    print(f"Focus sharpness: {float(cfg.get('focus_sharpness', 0.65)):.3f}")
     print(f"Wet amount: {float(cfg.get('wet', 1.0)):.3f}")
     print(f"Output channels: {ambi_channels}")
     print(f"Sample rate: {sample_rate} Hz")
