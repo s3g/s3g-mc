@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this package as software infrastructure, adapt its code, extend it in another project, or discuss it in a publication, research output, workshop, or teaching material, citation or attribution is appreciated: s3g-mc by Shawn Greenlee."
+message: "If this package supports your software, project, publication, research, workshop, or teaching material, citation or attribution is appreciated: s3g-mc by Shawn Greenlee."
 title: "s3g-mc"
 type: software
 authors:

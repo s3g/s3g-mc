@@ -1440,9 +1440,386 @@ def render_fata_morgana(cfg):
     print(f"Pre-normalize peak: {pre_peak:.6f}")
 
 
+def associated_legendre(n, m, x):
+    m = abs(int(m))
+    if m > n:
+        return 0.0
+    pmm = 1.0
+    if m > 0:
+        somx2 = math.sqrt(max(0.0, 1.0 - x * x))
+        fact = 1.0
+        for _ in range(1, m + 1):
+            pmm *= -fact * somx2
+            fact += 2.0
+    if n == m:
+        return pmm
+    pmmp1 = x * (2.0 * m + 1.0) * pmm
+    if n == m + 1:
+        return pmmp1
+    pll = 0.0
+    for ll in range(m + 2, n + 1):
+        pll = ((2.0 * ll - 1.0) * x * pmmp1 - (ll + m - 1.0) * pmm) / (ll - m)
+        pmm = pmmp1
+        pmmp1 = pll
+    return pll
+
+
+def sn3d_norm(n, m):
+    m = abs(int(m))
+    return math.sqrt((2.0 if m > 0 else 1.0) * math.factorial(n - m) / math.factorial(n + m))
+
+
+def ambisonic_basis(order, az_deg, el_deg):
+    az = math.radians(float(az_deg))
+    el = math.radians(float(el_deg))
+    z = math.sin(el)
+    values = []
+    for n in range(order + 1):
+        for m in range(-n, n + 1):
+            am = abs(m)
+            p = associated_legendre(n, am, z)
+            norm = sn3d_norm(n, am)
+            if m < 0:
+                y = norm * p * math.sin(am * az)
+            elif m == 0:
+                y = norm * p
+            else:
+                y = norm * p * math.cos(m * az)
+            values.append(y)
+    return values
+
+
+def foafx_layout(order):
+    if order <= 1:
+        return [
+            (0.0, 0.0), (90.0, 0.0), (180.0, 0.0), (-90.0, 0.0),
+            (0.0, 90.0), (0.0, -90.0),
+        ]
+    if order == 2:
+        return [
+            (0.0, 0.0), (45.0, 0.0), (90.0, 0.0), (135.0, 0.0),
+            (180.0, 0.0), (-135.0, 0.0), (-90.0, 0.0), (-45.0, 0.0),
+            (45.0, 45.0), (135.0, 45.0), (-135.0, -45.0), (-45.0, -45.0),
+        ]
+    return [
+        (0.000000, 73.402158), (137.507764, 61.044976), (-84.984472, 52.341538),
+        (52.523292, 45.099472), (-169.968944, 38.682187), (-32.461180, 32.797168),
+        (105.046584, 27.279613), (-117.445652, 22.024313), (20.062112, 16.957763),
+        (157.569876, 12.024699), (-64.922360, 7.180756), (72.585405, 2.388015),
+        (-149.906831, -2.388015), (-12.399067, -7.180756), (125.108697, -12.024699),
+        (-97.383539, -16.957763), (40.124225, -22.024313), (177.631989, -27.279613),
+        (-44.860247, -32.797168), (92.647517, -38.682187), (-129.844719, -45.099472),
+        (7.663045, -52.341538), (145.170809, -61.044976), (-77.321427, -73.402158),
+    ]
+
+
+def unit_from_aed(az_deg, el_deg):
+    az = math.radians(float(az_deg))
+    el = math.radians(float(el_deg))
+    ce = math.cos(el)
+    return np.array([ce * math.cos(az), ce * math.sin(az), math.sin(el)], dtype=np.float64)
+
+
+def wrap_degrees(values):
+    return ((values + 180.0) % 360.0) - 180.0
+
+
+def simple_delay(signal, sample_rate, delay_ms, feedback, damp):
+    delay = max(1, int(round(float(delay_ms) * sample_rate / 1000.0)))
+    out = np.zeros_like(signal, dtype=np.float32)
+    fb = float(np.clip(feedback, 0.0, 0.92))
+    damp = float(np.clip(damp, 0.0, 0.98))
+    state = np.zeros(signal.shape[1], dtype=np.float32)
+    for index in range(signal.shape[0]):
+        dry = signal[index]
+        wet = out[index - delay] if index >= delay else 0.0
+        state = state * damp + wet * (1.0 - damp)
+        out[index] = dry + state * fb
+    return out
+
+
+def one_pole_lowpass(signal, sample_rate, cutoff_hz):
+    cutoff = max(20.0, min(float(cutoff_hz), sample_rate * 0.45))
+    alpha = 1.0 - math.exp(-2.0 * math.pi * cutoff / sample_rate)
+    out = np.empty_like(signal, dtype=np.float32)
+    state = np.zeros(signal.shape[1], dtype=np.float32)
+    for index in range(signal.shape[0]):
+        state += alpha * (signal[index] - state)
+        out[index] = state
+    return out
+
+
+def tremolo_region(signal, sample_rate, rate_hz, depth):
+    depth = float(np.clip(depth, 0.0, 1.0))
+    t = np.arange(signal.shape[0], dtype=np.float32) / float(sample_rate)
+    mod = 1.0 - depth * 0.5 + depth * 0.5 * np.sin(2.0 * math.pi * float(rate_hz) * t)
+    return (signal * mod[:, None]).astype(np.float32)
+
+
+def ringmod_region(signal, sample_rate, freq_hz, depth):
+    depth = float(np.clip(depth, 0.0, 1.0))
+    t = np.arange(signal.shape[0], dtype=np.float32) / float(sample_rate)
+    carrier = np.sin(2.0 * math.pi * float(freq_hz) * t)
+    mod = (1.0 - depth) + depth * carrier
+    return (signal * mod[:, None]).astype(np.float32)
+
+
+def biquad_bandpass(signal, sample_rate, center_hz, q):
+    center = max(20.0, min(float(center_hz), sample_rate * 0.45))
+    q = max(0.1, min(float(q), 20.0))
+    omega = 2.0 * math.pi * center / sample_rate
+    alpha = math.sin(omega) / (2.0 * q)
+    cosw = math.cos(omega)
+    b0 = alpha
+    b1 = 0.0
+    b2 = -alpha
+    a0 = 1.0 + alpha
+    a1 = -2.0 * cosw
+    a2 = 1.0 - alpha
+    b0, b1, b2, a1, a2 = b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0
+    out = np.zeros_like(signal, dtype=np.float32)
+    x1 = np.zeros(signal.shape[1], dtype=np.float32)
+    x2 = np.zeros(signal.shape[1], dtype=np.float32)
+    y1 = np.zeros(signal.shape[1], dtype=np.float32)
+    y2 = np.zeros(signal.shape[1], dtype=np.float32)
+    for index in range(signal.shape[0]):
+        x0 = signal[index]
+        y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+        out[index] = y0
+        x2, x1 = x1, x0
+        y2, y1 = y1, y0
+    return out
+
+
+def comb_resonator(signal, sample_rate, freq_hz, feedback, damp):
+    delay = max(1, int(round(sample_rate / max(20.0, float(freq_hz)))))
+    fb = float(np.clip(feedback, 0.0, 0.96))
+    damp = float(np.clip(damp, 0.0, 0.98))
+    out = np.zeros_like(signal, dtype=np.float32)
+    state = np.zeros(signal.shape[1], dtype=np.float32)
+    for index in range(signal.shape[0]):
+        delayed = out[index - delay] if index >= delay else 0.0
+        state = state * damp + delayed * (1.0 - damp)
+        out[index] = signal[index] + state * fb
+    return out
+
+
+def diffusion_region(signal, sample_rate, base_ms, feedback, damp):
+    out = signal.astype(np.float32, copy=True)
+    channels = signal.shape[1]
+    fb = float(np.clip(feedback, 0.0, 0.9))
+    damp = float(np.clip(damp, 0.0, 0.98))
+    base = max(1, int(round(float(base_ms) * sample_rate / 1000.0)))
+    acc = out.copy()
+    for tap in range(1, 5):
+        delay = base * tap
+        if delay >= signal.shape[0]:
+            continue
+        gain = fb / (tap + 1.0)
+        shifted = np.zeros_like(signal, dtype=np.float32)
+        cross = np.roll(signal[:-delay], tap % max(1, channels), axis=1)
+        shifted[delay:] = cross
+        acc += shifted * gain
+    if damp > 0.0:
+        acc = one_pole_lowpass(acc, sample_rate, sample_rate * (0.08 + 0.34 * (1.0 - damp)))
+    return (acc / max(1.0, 1.0 + fb)).astype(np.float32)
+
+
+def stft_process(signal, fft_size, hop, process_frame):
+    fft_size = int(fft_size)
+    hop = int(hop)
+    window = np.hanning(fft_size).astype(np.float32)
+    pad = fft_size
+    padded = np.pad(signal, ((pad, pad), (0, 0)), mode="constant")
+    out = np.zeros_like(padded, dtype=np.float32)
+    norm = np.zeros(padded.shape[0], dtype=np.float32)
+    frame_count = 1 + max(0, (padded.shape[0] - fft_size) // hop)
+    for frame_index in range(frame_count):
+        start = frame_index * hop
+        frame = padded[start:start + fft_size] * window[:, None]
+        spec = np.fft.rfft(frame, axis=0)
+        new_spec = process_frame(spec, frame_index)
+        resynth = np.fft.irfft(new_spec, n=fft_size, axis=0).real.astype(np.float32)
+        out[start:start + fft_size] += resynth * window[:, None]
+        norm[start:start + fft_size] += window * window
+    out /= np.maximum(norm[:, None], 1e-8)
+    return out[pad:pad + signal.shape[0]].astype(np.float32)
+
+
+def spectral_smear_region(signal, smear_frames, amount):
+    fft_size = 1024
+    hop = 256
+    window = np.hanning(fft_size).astype(np.float32)
+    pad = fft_size
+    padded = np.pad(signal, ((pad, pad), (0, 0)), mode="constant")
+    frame_count = 1 + max(0, (padded.shape[0] - fft_size) // hop)
+    specs = []
+    for frame_index in range(frame_count):
+        start = frame_index * hop
+        specs.append(np.fft.rfft(padded[start:start + fft_size] * window[:, None], axis=0))
+    specs = np.stack(specs, axis=0)
+    mags = np.abs(specs)
+    phase = np.exp(1j * np.angle(specs))
+    radius = max(1, int(round(float(smear_frames))))
+    smooth = np.zeros_like(mags)
+    for index in range(frame_count):
+        lo = max(0, index - radius)
+        hi = min(frame_count, index + radius + 1)
+        smooth[index] = np.mean(mags[lo:hi], axis=0)
+    amount = float(np.clip(amount, 0.0, 1.0))
+    new_specs = ((1.0 - amount) * mags + amount * smooth) * phase
+    out = np.zeros_like(padded, dtype=np.float32)
+    norm = np.zeros(padded.shape[0], dtype=np.float32)
+    for frame_index in range(frame_count):
+        start = frame_index * hop
+        resynth = np.fft.irfft(new_specs[frame_index], n=fft_size, axis=0).real.astype(np.float32)
+        out[start:start + fft_size] += resynth * window[:, None]
+        norm[start:start + fft_size] += window * window
+    out /= np.maximum(norm[:, None], 1e-8)
+    return out[pad:pad + signal.shape[0]].astype(np.float32)
+
+
+def spectral_pitch_shift_region(signal, semitones):
+    ratio = 2.0 ** (float(semitones) / 12.0)
+    fft_size = 2048
+    hop = 512
+    bins = fft_size // 2 + 1
+
+    def shift_frame(spec, _frame_index):
+        shifted = np.zeros_like(spec)
+        for source_bin in range(1, bins):
+            target = source_bin * ratio
+            lo = int(math.floor(target))
+            frac = target - lo
+            if 0 <= lo < bins:
+                shifted[lo] += spec[source_bin] * (1.0 - frac)
+            if 0 <= lo + 1 < bins:
+                shifted[lo + 1] += spec[source_bin] * frac
+        shifted[0] = spec[0]
+        return shifted
+
+    return stft_process(signal, fft_size, hop, shift_frame)
+
+
+def render_foafx_offline(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    order = int(cfg.get("order", 3))
+    order = max(1, min(3, order))
+    ambi_channels = (order + 1) * (order + 1)
+    if audio.shape[1] < ambi_channels:
+        raise RuntimeError(f"Selected item has {audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+    audio = audio[:, :ambi_channels].astype(np.float32, copy=False)
+    frames = audio.shape[0]
+    layout = foafx_layout(order)
+    basis = np.array([ambisonic_basis(order, az, el) for az, el in layout], dtype=np.float64)
+    decode = basis.T
+    encode = np.linalg.pinv(basis).T
+    virtual = (audio.astype(np.float64) @ decode).astype(np.float32)
+
+    effect = str(cfg.get("effect", "gain"))
+    effect_gain = float(cfg.get("effect_gain", 1.0))
+    if effect == "tremolo":
+        rate_hz = float(cfg.get("tremolo_rate", cfg.get("effect_param", 4.0)))
+        processed = tremolo_region(virtual, sample_rate, rate_hz, min(1.0, max(0.0, effect_gain))).astype(np.float32)
+    elif effect == "ringmod":
+        freq_hz = float(cfg.get("ring_hz", cfg.get("effect_param", 90.0)))
+        processed = ringmod_region(virtual, sample_rate, freq_hz, min(1.0, max(0.0, effect_gain))).astype(np.float32)
+    elif effect == "saturation":
+        drive = max(0.01, float(cfg.get("drive", cfg.get("effect_param", 2.0))))
+        processed = np.tanh(virtual * drive) / math.tanh(drive)
+        processed = (processed * effect_gain).astype(np.float32)
+    elif effect == "delay":
+        delay_ms = float(cfg.get("delay_ms", cfg.get("effect_param", 120.0)))
+        feedback = float(cfg.get("feedback", 0.28))
+        damp = float(cfg.get("damp", 0.45))
+        processed = simple_delay(virtual, sample_rate, delay_ms, feedback, damp)
+        processed = (processed * effect_gain).astype(np.float32)
+    elif effect == "bandpass":
+        center = float(cfg.get("center_hz", cfg.get("effect_param", 1200.0)))
+        q = 0.65 + max(0.0, effect_gain) * 2.6
+        processed = biquad_bandpass(virtual, sample_rate, center, q).astype(np.float32)
+    elif effect == "comb":
+        freq = float(cfg.get("reson_hz", cfg.get("effect_param", 220.0)))
+        feedback = float(cfg.get("feedback", 0.28))
+        damp = float(cfg.get("damp", 0.45))
+        processed = comb_resonator(virtual, sample_rate, freq, feedback, damp)
+        processed = (processed * effect_gain).astype(np.float32)
+    elif effect == "diffusion":
+        diffusion_ms = float(cfg.get("diffusion_ms", cfg.get("effect_param", 18.0)))
+        feedback = float(cfg.get("feedback", 0.28))
+        damp = float(cfg.get("damp", 0.45))
+        processed = diffusion_region(virtual, sample_rate, diffusion_ms, feedback, damp)
+        processed = (processed * effect_gain).astype(np.float32)
+    elif effect == "spectral_smear":
+        smear_frames = float(cfg.get("smear_frames", cfg.get("effect_param", 8.0)))
+        processed = spectral_smear_region(virtual, smear_frames, min(1.0, max(0.0, effect_gain))).astype(np.float32)
+    elif effect == "pitch_shift":
+        semitones = float(cfg.get("pitch_semitones", cfg.get("effect_param", 7.0)))
+        processed = spectral_pitch_shift_region(virtual, semitones)
+        processed = (processed * effect_gain).astype(np.float32)
+    elif effect == "filter":
+        cutoff = float(cfg.get("cutoff_hz", cfg.get("effect_param", 1200.0)))
+        processed = one_pole_lowpass(virtual, sample_rate, cutoff)
+        processed = (processed * effect_gain).astype(np.float32)
+    else:
+        focus_boost = float(cfg.get("effect_param", 1.0))
+        processed = (virtual * effect_gain * focus_boost).astype(np.float32)
+
+    focus_width = env_array(cfg, "focus_width", frames, float(cfg.get("focus_width", 38.0)))
+    wet_amount = env_array(cfg, "wet", frames, float(cfg.get("wet", 1.0)))
+    dry_atten = env_array(cfg, "dry_attenuation", frames, float(cfg.get("dry_attenuation", 0.18)))
+    az_env = env_array(cfg, "azimuth", frames, float(cfg.get("azimuth", 0.0)))
+    el_env = env_array(cfg, "elevation", frames, float(cfg.get("elevation", 0.0)))
+    amp_env = env_array(cfg, "amplitude", frames, float(cfg.get("amplitude", 1.0)))
+
+    directions = np.array([unit_from_aed(az, el) for az, el in layout], dtype=np.float64)
+    rendered = np.empty_like(virtual, dtype=np.float32)
+    block = 2048
+    for start in range(0, frames, block):
+        end = min(frames, start + block)
+        count = end - start
+        focus = np.stack([unit_from_aed(az_env[start + i], el_env[start + i]) for i in range(count)], axis=0)
+        cosang = np.clip(focus @ directions.T, -1.0, 1.0)
+        angle = np.degrees(np.arccos(cosang))
+        width = np.maximum(2.0, focus_width[start:end])[:, None]
+        mask = np.exp(-0.5 * (angle / width) ** 2).astype(np.float32)
+        mask = np.clip(mask, 0.0, 1.0)
+        wet = wet_amount[start:end, None].astype(np.float32)
+        dry = np.clip(dry_atten[start:end, None], 0.0, 1.0).astype(np.float32)
+        amp = amp_env[start:end, None].astype(np.float32)
+        dry_gain = 1.0 - mask * (1.0 - dry)
+        rendered[start:end] = (virtual[start:end] * dry_gain + processed[start:end] * mask * wet) * amp
+
+    out = (rendered.astype(np.float64) @ encode).astype(np.float32)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("soft_limit", True)):
+        peak = float(np.max(np.abs(out))) if out.size else 0.0
+        if peak > 1.0:
+            ceiling = 0.92
+            out = (ceiling * np.tanh(out / ceiling)).astype(np.float32)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print(f"Ambisonic order: {order}OA")
+    print(f"Ambisonic channels: {ambi_channels}")
+    print(f"Virtual speakers: {len(layout)}")
+    print(f"Effect: {effect}")
+    print(f"Dry attenuation at focus: {float(cfg.get('dry_attenuation', 0.18)):.3f}")
+    print(f"Focus width: {float(cfg.get('focus_width', 38.0)):.2f} deg")
+    print(f"Wet amount: {float(cfg.get('wet', 1.0)):.3f}")
+    print(f"Output channels: {ambi_channels}")
+    print(f"Sample rate: {sample_rate} Hz")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|foafx_offline> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -1462,6 +1839,8 @@ def main():
         render_partial_trace_resynth(cfg)
     elif mode == "fata_morgana":
         render_fata_morgana(cfg)
+    elif mode == "foafx_offline":
+        render_foafx_offline(cfg)
     else:
         raise RuntimeError(f"Unknown render mode: {mode}")
 

@@ -78,6 +78,8 @@ modulation afterward.
   to 8 mono sources, driven by two automatable controls.
 - `25ch VBAP Dome Panner`: nearest-region vector-style panning for up to 8 mono
   sources across the 25-speaker dome.
+- `3OAFX Offline Renderer`: NumPy-backed ambisonic decode/process/re-encode
+  action for 1OA, 2OA, and 3OA media, with moving AED focus and dry attenuation.
 - `3OAFX Send Return Controller`: places a 24-channel insert lane inside an
   ambisonic decode/encode chain.
 - `Spatial Automation Composer`: previews algorithmic AED or XYZ motion, then
