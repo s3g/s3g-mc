@@ -92,6 +92,11 @@ spatially selected wet path, then recombine or re-encode the result. In
 speaker layout, and a REAPER workflow built around JSFX lanes, plugin pinning,
 and an ImGui controller.
 
+There is also a NumPy-backed offline renderer, `3OAFX Offline Renderer.lua`.
+It works directly from a selected ACN/SN3D ambisonic media item, supports 1OA,
+2OA, and 3OA, and writes a new ambisonic item with the selected focus movement,
+dry attenuation, and regional effect baked into the render.
+
 ### Required Files
 
 JSFX install to:
