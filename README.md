@@ -92,7 +92,8 @@ the RISD Studio for Research in Sound & Technology (SRST). They include a
 same array, giving composers room to compare and work with different spatial
 behaviors.
 
-See the 3OA / SPARTA setup section for the ambisonic send/return workflow.
+See the <a href="https://s3g.github.io/s3g-mc/workflows.html#3oafx" target="_blank" rel="noopener noreferrer">3OAFX workflow docs</a>
+for the ambisonic send/return workflow.
 
 ### Spectral / Convolution
 
@@ -234,48 +235,6 @@ In REAPER:
 5. Click `Install/refresh actions` in the browser.
 
 If the JSFX do not appear, rescan JSFX or restart REAPER.
-
-## 3OA / SPARTA Setup
-
-The 3OA workflow uses a 72-channel REAPER track:
-
-- `1-24`: wet/effect lane
-- `25-48`: protected dry copy
-- `49-72`: return mask lane
-
-Use this plugin order:
-
-1. SPARTA AmbiDEC
-2. `JS: s3g 3OA Send`
-3. one 24-channel insert effect
-4. `JS: s3g 3OA Return Mask`
-5. `JS: s3g 3OA Mixer`
-6. SPARTA AmbiENC
-
-Recommended SPARTA settings:
-
-- Ambisonic order: `3rd order`
-- Channel ordering: `ACN`
-- Normalization: `SN3D`
-- AmbiDEC decoder mode: `MMD` / multi-mode decoder
-- Number of virtual speaker/source points: `24`
-
-Load the included JSON layouts:
-
-- In SPARTA AmbiDEC, load
-  `Scripts/s3g-mc/sparta_json/s3g_3oa_24_virtual_speakers_ambidec_loudspeaker_layout.json`
-  as the 24-point loudspeaker layout.
-- In SPARTA AmbiENC, load
-  `Scripts/s3g-mc/sparta_json/s3g_3oa_24_virtual_speakers_ambienc_source_layout.json`
-  as the matching 24-point source layout.
-
-`MMD` is recommended for AmbiDEC here because the workflow decodes to a custom
-irregular 24-point virtual speaker cloud before re-encoding.
-
-After adding or moving the 24-channel insert, use the controller's `Pin inserts
-1-24` button so the effect only touches the wet/effect lane.
-
-More detail is in `Scripts/s3g-mc/s3g_3oa_fx_workflow.md`.
 
 ## License
 
