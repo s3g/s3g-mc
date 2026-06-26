@@ -704,7 +704,7 @@ local function loop()
         if ImGui.CollapsingHeader(ctx, "Global", nil, ImGui.TreeNodeFlags_DefaultOpen) then
           slider_double(track, fx, "XYZ spread radius", PARAM.spread, 0.05, 4, "%.2f")
           slider_double(track, fx, "Focus amount", PARAM.focus, 0, 1, "%.2f")
-          slider_double(track, fx, "Position smoothing", PARAM.smoothing, 1, 250, "%.0f ms")
+          slider_double(track, fx, "Motion smoothing", PARAM.smoothing, 1, 250, "%.0f ms")
           slider_double(track, fx, "Global X offset", PARAM.global_x, -GLOBAL_OFFSET_LIMIT, GLOBAL_OFFSET_LIMIT, "%.2f")
           slider_double(track, fx, "Global Y offset", PARAM.global_y, -GLOBAL_OFFSET_LIMIT, GLOBAL_OFFSET_LIMIT, "%.2f")
           slider_double(track, fx, "Global Z offset", PARAM.global_z, -GLOBAL_OFFSET_LIMIT, GLOBAL_OFFSET_LIMIT, "%.2f")

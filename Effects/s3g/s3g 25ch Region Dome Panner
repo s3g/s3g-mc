@@ -3,7 +3,7 @@ tags: multichannel spatial Region dome panner
 
 slider1:1<0.25,4,0.01>Region sharpness
 slider2:6<0,48,0.1>Distance rolloff (dB/oct)
-slider3:35<1,250,1>Distance smoothing (ms)
+slider3:35<1,250,1>Motion smoothing (ms)
 slider4:0<-360,360,0.1>Global azimuth (deg)
 slider5:0<0,90,0.1>Global elevation (deg)
 slider6:0<-3,3,0.01>Global distance offset (dome radius)
@@ -134,6 +134,7 @@ src_depth = 960;
 src_width = 1024;
 constel_bits = 1088;
 constel_closed = 1152;
+smooth_gain = 1216;
 
 spk_az[0] = 30;   spk_el[0] = 0;    spk_layer[0] = 1; spk_step[0] = 30;
 spk_az[1] = 60;   spk_el[1] = 0;    spk_layer[1] = 1; spk_step[1] = 30;
@@ -167,6 +168,12 @@ spk_az[24] = 0; spk_el[24] = 90; spk_layer[24] = 4; spk_step[24] = 0;
 i = 0;
 loop(NUM_SOURCES,
   dist_z[i] = 1;
+  i += 1;
+);
+
+i = 0;
+loop(NUM_SOURCES * NUM_SPEAKERS,
+  smooth_gain[i] = 0;
   i += 1;
 );
 
@@ -373,6 +380,7 @@ global_el = max(0, min(90, slider5));
 global_dist = slider6;
 out_gain = 10 ^ (slider7 / 20);
 distance_coef = exp(-1000 / (distance_smoothing_ms * srate));
+gain_coef = exp(-1000 / (distance_smoothing_ms * srate));
 
 src_az[0] = slider10; src_el[0] = slider11; src_dist[0] = slider12;
 src_az[1] = slider13; src_el[1] = slider14; src_dist[1] = slider15;
@@ -441,10 +449,13 @@ loop(NUM_SOURCES,
     );
 
     scale = scale < EPS ? 1 : sqrt(scale);
-    weighted = input * src_level[src] * source_amp / scale;
+    weighted = input * src_level[src] * source_amp;
     spk = 0;
     loop(NUM_SPEAKERS,
-      mix[spk] += weighted * src_gain[spk];
+      target_gain = src_gain[spk] / scale;
+      gain_index = src * NUM_SPEAKERS + spk;
+      smooth_gain[gain_index] = target_gain + (smooth_gain[gain_index] - target_gain) * gain_coef;
+      mix[spk] += weighted * smooth_gain[gain_index];
       spk += 1;
     );
   );

@@ -736,7 +736,7 @@ local function loop()
         if ImGui.CollapsingHeader(ctx, "Global", nil, ImGui.TreeNodeFlags_DefaultOpen) then
           slider_double(track, fx, "Cosine focus", PARAM.sharpness, 0.25, 4, "%.2f")
           slider_double(track, fx, "Distance rolloff", PARAM.rolloff, 0, 48, "%.1f dB/oct")
-          slider_double(track, fx, "Distance smoothing", PARAM.smoothing, 1, 250, "%.0f ms")
+          slider_double(track, fx, "Motion smoothing", PARAM.smoothing, 1, 250, "%.0f ms")
           slider_double(track, fx, "Global azimuth (deg)", PARAM.global_az, -360, 360, "%.1f")
           slider_double(track, fx, "Global elevation (deg)", PARAM.global_el, 0, 90, "%.1f")
           slider_double(track, fx, "Global distance offset (dome radius)", PARAM.global_dist, -3, 3, "%.2f")
