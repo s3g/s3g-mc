@@ -1770,6 +1770,7 @@ def render_foafx_offline(cfg):
     focus_width = env_array(cfg, "focus_width", frames, float(cfg.get("focus_width", 38.0)))
     focus_sharpness = env_array(cfg, "focus_sharpness", frames, float(cfg.get("focus_sharpness", 0.65)))
     wet_amount = env_array(cfg, "wet", frames, float(cfg.get("wet", 1.0)))
+    dry_level = env_array(cfg, "dry_level", frames, float(cfg.get("dry_level", 0.65)))
     dry_atten = env_array(cfg, "dry_attenuation", frames, float(cfg.get("dry_attenuation", 0.18)))
     az_env = env_array(cfg, "azimuth", frames, float(cfg.get("azimuth", 0.0)))
     el_env = env_array(cfg, "elevation", frames, float(cfg.get("elevation", 0.0)))
@@ -1791,10 +1792,11 @@ def render_foafx_offline(cfg):
         mask = mask ** (1.0 + sharpness * 5.0)
         mask = np.clip(mask, 0.0, 1.0)
         wet = wet_amount[start:end, None].astype(np.float32)
+        dry_trim = np.clip(dry_level[start:end, None], 0.0, 1.5).astype(np.float32)
         dry = np.clip(dry_atten[start:end, None], 0.0, 1.0).astype(np.float32)
         amp = amp_env[start:end, None].astype(np.float32)
         dry_gain = 1.0 - mask * (1.0 - dry)
-        dry_virtual = virtual[start:end] * dry_gain
+        dry_virtual = virtual[start:end] * dry_gain * dry_trim
         if move_wet_on_array:
             wet_feed = np.sum(processed[start:end], axis=1, keepdims=True) / math.sqrt(len(layout))
             moved_wet_virtual = wet_feed * mask * wet
@@ -1822,7 +1824,8 @@ def render_foafx_offline(cfg):
     print(f"Ambisonic channels: {ambi_channels}")
     print(f"Virtual speakers: {len(layout)}")
     print(f"Effect: {effect}")
-    print(f"Dry attenuation at focus: {float(cfg.get('dry_attenuation', 0.18)):.3f}")
+    print(f"Dry level: {float(cfg.get('dry_level', 0.65)):.3f}")
+    print(f"Dry remaining at focus: {float(cfg.get('dry_attenuation', 0.18)):.3f}")
     print(f"Focus width: {float(cfg.get('focus_width', 38.0)):.2f} deg")
     print(f"Focus sharpness: {float(cfg.get('focus_sharpness', 0.65)):.3f}")
     print(f"Wet amount: {float(cfg.get('wet', 1.0)):.3f}")

@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category Spatial / HOA
 -- @render Yes; NumPy-backed offline ambisonic decode/process/re-encode render.
--- @method Select one ACN/SN3D ambisonic media item. The renderer decodes 1OA, 2OA, or 3OA to an order-specific virtual speaker layer, applies a moving AED focus with 3OAFX-style dry attenuation, then re-encodes a new ambisonic item.
+-- @method Select one ACN/SN3D ambisonic media item. The renderer decodes 1OA, 2OA, or 3OA to an order-specific virtual speaker layer, applies a moving AED focus with 3OAFX-style dry control, then re-encodes a new ambisonic item.
 
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
@@ -71,7 +71,8 @@ local ENV_DEFS = {
   { key = "focus_width", label = "Focus width", min = 2.0, max = 140.0, default = 38.0, fmt = "%.1f deg" },
   { key = "focus_sharpness", label = "Focus sharpness", min = 0.0, max = 1.0, default = 0.65, fmt = "%.2f" },
   { key = "wet", label = "Wet amount", min = 0.0, max = 2.0, default = 1.0, fmt = "%.2f" },
-  { key = "dry_attenuation", label = "Dry attenuation", min = 0.0, max = 1.0, default = 0.18, fmt = "%.2f" },
+  { key = "dry_level", label = "Dry level", min = 0.0, max = 1.5, default = 0.65, fmt = "%.2f" },
+  { key = "dry_attenuation", label = "Dry remaining at focus", min = 0.0, max = 1.0, default = 0.18, fmt = "%.2f" },
   { key = "amplitude", label = "Output amp", min = 0.0, max = 1.5, default = 1.0, fmt = "%.2f" },
 }
 
@@ -265,14 +266,15 @@ local function draw_preview(settings, env_points, env_enabled, entry)
     local el = sample_env_value("elevation", t, settings, env_points, env_enabled)
     local fw = sample_env_value("focus_width", t, settings, env_points, env_enabled)
     local wet = sample_env_value("wet", t, settings, env_points, env_enabled)
+    local dry_level = sample_env_value("dry_level", t, settings, env_points, env_enabled)
     local dry = sample_env_value("dry_attenuation", t, settings, env_points, env_enabled)
     local amp = sample_env_value("amplitude", t, settings, env_points, env_enabled)
     local sharp = sample_env_value("focus_sharpness", t, settings, env_points, env_enabled)
     local px, py = project_aed(az, el, cx, cy, radius)
-    path[#path + 1] = { x = px, y = py, az = az, el = el, width = fw, wet = wet, dry = dry, amp = amp, sharp = sharp, t = t }
+    path[#path + 1] = { x = px, y = py, az = az, el = el, width = fw, wet = wet, dry_level = dry_level, dry = dry, amp = amp, sharp = sharp, t = t }
     for speaker_index, speaker in ipairs(layout) do
       local mask = focus_mask_for_speaker(az, el, fw, sharp, speaker)
-      local changed_energy = mask * amp * (math.max(0, wet) + math.max(0, 1.0 - dry))
+      local changed_energy = mask * amp * (math.max(0, wet) + math.max(0, dry_level) * math.max(0, 1.0 - dry))
       local stat = speaker_energy[speaker_index]
       stat.sum = stat.sum + changed_energy
       stat.peak = math.max(stat.peak, changed_energy)
@@ -344,7 +346,7 @@ local function draw_preview(settings, env_points, env_enabled, entry)
     end
   end
   draw_strip("wet", strip_y0, "wet", COLOR_WET, 0.0, 2.0)
-  draw_strip("dry duck", strip_y0 + 34, "dry_attenuation", COLOR_DRY, 0.0, 1.0)
+  draw_strip("dry focus", strip_y0 + 34, "dry_attenuation", COLOR_DRY, 0.0, 1.0)
   draw_strip("width", strip_y0 + 68, "focus_width", COLOR_WIDTH, 2.0, 140.0)
   draw_strip("sharp", strip_y0 + 102, "focus_sharpness", COLOR_SHARP, 0.0, 1.0)
 
@@ -382,6 +384,7 @@ local function render(entry, settings, env_points, env_enabled)
     focus_width = settings.focus_width,
     focus_sharpness = settings.focus_sharpness,
     wet = settings.wet,
+    dry_level = settings.dry_level,
     move_wet_on_array = settings.move_wet_on_array,
     dry_attenuation = settings.dry_attenuation,
     amplitude = settings.amplitude,
@@ -419,7 +422,8 @@ local function render(entry, settings, env_points, env_enabled)
     "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. "ch)",
     "Order: " .. ORDER_NAMES[settings.order_index],
     "Effect: " .. (EFFECT_NAMES[settings.effect_index] or "Focus gain"),
-    "Dry attenuation at focus: " .. string.format("%.2f", settings.dry_attenuation),
+    "Dry level: " .. string.format("%.2f", settings.dry_level),
+    "Dry remaining at focus: " .. string.format("%.2f", settings.dry_attenuation),
     "Output: " .. output_path,
     "NumPy time: " .. string.format("%.2f sec", elapsed),
     log,
@@ -442,6 +446,7 @@ function main()
     focus_width = get_number("focus_width", 38.0),
     focus_sharpness = get_number("focus_sharpness", 0.65),
     wet = get_number("wet", 1.0),
+    dry_level = get_number("dry_level", 0.65),
     move_wet_on_array = reaper.GetExtState(EXT, "move_wet_on_array") ~= "0",
     dry_attenuation = get_number("dry_attenuation", 0.18),
     amplitude = get_number("amplitude", 1.0),
@@ -493,8 +498,9 @@ function main()
       changed, settings.focus_width = ImGui.SliderDouble(ctx, "Focus width", settings.focus_width, 2.0, 140.0, "%.1f deg")
       changed, settings.focus_sharpness = ImGui.SliderDouble(ctx, "Focus sharpness", settings.focus_sharpness, 0.0, 1.0, "%.2f")
       changed, settings.wet = ImGui.SliderDouble(ctx, "Wet amount", settings.wet, 0.0, 2.0, "%.2f")
+      changed, settings.dry_level = ImGui.SliderDouble(ctx, "Dry level", settings.dry_level, 0.0, 1.5, "%.2f")
       changed, settings.move_wet_on_array = ImGui.Checkbox(ctx, "Move wet across virtual speaker array", settings.move_wet_on_array)
-      changed, settings.dry_attenuation = ImGui.SliderDouble(ctx, "Dry attenuation at focus", settings.dry_attenuation, 0.0, 1.0, "%.2f")
+      changed, settings.dry_attenuation = ImGui.SliderDouble(ctx, "Dry remaining at focus", settings.dry_attenuation, 0.0, 1.0, "%.2f")
       changed, settings.amplitude = ImGui.SliderDouble(ctx, "Output amp", settings.amplitude, 0.0, 1.5, "%.2f")
       changed, settings.effect_gain = ImGui.SliderDouble(ctx, "Effect amount / gain", settings.effect_gain, 0.0, 2.5, "%.2f")
       local pmin, pmax, pfmt = effect_param_range(settings.effect_index)
@@ -512,7 +518,7 @@ function main()
       ImGui.SameLine(ctx)
       changed, settings.soft_limit = ImGui.Checkbox(ctx, "Soft limit", settings.soft_limit)
       ImGui.Separator(ctx)
-      ImGui.Text(ctx, "Dry attenuation is always part of the render: the focus region ducks the dry decode before the effected region is re-encoded.")
+      ImGui.Text(ctx, "Dry remaining at focus sets how much dry signal stays under the moving effect mask before re-encoding.")
       draw_preview(settings, env_points, env_enabled, entry)
       ImGui.Separator(ctx)
       selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
