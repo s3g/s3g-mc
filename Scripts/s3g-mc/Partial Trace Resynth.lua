@@ -233,13 +233,16 @@ local function main()
   local should_render = false
   local selected_env = 1
   local selected_env_point = nil
-  local env_opts = { height = 150, overview_lane_h = 58, random_amount = 0.35, random_count = 12, random_dispersion = 0.25, random_smooth = true }
+  local env_opts = { height = 150, overview_lane_h = 58, random_amount = 0.35, random_count = 12, random_dispersion = 0.25, random_smooth = true, collapse_editor = true, compact_window_h = 1040, expanded_window_h = 1180 }
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 760, 980, WINDOW_OPEN_COND)
+    ImGui.SetNextWindowSize(ctx, 800, env_opts._editor_was_open and env_opts.expanded_window_h or env_opts.compact_window_h, ImGui.Cond_Always)
     local visible
     visible, open = ImGui.Begin(ctx, "Partial Trace Resynth", open)
     if visible then
+      local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+      local control_h = math.max(260, (avail_h or env_opts.compact_window_h) - 44)
+      if ImGui.BeginChild(ctx, "##partial_trace_controls", 0, control_h) then
       ImGui.Text(ctx, "Source: " .. (entry.name or entry.filename))
       local changed
       changed, settings.duration = ImGui.SliderDouble(ctx, "Render duration sec", settings.duration, 0.1, 300.0, "%.2f")
@@ -278,6 +281,8 @@ local function main()
       ImGui.Separator(ctx)
       selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
         selected_env_point, settings, env_opts)
+        ImGui.EndChild(ctx)
+      end
       if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
       ImGui.SameLine(ctx)
       if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end

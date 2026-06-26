@@ -10,14 +10,14 @@ local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local tex = dofile(script_dir .. "Multichannel Texture Library.lua")
 local mc = tex.mc
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 
 local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
-  local ok, input = reaper.GetUserInputs("Zigzag channel walker", 5,
+  input_dialog.prompt_csv("Zigzag channel walker",
     "Slices,Output channels,Source channel,Read 1=forward 2=reverse order,Fade sec",
-    "32,8,1,1,0.005")
-  if not ok then return end
+    "32,8,1,1,0.005", function(input)
   local slices_text, out_text, source_text, read_text, fade_text =
     input:match("^%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*$")
   if not slices_text then mc.show_error("Enter five comma-separated values.") return end
@@ -46,6 +46,7 @@ local function main()
     }
   end
   tex.render_events(item, output_channels, events, "Zigzag channel walker", { mute_source_item = true })
+  end)
 end
 
 main()

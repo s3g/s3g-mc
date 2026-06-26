@@ -646,7 +646,7 @@ local function main()
   local should_render = false
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 520, 330, ImGui.Cond_FirstUseEver)
+    ImGui.SetNextWindowSize(ctx, 560, 440, ImGui.Cond_FirstUseEver)
     local visible
     visible, open = ImGui.Begin(ctx, "Convolve selected items", open)
     if visible then

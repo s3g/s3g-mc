@@ -840,7 +840,7 @@ local function main()
   reset_density_points(density_points, "flat")
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 560, 650, ImGui.Cond_FirstUseEver)
+    ImGui.SetNextWindowSize(ctx, 640, 860, ImGui.Cond_FirstUseEver)
     local visible
     visible, open = ImGui.Begin(ctx, "Scatter Slices", open)
 
@@ -850,41 +850,49 @@ local function main()
       ImGui.Spacing(ctx)
 
       local changed
-      changed, target_duration = ImGui.SliderDouble(ctx, "Target duration sec", target_duration, 0.1, math.max(0.1, total_length * 4), "%.3f")
-      changed, output_channels = ImGui.SliderInt(ctx, "Output channels", output_channels, 2, mc.MAX_REAPER_TRACK_CHANNELS)
-      changed, slice_mode = draw_combo(ctx, "Slice source", slice_mode, SLICE_NAMES, SLICE_EQUAL, SLICE_MARKERS)
-      if slice_mode == SLICE_EQUAL then
-        changed, equal_count = ImGui.SliderInt(ctx, "Equal slices per item", equal_count, 2, 256)
-      else
-        ImGui.Text(ctx, "Uses project markers and active-take markers inside each item.")
+      if ImGui.CollapsingHeader(ctx, "Render Setup", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        changed, target_duration = ImGui.SliderDouble(ctx, "Target duration sec", target_duration, 0.1, math.max(0.1, total_length * 4), "%.3f")
+        changed, output_channels = ImGui.SliderInt(ctx, "Output channels", output_channels, 2, mc.MAX_REAPER_TRACK_CHANNELS)
       end
-      changed, source_mode = draw_combo(ctx, "Source channels", source_mode, SOURCE_NAMES, SOURCE_ALL_CHANNELS, SOURCE_ONE_CHANNEL)
-      if source_mode == SOURCE_ONE_CHANNEL then
-        changed, one_channel = ImGui.SliderInt(ctx, "Source channel", one_channel, 1, max_channels)
+      if ImGui.CollapsingHeader(ctx, "Slice Source", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        changed, slice_mode = draw_combo(ctx, "Slice source", slice_mode, SLICE_NAMES, SLICE_EQUAL, SLICE_MARKERS)
+        if slice_mode == SLICE_EQUAL then
+          changed, equal_count = ImGui.SliderInt(ctx, "Equal slices per item", equal_count, 2, 256)
+        else
+          ImGui.Text(ctx, "Uses project markers and active-take markers inside each item.")
+        end
+        changed, source_mode = draw_combo(ctx, "Source channels", source_mode, SOURCE_NAMES, SOURCE_ALL_CHANNELS, SOURCE_ONE_CHANNEL)
+        if source_mode == SOURCE_ONE_CHANNEL then
+          changed, one_channel = ImGui.SliderInt(ctx, "Source channel", one_channel, 1, max_channels)
+        end
       end
-      changed, arrange_mode = draw_combo(ctx, "Arrangement", arrange_mode, ARRANGE_NAMES, ARRANGE_SCATTER, ARRANGE_REPEATER)
-      changed, shape_mode = draw_combo(ctx, "Arrangement shape", shape_mode, SHAPE_NAMES, SHAPE_FREE, SHAPE_REVERSE_PULL)
-      if arrange_mode ~= ARRANGE_SCATTER or channel_motion > 0 then
-        changed, path_mode = draw_combo(ctx, "Channel path", path_mode, PATH_NAMES, PATH_CLOCKWISE, PATH_RANDOM)
+      if ImGui.CollapsingHeader(ctx, "Arrangement", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        changed, arrange_mode = draw_combo(ctx, "Arrangement", arrange_mode, ARRANGE_NAMES, ARRANGE_SCATTER, ARRANGE_REPEATER)
+        changed, shape_mode = draw_combo(ctx, "Arrangement shape", shape_mode, SHAPE_NAMES, SHAPE_FREE, SHAPE_REVERSE_PULL)
+        if arrange_mode ~= ARRANGE_SCATTER or channel_motion > 0 then
+          changed, path_mode = draw_combo(ctx, "Channel path", path_mode, PATH_NAMES, PATH_CLOCKWISE, PATH_RANDOM)
+        end
+        changed, spread_width = ImGui.SliderInt(ctx, "Smear width", spread_width, 1, math.min(output_channels, 32))
+        changed, channel_motion = ImGui.SliderDouble(ctx, "Channel motion", channel_motion, 0, 1, "%.2f")
+        if arrange_mode == ARRANGE_STUTTER then
+          changed, stutter_repeats = ImGui.SliderInt(ctx, "Stutter repeats", stutter_repeats, 1, 32)
+          changed, stutter_gap = ImGui.SliderDouble(ctx, "Stutter gap sec", stutter_gap, 0, 1, "%.3f")
+          changed, decay = ImGui.SliderDouble(ctx, "Repeat decay", decay, 0, 1, "%.2f")
+        elseif arrange_mode == ARRANGE_REPEATER then
+          changed, repeater_repeats = ImGui.SliderInt(ctx, "Repeater copies", repeater_repeats, 1, 32)
+          changed, repeater_spacing = ImGui.SliderDouble(ctx, "Repeater spacing sec", repeater_spacing, 0, 2, "%.3f")
+          changed, decay = ImGui.SliderDouble(ctx, "Repeat decay", decay, 0, 1, "%.2f")
+        end
+        changed, scatter = ImGui.SliderDouble(ctx, "Scatter", scatter, 0, 1, "%.2f")
+        changed, fade = ImGui.SliderDouble(ctx, "Fade seconds", fade, 0, 0.1, "%.4f")
+        changed, zero_window = ImGui.SliderDouble(ctx, "Zero-cross search", zero_window, 0, 0.02, "%.4f")
+        changed, seed = ImGui.InputInt(ctx, "Seed (0=random)", seed)
       end
-      changed, spread_width = ImGui.SliderInt(ctx, "Smear width", spread_width, 1, math.min(output_channels, 32))
-      changed, channel_motion = ImGui.SliderDouble(ctx, "Channel motion", channel_motion, 0, 1, "%.2f")
-      if arrange_mode == ARRANGE_STUTTER then
-        changed, stutter_repeats = ImGui.SliderInt(ctx, "Stutter repeats", stutter_repeats, 1, 32)
-        changed, stutter_gap = ImGui.SliderDouble(ctx, "Stutter gap sec", stutter_gap, 0, 1, "%.3f")
-        changed, decay = ImGui.SliderDouble(ctx, "Repeat decay", decay, 0, 1, "%.2f")
-      elseif arrange_mode == ARRANGE_REPEATER then
-        changed, repeater_repeats = ImGui.SliderInt(ctx, "Repeater copies", repeater_repeats, 1, 32)
-        changed, repeater_spacing = ImGui.SliderDouble(ctx, "Repeater spacing sec", repeater_spacing, 0, 2, "%.3f")
-        changed, decay = ImGui.SliderDouble(ctx, "Repeat decay", decay, 0, 1, "%.2f")
+      if ImGui.CollapsingHeader(ctx, "Density Envelope", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        ImGui.Spacing(ctx)
+        selected_density_point = draw_density_editor(ctx, density_points, selected_density_point)
+        changed, density_contrast = ImGui.SliderDouble(ctx, "Density contrast", density_contrast, 0, 4, "%.2f")
       end
-      changed, scatter = ImGui.SliderDouble(ctx, "Scatter", scatter, 0, 1, "%.2f")
-      changed, fade = ImGui.SliderDouble(ctx, "Fade seconds", fade, 0, 0.1, "%.4f")
-      changed, zero_window = ImGui.SliderDouble(ctx, "Zero-cross search", zero_window, 0, 0.02, "%.4f")
-      changed, seed = ImGui.InputInt(ctx, "Seed (0=random)", seed)
-      ImGui.Spacing(ctx)
-      selected_density_point = draw_density_editor(ctx, density_points, selected_density_point)
-      changed, density_contrast = ImGui.SliderDouble(ctx, "Density contrast", density_contrast, 0, 4, "%.2f")
 
       ImGui.Spacing(ctx)
       ImGui.Separator(ctx)

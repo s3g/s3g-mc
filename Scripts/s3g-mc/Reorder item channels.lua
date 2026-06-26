@@ -12,6 +12,7 @@
 local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local mc = dofile(script_dir .. "Multichannel Library.lua")
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 local MUTE_SOURCE_ITEM_AFTER_RENDER = true
 
 local function main()
@@ -19,9 +20,7 @@ local function main()
   if not item then return end
 
   local default_map = table.concat(mc.identity_map(channel_count), " ")
-  local ok, input = reaper.GetUserInputs("Reorder multichannel item", 1,
-    "Output channels use input channels", default_map)
-  if not ok then return end
+  input_dialog.prompt_csv("Reorder item channels", "Output channels use input channels", default_map, function(input)
 
   local channel_map, err = mc.parse_channel_map(input, channel_count, true)
   if not channel_map then
@@ -45,6 +44,7 @@ local function main()
   else
     reaper.ShowConsoleMsg("Built routing, but REAPER did not report a new rendered stem track.\n")
   end
+  end)
 end
 
 main()

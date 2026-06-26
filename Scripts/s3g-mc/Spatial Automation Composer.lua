@@ -436,7 +436,7 @@ local function draw_preview(spec, start_pos, end_pos)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 760, 720, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 820, 860, ImGui.Cond_FirstUseEver)
   local visible
   visible, open = ImGui.Begin(ctx, "Spatial Automation Composer", open)
   if visible then

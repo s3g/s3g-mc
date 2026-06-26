@@ -10,6 +10,7 @@ local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local tex = dofile(script_dir .. "Multichannel Texture Library.lua")
 local mc = tex.mc
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 
 local function reflect(value, lo, hi)
   if hi <= lo then return lo end
@@ -27,10 +28,9 @@ local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
 
-  local ok, input = reaper.GetUserInputs("Brownian Walk", 7,
+  input_dialog.prompt_csv("Brownian Walk",
     "Events,Output channels,Source channel,Event length sec,Tick sec,Channel step,Source step 0-1",
-    "96,8,1,0.08,0.06,1,0.08")
-  if not ok then return end
+    "96,8,1,0.08,0.06,1,0.08", function(input)
 
   local events_text, out_text, source_text, len_text, tick_text, chan_step_text, src_step_text =
     input:match("^%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*$")
@@ -79,6 +79,7 @@ local function main()
   end
 
   tex.render_events(item, output_channels, events, "Brownian Walk", { mute_source_item = true })
+  end)
 end
 
 main()

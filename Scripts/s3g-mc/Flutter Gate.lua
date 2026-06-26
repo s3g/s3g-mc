@@ -10,15 +10,15 @@ local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local tex = dofile(script_dir .. "Multichannel Texture Library.lua")
 local mc = tex.mc
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 
 local function main()
   local item, take, source_channels = mc.require_selected_multichannel_item()
   if not item then return end
 
-  local ok, input = reaper.GetUserInputs("Flutter Gate", 5,
+  input_dialog.prompt_csv("Flutter Gate",
     "Slices,Active channels,Duty 0-1,Step channels,Fade sec",
-    "96,2,0.65,1,0.003")
-  if not ok then return end
+    "96,2,0.65,1,0.003", function(input)
 
   local slices_text, active_text, duty_text, step_text, fade_text =
     input:match("^%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*$")
@@ -57,6 +57,7 @@ local function main()
   end
 
   tex.render_events(item, source_channels, events, "Flutter Gate", { mute_source_item = true })
+  end)
 end
 
 main()

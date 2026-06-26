@@ -10,15 +10,15 @@ local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local tex = dofile(script_dir .. "Multichannel Texture Library.lua")
 local mc = tex.mc
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 
 local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
 
-  local ok, input = reaper.GetUserInputs("Channel Smear", 6,
+  input_dialog.prompt_csv("Channel Smear",
     "Slices,Output channels,Source channel,Spread width,Path 1=cw 2=pingpong 3=random,Fade sec",
-    "32,8,1,3,2,0.005")
-  if not ok then return end
+    "32,8,1,3,2,0.005", function(input)
 
   local slices_text, out_text, source_text, spread_text, path_text, fade_text =
     input:match("^%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*$")
@@ -62,6 +62,7 @@ local function main()
   end
 
   tex.render_events(item, output_channels, events, "Channel smear", { mute_source_item = true })
+  end)
 end
 
 main()

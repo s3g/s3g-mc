@@ -13,6 +13,7 @@
 local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local mc = dofile(script_dir .. "Multichannel Library.lua")
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 local MUTE_SOURCE_ITEM_AFTER_RENDER = true
 
 local function mixes_from_repeat_map(source_count, output_count)
@@ -38,9 +39,7 @@ local function main()
   if not item then return end
 
   local default_channels = tostring(mc.reaper_track_channel_count(source_channels))
-  local ok, input = reaper.GetUserInputs("Resize item channel count", 1,
-    "Output channels", default_channels)
-  if not ok then return end
+  input_dialog.prompt_csv("Resize item channel count", "Output channels", default_channels, function(input)
 
   local output_channels, err = mc.validate_channel_count(input, "Output channels", 2, mc.MAX_REAPER_TRACK_CHANNELS)
   if not output_channels then
@@ -75,6 +74,7 @@ local function main()
   else
     reaper.ShowConsoleMsg("Built resize routing, but REAPER did not report a new rendered stem track.\n")
   end
+  end)
 end
 
 main()

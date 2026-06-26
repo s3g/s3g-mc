@@ -34,7 +34,7 @@ local normalize_db = -6.0
 local should_render = false
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 520, 350, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 520, 430, ImGui.Cond_FirstUseEver)
   local visible
   visible, open = ImGui.Begin(ctx, "Spectral Blur", open)
   if visible then

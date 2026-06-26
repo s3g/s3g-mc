@@ -793,7 +793,7 @@ local function draw_pin_matrix(track, fx, active_ch)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 880, 520, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 920, 760, ImGui.Cond_FirstUseEver)
   local visible
   visible, open = ImGui.Begin(ctx, "128ch Automation Mixer", open)
   if visible then

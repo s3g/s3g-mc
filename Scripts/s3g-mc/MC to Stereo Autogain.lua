@@ -503,7 +503,7 @@ local function draw_output_gain(track, fx)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 760, 560, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 820, 720, ImGui.Cond_FirstUseEver)
   local visible
   visible, open = ImGui.Begin(ctx, "MC to Stereo Autogain", open)
 

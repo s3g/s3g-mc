@@ -238,46 +238,56 @@ local function main()
   local env_opts = { height = 150, overview_lane_h = 56, random_amount = 0.3, random_count = 12, random_dispersion = 0.25, random_smooth = true }
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 680, 760, WINDOW_OPEN_COND)
+    ImGui.SetNextWindowSize(ctx, 720, 960, WINDOW_OPEN_COND)
     local visible
     visible, open = ImGui.Begin(ctx, "Loop Drift", open)
     if visible then
       ImGui.Text(ctx, "Sources: " .. tostring(#entries) .. " selected")
       local changed
-      changed, settings.duration = ImGui.SliderDouble(ctx, "Duration sec", settings.duration, 0.25, 1800.0, "%.2f")
-      changed, settings.channels = ImGui.SliderInt(ctx, "Output channels", math.floor(settings.channels), 1, mc.MAX_REAPER_TRACK_CHANNELS)
-      changed, settings.xfade_ms = ImGui.SliderDouble(ctx, "Loop crossfade ms", settings.xfade_ms, 1.0, 2000.0, "%.1f")
-      changed, settings.xfade_duck = ImGui.SliderDouble(ctx, "Seam duck", settings.xfade_duck, 0.0, 0.75, "%.2f")
-      changed, settings.base_rate = ImGui.SliderDouble(ctx, "Base rate", settings.base_rate, 0.125, 4.0, "%.4f")
-      changed, settings.rate_amount = ImGui.SliderDouble(ctx, "Rate spread/deviation", settings.rate_amount, 0.0, 1.0, "%.4f")
-      changed, settings.start_jitter_ms = ImGui.SliderDouble(ctx, "Start jitter ms", settings.start_jitter_ms, 0.0, 5000.0, "%.1f")
-      changed, settings.drift_amount = ImGui.SliderDouble(ctx, "Slow rate drift", settings.drift_amount, 0.0, 0.12, "%.4f")
-      changed, settings.spatial_spread = ImGui.SliderDouble(ctx, "Neighbor spread", settings.spatial_spread, 0.0, 1.0, "%.2f")
-      changed, settings.output_motion = ImGui.SliderDouble(ctx, "Output motion", settings.output_motion, 0.0, 1.0, "%.2f")
-      changed, settings.gain_variation_db = ImGui.SliderDouble(ctx, "Gain variation dB", settings.gain_variation_db, 0.0, 6.0, "%.1f")
-      changed, settings.gain = ImGui.SliderDouble(ctx, "Render gain", settings.gain, 0.05, 2.0, "%.2f")
+      if ImGui.CollapsingHeader(ctx, "Render Setup", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        changed, settings.duration = ImGui.SliderDouble(ctx, "Duration sec", settings.duration, 0.25, 1800.0, "%.2f")
+        changed, settings.channels = ImGui.SliderInt(ctx, "Output channels", math.floor(settings.channels), 1, mc.MAX_REAPER_TRACK_CHANNELS)
+        changed, settings.xfade_ms = ImGui.SliderDouble(ctx, "Loop crossfade ms", settings.xfade_ms, 1.0, 2000.0, "%.1f")
+        changed, settings.xfade_duck = ImGui.SliderDouble(ctx, "Seam duck", settings.xfade_duck, 0.0, 0.75, "%.2f")
+      end
+      if ImGui.CollapsingHeader(ctx, "Rate And Spatial Drift", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        changed, settings.base_rate = ImGui.SliderDouble(ctx, "Base rate", settings.base_rate, 0.125, 4.0, "%.4f")
+        changed, settings.rate_amount = ImGui.SliderDouble(ctx, "Rate spread/deviation", settings.rate_amount, 0.0, 1.0, "%.4f")
+        changed, settings.start_jitter_ms = ImGui.SliderDouble(ctx, "Start jitter ms", settings.start_jitter_ms, 0.0, 5000.0, "%.1f")
+        changed, settings.drift_amount = ImGui.SliderDouble(ctx, "Slow rate drift", settings.drift_amount, 0.0, 0.12, "%.4f")
+        changed, settings.spatial_spread = ImGui.SliderDouble(ctx, "Neighbor spread", settings.spatial_spread, 0.0, 1.0, "%.2f")
+        changed, settings.output_motion = ImGui.SliderDouble(ctx, "Output motion", settings.output_motion, 0.0, 1.0, "%.2f")
+        changed, settings.gain_variation_db = ImGui.SliderDouble(ctx, "Gain variation dB", settings.gain_variation_db, 0.0, 6.0, "%.1f")
+        changed, settings.gain = ImGui.SliderDouble(ctx, "Render gain", settings.gain, 0.05, 2.0, "%.2f")
+      end
       settings.channels = clamp(math.floor(settings.channels), 1, mc.MAX_REAPER_TRACK_CHANNELS)
       settings.seed = math.floor(settings.seed)
-      changed, settings.rate_mode = combo_from_options(ctx, "Rate mode", settings.rate_mode, RATE_MODES)
-      changed, settings.rate_quantize = combo_from_options(ctx, "Rate quantize", settings.rate_quantize, RATE_QUANTIZE)
-      changed, settings.source_mode = combo_from_options(ctx, "Source mode", settings.source_mode, SOURCE_MODES)
-      if settings.source_mode == "item_per_group" then
-        changed, settings.source_group_size = ImGui.SliderInt(ctx, "Source group size", math.floor(settings.source_group_size), 1, 32)
+      if ImGui.CollapsingHeader(ctx, "Source And Output Rules", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        changed, settings.rate_mode = combo_from_options(ctx, "Rate mode", settings.rate_mode, RATE_MODES)
+        changed, settings.rate_quantize = combo_from_options(ctx, "Rate quantize", settings.rate_quantize, RATE_QUANTIZE)
+        changed, settings.source_mode = combo_from_options(ctx, "Source mode", settings.source_mode, SOURCE_MODES)
+        if settings.source_mode == "item_per_group" then
+          changed, settings.source_group_size = ImGui.SliderInt(ctx, "Source group size", math.floor(settings.source_group_size), 1, 32)
+        end
+        changed, settings.distribution = combo_from_options(ctx, "Source distribution", settings.distribution, DISTRIBUTIONS)
+        changed, settings.phase_mode = combo_from_options(ctx, "Loop phase", settings.phase_mode, PHASE_MODES)
+        changed, settings.direction_mode = combo_from_options(ctx, "Direction", settings.direction_mode, DIRECTION_MODES)
+        if settings.direction_mode == "random" then
+          changed, settings.reverse_probability = ImGui.SliderDouble(ctx, "Reverse probability", settings.reverse_probability, 0.0, 1.0, "%.2f")
+        end
       end
-      changed, settings.distribution = combo_from_options(ctx, "Source distribution", settings.distribution, DISTRIBUTIONS)
-      changed, settings.phase_mode = combo_from_options(ctx, "Loop phase", settings.phase_mode, PHASE_MODES)
-      changed, settings.direction_mode = combo_from_options(ctx, "Direction", settings.direction_mode, DIRECTION_MODES)
-      if settings.direction_mode == "random" then
-        changed, settings.reverse_probability = ImGui.SliderDouble(ctx, "Reverse probability", settings.reverse_probability, 0.0, 1.0, "%.2f")
+      if ImGui.CollapsingHeader(ctx, "Output", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
+        if settings.normalize then
+          changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -36.0, -1.0, "%.1f")
+        end
+        changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
       end
-      changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
-      if settings.normalize then
-        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -36.0, -1.0, "%.1f")
-      end
-      changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
       ImGui.Separator(ctx)
-      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
-        selected_env_point, settings, env_opts)
+      if ImGui.CollapsingHeader(ctx, "Breakpoint Envelopes", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
+          selected_env_point, settings, env_opts)
+      end
       if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
       ImGui.SameLine(ctx)
       if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end

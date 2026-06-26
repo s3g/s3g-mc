@@ -10,14 +10,14 @@ local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local tex = dofile(script_dir .. "Multichannel Texture Library.lua")
 local mc = tex.mc
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 
 local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
-  local ok, input = reaper.GetUserInputs("Spatial Repeater", 6,
+  input_dialog.prompt_csv("Spatial Repeater",
     "Repeats,Output channels,Source channel,Spacing sec,Decay 0-1,Path 1=cw 2=pingpong 3=random",
-    "8,8,1,0.25,0.75,1")
-  if not ok then return end
+    "8,8,1,0.25,0.75,1", function(input)
   local reps_text, out_text, source_text, spacing_text, decay_text, path_text =
     input:match("^%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*$")
   if not reps_text then mc.show_error("Enter six comma-separated values.") return end
@@ -50,6 +50,7 @@ local function main()
   end
   local render_length = length + math.max(0, repeats - 1) * spacing
   tex.render_events(item, output_channels, events, "Spatial repeater", { mute_source_item = true, render_length = render_length })
+  end)
 end
 
 main()

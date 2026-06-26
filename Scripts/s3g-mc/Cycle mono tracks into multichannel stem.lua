@@ -14,6 +14,7 @@
 local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local mc = dofile(script_dir .. "Multichannel Library.lua")
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 
 local function get_insert_index_after_tracks(tracks)
   local insert_index = 0
@@ -63,9 +64,7 @@ local function main()
   local tracks = mc.require_selected_mono_compatible_tracks()
   if not tracks then return end
 
-  local ok, input = reaper.GetUserInputs("Cyclic multichannel distribute", 1,
-    "Output channels", tostring(#tracks))
-  if not ok then return end
+  input_dialog.prompt_csv("Cycle mono tracks into multichannel stem", "Output channels", tostring(#tracks), function(input)
 
   local output_channels, err = mc.validate_channel_count(input, "Output channels", 2, mc.MAX_REAPER_TRACK_CHANNELS)
   if not output_channels then
@@ -136,6 +135,7 @@ local function main()
   else
     reaper.ShowConsoleMsg("Built routing, but REAPER did not report a new rendered stem track.\n")
   end
+  end)
 end
 
 main()

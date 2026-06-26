@@ -317,6 +317,26 @@ function M.draw(ImGui, ctx, defs, points, enabled, selected, selected_point, cur
   opts.random_smooth = opts.random_smooth or false
   selected = math.max(1, math.min(#defs, selected or 1))
   selected, selected_point = draw_overview(ImGui, ctx, defs, points, enabled, selected, selected_point, current_values, opts)
+
+  local editor_open = true
+  if opts.collapse_editor then
+    local was_open = opts._editor_was_open
+    editor_open = ImGui.CollapsingHeader(ctx, opts.editor_label or "Detailed Breakpoint Editor")
+    if was_open ~= nil and was_open ~= editor_open then
+      local target_h = editor_open and opts.expanded_window_h or opts.compact_window_h
+      local ok_get, get_window_size = pcall(function() return ImGui.GetWindowSize end)
+      local ok_set, set_window_size = pcall(function() return ImGui.SetWindowSize end)
+      if target_h and ok_get and ok_set and type(get_window_size) == "function" and type(set_window_size) == "function" then
+        local window_w = select(1, get_window_size(ctx))
+        set_window_size(ctx, window_w, target_h, ImGui.Cond_Always or 0)
+      end
+    end
+    opts._editor_was_open = editor_open
+  end
+  if not editor_open then
+    return selected, selected_point
+  end
+
   local names = {}
   for index, def in ipairs(defs) do names[index] = def.label end
   selected = draw_combo(ImGui, ctx, "Envelope", selected, names)

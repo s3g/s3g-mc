@@ -1161,12 +1161,28 @@ end
 
 load_last_settings()
 
+local route_editor_was_open = false
+local route_compact_window_h = 1040
+local route_expanded_window_h = 1180
+
+local function resize_current_window(height)
+  local ok_get, get_window_size = pcall(function() return ImGui.GetWindowSize end)
+  local ok_set, set_window_size = pcall(function() return ImGui.SetWindowSize end)
+  if ok_get and ok_set and type(get_window_size) == "function" and type(set_window_size) == "function" then
+    local window_w = select(1, get_window_size(ctx))
+    set_window_size(ctx, window_w, height, ImGui.Cond_Always or 0)
+  end
+end
+
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 820, 880, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 860, route_editor_was_open and route_expanded_window_h or route_compact_window_h, ImGui.Cond_Always)
   local visible
   visible, open = ImGui.Begin(ctx, "Render MC Carto Synth", open)
   if visible then
     local changed
+    local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+    local control_h = math.max(260, (avail_h or route_compact_window_h) - 44)
+    if ImGui.BeginChild(ctx, "##carto_controls", 0, control_h) then
     local values = carto_values()
     selected_route, selected_route_point = draw_route_overview(ctx, route_points, route_enabled, selected_route,
       selected_route_point, values)
@@ -1222,41 +1238,48 @@ local function loop()
     changed, drift = ImGui.SliderDouble(ctx, "Drift", drift, 0, 1, "%.3f")
     changed, crush = ImGui.SliderDouble(ctx, "Crush / decimate", crush, 0, 1, "%.3f")
     ImGui.Separator(ctx)
-    ImGui.SetNextItemWidth(ctx, 180)
-    local route_changed
-    route_changed, selected_route = combo(ctx, "Edit route", ROUTE_NAMES, selected_route)
-    if route_changed then selected_route_point = nil end
-    ImGui.SameLine(ctx)
-    changed, route_enabled[selected_route] = ImGui.Checkbox(ctx, "Active", route_enabled[selected_route])
-    local selected_def = ROUTE_DEFS[selected_route]
-    selected_route_point = draw_route_editor(ctx, route_points[selected_route], selected_def, selected_route_point,
-      route_enabled[selected_route])
-    local current_norm = selected_def and route_norm(selected_def, current_value_for_key(carto_values(), selected_def.key)) or 0.5
-    if ImGui.Button(ctx, "Flat") then set_route_shape(route_points[selected_route], "flat", current_norm) selected_route_point = nil end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Rise") then set_route_shape(route_points[selected_route], "rise", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Fall") then set_route_shape(route_points[selected_route], "fall", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Ridge") then set_route_shape(route_points[selected_route], "ridge", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Valley") then set_route_shape(route_points[selected_route], "valley", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Terrace") then set_route_shape(route_points[selected_route], "terrace", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Switchback") then set_route_shape(route_points[selected_route], "switchback", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Add") and #route_points[selected_route] < MAX_ROUTE_POINTS then
-      route_points[selected_route][#route_points[selected_route] + 1] = { x = 0.5, y = current_norm }
-      selected_route_point = #route_points[selected_route]
-      route_enabled[selected_route] = true
-      sort_route_points(route_points[selected_route])
+    local route_editor_open = ImGui.CollapsingHeader(ctx, "Detailed Route Editor")
+    if route_editor_open ~= route_editor_was_open then
+      resize_current_window(route_editor_open and route_expanded_window_h or route_compact_window_h)
     end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Delete") and selected_route_point and selected_route_point > 1 and selected_route_point < #route_points[selected_route] then
-      table.remove(route_points[selected_route], selected_route_point)
-      selected_route_point = nil
-      sort_route_points(route_points[selected_route])
+    route_editor_was_open = route_editor_open
+    if route_editor_open then
+      ImGui.SetNextItemWidth(ctx, 180)
+      local route_changed
+      route_changed, selected_route = combo(ctx, "Edit route", ROUTE_NAMES, selected_route)
+      if route_changed then selected_route_point = nil end
+      ImGui.SameLine(ctx)
+      changed, route_enabled[selected_route] = ImGui.Checkbox(ctx, "Active", route_enabled[selected_route])
+      local selected_def = ROUTE_DEFS[selected_route]
+      selected_route_point = draw_route_editor(ctx, route_points[selected_route], selected_def, selected_route_point,
+        route_enabled[selected_route])
+      local current_norm = selected_def and route_norm(selected_def, current_value_for_key(carto_values(), selected_def.key)) or 0.5
+      if ImGui.Button(ctx, "Flat") then set_route_shape(route_points[selected_route], "flat", current_norm) selected_route_point = nil end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "Rise") then set_route_shape(route_points[selected_route], "rise", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "Fall") then set_route_shape(route_points[selected_route], "fall", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "Ridge") then set_route_shape(route_points[selected_route], "ridge", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "Valley") then set_route_shape(route_points[selected_route], "valley", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "Terrace") then set_route_shape(route_points[selected_route], "terrace", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "Switchback") then set_route_shape(route_points[selected_route], "switchback", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "Add") and #route_points[selected_route] < MAX_ROUTE_POINTS then
+        route_points[selected_route][#route_points[selected_route] + 1] = { x = 0.5, y = current_norm }
+        selected_route_point = #route_points[selected_route]
+        route_enabled[selected_route] = true
+        sort_route_points(route_points[selected_route])
+      end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "Delete") and selected_route_point and selected_route_point > 1 and selected_route_point < #route_points[selected_route] then
+        table.remove(route_points[selected_route], selected_route_point)
+        selected_route_point = nil
+        sort_route_points(route_points[selected_route])
+      end
     end
     ImGui.Separator(ctx)
     changed, gain_db = ImGui.SliderDouble(ctx, "Print gain", gain_db, -60, 0, "%.1f dB")
@@ -1266,6 +1289,8 @@ local function loop()
     end
     changed, insert_gain = ImGui.SliderDouble(ctx, "Inserted track gain", insert_gain, 0.05, 1.0, "%.2f")
     changed, seed = ImGui.SliderInt(ctx, "Seed", seed, 1, 9999)
+      ImGui.EndChild(ctx)
+    end
     ImGui.Separator(ctx)
     if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
     ImGui.SameLine(ctx)

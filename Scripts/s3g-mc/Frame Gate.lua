@@ -10,15 +10,15 @@ local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local tex = dofile(script_dir .. "Multichannel Texture Library.lua")
 local mc = tex.mc
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 
 local function main()
   local item, take, source_channels = mc.require_selected_multichannel_item()
   if not item then return end
 
-  local ok, input = reaper.GetUserInputs("Frame Gate", 4,
+  input_dialog.prompt_csv("Frame Gate",
     "Slices,Active group size,Step channels,Fade sec",
-    "32,2,1,0.005")
-  if not ok then return end
+    "32,2,1,0.005", function(input)
 
   local slices_text, group_text, step_text, fade_text =
     input:match("^%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*$")
@@ -52,6 +52,7 @@ local function main()
   end
 
   tex.render_events(item, source_channels, events, "Frame gate", { mute_source_item = true })
+  end)
 end
 
 main()

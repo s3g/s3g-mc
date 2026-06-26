@@ -11,14 +11,13 @@
 local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local mc = dofile(script_dir .. "Multichannel Library.lua")
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 
 local function main()
   local item, take, channel_count = mc.require_selected_audio_item()
   if not item then return end
 
-  local ok, input = reaper.GetUserInputs("Extract item channel", 1,
-    "Source channel", "1")
-  if not ok then return end
+  input_dialog.prompt_csv("Extract item channel", "Source channel", "1", function(input)
 
   local channel, err = mc.validate_channel_count(input, "Source channel", 1, channel_count)
   if not channel then
@@ -50,6 +49,7 @@ local function main()
   else
     mc.show_error("Could not duplicate the selected item.")
   end
+  end)
 end
 
 main()

@@ -10,14 +10,14 @@ local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local tex = dofile(script_dir .. "Multichannel Texture Library.lua")
 local mc = tex.mc
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 
 local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
-  local ok, input = reaper.GetUserInputs("Cascade spatial echo", 7,
+  input_dialog.prompt_csv("Cascade spatial echo",
     "Segments,Echoes,Output channels,Source channel,Delay sec,Decay 0-1,Fade sec",
-    "8,4,8,1,0.18,0.65,0.005")
-  if not ok then return end
+    "8,4,8,1,0.18,0.65,0.005", function(input)
   local seg_text, echoes_text, out_text, source_text, delay_text, decay_text, fade_text =
     input:match("^%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*$")
   if not seg_text then mc.show_error("Enter seven comma-separated values.") return end
@@ -55,6 +55,7 @@ local function main()
   end
   local render_length = length + math.max(0, echoes - 1) * delay
   tex.render_events(item, output_channels, events, "Cascade spatial echo", { mute_source_item = true, render_length = render_length })
+  end)
 end
 
 main()

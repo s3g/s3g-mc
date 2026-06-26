@@ -116,7 +116,7 @@ local function main()
   local should_render = false
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 450, 330, ImGui.Cond_FirstUseEver)
+    ImGui.SetNextWindowSize(ctx, 450, 410, ImGui.Cond_FirstUseEver)
     local visible
     visible, open = ImGui.Begin(ctx, "Fracture", open)
     if visible then

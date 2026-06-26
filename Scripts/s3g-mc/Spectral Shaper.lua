@@ -630,7 +630,7 @@ local function main()
   local should_render = false
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 560, 430, ImGui.Cond_FirstUseEver)
+    ImGui.SetNextWindowSize(ctx, 560, 520, ImGui.Cond_FirstUseEver)
     local visible
     visible, open = ImGui.Begin(ctx, "Spectral Shaper", open)
     if visible then

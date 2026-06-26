@@ -10,15 +10,15 @@ local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local tex = dofile(script_dir .. "Multichannel Texture Library.lua")
 local mc = tex.mc
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 
 local function main()
   local item, take, source_channels = mc.require_selected_audio_item()
   if not item then return end
 
-  local ok, input = reaper.GetUserInputs("Texture Clouds", 7,
+  input_dialog.prompt_csv("Texture Clouds",
     "Events,Output channels,Source channel,Avg grain sec,Length rand 0-1,Timing scatter 0-1,Fade sec",
-    "160,8,1,0.08,0.6,1,0.005")
-  if not ok then return end
+    "160,8,1,0.08,0.6,1,0.005", function(input)
 
   local events_text, out_text, source_text, grain_text, rand_text, scatter_text, fade_text =
     input:match("^%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*,%s*([^,]+)%s*$")
@@ -67,6 +67,7 @@ local function main()
       "Average grain: " .. tostring(grain),
     })
   end
+  end)
 end
 
 main()

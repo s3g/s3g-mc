@@ -12,15 +12,14 @@
 local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local mc = dofile(script_dir .. "Multichannel Library.lua")
+local input_dialog = dofile(script_dir .. "s3g-mc ImGui Input Dialog.lua")
 local MUTE_SOURCE_ITEM_AFTER_RENDER = true
 
 local function main()
   local item, take, channel_count = mc.require_selected_multichannel_item()
   if not item then return end
 
-  local ok, input = reaper.GetUserInputs("Rotate multichannel item", 1,
-    "Channel offset", "1")
-  if not ok then return end
+  input_dialog.prompt_csv("Rotate item channels", "Channel offset", "1", function(input)
 
   local offset = tonumber(input)
   if not offset or offset ~= math.floor(offset) then
@@ -47,6 +46,7 @@ local function main()
   else
     reaper.ShowConsoleMsg("Built routing, but REAPER did not report a new rendered stem track.\n")
   end
+  end)
 end
 
 main()

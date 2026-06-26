@@ -105,7 +105,7 @@ local function main()
   local should_render = false
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 500, 390, ImGui.Cond_FirstUseEver)
+    ImGui.SetNextWindowSize(ctx, 500, 470, ImGui.Cond_FirstUseEver)
     local visible
     visible, open = ImGui.Begin(ctx, "IR Toolkit", open)
     if visible then

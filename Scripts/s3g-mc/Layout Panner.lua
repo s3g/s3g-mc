@@ -761,7 +761,7 @@ local function draw_source_mixer(track, fx)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 820, 760, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 860, 1080, ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver)
   local visible
   visible, open = ImGui.Begin(ctx, "Layout Panner", open)
   if visible then

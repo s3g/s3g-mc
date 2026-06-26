@@ -10,6 +10,8 @@ next_page:
 toc:
   - title: Installation
     href: "#installation"
+  - title: Package Browser Shortcut
+    href: "#package-browser-shortcut"
   - title: Python Path
     href: "#python-path"
 ---
@@ -32,6 +34,19 @@ In REAPER:
 5. Click `Install/refresh actions` in the browser.
 
 If the JSFX do not appear, rescan JSFX or restart REAPER.
+
+## Package Browser Shortcut
+
+To keep the package browser available from REAPER without opening the Action
+List each time:
+
+1. Open `Options > Customize menus/toolbars...`.
+2. Choose where the browser should live, such as `Main actions` or a custom menu.
+3. Click `Add...`.
+4. Search for `s3g-mc Package Browser`, select the action, and confirm.
+5. Save the menu or toolbar changes.
+
+The same approach can also be used for any individual s3g-mc action you use often.
 
 ## Python Path
 
