@@ -27,6 +27,7 @@ Many of these tools are inspired by or extend existing computer music practices,
 - [Dependencies](dependencies.md)
 - [Tools](tools.md)
 - [Workflows](workflows.md)
+- [Gallery](gallery.md)
 
 ## Highlights
 
@@ -37,13 +38,6 @@ Many of these tools are inspired by or extend existing computer music practices,
 - Offline spectral, convolution, and resynthesis processes
 - Multichannel texture and montage actions 
 - Procedural synth engines rendered offline from controller actions
-
-<figure>
-  <a href="assets/images/s3g-mc-screenshot-montage.png" target="_blank" rel="noopener noreferrer">
-    <img src="assets/images/s3g-mc-screenshot-montage.png" alt="Montage of s3g-mc REAPER controllers and render tools">
-  </a>
-  <figcaption>Controllers and render tools from the s3g-mc package.</figcaption>
-</figure>
 
 ## License
 

@@ -231,6 +231,27 @@ a:focus-visible {
   font-size: 12px;
 }
 
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.gallery-grid figure {
+  margin: 0;
+  padding: 10px;
+  background: var(--panel-alt);
+  border: 1px solid var(--soft-line);
+}
+
+.gallery-grid img {
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top left;
+  background: #050606;
+}
+
 .page-nav {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -306,6 +327,10 @@ a:focus-visible {
   }
 
   .page-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .gallery-grid {
     grid-template-columns: 1fr;
   }
 

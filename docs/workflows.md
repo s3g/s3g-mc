@@ -4,6 +4,9 @@ title: Workflows
 prev_page:
   title: Tools
   url: /tools.html
+next_page:
+  title: Gallery
+  url: /gallery.html
 toc:
   - title: Package Browser
     href: "#package-browser"

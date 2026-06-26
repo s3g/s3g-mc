@@ -242,6 +242,9 @@ local function main()
     local visible
     visible, open = ImGui.Begin(ctx, "Loop Drift", open)
     if visible then
+      local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+      local control_h = math.max(300, (avail_h or 960) - 44)
+      if ImGui.BeginChild(ctx, "##loop_drift_controls", 0, control_h) then
       ImGui.Text(ctx, "Sources: " .. tostring(#entries) .. " selected")
       local changed
       if ImGui.CollapsingHeader(ctx, "Render Setup", nil, ImGui.TreeNodeFlags_DefaultOpen) then
@@ -287,6 +290,8 @@ local function main()
       if ImGui.CollapsingHeader(ctx, "Breakpoint Envelopes", nil, ImGui.TreeNodeFlags_DefaultOpen) then
         selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
           selected_env_point, settings, env_opts)
+      end
+        ImGui.EndChild(ctx)
       end
       if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
       ImGui.SameLine(ctx)
