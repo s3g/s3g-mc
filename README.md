@@ -9,10 +9,6 @@ render-based multichannel processes.
 
 Documentation and workflow notes: <a href="https://s3g.github.io/s3g-mc/" target="_blank" rel="noopener noreferrer">s3g-mc docs site</a>.
 
-The code is released under 0BSD. If this package is useful in a project,
-performance, publication, installation, or teaching context, attribution is
-appreciated: s3g-mc by Shawn Greenlee.
-
 Many of these tools are inspired by or extend existing computer music
 practices, with references mentioned in the documentation where they are
 useful.
@@ -283,5 +279,9 @@ More detail is in `Scripts/s3g-mc/s3g_3oa_fx_workflow.md`.
 
 Zero-Clause BSD. See
 <a href="https://github.com/s3g/s3g-mc?tab=License-1-ov-file" target="_blank" rel="noopener noreferrer">LICENSE</a>.
+
+Attribution is appreciated for software development, publications, research,
+teaching materials, and projects that build on or adapt this package. See
+<a href="https://github.com/s3g/s3g-mc/blob/main/CITATION.cff" target="_blank" rel="noopener noreferrer">CITATION.cff</a>.
 
 Development assistance: OpenAI Codex.
