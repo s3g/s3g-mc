@@ -1774,9 +1774,10 @@ def render_foafx_offline(cfg):
     az_env = env_array(cfg, "azimuth", frames, float(cfg.get("azimuth", 0.0)))
     el_env = env_array(cfg, "elevation", frames, float(cfg.get("elevation", 0.0)))
     amp_env = env_array(cfg, "amplitude", frames, float(cfg.get("amplitude", 1.0)))
+    move_wet_on_array = bool(cfg.get("move_wet_on_array", True))
 
     directions = np.array([unit_from_aed(az, el) for az, el in layout], dtype=np.float64)
-    rendered = np.empty_like(virtual, dtype=np.float32)
+    rendered = np.empty((frames, ambi_channels), dtype=np.float32)
     block = 2048
     for start in range(0, frames, block):
         end = min(frames, start + block)
@@ -1793,9 +1794,18 @@ def render_foafx_offline(cfg):
         dry = np.clip(dry_atten[start:end, None], 0.0, 1.0).astype(np.float32)
         amp = amp_env[start:end, None].astype(np.float32)
         dry_gain = 1.0 - mask * (1.0 - dry)
-        rendered[start:end] = (virtual[start:end] * dry_gain + processed[start:end] * mask * wet) * amp
+        dry_virtual = virtual[start:end] * dry_gain
+        if move_wet_on_array:
+            wet_feed = np.sum(processed[start:end], axis=1, keepdims=True) / math.sqrt(len(layout))
+            moved_wet_virtual = wet_feed * mask * wet
+            rendered_virtual = (dry_virtual + moved_wet_virtual) * amp
+            rendered[start:end] = (rendered_virtual.astype(np.float64) @ encode).astype(np.float32)
+        else:
+            wet_virtual = processed[start:end] * mask * wet
+            rendered_virtual = (dry_virtual + wet_virtual) * amp
+            rendered[start:end] = (rendered_virtual.astype(np.float64) @ encode).astype(np.float32)
 
-    out = (rendered.astype(np.float64) @ encode).astype(np.float32)
+    out = rendered
     if bool(cfg.get("dc_protect", True)):
         out -= np.mean(out, axis=0, keepdims=True)
     if bool(cfg.get("soft_limit", True)):
@@ -1816,6 +1826,7 @@ def render_foafx_offline(cfg):
     print(f"Focus width: {float(cfg.get('focus_width', 38.0)):.2f} deg")
     print(f"Focus sharpness: {float(cfg.get('focus_sharpness', 0.65)):.3f}")
     print(f"Wet amount: {float(cfg.get('wet', 1.0)):.3f}")
+    print(f"Move wet across virtual speaker array: {'on' if move_wet_on_array else 'off'}")
     print(f"Output channels: {ambi_channels}")
     print(f"Sample rate: {sample_rate} Hz")
     print(f"Pre-normalize peak: {pre_peak:.6f}")

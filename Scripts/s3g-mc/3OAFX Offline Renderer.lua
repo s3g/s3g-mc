@@ -227,6 +227,12 @@ local function angular_distance(a_az, a_el, b_az, b_el)
   return math.deg(math.acos(dot))
 end
 
+local function focus_mask_for_speaker(focus_az, focus_el, width, sharpness, speaker)
+  local dist = angular_distance(focus_az, focus_el, speaker[1], speaker[2])
+  local mask = math.exp(-0.5 * (dist / math.max(2.0, width or 38.0)) ^ 2)
+  return clamp(mask ^ (1.0 + clamp(sharpness or 0.0, 0, 1) * 5.0), 0, 1)
+end
+
 local function draw_preview(settings, env_points, env_enabled, entry)
   local width = math.max(420, ImGui.GetContentRegionAvail(ctx) - 2)
   local height = 270
@@ -246,24 +252,13 @@ local function draw_preview(settings, env_points, env_enabled, entry)
   ImGui.DrawList_AddLine(dl, cx, cy - radius, cx, cy + radius, COLOR_GRID, 1)
 
   local layout = VIRTUAL_LAYOUTS[settings.order_index] or VIRTUAL_LAYOUTS[3]
-  local last_focus_az = sample_env_value("azimuth", 1.0, settings, env_points, env_enabled)
-  local last_focus_el = sample_env_value("elevation", 1.0, settings, env_points, env_enabled)
-  local last_width = sample_env_value("focus_width", 1.0, settings, env_points, env_enabled)
-  local last_sharpness = sample_env_value("focus_sharpness", 1.0, settings, env_points, env_enabled)
-  for index, speaker in ipairs(layout) do
-    local sx, sy = project_aed(speaker[1], speaker[2], cx, cy, radius)
-    local dist = angular_distance(last_focus_az, last_focus_el, speaker[1], speaker[2])
-    local mask = math.exp(-0.5 * (dist / math.max(2.0, last_width)) ^ 2)
-    mask = mask ^ (1.0 + clamp(last_sharpness, 0, 1) * 5.0)
-    local alpha = 0.24 + 0.70 * clamp(mask, 0, 1)
-    local size = 2.6 + 4.6 * clamp(mask, 0, 1)
-    ImGui.DrawList_AddCircleFilled(dl, sx, sy, size + 2, color_rgba(0.10, 0.12, 0.13, 0.75), 18)
-    ImGui.DrawList_AddCircleFilled(dl, sx, sy, size, color_rgba(0.70, 0.76, 0.77, alpha), 18)
-    ImGui.DrawList_AddText(dl, sx + 6, sy - 6, color_rgba(0.72, 0.78, 0.78, 0.52 + 0.35 * mask), tostring(index))
-  end
-
   local samples = 48
   local path = {}
+  local speaker_energy = {}
+  local max_energy = 0.000001
+  for index = 1, #layout do
+    speaker_energy[index] = { sum = 0.0, peak = 0.0, last = 0.0 }
+  end
   for i = 1, samples do
     local t = (i - 1) / (samples - 1)
     local az = sample_env_value("azimuth", t, settings, env_points, env_enabled)
@@ -275,7 +270,33 @@ local function draw_preview(settings, env_points, env_enabled, entry)
     local sharp = sample_env_value("focus_sharpness", t, settings, env_points, env_enabled)
     local px, py = project_aed(az, el, cx, cy, radius)
     path[#path + 1] = { x = px, y = py, az = az, el = el, width = fw, wet = wet, dry = dry, amp = amp, sharp = sharp, t = t }
+    for speaker_index, speaker in ipairs(layout) do
+      local mask = focus_mask_for_speaker(az, el, fw, sharp, speaker)
+      local changed_energy = mask * amp * (math.max(0, wet) + math.max(0, 1.0 - dry))
+      local stat = speaker_energy[speaker_index]
+      stat.sum = stat.sum + changed_energy
+      stat.peak = math.max(stat.peak, changed_energy)
+      stat.last = changed_energy
+      max_energy = math.max(max_energy, changed_energy)
+    end
   end
+
+  for index, speaker in ipairs(layout) do
+    local stat = speaker_energy[index]
+    local avg = stat.sum / samples
+    local peak = stat.peak / max_energy
+    local last = stat.last / max_energy
+    local sx, sy = project_aed(speaker[1], speaker[2], cx, cy, radius)
+    local avg_norm = avg / max_energy
+    ImGui.DrawList_AddCircleFilled(dl, sx, sy, 3.5 + avg_norm * 22.0,
+      color_rgba(0.23, 0.70, 0.95, 0.04 + avg_norm * 0.26), 24)
+    ImGui.DrawList_AddCircle(dl, sx, sy, 5.5 + peak * 17.0,
+      color_rgba(0.30, 0.76, 0.98, 0.18 + peak * 0.50), 24, 1.4)
+    ImGui.DrawList_AddCircleFilled(dl, sx, sy, 2.8 + last * 5.8,
+      color_rgba(0.80, 0.86, 0.86, 0.32 + last * 0.56), 18)
+    ImGui.DrawList_AddText(dl, sx + 6, sy - 6, color_rgba(0.72, 0.78, 0.78, 0.52 + 0.30 * peak), tostring(index))
+  end
+
   for i = 2, #path do
     ImGui.DrawList_AddLine(dl, path[i - 1].x, path[i - 1].y, path[i].x, path[i].y, COLOR_PATH_FADE, 5)
     ImGui.DrawList_AddLine(dl, path[i - 1].x, path[i - 1].y, path[i].x, path[i].y, COLOR_PATH, 2)
@@ -294,7 +315,7 @@ local function draw_preview(settings, env_points, env_enabled, entry)
   local panel_x1 = x1 - 14
   local strip_y0 = y0 + 86
   local strip_h = 18
-  ImGui.DrawList_AddText(dl, x0 + 12, y0 + 10, COLOR_TEXT, "Offline 3OAFX focus preview")
+  ImGui.DrawList_AddText(dl, x0 + 12, y0 + 10, COLOR_TEXT, "Offline 3OAFX energy preview")
   ImGui.DrawList_AddText(dl, x0 + 12, y0 + 30, COLOR_MUTED,
     tostring(#layout) .. " virtual speakers / " .. string.format("%.2f sec", entry.length * math.max(0.000001, entry.playrate)))
   ImGui.DrawList_AddText(dl, panel_x0, y0 + 18, COLOR_TEXT, EFFECT_NAMES[settings.effect_index] or "Focus gain")
@@ -324,8 +345,9 @@ local function draw_preview(settings, env_points, env_enabled, entry)
   draw_strip("width", strip_y0 + 68, "focus_width", COLOR_WIDTH, 2.0, 140.0)
   draw_strip("sharp", strip_y0 + 102, "focus_sharpness", COLOR_SHARP, 0.0, 1.0)
 
-  ImGui.DrawList_AddText(dl, panel_x0, y1 - 38, COLOR_MUTED, "green=start / blue=end")
-  ImGui.DrawList_AddText(dl, panel_x0, y1 - 20, COLOR_MUTED, "rings show focus width samples")
+  ImGui.DrawList_AddText(dl, panel_x0, y1 - 56, COLOR_MUTED, "blue halo=duration energy")
+  ImGui.DrawList_AddText(dl, panel_x0, y1 - 38, COLOR_MUTED, "white core=end energy")
+  ImGui.DrawList_AddText(dl, panel_x0, y1 - 20, COLOR_MUTED, "green=start / blue=end")
 end
 
 local function render(entry, settings, env_points, env_enabled)
@@ -357,6 +379,7 @@ local function render(entry, settings, env_points, env_enabled)
     focus_width = settings.focus_width,
     focus_sharpness = settings.focus_sharpness,
     wet = settings.wet,
+    move_wet_on_array = settings.move_wet_on_array,
     dry_attenuation = settings.dry_attenuation,
     amplitude = settings.amplitude,
     effect_gain = settings.effect_gain,
@@ -416,6 +439,7 @@ function main()
     focus_width = get_number("focus_width", 38.0),
     focus_sharpness = get_number("focus_sharpness", 0.65),
     wet = get_number("wet", 1.0),
+    move_wet_on_array = reaper.GetExtState(EXT, "move_wet_on_array") ~= "0",
     dry_attenuation = get_number("dry_attenuation", 0.18),
     amplitude = get_number("amplitude", 1.0),
     effect_gain = get_number("effect_gain", 1.0),
@@ -466,6 +490,7 @@ function main()
       changed, settings.focus_width = ImGui.SliderDouble(ctx, "Focus width", settings.focus_width, 2.0, 140.0, "%.1f deg")
       changed, settings.focus_sharpness = ImGui.SliderDouble(ctx, "Focus sharpness", settings.focus_sharpness, 0.0, 1.0, "%.2f")
       changed, settings.wet = ImGui.SliderDouble(ctx, "Wet amount", settings.wet, 0.0, 2.0, "%.2f")
+      changed, settings.move_wet_on_array = ImGui.Checkbox(ctx, "Move wet across virtual speaker array", settings.move_wet_on_array)
       changed, settings.dry_attenuation = ImGui.SliderDouble(ctx, "Dry attenuation at focus", settings.dry_attenuation, 0.0, 1.0, "%.2f")
       changed, settings.amplitude = ImGui.SliderDouble(ctx, "Output amp", settings.amplitude, 0.0, 1.5, "%.2f")
       changed, settings.effect_gain = ImGui.SliderDouble(ctx, "Effect amount / gain", settings.effect_gain, 0.0, 2.5, "%.2f")
