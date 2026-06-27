@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import math
+import os
 import struct
 import sys
 
@@ -1835,9 +1836,366 @@ def render_foafx_offline(cfg):
     print(f"Pre-normalize peak: {pre_peak:.6f}")
 
 
+def fft_convolve_1d(source, impulse):
+    if source.size == 0 or impulse.size == 0:
+        return np.zeros(1, dtype=np.float32)
+    source = np.nan_to_num(source.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+    impulse = np.nan_to_num(impulse.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+    source = source - np.mean(source, dtype=np.float64)
+    impulse = impulse - np.mean(impulse, dtype=np.float64)
+    out_len = int(source.size + impulse.size - 1)
+    fft_len = 1 << (out_len - 1).bit_length()
+    spec = np.fft.rfft(source, fft_len) * np.fft.rfft(impulse, fft_len)
+    out = np.fft.irfft(spec, fft_len)[:out_len]
+    return out.astype(np.float32)
+
+
+def split_manifest_list(value):
+    text = str(value or "")
+    if text == "":
+        return []
+    return [part for part in text.split("||") if part != ""]
+
+
+def tetrahedral_layout():
+    # Bruce Wiggins, Sounds in Space 2017, describes a first-order B-format
+    # convolution workflow that transforms the source to a four-direction
+    # P-format/tetrahedral intermediate, convolves each directional feed with
+    # the corresponding ambisonic IR, then sums the ambisonic results.
+    return [
+        (45.0, 35.26438968),
+        (-45.0, -35.26438968),
+        (135.0, -35.26438968),
+        (-135.0, 35.26438968),
+    ]
+
+
+def ambisonic_convolve_layout(order, layout_key):
+    if str(layout_key) == "tetra" and int(order) == 1:
+        return tetrahedral_layout()
+    if int(order) >= 2:
+        # Practical higher-order recording/design bank: eight encoded ambisonic
+        # IRs. For 2OA this gives 8 x 9 = 72 stacked channels; for 3OA it gives
+        # 8 x 16 = 128 stacked channels, matching REAPER's maximum track width.
+        # This reflects a feasible measurement plan better than dense virtual
+        # effect layers.
+        return [
+            (45.0, 35.26438968),
+            (-45.0, 35.26438968),
+            (135.0, 35.26438968),
+            (-135.0, 35.26438968),
+            (45.0, -35.26438968),
+            (-45.0, -35.26438968),
+            (135.0, -35.26438968),
+            (-135.0, -35.26438968),
+        ]
+    return foafx_layout(order)
+
+
+def render_ambisonic_convolve(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    order = int(cfg.get("order", 1))
+    order = max(1, min(3, order))
+    ambi_channels = (order + 1) * (order + 1)
+    if audio.shape[1] < ambi_channels:
+        raise RuntimeError(f"Selected source has {audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+    audio = audio[:, :ambi_channels].astype(np.float32, copy=False)
+
+    ir_paths = split_manifest_list(cfg.get("ir_paths", ""))
+    ir_starts = [float(x) for x in split_manifest_list(cfg.get("ir_starts", ""))]
+    ir_durations = [float(x) for x in split_manifest_list(cfg.get("ir_durations", ""))]
+    if not ir_paths:
+        raise RuntimeError("At least one ambisonic IR WAV is required.")
+
+    layout = ambisonic_convolve_layout(order, cfg.get("direction_layout", "virtual"))
+    basis = np.array([ambisonic_basis(order, az, el) for az, el in layout], dtype=np.float64)
+    decode = basis.T
+    virtual = (audio.astype(np.float64) @ decode).astype(np.float32)
+
+    wet_gain = 10.0 ** (float(cfg.get("wet_gain_db", 0.0)) / 20.0)
+    wet_level = float(cfg.get("wet_level", 1.0))
+    dry_level = float(cfg.get("dry_level", 0.0))
+    trim_to_source = bool(cfg.get("trim_to_source", False))
+    ir_normalize = bool(cfg.get("ir_normalize", True))
+    dc_protect = bool(cfg.get("dc_protect", True))
+
+    ir_cache = {}
+
+    def load_ir(index):
+        path = ir_paths[index % len(ir_paths)]
+        cache_key = path
+        stacked_bank = len(ir_paths) == 1
+        if stacked_bank:
+            cache_key = f"{path}#{index}"
+        if cache_key not in ir_cache:
+            ir_audio, ir_rate = read_wav(path)
+            start = ir_starts[index % len(ir_starts)] if ir_starts else 0.0
+            dur = ir_durations[index % len(ir_durations)] if ir_durations else (ir_audio.shape[0] / max(1, ir_rate))
+            ir_audio = segment(ir_audio, ir_rate, start, dur, sample_rate)
+            if stacked_bank and ir_audio.shape[1] >= ambi_channels * len(layout):
+                channel_start = (index % len(layout)) * ambi_channels
+                ir_audio = ir_audio[:, channel_start:channel_start + ambi_channels]
+            elif ir_audio.shape[1] < ambi_channels:
+                raise RuntimeError(f"IR {path} has {ir_audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+            else:
+                ir_audio = ir_audio[:, :ambi_channels]
+            ir_audio = ir_audio.astype(np.float32, copy=False)
+            if dc_protect:
+                ir_audio = ir_audio - np.mean(ir_audio, axis=0, keepdims=True)
+            if ir_normalize:
+                peak = float(np.max(np.abs(ir_audio))) if ir_audio.size else 0.0
+                if peak > 1e-12:
+                    ir_audio = ir_audio / peak
+            ir_cache[cache_key] = ir_audio
+        return ir_cache[cache_key], path
+
+    output_len = audio.shape[0] if trim_to_source else audio.shape[0] + max(
+        1,
+        max((load_ir(i)[0].shape[0] for i in range(len(layout))), default=1),
+    ) - 1
+    wet = np.zeros((output_len, ambi_channels), dtype=np.float32)
+
+    direction_peak = []
+    for direction_index in range(len(layout)):
+        feed = virtual[:, direction_index]
+        ir_audio, ir_path = load_ir(direction_index)
+        feed_peak = float(np.max(np.abs(feed))) if feed.size else 0.0
+        direction_peak.append(feed_peak)
+        if feed_peak <= 1e-12:
+            continue
+        for channel in range(ambi_channels):
+            convolved = fft_convolve_1d(feed, ir_audio[:, channel])
+            if trim_to_source:
+                convolved = convolved[:audio.shape[0]]
+            wet[:convolved.size, channel] += convolved * wet_gain
+
+    wet *= wet_level / max(1.0, math.sqrt(len(layout)))
+    if dc_protect:
+        wet -= np.mean(wet, axis=0, keepdims=True)
+
+    if dry_level > 0.0:
+        dry = np.zeros_like(wet)
+        dry[:audio.shape[0], :] = audio * dry_level
+        out = dry + wet
+    else:
+        out = wet
+
+    if bool(cfg.get("soft_limit", True)):
+        peak = float(np.max(np.abs(out))) if out.size else 0.0
+        if peak > 1.0:
+            ceiling = 0.92
+            out = (ceiling * np.tanh(out / ceiling)).astype(np.float32)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print("Inspired by: Bruce Wiggins, Sounds in Space 2017, ambisonic measured reverb workflow")
+    print(f"Ambisonic order: {order}OA")
+    print(f"Ambisonic channels: {ambi_channels}")
+    print(f"Virtual directions: {len(layout)}")
+    print(f"Direction layout: {cfg.get('direction_layout', 'virtual')}")
+    print(f"IR files: {len(ir_paths)}")
+    stacked_bank = False
+    if len(ir_paths) == 1:
+        ir_audio, _ir_rate = read_wav(ir_paths[0])
+        if ir_audio.shape[1] >= ambi_channels * len(layout):
+            stacked_bank = True
+            print(f"IR bank mode: stacked multichannel ({ir_audio.shape[1]} channels)")
+    if stacked_bank:
+        print("IR assignment: stacked channel blocks per virtual direction")
+    else:
+        print("IR assignment: matched" if len(ir_paths) == len(layout) else "IR assignment: wrapped across virtual directions")
+    print(f"Dry level: {dry_level:.3f}")
+    print(f"Wet level: {wet_level:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+    print(f"Output channels: {ambi_channels}")
+    print(f"Sample rate: {sample_rate} Hz")
+
+
+def render_synthetic_ambisonic_ir_bank(cfg):
+    order = int(cfg.get("order", 1))
+    order = max(1, min(3, order))
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    ambi_channels = (order + 1) * (order + 1)
+    layout_key = cfg.get("direction_layout", "tetra")
+    layout = ambisonic_convolve_layout(order, layout_key)
+    output_dir = str(cfg.get("output_dir", ""))
+    prefix = str(cfg.get("prefix", "s3g_synthetic_ambi_ir"))
+    if output_dir == "":
+        raise RuntimeError("Synthetic IR bank needs an output directory.")
+    os.makedirs(output_dir, exist_ok=True)
+
+    room_x = max(1.0, float(cfg.get("room_x", 12.0)))
+    room_y = max(1.0, float(cfg.get("room_y", 9.0)))
+    room_z = max(1.0, float(cfg.get("room_z", 5.0)))
+    volume = room_x * room_y * room_z
+    surface = 2.0 * (room_x * room_y + room_x * room_z + room_y * room_z)
+    absorption = float(np.clip(cfg.get("absorption", 0.32), 0.03, 0.95))
+    scattering = float(np.clip(cfg.get("scattering", 0.45), 0.0, 1.0))
+    air_damping = float(np.clip(cfg.get("air_damping", 0.35), 0.0, 1.0))
+    source_distance = max(0.25, float(cfg.get("source_distance", min(room_x, room_y) * 0.25)))
+    pre_delay_ms = max(0.0, float(cfg.get("pre_delay_ms", 0.0)))
+    direct_gain = float(cfg.get("direct_gain", 1.0))
+    early_count = max(0, int(cfg.get("early_reflections", 18)))
+    diffuse_count = max(0, int(cfg.get("diffuse_taps", 160)))
+    decay = max(0.05, float(cfg.get("decay", 0.85)))
+    if bool(cfg.get("auto_decay", True)):
+        area_absorption = max(0.01, surface * absorption)
+        decay = float(np.clip(0.161 * volume / area_absorption, 0.08, 8.0))
+    duration = max(0.05, float(cfg.get("duration", max(0.35, decay * 1.6))))
+    frames = max(1, int(round(duration * sample_rate)))
+    spread_deg = max(0.0, float(cfg.get("spread_deg", 38.0)))
+    lowpass = float(np.clip(cfg.get("tail_soften", 0.35), 0.0, 1.0))
+    normalize_db = float(cfg.get("normalize_db", -6.0))
+    output_mode = str(cfg.get("output_mode", "separate"))
+    seed = int(cfg.get("seed", 1))
+    rng = np.random.default_rng(seed)
+    speed_of_sound = 343.0
+    listener = np.array([room_x * 0.5, room_y * 0.5, room_z * 0.5], dtype=np.float64)
+
+    def perturbed_direction(az, el, amount_deg):
+        return (
+            float(wrap_degrees(np.array([az + rng.normal(0.0, amount_deg)], dtype=np.float64))[0]),
+            float(np.clip(el + rng.normal(0.0, amount_deg * 0.55), -89.0, 89.0)),
+        )
+
+    def aed_from_vector(vec):
+        x, y, z = float(vec[0]), float(vec[1]), float(vec[2])
+        radius = math.sqrt(x * x + y * y + z * z) + 1e-12
+        az = math.degrees(math.atan2(y, x))
+        el = math.degrees(math.asin(np.clip(z / radius, -1.0, 1.0)))
+        return az, el
+
+    def unit_from_layout(az, el):
+        return unit_from_aed(az, el)
+
+    def add_encoded_tap(ir, time_sec, az, el, amp):
+        if time_sec < 0.0 or time_sec >= duration:
+            return
+        frame = min(frames - 1, max(0, int(round(time_sec * sample_rate))))
+        basis = np.array(ambisonic_basis(order, az, el), dtype=np.float32)
+        ir[frame] += basis * float(amp)
+
+    def reflection_points(source_pos):
+        sx, sy, sz = source_pos
+        images = [
+            np.array([-sx, sy, sz], dtype=np.float64),
+            np.array([2.0 * room_x - sx, sy, sz], dtype=np.float64),
+            np.array([sx, -sy, sz], dtype=np.float64),
+            np.array([sx, 2.0 * room_y - sy, sz], dtype=np.float64),
+            np.array([sx, sy, -sz], dtype=np.float64),
+            np.array([sx, sy, 2.0 * room_z - sz], dtype=np.float64),
+        ]
+        return images
+
+    written = []
+    generated_irs = []
+    for direction_index, (base_az, base_el) in enumerate(layout, start=1):
+        ir = np.zeros((frames, ambi_channels), dtype=np.float32)
+        direct_basis = np.array(ambisonic_basis(order, base_az, base_el), dtype=np.float32)
+        source_vec = unit_from_layout(base_az, base_el)
+        source_pos = listener + source_vec * min(source_distance, min(room_x, room_y, room_z) * 0.48)
+        source_pos = np.clip(source_pos, np.array([0.05, 0.05, 0.05]), np.array([room_x - 0.05, room_y - 0.05, room_z - 0.05]))
+        direct_time = pre_delay_ms / 1000.0 + source_distance / speed_of_sound
+        direct_amp = direct_gain / max(1.0, source_distance)
+        if direct_time < duration:
+            direct_frame = min(frames - 1, max(0, int(round(direct_time * sample_rate))))
+            ir[direct_frame] += direct_basis * direct_amp
+
+        # Synthetic test IRs are encoded ambisonic responses for each virtual
+        # source direction. They are not P-format files; the P-format or virtual
+        # direction layer exists inside the convolution process.
+        reflectivity = math.sqrt(max(0.0, 1.0 - absorption))
+        images = reflection_points(source_pos)
+        for image in images:
+            vec = image - listener
+            distance = float(np.linalg.norm(vec))
+            if distance <= 1e-9:
+                continue
+            t = pre_delay_ms / 1000.0 + distance / speed_of_sound
+            az, el = aed_from_vector(vec)
+            az, el = perturbed_direction(az, el, scattering * spread_deg * 0.35)
+            amp = direct_gain * reflectivity * math.exp(-t / max(0.05, decay)) / max(1.0, distance)
+            add_encoded_tap(ir, t, az, el, amp)
+
+        for _ in range(max(0, early_count - len(images))):
+            room_cross = math.sqrt(room_x * room_x + room_y * room_y + room_z * room_z)
+            t = pre_delay_ms / 1000.0 + float(rng.uniform(0.006, min(duration * 0.35, room_cross / speed_of_sound)))
+            if rng.random() < 0.55 + scattering * 0.35:
+                az, el = perturbed_direction(base_az, base_el, spread_deg * (0.5 + scattering))
+            else:
+                az = float(rng.uniform(-180.0, 180.0))
+                el = float(np.degrees(np.arcsin(rng.uniform(-1.0, 1.0))))
+            amp = (0.22 + 0.55 * rng.random()) * reflectivity * math.exp(-t / max(0.05, decay))
+            amp *= rng.choice([-1.0, 1.0])
+            add_encoded_tap(ir, t, az, el, amp)
+
+        for _ in range(diffuse_count):
+            u = rng.random()
+            late_start = min(duration * 0.92, pre_delay_ms / 1000.0 + 0.035 + (1.0 - scattering) * 0.080)
+            t = late_start + max(0.0, duration - late_start) * (u ** (1.35 + scattering * 0.9))
+            if rng.random() < 0.35 + scattering * 0.45:
+                az, el = perturbed_direction(base_az, base_el, spread_deg * (1.4 + scattering * 2.0))
+            else:
+                az = float(rng.uniform(-180.0, 180.0))
+                el = float(np.degrees(np.arcsin(rng.uniform(-1.0, 1.0))))
+            amp = (0.018 + 0.12 * rng.random()) * reflectivity * math.exp(-t / max(0.05, decay))
+            amp *= 0.65 + scattering * 0.85
+            amp *= rng.choice([-1.0, 1.0])
+            add_encoded_tap(ir, t, az, el, amp)
+
+        if lowpass > 0.001:
+            cutoff = sample_rate * (0.05 + 0.36 * (1.0 - max(lowpass, air_damping * 0.75)))
+            ir = one_pole_lowpass(ir, sample_rate, cutoff)
+            if direct_time < duration:
+                direct_frame = min(frames - 1, max(0, int(round(direct_time * sample_rate))))
+                ir[direct_frame] += direct_basis * direct_amp * 0.85
+        ir, pre_peak = normalize_peak(ir, normalize_db)
+        generated_irs.append(ir)
+        if output_mode != "stacked":
+            name = f"{prefix}_{direction_index:02d}_{order}oa.wav"
+            path = output_dir.rstrip("/\\") + "/" + name
+            write_pcm24_wav(path, ir, sample_rate)
+            written.append(path)
+
+    if output_mode == "stacked":
+        stacked = np.concatenate(generated_irs, axis=1) if generated_irs else np.zeros((frames, ambi_channels), dtype=np.float32)
+        path = str(cfg.get("output_path", "")) or (output_dir.rstrip("/\\") + "/" + f"{prefix}_stacked_{order}oa_bank.wav")
+        write_pcm24_wav(path, stacked, sample_rate)
+        written.append(path)
+
+    # Touch the first generated file path as the required output_path contract
+    # used by the shared Lua NumPy runner.
+    if output_mode != "stacked" and written and cfg.get("output_path") and str(cfg.get("output_path")) != written[0]:
+        write_pcm24_wav(str(cfg["output_path"]), read_wav(written[0])[0], sample_rate)
+    print(f"Ambisonic order: {order}OA")
+    print(f"Ambisonic channels per IR: {ambi_channels}")
+    print(f"Direction layout: {layout_key}")
+    print(f"Output mode: {output_mode}")
+    print(f"IR files written: {len(written)}")
+    if output_mode == "stacked":
+        print(f"Stacked bank channels: {ambi_channels * len(layout)}")
+    print(f"Room: {room_x:.2f} x {room_y:.2f} x {room_z:.2f} m")
+    print(f"Absorption: {absorption:.3f}")
+    print(f"Scattering: {scattering:.3f}")
+    print(f"Duration: {duration:.3f} sec")
+    print(f"Estimated / manual decay: {decay:.3f} sec")
+    print(f"Source distance: {source_distance:.3f} m")
+    print(f"Pre-delay: {pre_delay_ms:.2f} ms")
+    print(f"Early reflections per IR: {early_count}")
+    print(f"Diffuse taps per IR: {diffuse_count}")
+    print("Files:")
+    for path in written:
+        print(path)
+
+
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|foafx_offline> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|foafx_offline|ambisonic_convolve|synthetic_ambisonic_ir_bank> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -1859,6 +2217,10 @@ def main():
         render_fata_morgana(cfg)
     elif mode == "foafx_offline":
         render_foafx_offline(cfg)
+    elif mode == "ambisonic_convolve":
+        render_ambisonic_convolve(cfg)
+    elif mode == "synthetic_ambisonic_ir_bank":
+        render_synthetic_ambisonic_ir_bank(cfg)
     else:
         raise RuntimeError(f"Unknown render mode: {mode}")
 

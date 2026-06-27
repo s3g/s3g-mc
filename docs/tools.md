@@ -97,6 +97,14 @@ modulation afterward.
   action for 1OA, 2OA, and 3OA media, with moving AED focus and dry attenuation.
 - `3OAFX Send Return Controller`: places a 24-channel insert lane inside an
   ambisonic decode/encode chain.
+- `3OAFX Offline Ambisonic Convolve`: NumPy-backed ambisonic convolution. It
+  decodes an ambisonic source to virtual directions, convolves each direction
+  with one or more ambisonic IRs, and sums a new ambisonic result.
+- `3OAFX Synthetic Ambisonic IR Bank`: designs encoded ambisonic IR banks for
+  `3OAFX Offline Ambisonic Convolve`, with room size, material absorption,
+  scattering, early reflections, late-field controls, and separate or stacked
+  output formats. Higher-order banks use 8 directions: stacked 2OA is 72
+  channels and stacked 3OA is 128 channels.
 - `Spatial Automation Composer`: previews algorithmic AED or XYZ motion, then
   writes editable automation lanes for supported 8-source s3g panners.
 

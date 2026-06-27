@@ -38,6 +38,8 @@ toc:
     href: "#resonant-terrain"
   - title: Render MC Impulse Field
     href: "#render-mc-impulse-field"
+  - title: 3OAFX Offline Ambisonic Convolve
+    href: "#3oafx-offline-ambisonic-convolve"
   - title: 3OAFX Offline Renderer
     href: "#3oafx-offline-renderer"
   - title: Panners
@@ -304,6 +306,34 @@ Core decisions:
 - Profile controls change impulse shape, decay, and brightness.
 
 For convolution use, start shorter than you think. A sparse one- or two-second impulse field can already create a strong spatial response. Use longer durations when you want tail behavior, echo fields, or unstable room-like motion.
+
+## 3OAFX Offline Ambisonic Convolve
+
+Use this for offline convolution of ambisonic source material with ambisonic impulse responses. It belongs with the 3OAFX offline family because it uses an intermediate directional layer before returning to ambisonic format. The process is inspired by the measured-reverb workflow Bruce Wiggins described in *Sounds in Space 2017*: decode or transform the ambisonic source to directional feeds, convolve those feeds with corresponding ambisonic IRs, then sum the wet result back into ambisonic format. This version adapts that idea for practical 1OA, 2OA, and 3OA IR-bank workflows in REAPER.
+
+Selection:
+
+1. Select the ambisonic source WAV as the earliest selected item on the timeline.
+2. Select one or more ambisonic IR WAV items with it.
+3. Run `3OAFX Offline Ambisonic Convolve`.
+
+The source and IR items should use the same ambisonic convention: `ACN/SN3D`. Choose the source order to match the item: `1OA / 4ch`, `2OA / 9ch`, or `3OA / 16ch`.
+
+Direction layers:
+
+- `Wiggins tetrahedral / P-format` uses a four-direction first-order intermediate.
+- `Order virtual speaker layout` uses the package's order-specific virtual direction sets.
+- For 2OA and 3OA, the convolve bank uses eight practical measurement/design directions. Each direction is an encoded ambisonic IR: `8 x 9 = 72` channels for a stacked 2OA bank, or `8 x 16 = 128` channels for a stacked 3OA bank.
+
+The IRs are ambisonic WAVs, not P-format files. The source is transformed into the intermediate direction layer, then each directional feed is convolved with an encoded ambisonic IR. The summed output is a new encoded ambisonic WAV in the selected order.
+
+If the selected IR count matches the virtual direction count, each direction uses one IR. If fewer IRs are selected, the IRs wrap across the virtual directions. Render time increases with source duration, IR length, ambisonic order, and number of virtual directions.
+
+Use `Dry level` when the IRs were captured with little direct sound and you want to add the original source back separately. Use `Wet pre-gain dB` to lower the convolution bank before normalization if the wet result builds up.
+
+For testing and designed spaces, run `3OAFX Synthetic Ambisonic IR Bank` to create encoded ambisonic IRs for the same direction layer. It uses room dimensions, material absorption, scattering, source distance, early reflections, and late diffuse taps to sketch a synthetic acoustic response.
+
+The designer can write separate ambisonic WAVs, one per virtual direction, or one stacked multichannel bank where each direction occupies a block of ambisonic channels. The convolver detects either format. The 2OA and 3OA stacked banks are designed to fit REAPER's 128-channel track limit.
 
 ## 3OAFX Offline Renderer
 
