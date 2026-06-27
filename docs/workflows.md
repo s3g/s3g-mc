@@ -5,8 +5,8 @@ prev_page:
   title: Tools
   url: /tools.html
 next_page:
-  title: Gallery
-  url: /gallery.html
+  title: Process Guides
+  url: /process-guides.html
 toc:
   - title: Package Browser
     href: "#package-browser"

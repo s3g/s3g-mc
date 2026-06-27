@@ -2,8 +2,8 @@
 layout: default
 title: Gallery
 prev_page:
-  title: Workflows
-  url: /workflows.html
+  title: Process Guides
+  url: /process-guides.html
 toc:
   - title: Interface Screenshots
     href: "#interface-screenshots"

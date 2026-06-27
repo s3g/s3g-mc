@@ -27,6 +27,7 @@ Many of these tools are inspired by or extend existing computer music practices,
 - [Dependencies](dependencies.md)
 - [Tools](tools.md)
 - [Workflows](workflows.md)
+- [Process Guides](process-guides.md)
 - [Gallery](gallery.md)
 
 ## Highlights

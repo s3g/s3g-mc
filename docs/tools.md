@@ -28,6 +28,8 @@ toc:
 
 # Tools
 
+For step-by-step notes on selected render processes, see the [Process Guides](process-guides.md).
+
 ## Channel Mixing / Automation
 
 - `128ch Automation Mixer`: faders, mute/solo, channel groups, meters, and
