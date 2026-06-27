@@ -75,8 +75,8 @@ Several offline processes include compact breakpoint lanes plus a `Detailed Brea
 Useful habits:
 
 - Draw `Amplitude` or `Density` first, then adjust timbre or spatial controls.
-- Use many points for animated materials, but keep the shape simple when judging a new process.
-- `Random selected` is safer than `Random all` when you already like part of a render.
+- Use many points for animated materials, but start with a readable shape when learning a process.
+- `Random selected` changes one chosen lane; `Random all` changes every active lane.
 - If an envelope is not active, the current slider value is used instead.
 
 ## Convolve Selected Items
@@ -89,9 +89,9 @@ Selection:
 2. Select the impulse item second.
 3. Run `Convolve selected items`.
 
-Start with `Matched / wrap impulse` for simple mono, stereo, or same-channel experiments. Use matrix-sum behavior when you want multichannel source and impulse material to combine into a richer shared result without exploding into every source/impulse channel pair.
+Start with `Matched / wrap impulse` for mono, stereo, or same-channel experiments. Use matrix-sum behavior when you want multichannel source and impulse material to combine into one summed channel layout rather than creating every source/impulse channel pair.
 
-Good first settings:
+Starting settings:
 
 - Tail: `Full convolution tail`
 - Normalize: on
@@ -113,7 +113,7 @@ The classic way to think about it: one sound keeps the contour of its performanc
 
 Try the standard spectral envelope mode first. Use the formant-vocode algorithm when you want broader vocal-like or resonant contour transfer instead of dense frame-by-frame spectral matching.
 
-Good first settings:
+Starting settings:
 
 - Amount: moderate rather than maximum
 - Contrast: increase after the source relationship is working
@@ -157,7 +157,7 @@ Important controls:
 - `Rate quantize` can make rate relationships more stable or more stepped.
 - `Source mode` and `Source distribution` decide how multiple selected items are assigned.
 
-Start with conservative rate spread and a generous crossfade. Increase drift once the loop feels seamless.
+Start with moderate rate spread and a generous crossfade. Increase drift after the loop seam feels stable.
 
 ## Loop Rift
 
@@ -199,7 +199,7 @@ Start with fewer grains and moderate density, then raise grain count after the s
 
 Use this when you want a rendered multichannel synthetic source rather than a processed input file. Carto is a JSFX synth driven offline by the Lua renderer, so it creates a new media item instead of requiring realtime playback.
 
-Good first approach:
+Starting approach:
 
 1. Choose duration and channel count.
 2. Choose one algorithm.
@@ -207,22 +207,22 @@ Good first approach:
 4. Shape amplitude and density with breakpoint envelopes.
 5. Render a short test before making a long version.
 
-Algorithms have different spatial behavior. Dust-like modes work well as stochastic clouds. Pulse and packet modes read more clearly with lower density and sharper envelopes. Byte-mask materials can become noise quickly, so sparse density and amplitude shaping are useful. Spline and drift-like materials benefit from slower breakpoint motion.
+Algorithms have different spatial behavior. Dust-like modes behave as stochastic clouds. Pulse and packet modes show their event structure with lower density and sharper envelopes. Byte-mask materials change quickly as density increases, so sparse density and amplitude shaping give more separation. Spline and drift-like materials respond well to slower breakpoint motion.
 
 Use the detailed breakpoint editor when the render feels too static. A good starting set is amplitude, density, brightness, and one spatial control. Randomize one lane at a time until the behavior is legible.
 
 ## Render MC Spectra Synth
 
-Use this for slower, polished synthetic material based on spectral masses, resonators, impulse responses, and partial-like behavior. It is also rendered offline through the included JSFX synth engine.
+Use this for synthetic material based on spectral masses, resonators, impulse responses, and partial-like behavior. It is also rendered offline through the included JSFX synth engine.
 
-Good first approach:
+Starting approach:
 
 - Keep peak normalize on.
 - Start with moderate density and brightness.
-- Use amplitude and spectral-shape breakpoint lanes before adding heavy spatial motion.
-- Avoid judging the process from only the first second; some modes develop over the whole duration.
+- Use amplitude and spectral-shape breakpoint lanes before adding wide spatial motion.
+- Some modes develop over the whole duration, so check more than the opening moment of a render.
 
-Impulse and resonator modes can become clicky if the event layer is too sharp. Increase event smoothing or use slower envelopes when that happens. Spectral-mass modes usually sound better when density changes over time rather than staying fixed.
+Impulse and resonator modes can become clicky if the event layer is too sharp. Increase event smoothing or use slower envelopes when that happens. Spectral-mass modes often reveal more internal motion when density changes over time rather than staying fixed.
 
 ## Partial Trace Resynth
 
@@ -241,9 +241,9 @@ Useful controls:
 - `Density` admits fewer or more traces before synthesis.
 - `Trace count` or equivalent detail controls set how many peaks are followed.
 - `Pitch spread` and `jitter` push the result away from literal resynthesis.
-- `Protection` or clarity controls help avoid muddy, overloaded renders.
+- `Protection` or clarity controls reduce buildup in dense renders.
 
-If the output sounds staticy, reduce density and pitch spread first. If it sounds too much like a simple filtered copy, increase trace motion or spatial spread.
+If the output sounds staticy, reduce density and pitch spread first. If it stays close to the source, increase trace motion or spatial spread.
 
 ## Fata Morgana Resynth
 
@@ -267,22 +267,22 @@ If the output becomes whistly, reduce pitch emphasis with fewer traces, lower pi
 
 ## Mass Partial Field
 
-Use this for additive fields made from many generated partial events rather than from a single analyzed source. It can become computationally heavy, so it is best approached with conservative tests.
+Use this for additive fields made from many generated partial events rather than from a single analyzed source. Render time increases with duration, partial count, event count, and channel count.
 
-Good first settings:
+Starting settings:
 
-- Use a short duration while designing.
+- Use a short duration while setting up a sound.
 - Keep partial or event counts moderate.
 - Leave normalize on.
 - Shape amplitude and density with breakpoints before adding wide pitch drift.
 
-This process is strongest when it behaves like a mass: many small related events that change density, register, and spatial focus over time. If REAPER feels slow while the window is open, collapse the detailed breakpoint editor and render shorter tests.
+This process is designed around mass behavior: many small related events that change density, register, and spatial focus over time. If REAPER feels slow while the window is open, collapse the detailed breakpoint editor or render a shorter test.
 
 ## Resonant Terrain
 
 Use this for struck resonator banks, metallic fields, synthetic impulse responses, and sustained resonant dust. It sits between an offline synth and an impulse-design process.
 
-Good first settings:
+Starting settings:
 
 - Start with moderate excitation.
 - Use fewer resonators while learning the controls.
@@ -352,9 +352,9 @@ The 25-channel dome panners share the RISD SRST dome layout but use different pa
 - `Region` constrains sources to named arcs, rings, triangles, and custom constellations.
 - `Vector Morph` stores scenes and interpolates between them.
 
-The `17ch Cube XYZ Panner` is best treated as an XYZ-native panner. Use smaller spread values when you want a source to focus near a single speaker, and larger distance or offset gestures when you want a source to feel beyond the cube.
+The `17ch Cube XYZ Panner` is an XYZ-native panner. Use smaller spread values when you want a source to focus near a single speaker, and larger distance or offset gestures when you want a source to feel beyond the cube.
 
-The `12ch Dodeca Panner` uses an AED-native spherical layout drawn as a dodecahedron. It is useful for discrete spherical motion with a smaller speaker count.
+The `12ch Dodeca Panner` uses an AED-native spherical layout drawn as a dodecahedron. It supports discrete spherical motion with a smaller speaker count.
 
 For automation, use the controller's automation controls to show, hide, arm, and write relevant lanes. In `Trim/Read`, the GUI can audition control changes without writing automation. Use write modes when you intentionally want controller motion recorded.
 
@@ -375,7 +375,7 @@ Use shift-click to select or release channels. Quick channel groups highlight re
 
 ## MC to Stereo Autogain
 
-Use this at the end of a multichannel sketch when you need a useful stereo monitor or print. It is not a substitute for an actual multichannel render; it is a controlled fold-down.
+Use this at the end of a multichannel sketch when you need a stereo monitor or print. It is not a substitute for an actual multichannel render; it is a controlled fold-down.
 
 Important controls:
 
@@ -389,7 +389,7 @@ Use ring projection for circular layouts, sphere or hemisphere projection for do
 
 ## Track and Item Helpers
 
-These are utility actions for building and reorganizing multichannel projects. They usually do one structural task and are easiest to learn by duplicating a few test items first.
+These are utility actions for building and reorganizing multichannel projects. They usually do one structural task, so duplicated test items are a useful way to confirm the result before working on source material.
 
 Useful starting points:
 
