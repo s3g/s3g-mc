@@ -37,12 +37,20 @@ published system unless a process guide says so.
 
 <p class="bib-entry">Zotter, Franz, and Matthias Frank. 2019. <em>Ambisonics: A Practical 3D Audio Theory for Recording, Studio Production, Sound Reinforcement, and Virtual Reality</em>. Cham: Springer.</p>
 
+<p class="bib-entry">Institute of Electronic Music and Acoustics, University of Music and Performing Arts Graz. n.d. <em>IEM Plug-in Suite</em>. Software, documentation, and source repository. Accessed June 28, 2026.
+<a href="https://plugins.iem.at/" target="_blank" rel="noopener noreferrer">Project site</a>;
+<a href="https://plugins.iem.at/docs/" target="_blank" rel="noopener noreferrer">documentation</a>;
+<a href="https://plugins.iem.at/download/" target="_blank" rel="noopener noreferrer">download page</a>;
+<a href="https://git.iem.at/audioplugins/IEMPluginSuite" target="_blank" rel="noopener noreferrer">source repository</a>.</p>
+
 <p class="bib-entry">McCormack, Leo, and SPARTA contributors. n.d. <em>SPARTA: Spatial Audio Real-time Applications</em>. Project documentation and source repository. Accessed June 28, 2026.
 <a href="https://leomccormack.github.io/sparta-site/" target="_blank" rel="noopener noreferrer">Project site</a>;
 <a href="https://github.com/leomccormack/SPARTA" target="_blank" rel="noopener noreferrer">GitHub repository</a>.</p>
 
 <p class="bib-entry">RISD Sound. 2022. <em>FOAFX</em>. GitHub repository. Accessed June 28, 2026.
 <a href="https://github.com/risdsound/foafx" target="_blank" rel="noopener noreferrer">https://github.com/risdsound/foafx</a>.</p>
+
+<p class="bib-entry">Kronlachner, Matthias. 2014. <em>Spatial Transformations for the Alteration of Ambisonic Recordings</em>. Master's thesis, Institute of Electronic Music and Acoustics, University of Music and Performing Arts Graz, and Graz University of Technology.</p>
 
 <p class="bib-entry">Farina, Angelo. n.d. "SPS Conversion." Accessed June 28, 2026.
 <a href="https://www.angelofarina.it/SPS-conversion.htm" target="_blank" rel="noopener noreferrer">https://www.angelofarina.it/SPS-conversion.htm</a>.
@@ -101,6 +109,8 @@ Archived March 1, 2024:
 
 <p class="bib-entry">Deleflie, E., and Schiemer, Greg. 2009. "Spatial Grains: Imbuing Granular Particles With Spatial-Domain Information."
 <a href="https://ro.uow.edu.au/creartspapers/35" target="_blank" rel="noopener noreferrer">https://ro.uow.edu.au/creartspapers/35</a>.</p>
+
+<p class="bib-entry">Mariette, Nicholas. 2009. "AmbiGrainer: A Higher Order Ambisonic Granulator in Pd." Paper presented at Ambisonics Symposium 2009, Graz, June 25-27.</p>
 
 </div>
 
