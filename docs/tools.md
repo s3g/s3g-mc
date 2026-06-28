@@ -64,6 +64,10 @@ modulation afterward.
   source items, recombining timing, pitch, amplitude, and spatial traits.
 - `IR Toolkit`: reshapes a selected impulse response item with silence trim,
   tail fade, normalization, early reflections, and channel decorrelation.
+- `Karplus Field`: Karplus-Strong plucked resonator events distributed across
+  a multichannel bed.
+- `Subharmonic Bank`: subharmonic divider-bank synthesis with masks,
+  instability, pulse/sine blend, folded articulation, and spatial spread.
 - `Mass Partial Field`: additive partial events with drift and channel motion.
 - `Partial Trace Resynth`: STFT peak tracing rendered as a multichannel
   oscillator field, with linked, point, smear, and frozen trace modes.
@@ -107,6 +111,9 @@ behaviors.
 
 ## 3OAFX
 
+- `6ch Ambisonic Decoder Router`: package-native JSFX monitor decoder/router
+  for ACN/SN3D 1OA, 2OA, or 3OA into an editable 6-speaker layout, with direct
+  6-channel routing mode.
 - `3OAFX Ambiance Extractor`: extracts room tone, noise bed, or other
   profile-like material from an ambisonic source while preserving the directional
   decode/re-encode workflow.
@@ -121,6 +128,10 @@ behaviors.
   with optional lower-order and sparse FOA IR adaptation.
 - `3OAFX Send Return Controller`: places a 24-channel insert lane inside an
   ambisonic decode/encode chain.
+- `3OAFX Spatial Grains`: spatial-grain renderer for 1OA, 2OA, and 3OA media.
+  Grain position, envelope, duration, rate, and overlap are shared across all
+  encoded channels, with source-time navigation and optional HOA yaw/order
+  transforms.
 - `3OAFX Spectral Hole Maker`: carves profile-shaped spectral space from an
   ambisonic source per direction.
 - `3OAFX Spectral Profile Match`: steers the source spectrum toward a reference
@@ -150,17 +161,28 @@ and run from the package's Python/NumPy backend.
 - `Cross Synthesis`: offline STFT cross-synthesis for two WAV-backed media
   items. The first selected item keeps phase and timing while its spectral
   magnitudes are blended toward the second item's magnitudes.
+- `Chaotic Resonant EQ`: protected multichannel resonant filter-bank process
+  with chaotic detuning, drive, and channel-to-channel feedback.
 - `Render MC Impulse Field`: procedural multichannel impulse fields for
   convolution.
 - `Spectral Accumulate`: spectral sustain where each frequency band holds until
   stronger energy replaces it.
+- `Spectral Ambiance Extractor`: extracts source material that resembles a
+  room-tone or noise-bed profile while preserving the source channel layout.
 - `Spectral Blur`: offline magnitude blur across neighboring STFT frames, with
   safe envelope mode and optional time expansion.
 - `Spectral Freeze`: imposes one selected spectral frame across the item while
   preserving phase/timing motion, with safe envelope mode, envelope floor, and
   optional time expansion.
+- `Spectral Hole Maker`: carves profile-shaped spectral space from a source
+  item without ambisonic decoding.
 - `Spectral Morph`: live or frozen spectral morph between two WAV-backed media
   items.
+- `Spectral Profile Subtract`: removes a learned spectral profile directly
+  across ordinary mono, stereo, or multichannel media while preserving the source
+  channel count.
+- `Spectral Residue Extractor`: renders the material removed by a profile
+  subtraction as its own multichannel item.
 - `Spectral Shaper`: offline spectral envelope transfer for two WAV-backed
   media items, with an alternate formant-vocode algorithm. The first selected
   item is the carrier/tune/timing source; the second supplies the spectral

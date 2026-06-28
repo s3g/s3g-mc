@@ -1,0 +1,174 @@
+desc:s3g 6ch Ambisonic Decoder Router
+tags: ambisonic decoder ACN SN3D six speaker direct router
+
+slider1:0<0,2,1{Ambisonic ACN/SN3D,Direct 6ch,Ambisonic + Direct}>Input mode
+slider2:1<1,3,1{1OA / 4ch,2OA / 9ch,3OA / 16ch}>Ambisonic order
+slider3:1<0,2,1{Projection,Energy-normalized,Max-rE-ish}>Decode weighting
+slider4:0<-24,24,0.1>Output gain (dB)
+slider5:1<0,1,1{Keep extra channels,Clear extra channels}>Extra channel output
+slider6:100<0,150,1>Direct input mix (%)
+slider7:100<0,150,1>Ambisonic decode mix (%)
+
+slider10:45<-180,180,0.1>S1 FL azimuth
+slider11:0<-90,90,0.1>S1 FL elevation
+slider12:-45<-180,180,0.1>S2 FR azimuth
+slider13:0<-90,90,0.1>S2 FR elevation
+slider14:-135<-180,180,0.1>S3 BR azimuth
+slider15:0<-90,90,0.1>S3 BR elevation
+slider16:135<-180,180,0.1>S4 BL azimuth
+slider17:0<-90,90,0.1>S4 BL elevation
+slider18:90<-180,180,0.1>S5 OH-L azimuth
+slider19:60<-90,90,0.1>S5 OH-L elevation
+slider20:-90<-180,180,0.1>S6 OH-R azimuth
+slider21:60<-90,90,0.1>S6 OH-R elevation
+
+@init
+deg2rad = $pi / 180;
+EPS = 0.000000001;
+MAX_SPK = 6;
+MAX_CH = 16;
+spk_az = 0;
+spk_el = 16;
+basis = 64;
+row_norm = 192;
+
+function wrap_deg(v) (
+  v > 180 ? v -= 360;
+  v < -180 ? v += 360;
+  v;
+);
+
+function set_basis(spk, az_deg, el_deg) local(az, el, ca, sa, c2a, s2a, c3a, s3a, ce, se, ce2, ce3, se2, idx)
+(
+  spk_az[spk] = az_deg;
+  spk_el[spk] = el_deg;
+  az = az_deg * deg2rad;
+  el = el_deg * deg2rad;
+  ca = cos(az);
+  sa = sin(az);
+  c2a = cos(2 * az);
+  s2a = sin(2 * az);
+  c3a = cos(3 * az);
+  s3a = sin(3 * az);
+  ce = cos(el);
+  se = sin(el);
+  ce2 = ce * ce;
+  ce3 = ce2 * ce;
+  se2 = se * se;
+  idx = basis + spk * MAX_CH;
+
+  // Real ACN/SN3D basis, AmbiX convention.
+  basis[idx + 0] = 1;
+  basis[idx + 1] = sa * ce;
+  basis[idx + 2] = se;
+  basis[idx + 3] = ca * ce;
+
+  basis[idx + 4] = 0.8660254038 * s2a * ce2;
+  basis[idx + 5] = 0.8660254038 * sa * sin(2 * el);
+  basis[idx + 6] = 0.5 * (3 * se2 - 1);
+  basis[idx + 7] = 0.8660254038 * ca * sin(2 * el);
+  basis[idx + 8] = 0.8660254038 * c2a * ce2;
+
+  basis[idx + 9] = 0.7905694150 * s3a * ce3;
+  basis[idx + 10] = 1.9364916731 * s2a * se * ce2;
+  basis[idx + 11] = 0.6123724357 * sa * ce * (5 * se2 - 1);
+  basis[idx + 12] = 0.5 * se * (5 * se2 - 3);
+  basis[idx + 13] = 0.6123724357 * ca * ce * (5 * se2 - 1);
+  basis[idx + 14] = 1.9364916731 * c2a * se * ce2;
+  basis[idx + 15] = 0.7905694150 * c3a * ce3;
+);
+
+function channel_count_for_order(order) (
+  order <= 1 ? 4 : order == 2 ? 9 : 16;
+);
+
+function order_weight(ch, order, mode) local(w)
+(
+  w = 1;
+  mode == 2 ? (
+    ch == 0 ? w = 1 :
+    ch < 4 ? w = 1 :
+    ch < 9 ? w = order >= 2 ? 0.82 : 0 :
+    w = order >= 3 ? 0.64 : 0;
+  );
+  w;
+);
+
+@slider
+input_mode = floor(slider1 + 0.5);
+order = floor(slider2 + 0.5);
+decode_mode = floor(slider3 + 0.5);
+out_gain = 10 ^ (slider4 / 20);
+clear_extra = floor(slider5 + 0.5);
+direct_mix = slider6 / 100;
+ambi_mix = slider7 / 100;
+
+set_basis(0, slider10, slider11);
+set_basis(1, slider12, slider13);
+set_basis(2, slider14, slider15);
+set_basis(3, slider16, slider17);
+set_basis(4, slider18, slider19);
+set_basis(5, slider20, slider21);
+
+ch_count = channel_count_for_order(order);
+
+spk = 0;
+loop(MAX_SPK,
+  idx = basis + spk * MAX_CH;
+  sumsq = 0;
+  ch = 0;
+  loop(ch_count,
+    w = order_weight(ch, order, decode_mode);
+    sumsq += (basis[idx + ch] * w) * (basis[idx + ch] * w);
+    ch += 1;
+  );
+  row_norm[spk] = decode_mode >= 1 ? 1 / sqrt(max(EPS, sumsq)) : 1;
+  spk += 1;
+);
+
+@sample
+in0 = spl0; in1 = spl1; in2 = spl2; in3 = spl3; in4 = spl4; in5 = spl5;
+in6 = spl6; in7 = spl7; in8 = spl8; in9 = spl9; in10 = spl10; in11 = spl11; in12 = spl12; in13 = spl13; in14 = spl14; in15 = spl15;
+
+input_mode == 1 ? (
+  spl0 = in0 * direct_mix * out_gain;
+  spl1 = in1 * direct_mix * out_gain;
+  spl2 = in2 * direct_mix * out_gain;
+  spl3 = in3 * direct_mix * out_gain;
+  spl4 = in4 * direct_mix * out_gain;
+  spl5 = in5 * direct_mix * out_gain;
+) : (
+  spk = 0;
+  loop(MAX_SPK,
+    idx = basis + spk * MAX_CH;
+    y = 0;
+    ch = 0;
+    loop(ch_count,
+      sample =
+        ch == 0 ? in0 : ch == 1 ? in1 : ch == 2 ? in2 : ch == 3 ? in3 :
+        ch == 4 ? in4 : ch == 5 ? in5 : ch == 6 ? in6 : ch == 7 ? in7 :
+        ch == 8 ? in8 : ch == 9 ? in9 : ch == 10 ? in10 : ch == 11 ? in11 :
+        ch == 12 ? in12 : ch == 13 ? in13 : ch == 14 ? in14 : in15;
+      y += sample * basis[idx + ch] * order_weight(ch, order, decode_mode);
+      ch += 1;
+    );
+    y *= row_norm[spk] * ambi_mix * out_gain;
+    direct = 0;
+    input_mode == 2 ? (
+      direct = spk == 0 ? in0 : spk == 1 ? in1 : spk == 2 ? in2 : spk == 3 ? in3 : spk == 4 ? in4 : in5;
+    );
+    y += direct * direct_mix * out_gain;
+    spk == 0 ? spl0 = y :
+    spk == 1 ? spl1 = y :
+    spk == 2 ? spl2 = y :
+    spk == 3 ? spl3 = y :
+    spk == 4 ? spl4 = y :
+    spl5 = y;
+    spk += 1;
+  );
+);
+
+clear_extra ? (
+  spl6 = 0; spl7 = 0; spl8 = 0; spl9 = 0;
+  spl10 = 0; spl11 = 0; spl12 = 0; spl13 = 0; spl14 = 0; spl15 = 0;
+);

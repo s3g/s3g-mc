@@ -44,10 +44,16 @@ toc:
     href: "#3oafx-offline-ambisonic-convolve"
   - title: 3OAFX Offline Renderer
     href: "#3oafx-offline-renderer"
+  - title: 6ch Ambisonic Decoder Router
+    href: "#6ch-ambisonic-decoder-router"
   - title: 3OAFX Spectral Profile Subtract
     href: "#3oafx-spectral-profile-subtract"
   - title: 3OAFX Spectral Profile Tools
     href: "#3oafx-spectral-profile-tools"
+  - title: 3OAFX Spatial Grains
+    href: "#3oafx-spatial-grains"
+  - title: Multichannel Spectral Profile Tools
+    href: "#multichannel-spectral-profile-tools"
   - title: Panners
     href: "#panners"
   - title: MC Channel Automation Mixer
@@ -418,6 +424,24 @@ Settings:
 - `Frequency smoothing bins` and `Temporal smoothing`: soften narrow-bin and
   frame-to-frame changes.
 
+## 6ch Ambisonic Decoder Router
+
+This JSFX is a package-native monitor decoder/router for a compact 6-speaker
+setup. It accepts ACN/SN3D 1OA, 2OA, or 3OA input and writes speaker feeds to
+channels 1-6. The default output layout is `45/0`, `-45/0`, `-135/0`,
+`135/0`, `90/60`, and `-90/60` in azimuth/elevation degrees; each speaker has
+editable azimuth and elevation sliders.
+
+The decoder is an energy-normalized projection decoder with optional
+max-rE-style order weighting. It is useful for realtime listening and sketching
+inside REAPER. For formal calibrated ambisonic decoding, use a measured decoder
+such as IEM `AllRADecoder` when available.
+
+`Direct 6ch` mode bypasses ambisonic decoding and routes input channels 1-6 to
+the same speaker outputs. `Ambisonic + Direct` mixes that direct layer with the
+decoded ambisonic layer, which is useful when combining non-ambisonic materials
+with the same monitor rig.
+
 ## 3OAFX Spectral Profile Tools
 
 These actions share the same source/profile workflow as `3OAFX Spectral Profile
@@ -442,6 +466,48 @@ Useful first controls:
 - `Spectral floor`: how much material is allowed to remain in reduced areas.
 - `Frequency smoothing bins` and `Temporal smoothing`: increase these when the
   result feels too narrow, watery, or frame-like.
+
+## 3OAFX Spatial Grains
+
+`3OAFX Spatial Grains` follows the spatial-grain principle described by E.
+Deleflie and Greg Schiemer: the same grain micro-control is applied to every
+encoded component channel. In practice, grain position, duration, envelope,
+playback rate, overlap, and navigation mode are shared across the 1OA, 2OA, or
+3OA channels, so the renderer can work directly on the encoded ambisonic file.
+
+Use `Navigation mode` to decide how source time is used as a spatial index:
+
+- `Index scan`: reads through the source as a trajectory.
+- `Cloud`: samples source-time positions statistically.
+- `Dual state`: moves between two source-time regions.
+- `Jump scan`: steps through source-time regions.
+- `Freeze cloud`: builds a cloud around one source-time position.
+
+`Room memory` increases minimum grain length and overlap to help retain
+reverberant or time-based spatial cues. `Yaw` controls add optional HOA-domain
+rotation; order weighting can soften or emphasize higher-order spatial detail.
+
+## Multichannel Spectral Profile Tools
+
+These are the non-ambisonic counterparts to the 3OAFX profile tools. Select a
+WAV-backed source item first, then a WAV-backed profile item. The output keeps
+the source channel count and does not decode or re-encode HOA.
+
+Use the variants for different intentions:
+
+- `Spectral Profile Subtract`: reduces material in the source that matches the
+  profile.
+- `Spectral Residue Extractor`: writes the removed material as a separate item.
+- `Spectral Hole Maker`: carves profile-shaped spectral space in the source.
+- `Spectral Ambiance Extractor`: extracts material that resembles room tone,
+  noise bed, or ambiance profile.
+
+The `Channel mode` setting controls how the profile channels are assigned:
+
+- `Matched channels`: source channel 1 uses profile channel 1, and so on.
+- `Wrap profile channels`: profile channels repeat across the source channels.
+- `Summed profile to all`: the profile is analyzed as one composite spectrum and
+  applied to every source channel.
 
 ## Panners
 

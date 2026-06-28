@@ -2028,6 +2028,395 @@ def render_foafx_profile_subtract(cfg):
     render_foafx_spectral_profile_tool(cfg)
 
 
+def map_profile_channels(profile_audio, source_channels, mode):
+    mode = str(mode or "matched")
+    profile_channels = int(profile_audio.shape[1])
+    source_channels = int(source_channels)
+    if profile_channels <= 0:
+        raise RuntimeError("Profile audio has no channels.")
+    if mode == "summed":
+        mono = np.mean(profile_audio, axis=1, keepdims=True)
+        return np.repeat(mono, source_channels, axis=1).astype(np.float32, copy=False)
+    if mode == "wrap":
+        indices = np.arange(source_channels) % profile_channels
+        return profile_audio[:, indices].astype(np.float32, copy=False)
+    if profile_channels < source_channels:
+        raise RuntimeError(
+            f"Matched channel mode needs at least {source_channels} profile channels; "
+            f"selected profile has {profile_channels}."
+        )
+    return profile_audio[:, :source_channels].astype(np.float32, copy=False)
+
+
+def render_multichannel_spectral_profile_tool(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    profile, profile_rate = read_wav(cfg["profile_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    profile_audio = segment(profile, profile_rate, cfg.get("profile_start", 0.0), cfg.get("profile_duration", 1.0), sample_rate)
+    if audio.ndim == 1:
+        audio = audio[:, None]
+    if profile_audio.ndim == 1:
+        profile_audio = profile_audio[:, None]
+    source_channels = int(audio.shape[1])
+    if source_channels < 1:
+        raise RuntimeError("Source audio has no channels.")
+    if source_channels > 128:
+        raise RuntimeError(f"REAPER supports up to 128 channels; source has {source_channels}.")
+    channel_mode = str(cfg.get("channel_mode", "matched"))
+    profile_mapped = map_profile_channels(profile_audio, source_channels, channel_mode)
+    audio = audio[:, :source_channels].astype(np.float32, copy=False)
+
+    processed, stats = spectral_profile_tool_region(audio, profile_mapped, sample_rate, cfg)
+    out = processed.astype(np.float32, copy=False)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("soft_limit", True)):
+        peak = float(np.max(np.abs(out))) if out.size else 0.0
+        if peak > 1.0:
+            ceiling = 0.92
+            out = (ceiling * np.tanh(out / ceiling)).astype(np.float32)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    process_name = str(cfg.get("process_name", "Spectral Profile Tool"))
+    print(f"Process: {process_name}")
+    print(f"Source channels: {source_channels}")
+    print(f"Profile channels: {int(profile_audio.shape[1])}")
+    print(f"Channel mode: {channel_mode}")
+    print(f"Process kind: {str(cfg.get('process_kind', 'subtract'))}")
+    print(f"Output mode: {str(cfg.get('output_mode', 'cleaned'))}")
+    print(f"Profile statistic: {str(cfg.get('profile_stat', 'median'))}")
+    print(f"Reduction amount: {float(cfg.get('reduction_amount', 0.75)):.3f}")
+    print(f"Spectral floor: {float(cfg.get('spectral_floor', 0.18)):.3f}")
+    print(f"Profile sensitivity: {float(cfg.get('profile_sensitivity', 1.15)):.3f}")
+    print(f"Frequency smoothing bins: {int(cfg.get('frequency_smoothing_bins', 3))}")
+    print(f"Temporal smoothing: {float(cfg.get('temporal_smoothing', 0.35)):.3f}")
+    print(f"FFT / hop: {stats['fft_size']} / {stats['hop_size']}")
+    print(f"Profile STFT frames: {stats['profile_frames']}")
+    print(f"Source STFT frames: {stats['source_frames']}")
+    print(f"Max spectral reduction: {stats['max_reduction']:.3f}")
+    print(f"Minimum spectral gain: {stats['min_gain']:.3f}")
+    if "max_gain" in stats:
+        print(f"Maximum spectral gain: {stats['max_gain']:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+    print(f"Output channels: {source_channels}")
+    print(f"Sample rate: {sample_rate} Hz")
+
+
+def apply_hoa_yaw(audio, order, angle_deg):
+    order = int(max(1, min(3, order)))
+    channels = (order + 1) * (order + 1)
+    out = audio[:, :channels].astype(np.float32, copy=True)
+    angle = math.radians(float(angle_deg))
+    index = 0
+    for n in range(order + 1):
+        pairs = {}
+        for m in range(-n, n + 1):
+            pairs[m] = index
+            index += 1
+        for m in range(1, n + 1):
+            sin_i = pairs.get(-m)
+            cos_i = pairs.get(m)
+            if sin_i is None or cos_i is None:
+                continue
+            c = math.cos(m * angle)
+            s = math.sin(m * angle)
+            sin_v = audio[:, sin_i].astype(np.float32, copy=False)
+            cos_v = audio[:, cos_i].astype(np.float32, copy=False)
+            out[:, sin_i] = sin_v * c - cos_v * s
+            out[:, cos_i] = sin_v * s + cos_v * c
+    return out
+
+
+def apply_hoa_order_weights(audio, order, first_weight, second_weight, third_weight, w_weight=1.0):
+    weights = {0: float(w_weight), 1: float(first_weight), 2: float(second_weight), 3: float(third_weight)}
+    out = audio.copy()
+    index = 0
+    for n in range(int(order) + 1):
+        count = 2 * n + 1
+        out[:, index:index + count] *= weights.get(n, 1.0)
+        index += count
+    return out
+
+
+def render_foafx_spatial_granulator(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    order = int(cfg.get("order", ambisonic_order_from_channels(audio.shape[1])))
+    order = max(1, min(3, order))
+    ambi_channels = (order + 1) * (order + 1)
+    if audio.shape[1] < ambi_channels:
+        raise RuntimeError(f"Selected source has {audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+    audio = audio[:, :ambi_channels].astype(np.float32, copy=False)
+    duration = float(cfg.get("duration", audio.shape[0] / sample_rate))
+    out_frames = max(1, int(round(duration * sample_rate)))
+    grain_ms = float(cfg.get("grain_ms", 80.0))
+    grain_frames = max(8, int(round(grain_ms * sample_rate / 1000.0)))
+    density = max(0.1, float(cfg.get("density", 24.0)))
+    event_count = max(1, int(round(duration * density)))
+    overlap_gain = 1.0 / math.sqrt(max(1.0, density * grain_ms / 1000.0))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+    mode = str(cfg.get("navigation_mode", "scan"))
+    jitter = float(np.clip(cfg.get("position_jitter", 0.12), 0.0, 1.0))
+    rate = float(cfg.get("rate", 1.0))
+    rate_jitter = float(np.clip(cfg.get("rate_jitter", 0.05), 0.0, 2.0))
+    reverse_prob = float(np.clip(cfg.get("reverse_probability", 0.0), 0.0, 1.0))
+    yaw_start = float(cfg.get("yaw_start", 0.0))
+    yaw_end = float(cfg.get("yaw_end", 0.0))
+    yaw_scatter = float(max(0.0, cfg.get("yaw_scatter", 0.0)))
+    room_memory = float(np.clip(cfg.get("room_memory", 0.35), 0.0, 1.0))
+    doppler = float(np.clip(cfg.get("doppler_rate", 0.0), 0.0, 1.0))
+    dual_a = float(np.clip(cfg.get("dual_a", 0.18), 0.0, 1.0))
+    dual_b = float(np.clip(cfg.get("dual_b", 0.82), 0.0, 1.0))
+    higher_weight = float(np.clip(cfg.get("higher_order_weight", 1.0), 0.0, 2.0))
+    w_weight = float(np.clip(cfg.get("w_weight", 1.0), 0.0, 2.0))
+    if room_memory > 0.0:
+        grain_frames = max(grain_frames, int(round((40.0 + 220.0 * room_memory) * sample_rate / 1000.0)))
+    window = np.hanning(grain_frames).astype(np.float32)
+    out = np.zeros((out_frames + grain_frames + 4, ambi_channels), dtype=np.float32)
+    norm = np.zeros(out.shape[0], dtype=np.float32)
+    max_start = max(1, audio.shape[0] - grain_frames - 2)
+    positions = []
+
+    def source_position(frac):
+        if mode == "cloud":
+            base = rng.random()
+        elif mode == "dual":
+            blend = 0.5 + 0.5 * math.sin(2.0 * math.pi * frac)
+            base = dual_a * (1.0 - blend) + dual_b * blend
+        elif mode == "jump":
+            steps = max(2, int(cfg.get("jump_steps", 8)))
+            base = math.floor(frac * steps) / max(1, steps - 1)
+        elif mode == "freeze":
+            base = float(cfg.get("freeze_position", 0.5))
+        else:
+            base = frac
+        base += (rng.random() * 2.0 - 1.0) * jitter
+        return float(np.clip(base, 0.0, 1.0))
+
+    for event in range(event_count):
+        frac = event / max(1, event_count - 1)
+        out_start = int(round(frac * max(1, out_frames - 1)))
+        src_frac = source_position(frac)
+        src_start = int(round(src_frac * max_start))
+        local_rate = rate * (2.0 ** ((rng.random() * 2.0 - 1.0) * rate_jitter))
+        if doppler > 0.0 and event > 0:
+            local_rate *= 1.0 + (src_frac - positions[-1]) * doppler * 2.0
+        positions.append(src_frac)
+        if rng.random() < reverse_prob:
+            local_rate *= -1.0
+        read = src_start + np.arange(grain_frames, dtype=np.float64) * local_rate
+        read = np.clip(read, 0.0, audio.shape[0] - 1.0)
+        i0 = np.floor(read).astype(np.int64)
+        i1 = np.clip(i0 + 1, 0, audio.shape[0] - 1)
+        frac_read = (read - i0)[:, None].astype(np.float32)
+        grain = audio[i0] * (1.0 - frac_read) + audio[i1] * frac_read
+        yaw = yaw_start + (yaw_end - yaw_start) * frac + (rng.random() * 2.0 - 1.0) * yaw_scatter
+        if abs(yaw) > 1e-9:
+            grain = apply_hoa_yaw(grain, order, yaw)
+        if higher_weight != 1.0 or w_weight != 1.0:
+            grain = apply_hoa_order_weights(grain, order, higher_weight, higher_weight, higher_weight, w_weight)
+        end = min(out_start + grain_frames, out.shape[0])
+        count = end - out_start
+        if count <= 0:
+            continue
+        shaped = grain[:count] * window[:count, None] * overlap_gain
+        out[out_start:end] += shaped
+        norm[out_start:end] += window[:count] * window[:count]
+
+    out = out[:out_frames]
+    if bool(cfg.get("normalize_overlap", True)):
+        out /= np.maximum(np.sqrt(norm[:out_frames, None]), 0.25)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out.astype(np.float32), sample_rate)
+    print("Process: 3OAFX Spatial Grains")
+    print(f"Ambisonic order: {order}OA")
+    print(f"Output channels: {ambi_channels}")
+    print(f"Navigation mode: {mode}")
+    print(f"Grains: {event_count}")
+    print(f"Grain size ms: {grain_ms:.2f}")
+    print(f"Density: {density:.2f}")
+    print(f"Yaw start/end/scatter: {yaw_start:.2f} / {yaw_end:.2f} / {yaw_scatter:.2f}")
+    print(f"Room memory: {room_memory:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+    print(f"Sample rate: {sample_rate} Hz")
+
+
+def spatial_weights(channels, center, width):
+    idx = np.arange(channels, dtype=np.float64)
+    dist = np.abs(((idx - center + channels / 2.0) % channels) - channels / 2.0)
+    sigma = max(0.2, float(width))
+    weights = np.exp(-0.5 * (dist / sigma) ** 2)
+    total = math.sqrt(float(np.sum(weights * weights))) + 1e-12
+    return (weights / total).astype(np.float32)
+
+
+def render_karplus_field(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    duration = float(cfg.get("duration", 8.0))
+    channels = int(max(1, min(128, cfg.get("channels", 8))))
+    frames = max(1, int(round(duration * sample_rate)))
+    events = int(max(1, cfg.get("events", 80)))
+    base_freq = float(cfg.get("base_freq", 82.0))
+    spread_oct = float(cfg.get("spread_oct", 3.0))
+    decay = float(np.clip(cfg.get("decay", 0.985), 0.8, 0.9995))
+    damping = float(np.clip(cfg.get("damping", 0.45), 0.0, 0.98))
+    brightness = float(np.clip(cfg.get("brightness", 0.7), 0.0, 1.0))
+    dispersion = float(np.clip(cfg.get("dispersion", 0.08), 0.0, 0.5))
+    width = float(max(0.2, cfg.get("spatial_width", 1.4)))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+    out = np.zeros((frames, channels), dtype=np.float32)
+    for event in range(events):
+        t = rng.random() * max(0.001, duration - 0.02)
+        start = int(t * sample_rate)
+        freq = base_freq * (2.0 ** (rng.random() * spread_oct))
+        delay = max(2, int(round(sample_rate / max(20.0, freq))))
+        length = min(frames - start, int(sample_rate * (0.25 + 3.5 * (decay - 0.8) / 0.1995)))
+        if length <= 8:
+            continue
+        buf = (rng.random(delay).astype(np.float32) * 2.0 - 1.0) * (0.25 + brightness)
+        pos = rng.random() * channels
+        weights = spatial_weights(channels, pos, width)
+        y = np.zeros(length, dtype=np.float32)
+        prev = 0.0
+        for n in range(length):
+            a = buf[n % delay]
+            b = buf[(n + 1) % delay]
+            val = ((1.0 - damping) * a + damping * 0.5 * (a + b)) * decay
+            val += prev * dispersion
+            val = math.tanh(val)
+            buf[n % delay] = val
+            prev = val
+            y[n] = val
+        env = np.exp(-np.linspace(0.0, 6.0, length, dtype=np.float32) * (1.0 - decay + 0.015))
+        y *= env * (0.08 / math.sqrt(max(1, events / duration)))
+        out[start:start + length] += y[:, None] * weights[None, :]
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -12.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print("Process: Karplus Field")
+    print(f"Duration: {duration:.2f} sec")
+    print(f"Channels: {channels}")
+    print(f"Events: {events}")
+    print(f"Base frequency: {base_freq:.2f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
+def render_subharmonic_bank(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    duration = float(cfg.get("duration", 12.0))
+    channels = int(max(1, min(128, cfg.get("channels", 8))))
+    frames = max(1, int(round(duration * sample_rate)))
+    root = float(cfg.get("root_freq", 110.0))
+    voices = int(max(1, min(96, cfg.get("voices", 24))))
+    instability = float(np.clip(cfg.get("instability", 0.12), 0.0, 1.0))
+    pulse_blend = float(np.clip(cfg.get("pulse_blend", 0.55), 0.0, 1.0))
+    fold = float(np.clip(cfg.get("fold", 0.2), 0.0, 1.0))
+    mask = float(np.clip(cfg.get("event_mask", 0.55), 0.0, 1.0))
+    width = float(max(0.2, cfg.get("spatial_width", 1.8)))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+    t = np.arange(frames, dtype=np.float64) / sample_rate
+    out = np.zeros((frames, channels), dtype=np.float32)
+    divs = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 13, 16, 21, 24, 32], dtype=np.float64)
+    for voice in range(voices):
+        div = float(rng.choice(divs))
+        freq = root / div * (2.0 ** rng.integers(-1, 2))
+        drift = np.sin(2.0 * np.pi * (0.03 + rng.random() * 0.18) * t + rng.random() * 6.28) * instability * 0.035
+        phase = 2.0 * np.pi * np.cumsum(freq * (1.0 + drift)) / sample_rate + rng.random() * 6.28
+        sine = np.sin(phase)
+        pulse = np.sign(np.sin(phase + 0.3 * np.sin(phase / max(1.0, div)))).astype(np.float64)
+        sig = sine * (1.0 - pulse_blend) + pulse * pulse_blend
+        gate_rate = 0.12 + rng.random() * 1.6
+        gate_phase = rng.random() * 6.28
+        gate = (0.5 + 0.5 * np.sin(2.0 * np.pi * gate_rate * t + gate_phase)) > (1.0 - mask)
+        smooth = np.convolve(gate.astype(np.float32), np.hanning(max(16, int(0.025 * sample_rate))).astype(np.float32), mode="same")
+        smooth /= max(1e-6, float(np.max(smooth)))
+        sig *= smooth
+        if fold > 0.0:
+            sig = np.tanh(sig * (1.0 + fold * 8.0)) / math.tanh(1.0 + fold * 8.0)
+        pos = (voice / max(1, voices) * channels + rng.normal(0.0, channels * 0.08)) % channels
+        weights = spatial_weights(channels, pos, width)
+        out += (sig.astype(np.float32)[:, None] * weights[None, :]) * (0.12 / math.sqrt(voices))
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -12.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print("Process: Subharmonic Bank")
+    print(f"Duration: {duration:.2f} sec")
+    print(f"Channels: {channels}")
+    print(f"Voices: {voices}")
+    print(f"Root frequency: {root:.2f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
+def resonant_one_pole_bank(x, sample_rate, freqs, q, drive):
+    y = np.zeros_like(x, dtype=np.float32)
+    states = np.zeros((len(freqs), 2), dtype=np.float64)
+    damp = math.exp(-math.pi / max(0.5, q))
+    for n, sample in enumerate(x):
+        total = 0.0
+        for i, freq in enumerate(freqs):
+            theta = 2.0 * math.pi * freq / sample_rate
+            v = sample + 2.0 * damp * math.cos(theta) * states[i, 0] - (damp * damp) * states[i, 1]
+            states[i, 1] = states[i, 0]
+            states[i, 0] = math.tanh(v * drive)
+            total += states[i, 0]
+        y[n] = total / max(1, len(freqs))
+    return y
+
+
+def render_chaotic_resonant_eq(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    channels = min(int(audio.shape[1]), 128)
+    audio = audio[:, :channels].astype(np.float32, copy=False)
+    bands = int(max(2, min(48, cfg.get("bands", 12))))
+    low = float(cfg.get("low_freq", 90.0))
+    high = float(cfg.get("high_freq", 6000.0))
+    q = float(np.clip(cfg.get("q", 18.0), 1.0, 120.0))
+    feedback = float(np.clip(cfg.get("feedback", 0.18), 0.0, 0.92))
+    chaos = float(np.clip(cfg.get("chaos", 0.25), 0.0, 1.0))
+    wet = float(np.clip(cfg.get("wet", 0.55), 0.0, 1.0))
+    drive = float(np.clip(cfg.get("drive", 1.2), 0.2, 8.0))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+    out = np.zeros_like(audio, dtype=np.float32)
+    base_freqs = np.geomspace(low, high, bands)
+    feedback_state = np.zeros(channels, dtype=np.float32)
+    for ch in range(channels):
+        detune = 2.0 ** rng.normal(0.0, chaos * 0.18, size=bands)
+        filtered = resonant_one_pole_bank(audio[:, ch] + feedback_state[ch] * feedback, sample_rate, base_freqs * detune, q, drive)
+        if feedback > 0.0:
+            neighbor = audio[:, (ch - 1) % channels] if channels > 1 else audio[:, ch]
+            filtered += resonant_one_pole_bank(neighbor * feedback * chaos, sample_rate, base_freqs[::-1] * detune, q * 0.7, drive)
+        out[:, ch] = audio[:, ch] * (1.0 - wet) + np.tanh(filtered) * wet
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -9.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print("Process: Chaotic Resonant EQ")
+    print(f"Channels: {channels}")
+    print(f"Bands: {bands}")
+    print(f"Frequency range: {low:.2f} - {high:.2f} Hz")
+    print(f"Feedback: {feedback:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
 def render_foafx_offline(cfg):
     source, source_rate = read_wav(cfg["source_path"])
     sample_rate = int(cfg.get("sample_rate", source_rate))
@@ -2840,7 +3229,7 @@ def render_synthetic_ambisonic_ir_bank(cfg):
 
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|foafx_offline|foafx_profile_subtract|foafx_spectral_profile_tool|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|foafx_offline|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -2866,6 +3255,16 @@ def main():
         render_foafx_profile_subtract(cfg)
     elif mode == "foafx_spectral_profile_tool":
         render_foafx_spectral_profile_tool(cfg)
+    elif mode == "multichannel_spectral_profile_tool":
+        render_multichannel_spectral_profile_tool(cfg)
+    elif mode == "foafx_spatial_grains":
+        render_foafx_spatial_granulator(cfg)
+    elif mode == "karplus_field":
+        render_karplus_field(cfg)
+    elif mode == "subharmonic_bank":
+        render_subharmonic_bank(cfg)
+    elif mode == "chaotic_resonant_eq":
+        render_chaotic_resonant_eq(cfg)
     elif mode == "ambisonic_convolve":
         render_ambisonic_convolve(cfg)
     elif mode == "ambisonic_kernel_collage":
