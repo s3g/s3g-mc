@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.1
 -- @requires ReaImGui; Python 3 with NumPy
--- @category Spatial / HOA
+-- @category 3OAFX
 -- @render Yes; NumPy-backed offline ambisonic decode/process/re-encode render.
 -- @method Select one ACN/SN3D ambisonic media item. The renderer decodes 1OA, 2OA, or 3OA to an order-specific virtual speaker layer, applies a moving AED focus with 3OAFX-style dry control, then re-encodes a new ambisonic item.
 
@@ -414,7 +414,10 @@ local function render(entry, settings, env_points, env_enabled)
 
   reaper.Undo_BeginBlock()
   local item, err = nr.insert_output_item(output_path,
-    "3OAFX offline " .. tostring(ORDER_VALUES[settings.order_index]) .. "OA", entry.position, needed_channels)
+    "3OAFX offline " .. tostring(ORDER_VALUES[settings.order_index]) .. "OA", entry.position, needed_channels, {
+      master_send = false,
+      track_gain = 0.5,
+    })
   reaper.Undo_EndBlock("3OAFX Offline Renderer", -1)
   if not item then mc.show_error(err or "Could not insert rendered 3OAFX item.") return end
 
@@ -424,6 +427,7 @@ local function render(entry, settings, env_points, env_enabled)
     "Effect: " .. (EFFECT_NAMES[settings.effect_index] or "Focus gain"),
     "Dry level: " .. string.format("%.2f", settings.dry_level),
     "Dry remaining at focus: " .. string.format("%.2f", settings.dry_attenuation),
+    "Inserted track: master send off, gain -6 dB",
     "Output: " .. output_path,
     "NumPy time: " .. string.format("%.2f sec", elapsed),
     log,

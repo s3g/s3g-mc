@@ -53,7 +53,7 @@ modulation afterward.
 - `Resonant Terrain`: struck resonator banks for metallic, synthetic-IR, and
   resonant-dust materials.
 
-### Spatial / HOA
+### Spatial Panners
 
 - `12ch Dodeca Panner`: AED-native panning for up to 8 mono sources across a
   12-channel dodecahedron loudspeaker layout, with a dodecahedron controller
@@ -78,18 +78,6 @@ modulation afterward.
   to 8 mono sources, driven by two automatable controls.
 - `25ch VBAP Dome Panner`: nearest-region vector-style panning for up to 8 mono
   sources across the 25-speaker dome.
-- `3OAFX Offline Renderer`: NumPy-backed ambisonic decode/process/re-encode
-  action for 1OA, 2OA, and 3OA media, with moving AED focus and dry attenuation.
-- `3OAFX Send Return Controller`: places a 24-channel insert lane inside an
-  ambisonic decode/encode chain.
-- `3OAFX Offline Ambisonic Convolve`: NumPy-backed ambisonic convolution. It
-  decodes an ambisonic source to virtual directions, convolves each direction
-  with one or more ambisonic IRs, and sums a new ambisonic result.
-- `3OAFX Synthetic Ambisonic IR Bank`: designs encoded ambisonic IR banks for
-  `3OAFX Offline Ambisonic Convolve`, with room size, material absorption,
-  scattering, early reflections, late-field controls, and separate or stacked
-  output formats. Higher-order banks use 8 directions: stacked 2OA is 72
-  channels and stacked 3OA is 128 channels.
 - `Spatial Automation Composer`: previews algorithmic AED or XYZ motion, then
   writes editable automation lanes for supported 8-source s3g panners.
 
@@ -102,6 +90,37 @@ behaviors.
 
 See the <a href="https://s3g.github.io/s3g-mc/workflows.html#3oafx" target="_blank" rel="noopener noreferrer">3OAFX workflow docs</a>
 for the ambisonic send/return workflow.
+
+### 3OAFX
+
+- `3OAFX Ambiance Extractor`: extracts room tone, noise bed, or other
+  profile-like material from an ambisonic source while preserving the directional
+  decode/re-encode workflow.
+- `3OAFX Ambisonic Kernel Collage`: creative ambisonic cross-convolution that
+  treats selected ambisonic recordings as spatial/spectral kernels for another
+  ambisonic source, with mixed-order kernel adaptation.
+- `3OAFX Offline Renderer`: NumPy-backed ambisonic decode/process/re-encode
+  action for 1OA, 2OA, and 3OA media, with moving AED focus and dry attenuation.
+- `3OAFX Offline Ambisonic Convolve`: NumPy-backed ambisonic convolution. It
+  can convolve one ambisonic source with one same-order ambisonic IR, or use
+  direction-accurate IR banks for P-format first order and 8-direction 2OA/3OA,
+  with optional lower-order and sparse FOA IR adaptation.
+- `3OAFX Send Return Controller`: places a 24-channel insert lane inside an
+  ambisonic decode/encode chain.
+- `3OAFX Spectral Hole Maker`: carves profile-shaped spectral space from an
+  ambisonic source per direction.
+- `3OAFX Spectral Profile Match`: steers the source spectrum toward a reference
+  profile per direction without mixing the reference into the output.
+- `3OAFX Spectral Profile Subtract`: ambisonic noise/material-profile
+  subtraction. Select a source and a profile item; both are decoded to the same
+  directional layer before cleaned or residue output is re-encoded.
+- `3OAFX Spectral Residue Extractor`: renders the removed spectral material as
+  its own ambisonic item for creative or diagnostic use.
+- `3OAFX Synthetic Ambisonic IR Bank`: designs encoded ambisonic IR banks for
+  `3OAFX Offline Ambisonic Convolve`, with room size, material absorption,
+  scattering, early reflections, late-field controls, and separate or stacked
+  output formats. Higher-order banks use 8 directions: stacked 2OA is 72
+  channels and stacked 3OA is 128 channels.
 
 ### Spectral / Convolution
 

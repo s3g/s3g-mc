@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.1
 -- @requires ReaImGui; JSFX: s3g 3OA Send, s3g 3OA Return Mask, s3g 3OA Mixer
--- @category Spatial / HOA
+-- @category 3OAFX
 -- @method Requires SPARTA AmbiDEC before Send, set to MMD, and SPARTA AmbiENC after Mixer; both must load the included 24-point JSON layouts.
 -- @about
 --   ReaImGui companion controller for a 3OA 24-channel insert lane.

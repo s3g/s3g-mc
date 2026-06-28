@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.6
 -- @requires ReaImGui; JSFX: s3g 25ch Region Dome Panner
--- @category Spatial / HOA
+-- @category Spatial Panners
 -- @method Auto-loads the JSFX on the selected track and constrains up to 8 mono source channels to speaker-defined rings, arcs, ribs, triangles, and caps across the 25-speaker dome layout of the RISD SRST Spatial Audio Studio.
 -- @about
 --   ReaImGui companion controller for JS: s3g 25ch Region Dome Panner.

@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.1
 -- @requires ReaImGui; JSFX: s3g 12ch Dodeca Panner
--- @category Spatial / HOA
+-- @category Spatial Panners
 -- @method Auto-loads the JSFX on the selected track and pans up to 8 mono source channels across a 12-channel dodeca speaker sphere using AED-native control and 3D distance-based amplitude panning.
 -- @about
 --   ReaImGui companion controller for JS: s3g 12ch Dodeca Panner.

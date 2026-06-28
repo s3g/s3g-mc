@@ -67,7 +67,9 @@ def write_pcm24_wav(path, data, sample_rate):
     if data.ndim == 1:
         data = data[:, None]
     channels = int(data.shape[1])
-    clipped = np.clip(np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0), -1.0, 1.0)
+    cleaned = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+    cleaned = np.where(np.abs(cleaned) < 1e-20, 0.0, cleaned)
+    clipped = np.clip(cleaned, -1.0, 1.0)
     ints = np.rint(clipped * 8388607.0).astype("<i4", copy=False)
     payload = bytearray(ints.shape[0] * ints.shape[1] * 3)
     cursor = 0
@@ -1490,6 +1492,66 @@ def ambisonic_basis(order, az_deg, el_deg):
     return values
 
 
+def ambisonic_order_from_channels(channels):
+    channels = int(channels)
+    if channels >= 16:
+        return 3
+    if channels >= 9:
+        return 2
+    if channels >= 4:
+        return 1
+    return 0
+
+
+def adapt_ambisonic_ir_order(ir_audio, source_order, target_order):
+    source_order = int(source_order)
+    target_order = int(target_order)
+    source_channels = (source_order + 1) * (source_order + 1)
+    target_channels = (target_order + 1) * (target_order + 1)
+    if source_order >= target_order:
+        return ir_audio[:, :target_channels].astype(np.float32, copy=False)
+    if source_order < 1:
+        raise RuntimeError("Lower-order IR adaptation needs at least a first-order IR.")
+    src = ir_audio[:, :source_channels].astype(np.float32, copy=False)
+    out = np.zeros((src.shape[0], target_channels), dtype=np.float32)
+    out[:, :source_channels] = src
+    if src.shape[0] == 0:
+        return out
+
+    w = src[:, 0].astype(np.float64, copy=False)
+    # ACN/SN3D order in this file is W, Y, Z, X for first order. The real
+    # spherical harmonic basis uses negative X/Y signs, so invert those axes to
+    # recover a conventional direction vector.
+    x_raw = -src[:, 3].astype(np.float64, copy=False)
+    y_raw = -src[:, 1].astype(np.float64, copy=False)
+    z_raw = src[:, 2].astype(np.float64, copy=False)
+    vector_norm = np.sqrt(x_raw * x_raw + y_raw * y_raw + z_raw * z_raw)
+    active = (np.abs(w) > 1e-10) | (vector_norm > 1e-10)
+
+    for frame in np.flatnonzero(active):
+        amp = float(w[frame])
+        if abs(amp) > 1e-10:
+            x = float(x_raw[frame] / amp)
+            y = float(y_raw[frame] / amp)
+            z = float(z_raw[frame] / amp)
+        else:
+            amp = float(vector_norm[frame])
+            x = float(x_raw[frame] / max(vector_norm[frame], 1e-10))
+            y = float(y_raw[frame] / max(vector_norm[frame], 1e-10))
+            z = float(z_raw[frame] / max(vector_norm[frame], 1e-10))
+        radius = math.sqrt(x * x + y * y + z * z)
+        if radius <= 1e-10:
+            continue
+        x /= radius
+        y /= radius
+        z /= radius
+        az = math.degrees(math.atan2(y, x))
+        el = math.degrees(math.asin(max(-1.0, min(1.0, z))))
+        encoded = np.array(ambisonic_basis(target_order, az, el), dtype=np.float32) * amp
+        out[frame, source_channels:] = encoded[source_channels:]
+    return out
+
+
 def foafx_layout(order):
     if order <= 1:
         return [
@@ -1702,6 +1764,270 @@ def spectral_pitch_shift_region(signal, semitones):
     return stft_process(signal, fft_size, hop, shift_frame)
 
 
+def smooth_profile_bins(profile, bins):
+    bins = int(max(0, bins))
+    if bins <= 0:
+        return profile
+    kernel_size = bins * 2 + 1
+    kernel = np.ones(kernel_size, dtype=np.float64) / float(kernel_size)
+    padded = np.pad(profile, ((bins, bins), (0, 0)), mode="edge")
+    smoothed = np.empty_like(profile, dtype=np.float64)
+    for channel in range(profile.shape[1]):
+        smoothed[:, channel] = np.convolve(padded[:, channel], kernel, mode="valid")
+    return smoothed
+
+
+def spectral_profile_subtract_region(signal, profile, sample_rate, cfg):
+    fft_size = int(cfg.get("fft_size", 2048))
+    fft_size = max(256, min(8192, fft_size))
+    hop = int(cfg.get("hop_size", fft_size // 4))
+    hop = max(64, min(fft_size, hop))
+    window = np.hanning(fft_size).astype(np.float32)
+    output_mode = str(cfg.get("output_mode", "cleaned"))
+    amount = float(np.clip(cfg.get("reduction_amount", 0.75), 0.0, 1.0))
+    floor = float(np.clip(cfg.get("spectral_floor", 0.18), 0.0, 1.0))
+    sensitivity = float(np.clip(cfg.get("profile_sensitivity", 1.15), 0.1, 8.0))
+    profile_mode = str(cfg.get("profile_stat", "median"))
+    freq_smoothing = int(cfg.get("frequency_smoothing_bins", 3))
+    temporal_smoothing = float(np.clip(cfg.get("temporal_smoothing", 0.35), 0.0, 0.98))
+
+    profile_pad = np.pad(profile, ((0, max(0, fft_size - min(profile.shape[0], fft_size))), (0, 0)), mode="constant")
+    profile_frame_count = 1 + max(0, (profile_pad.shape[0] - fft_size) // hop)
+    mags = []
+    for frame_index in range(profile_frame_count):
+        start = frame_index * hop
+        frame = profile_pad[start:start + fft_size]
+        if frame.shape[0] < fft_size:
+            frame = np.pad(frame, ((0, fft_size - frame.shape[0]), (0, 0)), mode="constant")
+        spec = np.fft.rfft(frame * window[:, None], axis=0)
+        mags.append(np.abs(spec))
+    if not mags:
+        raise RuntimeError("The profile item is too short to analyze.")
+    profile_mags = np.stack(mags, axis=0)
+    if profile_mode == "mean":
+        noise_profile = np.mean(profile_mags, axis=0)
+    else:
+        noise_profile = np.median(profile_mags, axis=0)
+    noise_profile = smooth_profile_bins(noise_profile, freq_smoothing)
+
+    pad = fft_size
+    padded = np.pad(signal, ((pad, pad), (0, 0)), mode="constant")
+    out = np.zeros_like(padded, dtype=np.float32)
+    norm = np.zeros(padded.shape[0], dtype=np.float32)
+    frame_count = 1 + max(0, (padded.shape[0] - fft_size) // hop)
+    previous_gain = None
+    min_gain_seen = 1.0
+    max_reduction_seen = 0.0
+    eps = 1e-10
+
+    for frame_index in range(frame_count):
+        start = frame_index * hop
+        frame = padded[start:start + fft_size] * window[:, None]
+        spec = np.fft.rfft(frame, axis=0)
+        mag = np.abs(spec)
+        phase = np.exp(1j * np.angle(spec))
+        target = noise_profile * sensitivity
+        subtraction = amount * target
+        clean_mag = np.maximum(mag - subtraction, mag * floor)
+        gain = clean_mag / np.maximum(mag, eps)
+        gain = np.clip(gain, floor, 1.0)
+        if previous_gain is not None and temporal_smoothing > 0.0:
+            gain = previous_gain * temporal_smoothing + gain * (1.0 - temporal_smoothing)
+        previous_gain = gain
+        min_gain_seen = min(min_gain_seen, float(np.min(gain)))
+        max_reduction_seen = max(max_reduction_seen, float(np.max(1.0 - gain)))
+        if output_mode == "residue":
+            new_spec = spec - (mag * gain * phase)
+        else:
+            new_spec = mag * gain * phase
+        resynth = np.fft.irfft(new_spec, n=fft_size, axis=0).real.astype(np.float32)
+        out[start:start + fft_size] += resynth * window[:, None]
+        norm[start:start + fft_size] += window * window
+
+    out /= np.maximum(norm[:, None], 1e-8)
+    result = out[pad:pad + signal.shape[0]].astype(np.float32)
+    stats = {
+        "profile_frames": profile_frame_count,
+        "source_frames": frame_count,
+        "fft_size": fft_size,
+        "hop_size": hop,
+        "min_gain": min_gain_seen,
+        "max_reduction": max_reduction_seen,
+    }
+    return result, stats
+
+
+def spectral_profile_tool_region(signal, profile, sample_rate, cfg):
+    mode = str(cfg.get("process_kind", "subtract"))
+    if mode in ("subtract", "residue", "hole"):
+        local_cfg = dict(cfg)
+        if mode == "residue":
+            local_cfg["output_mode"] = "residue"
+        else:
+            local_cfg["output_mode"] = "cleaned"
+        return spectral_profile_subtract_region(signal, profile, sample_rate, local_cfg)
+
+    fft_size = int(cfg.get("fft_size", 2048))
+    fft_size = max(256, min(8192, fft_size))
+    hop = int(cfg.get("hop_size", fft_size // 4))
+    hop = max(64, min(fft_size, hop))
+    window = np.hanning(fft_size).astype(np.float32)
+    amount = float(np.clip(cfg.get("reduction_amount", 0.75), 0.0, 1.0))
+    floor = float(np.clip(cfg.get("spectral_floor", 0.18), 0.0, 1.0))
+    sensitivity = float(np.clip(cfg.get("profile_sensitivity", 1.15), 0.1, 8.0))
+    profile_mode = str(cfg.get("profile_stat", "median"))
+    freq_smoothing = int(cfg.get("frequency_smoothing_bins", 3))
+    temporal_smoothing = float(np.clip(cfg.get("temporal_smoothing", 0.35), 0.0, 0.98))
+
+    profile_pad = np.pad(profile, ((0, max(0, fft_size - min(profile.shape[0], fft_size))), (0, 0)), mode="constant")
+    profile_frame_count = 1 + max(0, (profile_pad.shape[0] - fft_size) // hop)
+    mags = []
+    for frame_index in range(profile_frame_count):
+        start = frame_index * hop
+        frame = profile_pad[start:start + fft_size]
+        if frame.shape[0] < fft_size:
+            frame = np.pad(frame, ((0, fft_size - frame.shape[0]), (0, 0)), mode="constant")
+        mags.append(np.abs(np.fft.rfft(frame * window[:, None], axis=0)))
+    if not mags:
+        raise RuntimeError("The profile item is too short to analyze.")
+    profile_mags = np.stack(mags, axis=0)
+    if profile_mode == "mean":
+        profile_mag = np.mean(profile_mags, axis=0)
+    else:
+        profile_mag = np.median(profile_mags, axis=0)
+    profile_mag = smooth_profile_bins(profile_mag, freq_smoothing)
+
+    eps = 1e-10
+    if mode == "match":
+        profile_shape = profile_mag / np.maximum(np.mean(profile_mag, axis=0, keepdims=True), eps)
+        profile_shape = 1.0 + (profile_shape - 1.0) * sensitivity
+        profile_shape = np.clip(profile_shape, 0.05, 16.0)
+
+    pad = fft_size
+    padded = np.pad(signal, ((pad, pad), (0, 0)), mode="constant")
+    out = np.zeros_like(padded, dtype=np.float32)
+    norm = np.zeros(padded.shape[0], dtype=np.float32)
+    frame_count = 1 + max(0, (padded.shape[0] - fft_size) // hop)
+    previous_gain = None
+    min_gain_seen = 1.0
+    max_gain_seen = 0.0
+    max_reduction_seen = 0.0
+
+    for frame_index in range(frame_count):
+        start = frame_index * hop
+        frame = padded[start:start + fft_size] * window[:, None]
+        spec = np.fft.rfft(frame, axis=0)
+        mag = np.abs(spec)
+        phase = np.exp(1j * np.angle(spec))
+
+        if mode == "match":
+            frame_energy = np.mean(mag, axis=0, keepdims=True)
+            target_mag = frame_energy * profile_shape
+            blend = amount
+            new_mag = mag * (1.0 - blend) + target_mag * blend
+            max_match_gain = 1.0 + 3.0 * amount
+            gain = np.clip(new_mag / np.maximum(mag, eps), max(0.02, floor), max_match_gain)
+        elif mode == "ambience":
+            mask = (profile_mag * sensitivity) / np.maximum(mag + profile_mag * sensitivity, eps)
+            mask = np.clip(mask, 0.0, 1.0)
+            gain = np.clip(floor + (1.0 - floor) * mask * amount, 0.0, 1.0)
+        else:
+            gain = np.ones_like(mag)
+
+        if previous_gain is not None and temporal_smoothing > 0.0:
+            gain = previous_gain * temporal_smoothing + gain * (1.0 - temporal_smoothing)
+        previous_gain = gain
+        min_gain_seen = min(min_gain_seen, float(np.min(gain)))
+        max_gain_seen = max(max_gain_seen, float(np.max(gain)))
+        max_reduction_seen = max(max_reduction_seen, float(np.max(1.0 - np.minimum(gain, 1.0))))
+        new_spec = mag * gain * phase
+        resynth = np.fft.irfft(new_spec, n=fft_size, axis=0).real.astype(np.float32)
+        out[start:start + fft_size] += resynth * window[:, None]
+        norm[start:start + fft_size] += window * window
+
+    out /= np.maximum(norm[:, None], 1e-8)
+    result = out[pad:pad + signal.shape[0]].astype(np.float32)
+    stats = {
+        "profile_frames": profile_frame_count,
+        "source_frames": frame_count,
+        "fft_size": fft_size,
+        "hop_size": hop,
+        "min_gain": min_gain_seen,
+        "max_gain": max_gain_seen,
+        "max_reduction": max_reduction_seen,
+    }
+    return result, stats
+
+
+def render_foafx_spectral_profile_tool(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    profile, profile_rate = read_wav(cfg["profile_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    profile_audio = segment(profile, profile_rate, cfg.get("profile_start", 0.0), cfg.get("profile_duration", 1.0), sample_rate)
+    order = int(cfg.get("order", 3))
+    order = max(1, min(3, order))
+    ambi_channels = (order + 1) * (order + 1)
+    if audio.shape[1] < ambi_channels:
+        raise RuntimeError(f"Selected source has {audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+    if profile_audio.shape[1] < ambi_channels:
+        raise RuntimeError(f"Selected profile has {profile_audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+    audio = audio[:, :ambi_channels].astype(np.float32, copy=False)
+    profile_audio = profile_audio[:, :ambi_channels].astype(np.float32, copy=False)
+
+    layout = foafx_layout(order)
+    basis = np.array([ambisonic_basis(order, az, el) for az, el in layout], dtype=np.float64)
+    decode = basis.T
+    encode = np.linalg.pinv(basis).T
+    virtual_source = (audio.astype(np.float64) @ decode).astype(np.float32)
+    virtual_profile = (profile_audio.astype(np.float64) @ decode).astype(np.float32)
+
+    processed, stats = spectral_profile_tool_region(virtual_source, virtual_profile, sample_rate, cfg)
+    out = (processed.astype(np.float64) @ encode).astype(np.float32)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("soft_limit", True)):
+        peak = float(np.max(np.abs(out))) if out.size else 0.0
+        if peak > 1.0:
+            ceiling = 0.92
+            out = (ceiling * np.tanh(out / ceiling)).astype(np.float32)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    process_name = str(cfg.get("process_name", "3OAFX Spectral Profile Tool"))
+    print(f"Process: {process_name}")
+    print(f"Ambisonic order: {order}OA")
+    print(f"Ambisonic channels: {ambi_channels}")
+    print(f"Virtual speakers: {len(layout)}")
+    print(f"Process kind: {str(cfg.get('process_kind', 'subtract'))}")
+    print(f"Output mode: {str(cfg.get('output_mode', 'cleaned'))}")
+    print(f"Profile statistic: {str(cfg.get('profile_stat', 'median'))}")
+    print(f"Reduction amount: {float(cfg.get('reduction_amount', 0.75)):.3f}")
+    print(f"Spectral floor: {float(cfg.get('spectral_floor', 0.18)):.3f}")
+    print(f"Profile sensitivity: {float(cfg.get('profile_sensitivity', 1.15)):.3f}")
+    print(f"Frequency smoothing bins: {int(cfg.get('frequency_smoothing_bins', 3))}")
+    print(f"Temporal smoothing: {float(cfg.get('temporal_smoothing', 0.35)):.3f}")
+    print(f"FFT / hop: {stats['fft_size']} / {stats['hop_size']}")
+    print(f"Profile STFT frames: {stats['profile_frames']}")
+    print(f"Source STFT frames: {stats['source_frames']}")
+    print(f"Max spectral reduction: {stats['max_reduction']:.3f}")
+    print(f"Minimum spectral gain: {stats['min_gain']:.3f}")
+    if "max_gain" in stats:
+        print(f"Maximum spectral gain: {stats['max_gain']:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+    print(f"Output channels: {ambi_channels}")
+    print(f"Sample rate: {sample_rate} Hz")
+
+
+def render_foafx_profile_subtract(cfg):
+    cfg = dict(cfg)
+    cfg["process_kind"] = "subtract"
+    cfg["process_name"] = "3OAFX Spectral Profile Subtract"
+    render_foafx_spectral_profile_tool(cfg)
+
+
 def render_foafx_offline(cfg):
     source, source_rate = read_wav(cfg["source_path"])
     sample_rate = int(cfg.get("sample_rate", source_rate))
@@ -1871,7 +2197,7 @@ def tetrahedral_layout():
 
 
 def ambisonic_convolve_layout(order, layout_key):
-    if str(layout_key) == "tetra" and int(order) == 1:
+    if str(layout_key) == "tetra":
         return tetrahedral_layout()
     if int(order) >= 2:
         # Practical higher-order recording/design bank: eight encoded ambisonic
@@ -1892,6 +2218,20 @@ def ambisonic_convolve_layout(order, layout_key):
     return foafx_layout(order)
 
 
+def write_direction_map(path, layout, order, ambi_channels, output_mode, written_paths):
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write("index,azimuth_deg,elevation_deg,ambi_order,ambi_channels,stacked_channel_start,stacked_channel_end,file\n")
+        for index, (az, el) in enumerate(layout, start=1):
+            ch_start = (index - 1) * ambi_channels + 1
+            ch_end = index * ambi_channels
+            file_path = written_paths[0] if output_mode == "stacked" and written_paths else (
+                written_paths[index - 1] if index - 1 < len(written_paths) else ""
+            )
+            handle.write(
+                f"{index},{az:.6f},{el:.6f},{order},{ambi_channels},{ch_start},{ch_end},{file_path}\n"
+            )
+
+
 def render_ambisonic_convolve(cfg):
     source, source_rate = read_wav(cfg["source_path"])
     sample_rate = int(cfg.get("sample_rate", source_rate))
@@ -1909,36 +2249,129 @@ def render_ambisonic_convolve(cfg):
     if not ir_paths:
         raise RuntimeError("At least one ambisonic IR WAV is required.")
 
+    convolve_mode = str(cfg.get("convolve_mode", "bank"))
     layout = ambisonic_convolve_layout(order, cfg.get("direction_layout", "virtual"))
-    basis = np.array([ambisonic_basis(order, az, el) for az, el in layout], dtype=np.float64)
-    decode = basis.T
-    virtual = (audio.astype(np.float64) @ decode).astype(np.float32)
-
     wet_gain = 10.0 ** (float(cfg.get("wet_gain_db", 0.0)) / 20.0)
     wet_level = float(cfg.get("wet_level", 1.0))
     dry_level = float(cfg.get("dry_level", 0.0))
     trim_to_source = bool(cfg.get("trim_to_source", False))
     ir_normalize = bool(cfg.get("ir_normalize", True))
+    adapt_lower_order_ir = bool(cfg.get("adapt_lower_order_ir", False))
     dc_protect = bool(cfg.get("dc_protect", True))
+
+    if convolve_mode == "direct":
+        if len(ir_paths) != 1:
+            raise RuntimeError("Same-order direct convolution needs exactly one ambisonic IR WAV.")
+        ir_audio, ir_rate = read_wav(ir_paths[0])
+        start = ir_starts[0] if ir_starts else 0.0
+        dur = ir_durations[0] if ir_durations else (ir_audio.shape[0] / max(1, ir_rate))
+        ir_audio = segment(ir_audio, ir_rate, start, dur, sample_rate)
+        if ir_audio.shape[1] < ambi_channels:
+            raise RuntimeError(f"IR {ir_paths[0]} has {ir_audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+        ir_audio = ir_audio[:, :ambi_channels].astype(np.float32, copy=False)
+        if dc_protect:
+            ir_audio = ir_audio - np.mean(ir_audio, axis=0, keepdims=True)
+        if ir_normalize:
+            peak = float(np.max(np.abs(ir_audio))) if ir_audio.size else 0.0
+            if peak > 1e-12:
+                ir_audio = ir_audio / peak
+        output_len = audio.shape[0] if trim_to_source else audio.shape[0] + ir_audio.shape[0] - 1
+        wet = np.zeros((output_len, ambi_channels), dtype=np.float32)
+        for channel in range(ambi_channels):
+            convolved = fft_convolve_1d(audio[:, channel], ir_audio[:, channel])
+            if trim_to_source:
+                convolved = convolved[:audio.shape[0]]
+            wet[:convolved.size, channel] = convolved * wet_gain
+        wet *= wet_level
+        if dc_protect:
+            wet -= np.mean(wet, axis=0, keepdims=True)
+        if dry_level > 0.0:
+            dry = np.zeros_like(wet)
+            dry[:audio.shape[0], :] = audio * dry_level
+            out = dry + wet
+        else:
+            out = wet
+        if bool(cfg.get("soft_limit", True)):
+            peak = float(np.max(np.abs(out))) if out.size else 0.0
+            if peak > 1.0:
+                ceiling = 0.92
+                out = (ceiling * np.tanh(out / ceiling)).astype(np.float32)
+        if bool(cfg.get("normalize", True)):
+            out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+        else:
+            pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+        write_pcm24_wav(cfg["output_path"], out, sample_rate)
+        print("Inspired by: Bruce Wiggins, Sounds in Space 2017, ambisonic measured reverb workflow")
+        print("Convolution mode: same-order direct")
+        print(f"Ambisonic order: {order}OA")
+        print(f"Ambisonic channels: {ambi_channels}")
+        print(f"IR files: {len(ir_paths)}")
+        print("IR assignment: one same-order ambisonic IR")
+        print(f"Dry level: {dry_level:.3f}")
+        print(f"Wet level: {wet_level:.3f}")
+        print(f"Pre-normalize peak: {pre_peak:.6f}")
+        print(f"Output channels: {ambi_channels}")
+        print(f"Sample rate: {sample_rate} Hz")
+        return
+
+    basis = np.array([ambisonic_basis(order, az, el) for az, el in layout], dtype=np.float64)
+    decode = basis.T
+    virtual = (audio.astype(np.float64) @ decode).astype(np.float32)
+
+    stacked_input = len(ir_paths) == 1
+    stacked_block_channels = ambi_channels
+    stacked_source_order = order
+    adapted_ir_orders = set()
+    if stacked_input:
+        stacked_audio, _stacked_rate = read_wav(ir_paths[0])
+        if stacked_audio.shape[1] >= ambi_channels * len(layout):
+            stacked_block_channels = ambi_channels
+            stacked_source_order = order
+        elif adapt_lower_order_ir:
+            possible_block_channels = stacked_audio.shape[1] // len(layout)
+            possible_order = ambisonic_order_from_channels(possible_block_channels)
+            if possible_order > 0 and possible_order < order and stacked_audio.shape[1] >= ((possible_order + 1) * (possible_order + 1)) * len(layout):
+                stacked_source_order = possible_order
+                stacked_block_channels = (possible_order + 1) * (possible_order + 1)
+                adapted_ir_orders.add(possible_order)
+            else:
+                raise RuntimeError(
+                    f"Directional bank needs one stacked {ambi_channels * len(layout)}-channel IR bank, "
+                    f"or an adaptable lower-order stacked bank with {len(layout)} direction blocks."
+                )
+        else:
+            raise RuntimeError(
+                f"Directional bank needs one stacked {ambi_channels * len(layout)}-channel IR bank, "
+                f"or {len(layout)} separate {ambi_channels}-channel IRs."
+            )
+    elif len(ir_paths) != len(layout):
+        raise RuntimeError(
+            f"Directional bank needs {len(layout)} IR files, one per virtual direction. "
+            "Reusing or wrapping IRs is disabled for direction accuracy."
+        )
 
     ir_cache = {}
 
     def load_ir(index):
-        path = ir_paths[index % len(ir_paths)]
+        path = ir_paths[0] if stacked_input else ir_paths[index]
         cache_key = path
-        stacked_bank = len(ir_paths) == 1
-        if stacked_bank:
+        if stacked_input:
             cache_key = f"{path}#{index}"
         if cache_key not in ir_cache:
             ir_audio, ir_rate = read_wav(path)
-            start = ir_starts[index % len(ir_starts)] if ir_starts else 0.0
-            dur = ir_durations[index % len(ir_durations)] if ir_durations else (ir_audio.shape[0] / max(1, ir_rate))
+            start = ir_starts[0 if stacked_input else index] if ir_starts else 0.0
+            dur = ir_durations[0 if stacked_input else index] if ir_durations else (ir_audio.shape[0] / max(1, ir_rate))
             ir_audio = segment(ir_audio, ir_rate, start, dur, sample_rate)
-            if stacked_bank and ir_audio.shape[1] >= ambi_channels * len(layout):
-                channel_start = (index % len(layout)) * ambi_channels
-                ir_audio = ir_audio[:, channel_start:channel_start + ambi_channels]
+            if stacked_input:
+                channel_start = index * stacked_block_channels
+                ir_audio = ir_audio[:, channel_start:channel_start + stacked_block_channels]
             elif ir_audio.shape[1] < ambi_channels:
-                raise RuntimeError(f"IR {path} has {ir_audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+                source_order = ambisonic_order_from_channels(ir_audio.shape[1])
+                if not adapt_lower_order_ir or source_order <= 0 or source_order >= order:
+                    raise RuntimeError(f"IR {path} has {ir_audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+                source_channels = (source_order + 1) * (source_order + 1)
+                ir_audio = ir_audio[:, :source_channels]
+                adapted_ir_orders.add(source_order)
             else:
                 ir_audio = ir_audio[:, :ambi_channels]
             ir_audio = ir_audio.astype(np.float32, copy=False)
@@ -1948,6 +2381,11 @@ def render_ambisonic_convolve(cfg):
                 peak = float(np.max(np.abs(ir_audio))) if ir_audio.size else 0.0
                 if peak > 1e-12:
                     ir_audio = ir_audio / peak
+            source_order = stacked_source_order if stacked_input else ambisonic_order_from_channels(ir_audio.shape[1])
+            if source_order > 0 and source_order < order:
+                ir_audio = adapt_ambisonic_ir_order(ir_audio, source_order, order)
+                if dc_protect:
+                    ir_audio = ir_audio - np.mean(ir_audio, axis=0, keepdims=True)
             ir_cache[cache_key] = ir_audio
         return ir_cache[cache_key], path
 
@@ -1994,23 +2432,227 @@ def render_ambisonic_convolve(cfg):
 
     write_pcm24_wav(cfg["output_path"], out, sample_rate)
     print("Inspired by: Bruce Wiggins, Sounds in Space 2017, ambisonic measured reverb workflow")
+    print("Convolution mode: directional IR bank")
     print(f"Ambisonic order: {order}OA")
     print(f"Ambisonic channels: {ambi_channels}")
     print(f"Virtual directions: {len(layout)}")
     print(f"Direction layout: {cfg.get('direction_layout', 'virtual')}")
     print(f"IR files: {len(ir_paths)}")
     stacked_bank = False
-    if len(ir_paths) == 1:
+    if stacked_input:
         ir_audio, _ir_rate = read_wav(ir_paths[0])
         if ir_audio.shape[1] >= ambi_channels * len(layout):
             stacked_bank = True
             print(f"IR bank mode: stacked multichannel ({ir_audio.shape[1]} channels)")
     if stacked_bank:
         print("IR assignment: stacked channel blocks per virtual direction")
+    elif stacked_input:
+        print("IR assignment: adapted lower-order stacked channel blocks per virtual direction")
     else:
-        print("IR assignment: matched" if len(ir_paths) == len(layout) else "IR assignment: wrapped across virtual directions")
+        print("IR assignment: matched one IR per virtual direction")
+    if adapted_ir_orders:
+        orders = ", ".join(f"{value}OA" for value in sorted(adapted_ir_orders))
+        print(f"IR adaptation: lower-order IRs adapted to {order}OA from {orders}")
+        print("Adaptation note: preserves lower-order direction/energy but does not create measured higher-order detail.")
+    print("Direction map:")
+    for index, (az, el) in enumerate(layout, start=1):
+        print(f"  {index:02d}: az {az:.2f} deg, el {el:.2f} deg")
     print(f"Dry level: {dry_level:.3f}")
     print(f"Wet level: {wet_level:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+    print(f"Output channels: {ambi_channels}")
+    print(f"Sample rate: {sample_rate} Hz")
+
+
+def apply_kernel_fade(audio, sample_rate, fade_ms):
+    fade_frames = int(round(max(0.0, float(fade_ms)) * sample_rate / 1000.0))
+    if fade_frames <= 0 or audio.shape[0] <= 1:
+        return audio
+    fade_frames = min(fade_frames, max(1, audio.shape[0] // 2))
+    window = np.ones(audio.shape[0], dtype=np.float32)
+    ramp = np.linspace(0.0, 1.0, fade_frames, endpoint=True, dtype=np.float32)
+    window[:fade_frames] *= ramp
+    window[-fade_frames:] *= ramp[::-1]
+    return (audio * window[:, None]).astype(np.float32)
+
+
+def angular_distance_deg(a, b):
+    va = unit_from_aed(a[0], a[1])
+    vb = unit_from_aed(b[0], b[1])
+    return math.degrees(math.acos(float(np.clip(np.dot(va, vb), -1.0, 1.0))))
+
+
+def kernel_position_layout(count, layer_layout):
+    count = max(1, int(count))
+    if count == len(layer_layout):
+        return list(layer_layout)
+    if count == 1:
+        return [(0.0, 0.0)]
+    if count == 4:
+        return tetrahedral_layout()
+    if count == 8:
+        return ambisonic_convolve_layout(2, "virtual")
+    return foafx_layout(3)[:count] if count <= 24 else [
+        (float((index * 137.507764) % 360.0 - 180.0), float(math.degrees(math.asin(1.0 - 2.0 * (index + 0.5) / count))))
+        for index in range(count)
+    ]
+
+
+def render_ambisonic_kernel_collage(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    order = int(cfg.get("order", 3))
+    order = max(1, min(3, order))
+    ambi_channels = (order + 1) * (order + 1)
+    if audio.shape[1] < ambi_channels:
+        raise RuntimeError(f"Selected source has {audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+    audio = audio[:, :ambi_channels].astype(np.float32, copy=False)
+
+    kernel_paths = split_manifest_list(cfg.get("kernel_paths", ""))
+    kernel_starts = [float(x) for x in split_manifest_list(cfg.get("kernel_starts", ""))]
+    kernel_durations = [float(x) for x in split_manifest_list(cfg.get("kernel_durations", ""))]
+    if not kernel_paths:
+        raise RuntimeError("Select at least one ambisonic recording to use as a convolution kernel.")
+
+    max_kernel_seconds = max(0.01, float(cfg.get("max_kernel_seconds", 4.0)))
+    kernel_fade_ms = max(0.0, float(cfg.get("kernel_fade_ms", 25.0)))
+    kernel_normalize = bool(cfg.get("kernel_normalize", True))
+    adapt_mixed_order_kernels = bool(cfg.get("adapt_mixed_order_kernels", True))
+    dc_protect = bool(cfg.get("dc_protect", True))
+    assignment_mode = str(cfg.get("assignment_mode", "cycle"))
+    direction_layer = str(cfg.get("direction_layer", "auto"))
+    seed = int(cfg.get("seed", 1))
+
+    if direction_layer == "tetra":
+        layout = ambisonic_convolve_layout(order, "tetra")
+    elif direction_layer == "virtual":
+        layout = ambisonic_convolve_layout(order, "virtual")
+    else:
+        layout = ambisonic_convolve_layout(order, "tetra" if order == 1 else "virtual")
+    basis = np.array([ambisonic_basis(order, az, el) for az, el in layout], dtype=np.float64)
+    virtual = (audio.astype(np.float64) @ basis.T).astype(np.float32)
+
+    kernels = []
+    kernel_orders = []
+    for index, path in enumerate(kernel_paths):
+        kernel_audio, kernel_rate = read_wav(path)
+        kernel_order = ambisonic_order_from_channels(kernel_audio.shape[1])
+        if kernel_order <= 0:
+            raise RuntimeError(f"Kernel {path} has {kernel_audio.shape[1]} channels, but ambisonic kernels need at least 1OA / 4ch.")
+        if not adapt_mixed_order_kernels and kernel_audio.shape[1] < ambi_channels:
+            raise RuntimeError(f"Kernel {path} has {kernel_audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+        start = kernel_starts[index] if index < len(kernel_starts) else 0.0
+        duration = kernel_durations[index] if index < len(kernel_durations) else (kernel_audio.shape[0] / max(1, kernel_rate))
+        duration = min(float(duration), max_kernel_seconds)
+        kernel_audio = segment(kernel_audio, kernel_rate, start, duration, sample_rate)
+        if adapt_mixed_order_kernels and kernel_order != order:
+            kernel_audio = adapt_ambisonic_ir_order(kernel_audio, kernel_order, order)
+        elif kernel_audio.shape[1] >= ambi_channels:
+            kernel_audio = kernel_audio[:, :ambi_channels].astype(np.float32, copy=False)
+        else:
+            raise RuntimeError(f"Kernel {path} has {kernel_audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+        if dc_protect:
+            kernel_audio = kernel_audio - np.mean(kernel_audio, axis=0, keepdims=True)
+        kernel_audio = apply_kernel_fade(kernel_audio, sample_rate, kernel_fade_ms)
+        if kernel_normalize:
+            peak = float(np.max(np.abs(kernel_audio))) if kernel_audio.size else 0.0
+            if peak > 1e-12:
+                kernel_audio = kernel_audio / peak
+        kernels.append(kernel_audio)
+        kernel_orders.append(kernel_order)
+
+    rng = np.random.default_rng(seed)
+    assignments = []
+    kernel_positions = kernel_position_layout(len(kernels), layout)
+    for direction_index in range(len(layout)):
+        if assignment_mode == "all":
+            assignments.append([(index, 1.0 / max(1.0, math.sqrt(len(kernels)))) for index in range(len(kernels))])
+        elif assignment_mode == "random":
+            assignments.append([(int(rng.integers(0, len(kernels))), 1.0)])
+        elif assignment_mode == "indexed":
+            assignments.append([(direction_index, 1.0)] if direction_index < len(kernels) else [])
+        elif assignment_mode == "region":
+            distances = np.array([angular_distance_deg(layout[direction_index], pos) for pos in kernel_positions], dtype=np.float64)
+            width = max(12.0, float(cfg.get("region_width_deg", 70.0)))
+            weights = np.exp(-0.5 * (distances / width) ** 2)
+            if np.max(weights) > 1e-12:
+                weights = weights / math.sqrt(float(np.sum(weights * weights)))
+            assignments.append([(index, float(weight)) for index, weight in enumerate(weights) if weight > 1e-4])
+        else:
+            assignments.append([(direction_index % len(kernels), 1.0)])
+
+    tail_mode = str(cfg.get("tail_mode", "max_tail"))
+    max_kernel_len = max(kernel.shape[0] for kernel in kernels)
+    if tail_mode == "source":
+        output_len = audio.shape[0]
+    elif tail_mode == "full":
+        output_len = audio.shape[0] + max_kernel_len - 1
+    else:
+        max_tail_seconds = max(0.0, float(cfg.get("max_tail_seconds", 12.0)))
+        output_len = audio.shape[0] + int(round(max_tail_seconds * sample_rate))
+        output_len = min(output_len, audio.shape[0] + max_kernel_len - 1)
+    output_len = max(1, output_len)
+
+    wet_gain = 10.0 ** (float(cfg.get("wet_gain_db", -18.0)) / 20.0)
+    wet_level = float(cfg.get("wet_level", 1.0))
+    dry_level = float(cfg.get("dry_level", 0.0))
+    wet = np.zeros((output_len, ambi_channels), dtype=np.float32)
+    work_count = sum(len(entry) for entry in assignments)
+    scale = wet_gain * wet_level / max(1.0, math.sqrt(work_count))
+
+    for direction_index, kernel_indices in enumerate(assignments):
+        feed = virtual[:, direction_index]
+        if feed.size == 0 or float(np.max(np.abs(feed))) <= 1e-12:
+            continue
+        for kernel_index, assignment_gain in kernel_indices:
+            kernel = kernels[kernel_index]
+            for channel in range(ambi_channels):
+                convolved = fft_convolve_1d(feed, kernel[:, channel])
+                convolved = convolved[:output_len]
+                wet[:convolved.size, channel] += convolved * scale * assignment_gain
+
+    if dc_protect:
+        wet -= np.mean(wet, axis=0, keepdims=True)
+    if dry_level > 0.0:
+        out = wet.copy()
+        dry_len = min(audio.shape[0], out.shape[0])
+        out[:dry_len] += audio[:dry_len] * dry_level
+    else:
+        out = wet
+
+    if bool(cfg.get("soft_limit", True)):
+        peak = float(np.max(np.abs(out))) if out.size else 0.0
+        if peak > 1.0:
+            ceiling = 0.92
+            out = (ceiling * np.tanh(out / ceiling)).astype(np.float32)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+
+    write_pcm24_wav(cfg["output_path"], out, sample_rate)
+    print("Process: 3OAFX Ambisonic Kernel Collage")
+    print("Kernel interpretation: selected ambisonic recordings used as convolution kernels")
+    print(f"Ambisonic order: {order}OA")
+    print(f"Ambisonic channels: {ambi_channels}")
+    print(f"Direction layer: {direction_layer}")
+    print(f"Virtual directions: {len(layout)}")
+    print(f"Kernels: {len(kernels)}")
+    print(f"Mixed-order kernel adaptation: {'on' if adapt_mixed_order_kernels else 'off'}")
+    for index, kernel_order in enumerate(kernel_orders, start=1):
+        relation = "native" if kernel_order == order else ("adapted up" if kernel_order < order else "reduced")
+        print(f"  kernel {index:02d} order: {kernel_order}OA -> {order}OA ({relation})")
+    print(f"Assignment mode: {assignment_mode}")
+    for direction_index, kernel_indices in enumerate(assignments, start=1):
+        labels = ", ".join(f"{k + 1}:{g:.2f}" for k, g in kernel_indices) if kernel_indices else "silent"
+        print(f"  direction {direction_index:02d}: kernel {labels}")
+    print(f"Max kernel window: {max_kernel_seconds:.3f} sec")
+    print(f"Kernel fade: {kernel_fade_ms:.2f} ms")
+    print(f"Wet pre-gain: {float(cfg.get('wet_gain_db', -18.0)):.2f} dB")
+    print(f"Wet level: {wet_level:.3f}")
+    print(f"Dry level: {dry_level:.3f}")
+    print(f"Tail mode: {tail_mode}")
     print(f"Pre-normalize peak: {pre_peak:.6f}")
     print(f"Output channels: {ambi_channels}")
     print(f"Sample rate: {sample_rate} Hz")
@@ -2172,6 +2814,8 @@ def render_synthetic_ambisonic_ir_bank(cfg):
     # used by the shared Lua NumPy runner.
     if output_mode != "stacked" and written and cfg.get("output_path") and str(cfg.get("output_path")) != written[0]:
         write_pcm24_wav(str(cfg["output_path"]), read_wav(written[0])[0], sample_rate)
+    map_path = output_dir.rstrip("/\\") + "/" + f"{prefix}_direction_map.csv"
+    write_direction_map(map_path, layout, order, ambi_channels, output_mode, written)
     print(f"Ambisonic order: {order}OA")
     print(f"Ambisonic channels per IR: {ambi_channels}")
     print(f"Direction layout: {layout_key}")
@@ -2188,6 +2832,7 @@ def render_synthetic_ambisonic_ir_bank(cfg):
     print(f"Pre-delay: {pre_delay_ms:.2f} ms")
     print(f"Early reflections per IR: {early_count}")
     print(f"Diffuse taps per IR: {diffuse_count}")
+    print(f"Direction map CSV: {map_path}")
     print("Files:")
     for path in written:
         print(path)
@@ -2195,7 +2840,7 @@ def render_synthetic_ambisonic_ir_bank(cfg):
 
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|foafx_offline|ambisonic_convolve|synthetic_ambisonic_ir_bank> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|foafx_offline|foafx_profile_subtract|foafx_spectral_profile_tool|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -2217,8 +2862,14 @@ def main():
         render_fata_morgana(cfg)
     elif mode == "foafx_offline":
         render_foafx_offline(cfg)
+    elif mode == "foafx_profile_subtract":
+        render_foafx_profile_subtract(cfg)
+    elif mode == "foafx_spectral_profile_tool":
+        render_foafx_spectral_profile_tool(cfg)
     elif mode == "ambisonic_convolve":
         render_ambisonic_convolve(cfg)
+    elif mode == "ambisonic_kernel_collage":
+        render_ambisonic_kernel_collage(cfg)
     elif mode == "synthetic_ambisonic_ir_bank":
         render_synthetic_ambisonic_ir_bank(cfg)
     else:

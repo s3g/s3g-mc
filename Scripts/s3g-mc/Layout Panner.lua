@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.1
 -- @requires ReaImGui; JSFX: s3g Layout Panner
--- @category Spatial / HOA
+-- @category Spatial Panners
 -- @method Auto-loads the JSFX on the selected track and pans up to 8 mono source channels across selectable loudspeaker layouts: quad, octophonic ring, 8ch cube, 12ch ring, 16ch ring, 16ch double ring, 20ch double ring, and 24ch dome without overhead. LFE formats are intentionally left out. Speaker numbering starts near the stereo-right position and proceeds clockwise.
 -- @about
 --   ReaImGui companion controller for JS: s3g Layout Panner.

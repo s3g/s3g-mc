@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.6
 -- @requires ReaImGui; JSFX: s3g 25ch Vector Morph Dome Panner
--- @category Spatial / HOA
+-- @category Spatial Panners
 -- @method Auto-loads the JSFX on the selected track, provides a free live 8-source AED layout editor, and stores/loads that layout into four snapshots for two-axis vector morphing across the 25-speaker dome.
 -- @about
 --   ReaImGui companion controller for JS: s3g 25ch Vector Morph Dome Panner.

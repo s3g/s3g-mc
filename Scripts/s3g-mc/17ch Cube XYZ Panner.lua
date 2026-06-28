@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.4
 -- @requires ReaImGui; JSFX: s3g 17ch Cube XYZ Panner
--- @category Spatial / HOA
+-- @category Spatial Panners
 -- @method Auto-loads the JSFX on the selected track and pans up to 8 mono source channels across a 17-speaker cube layout using 3D DBAP-style Cartesian amplitude panning.
 -- @about
 --   ReaImGui companion controller for JS: s3g 17ch Cube XYZ Panner.

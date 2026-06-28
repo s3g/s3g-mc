@@ -40,7 +40,8 @@ local CATEGORY_ORDER = {
   "Channel Mixing / Automation",
   "Procedural Synthesis",
   "Offline Synthesis / IR",
-  "Spatial / HOA",
+  "Spatial Panners",
+  "3OAFX",
   "Spectral / Convolution",
   "Multichannel Texture / Montage",
   "Item Channel Transforms",
@@ -53,11 +54,12 @@ local CATEGORY_LABELS = {
   ["Channel Mixing / Automation"] = "Channel Mixing",
   ["Procedural Synthesis"] = "Procedural Synth",
   ["Offline Synthesis / IR"] = "Offline Synth / IR",
-  ["Spatial / HOA"] = "Spatial / HOA",
-  ["Spectral / Convolution"] = "Spectral / Convolution",
-  ["Multichannel Texture / Montage"] = "Texture / Montage",
-  ["Item Channel Transforms"] = "Item Transforms",
-  ["Track Building / Routing"] = "Track Routing",
+  ["Spatial Panners"] = "Spatial Panners",
+  ["3OAFX"] = "3OAFX",
+  ["Spectral / Convolution"] = "Spectral",
+  ["Multichannel Texture / Montage"] = "Texture",
+  ["Item Channel Transforms"] = "Items",
+  ["Track Building / Routing"] = "Routing",
   ["Package / Utilities"] = "Package",
 }
 
@@ -149,7 +151,8 @@ local function classify(name, description)
   if hay:find("cdp") or hay:find("reacoma") then return "Personal / Advanced" end
   if hay:find("carto synth") or hay:find("procedural synth") then return "Procedural Synthesis" end
   if hay:find("shred") or hay:find("fracture") or hay:find("zigzag") or hay:find("cascade") or hay:find("crumble") or hay:find("spatial repeater") then return "Multichannel Texture / Montage" end
-  if hay:find("lbap") or hay:find("hoa") or hay:find("3oa") or hay:find("dome") then return "Spatial / HOA" end
+  if hay:find("3oafx") then return "3OAFX" end
+  if hay:find("lbap") or hay:find("panner") or hay:find("dome") or hay:find("spatial automation") then return "Spatial Panners" end
   if hay:find("automation") or hay:find("mixer") or hay:find("fader") then return "Channel Mixing / Automation" end
   if hay:find("selected item") or hay:find("multichannel item") or hay:find("item channel") or hay:find("shred") then return "Item Channel Transforms" end
   if hay:find("selected tracks") or hay:find("selected mono tracks") or hay:find("track from") or hay:find("routing") then return "Track Building / Routing" end
@@ -252,8 +255,8 @@ end
 
 local function draw_category_buttons()
   local rows = {
-    { "All", "Channel Mixing / Automation", "Procedural Synthesis", "Offline Synthesis / IR", "Spatial / HOA" },
-    { "Spectral / Convolution", "Multichannel Texture / Montage", "Item Channel Transforms", "Track Building / Routing", "Package / Utilities" },
+    { "All", "Channel Mixing / Automation", "Procedural Synthesis", "Offline Synthesis / IR", "Spatial Panners" },
+    { "3OAFX", "Spectral / Convolution", "Multichannel Texture / Montage", "Item Channel Transforms", "Track Building / Routing", "Package / Utilities" },
   }
   for _, row in ipairs(rows) do
     for index, category in ipairs(row) do

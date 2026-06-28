@@ -165,6 +165,9 @@ function M.insert_output_item(path, label, position, channel_count, options)
   local track = reaper.GetTrack(mc.PROJECT, reaper.CountTracks(mc.PROJECT) - 1)
   reaper.GetSetMediaTrackInfo_String(track, "P_NAME", label, true)
   reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", mc.reaper_track_channel_count(channel_count))
+  if options.master_send ~= nil then
+    reaper.SetMediaTrackInfo_Value(track, "B_MAINSEND", options.master_send and 1 or 0)
+  end
   if options.track_gain then
     reaper.SetMediaTrackInfo_Value(track, "D_VOL", options.track_gain)
   end

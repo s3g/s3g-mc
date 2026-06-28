@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.1
 -- @requires ReaImGui; Python 3 with NumPy
--- @category Spatial / HOA
+-- @category 3OAFX
 -- @render Yes; NumPy-backed synthetic ambisonic IR bank generator.
 -- @method Designs encoded ACN/SN3D ambisonic impulse-response WAVs for the direction layer used by 3OAFX Offline Ambisonic Convolve. Room size, material absorption, scattering, source distance, early reflections, and late diffuse taps shape the synthetic space.
 -- @about
@@ -38,8 +38,6 @@ local COLOR_FILL = ImGui.ColorConvertDouble4ToU32(0.28, 0.70, 0.95, 0.16)
 
 local ORDER_NAMES = { "1OA / 4ch", "2OA / 9ch", "3OA / 16ch" }
 local ORDER_VALUES = { 1, 2, 3 }
-local LAYOUT_NAMES = { "Wiggins tetrahedral / P-format", "Order virtual speaker layout" }
-local LAYOUT_KEYS = { "tetra", "virtual" }
 local OUTPUT_MODE_NAMES = { "Separate ambisonic WAVs", "One stacked multichannel bank" }
 local OUTPUT_MODE_KEYS = { "separate", "stacked" }
 local MATERIAL_NAMES = {
@@ -111,10 +109,9 @@ local function order_channels(order_index)
   return (order + 1) * (order + 1)
 end
 
-local function direction_count(order_index, layout_index)
+local function direction_count(order_index)
   local order = ORDER_VALUES[order_index] or 1
-  if order == 1 and layout_index == 1 then return 4 end
-  if order == 1 then return 6 end
+  if order == 1 then return 4 end
   return 8
 end
 
@@ -129,7 +126,7 @@ local function estimated_rt60(settings)
 end
 
 local function stacked_channel_count(settings)
-  return order_channels(settings.order_index) * direction_count(settings.order_index, settings.layout_index)
+  return order_channels(settings.order_index) * direction_count(settings.order_index)
 end
 
 local function frac_noise(seed, index)
@@ -225,6 +222,8 @@ local function insert_ir_item(path, label, position, channel_count)
   local track = reaper.GetTrack(mc.PROJECT, reaper.CountTracks(mc.PROJECT) - 1)
   reaper.GetSetMediaTrackInfo_String(track, "P_NAME", label, true)
   reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", mc.reaper_track_channel_count(channel_count))
+  reaper.SetMediaTrackInfo_Value(track, "B_MAINSEND", 0)
+  reaper.SetMediaTrackInfo_Value(track, "D_VOL", 0.5)
   local item = reaper.AddMediaItemToTrack(track)
   local take = reaper.AddTakeToMediaItem(item)
   reaper.SetMediaItemTake_Source(take, source)
@@ -238,7 +237,7 @@ local function run_render(settings)
   local stamp = tostring(math.floor(reaper.time_precise() * 1000))
   local order = ORDER_VALUES[settings.order_index] or 1
   local channels = order_channels(settings.order_index)
-  local count = direction_count(settings.order_index, settings.layout_index)
+  local count = direction_count(settings.order_index)
   local output_dir = nr.output_dir("s3g_synthetic_ambisonic_irs", "", script_dir)
   local prefix = "s3g_synthetic_ambi_ir_" .. stamp
   local first_path
@@ -253,7 +252,7 @@ local function run_render(settings)
     prefix = prefix,
     sample_rate = settings.sample_rate,
     order = order,
-    direction_layout = LAYOUT_KEYS[settings.layout_index] or "tetra",
+    direction_layout = order == 1 and "tetra" or "virtual",
     output_mode = OUTPUT_MODE_KEYS[settings.output_mode_index] or "separate",
     duration = settings.duration,
     room_x = settings.room_x,
@@ -305,13 +304,13 @@ local function run_render(settings)
     reaper.Undo_EndBlock(TITLE, -1)
     reaper.Main_OnCommand(40245, 0)
     reaper.UpdateArrange()
-    log = log .. "\nInserted IR items: " .. tostring(inserted)
+    log = log .. "\nInserted IR items: " .. tostring(inserted) .. " (master send off, track gain -6 dB)"
   end
 
   local lines = {
     "Order: " .. tostring(order) .. "OA",
     "Channels per IR: " .. tostring(channels),
-    "Direction layout: " .. (LAYOUT_NAMES[settings.layout_index] or "?"),
+    "Direction layout: " .. (order == 1 and "P-format / tetrahedral" or "Practical 8-direction bank"),
     "Output mode: " .. (OUTPUT_MODE_NAMES[settings.output_mode_index] or "?"),
     "IR files: " .. tostring(#paths),
     string.format("NumPy time: %.2f sec", elapsed),
@@ -328,7 +327,6 @@ local function main()
   local should_render = false
   local settings = {
     order_index = clamp(math.floor(get_number("order_index", 1)), 1, 3),
-    layout_index = clamp(math.floor(get_number("layout_index", 1)), 1, #LAYOUT_NAMES),
     material_index = clamp(math.floor(get_number("material_index", 2)), 1, #MATERIAL_NAMES),
     output_mode_index = clamp(math.floor(get_number("output_mode_index", 1)), 1, #OUTPUT_MODE_NAMES),
     sample_rate = clamp(math.floor(get_number("sample_rate", 48000)), 8000, 192000),
@@ -362,12 +360,10 @@ local function main()
     visible, open = ImGui.Begin(ctx, TITLE, open)
     if visible then
       settings.order_index = combo(ctx, "Ambisonic order", settings.order_index, ORDER_NAMES)
-      settings.layout_index = combo(ctx, "Direction layer", settings.layout_index, LAYOUT_NAMES)
       settings.output_mode_index = combo(ctx, "Output format", settings.output_mode_index, OUTPUT_MODE_NAMES)
-      if settings.order_index ~= 1 and settings.layout_index == 1 then
-        ImGui.Text(ctx, "Tetrahedral mode is first-order only; higher orders use the virtual layout.")
-      end
-      if settings.order_index >= 2 then
+      if settings.order_index == 1 then
+        ImGui.Text(ctx, "First order uses the four-direction P-format / tetrahedral bank.")
+      else
         ImGui.Text(ctx, "Higher-order bank uses 8 directions: 2OA stacked = 72ch, 3OA stacked = 128ch.")
       end
       ImGui.Spacing(ctx)
@@ -404,7 +400,7 @@ local function main()
       changed, settings.insert_items = ImGui.Checkbox(ctx, "Insert generated IR items", settings.insert_items)
       ImGui.Spacing(ctx)
       ImGui.Separator(ctx)
-      ImGui.Text(ctx, "IR files to create: " .. tostring(direction_count(settings.order_index, settings.layout_index)))
+      ImGui.Text(ctx, "IR files to create: " .. tostring(direction_count(settings.order_index)))
       ImGui.Text(ctx, "Channels per IR: " .. tostring(order_channels(settings.order_index)))
       if settings.output_mode_index == 2 then
         local stacked_channels = stacked_channel_count(settings)
