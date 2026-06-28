@@ -74,8 +74,10 @@ script writes a new media item into the project.
 
 Python and NumPy are used where Lua or JSFX would be too slow or too limited:
 FFT processing, convolution, spectral recombination, dense grain rendering, and
-oscillator-bank resynthesis. The included JSFX synth engines are also rendered
-offline when a process benefits from REAPER's audio engine and automation.
+oscillator-bank resynthesis. Some included JSFX synth engines can also be
+rendered offline when a process benefits from REAPER's audio engine and
+automation, or controlled directly from MIDI items through their MIDI controller
+actions.
 
 ## Texture / Montage
 

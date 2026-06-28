@@ -24,10 +24,14 @@ toc:
     href: "#loop-rift"
   - title: Dense Grain Cloud
     href: "#dense-grain-cloud"
-  - title: Render MC Carto Synth
-    href: "#render-mc-carto-synth"
-  - title: Render MC Spectra Synth
-    href: "#render-mc-spectra-synth"
+  - title: Carto Synth Render
+    href: "#carto-synth-render"
+  - title: Carto Synth MIDI Controller
+    href: "#carto-synth-midi-controller"
+  - title: Spectra Synth Render
+    href: "#spectra-synth-render"
+  - title: Spectra Synth MIDI Controller
+    href: "#spectra-synth-midi-controller"
   - title: Partial Trace Resynth
     href: "#partial-trace-resynth"
   - title: Fata Morgana Resynth
@@ -213,7 +217,7 @@ Important controls:
 
 Start with fewer grains and moderate density, then raise grain count after the spatial behavior is clear. Use the amplitude envelope for fades instead of relying only on post-render gain.
 
-## Render MC Carto Synth
+## Carto Synth Render
 
 Use this when you want a rendered multichannel synthetic source rather than a processed input file. Carto is a JSFX synth driven offline by the Lua renderer, so it creates a new media item instead of requiring realtime playback.
 
@@ -229,7 +233,21 @@ Algorithms have different spatial behavior. Dust-like modes behave as stochastic
 
 Use the detailed breakpoint editor when the render feels too static. A good starting set is amplitude, density, brightness, and one spatial control. Randomize one lane at a time until the behavior is legible.
 
-## Render MC Spectra Synth
+## Carto Synth MIDI Controller
+
+Use this when you want to drive Carto from MIDI items on the timeline. The controller loads the JSFX engine on the selected track and exposes the MIDI response layer: pitch mode, velocity-to-density, velocity-to-rate, velocity-to-gain, note gate depth, and MIDI-channel focus.
+
+Starting approach:
+
+- Put the controller on the selected track, or let it load the JSFX engine.
+- Create a MIDI item on the same track.
+- Enable `MIDI control`.
+- Use `Pitch sets frequency` for note-like behavior, or `Gate only` when the synth should keep its base frequency.
+- Use MIDI channels when `Focus by MIDI channel` is active.
+
+The offline render action remains separate. Use `Carto Synth Render` when you want breakpoint-controlled file output instead of realtime playback.
+
+## Spectra Synth Render
 
 Use this for synthetic material based on spectral masses, resonators, impulse responses, and partial-like behavior. It is also rendered offline through the included JSFX synth engine.
 
@@ -241,6 +259,19 @@ Starting approach:
 - Some modes develop over the whole duration, so check more than the opening moment of a render.
 
 Impulse and resonator modes can become clicky if the event layer is too sharp. Increase event smoothing or use slower envelopes when that happens. Spectral-mass modes often reveal more internal motion when density changes over time rather than staying fixed.
+
+## Spectra Synth MIDI Controller
+
+Use this when you want the Spectra engine to behave as a realtime multichannel instrument. The controller loads the JSFX engine on the selected track and exposes the same MIDI response layer as Carto.
+
+Starting approach:
+
+- Enable `MIDI control`.
+- Use lower density and moderate decay for note-driven articulation.
+- Use velocity-to-gain first, then add velocity-to-density or velocity-to-rate.
+- Use MIDI-channel focus when different MIDI channels should pull energy toward different output-channel regions.
+
+The MIDI controller is for realtime/timeline use. Use `Spectra Synth Render` for offline breakpoint composition and rendered media items.
 
 ## Partial Trace Resynth
 

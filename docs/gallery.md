@@ -34,8 +34,8 @@ Screenshots of selected s3g-mc controllers, render tools, panners, and workflow 
   <button class="gallery-tile" type="button" data-full="assets/images/gallery/DenseGrainCloud.png" aria-label="Open Dense Grain Cloud screenshot"><img src="assets/images/gallery/DenseGrainCloud.png" alt="Dense Grain Cloud"></button>
   <button class="gallery-tile" type="button" data-full="assets/images/gallery/FataMorganaResynth.png" aria-label="Open Fata Morgana Resynth screenshot"><img src="assets/images/gallery/FataMorganaResynth.png" alt="Fata Morgana Resynth"></button>
   <button class="gallery-tile" type="button" data-full="assets/images/gallery/LoopDrift.png" aria-label="Open Loop Drift screenshot"><img src="assets/images/gallery/LoopDrift.png" alt="Loop Drift"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/RenderMCCartoSynth.png" aria-label="Open Render MC Carto Synth screenshot"><img src="assets/images/gallery/RenderMCCartoSynth.png" alt="Render MC Carto Synth"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/MCCartoSynth.png" aria-label="Open MC Carto Synth screenshot"><img src="assets/images/gallery/MCCartoSynth.png" alt="MC Carto Synth"></button>
+  <button class="gallery-tile" type="button" data-full="assets/images/gallery/RenderMCCartoSynth.png" aria-label="Open Carto Synth Render screenshot"><img src="assets/images/gallery/RenderMCCartoSynth.png" alt="Carto Synth Render"></button>
+  <button class="gallery-tile" type="button" data-full="assets/images/gallery/MCCartoSynth.png" aria-label="Open Carto Synth screenshot"><img src="assets/images/gallery/MCCartoSynth.png" alt="Carto Synth"></button>
   <button class="gallery-tile" type="button" data-full="assets/images/gallery/ResonantTerrain.png" aria-label="Open Resonant Terrain screenshot"><img src="assets/images/gallery/ResonantTerrain.png" alt="Resonant Terrain"></button>
 </div>
 

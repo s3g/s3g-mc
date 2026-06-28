@@ -1,4 +1,4 @@
--- @description Render MC Carto Synth
+-- @description Carto Synth Render
 -- @author s3g
 -- @version 0.2
 -- @requires ReaImGui; JSFX: s3g MC Carto Synth Engine
@@ -11,7 +11,7 @@ local script_dir = script_path:match("^(.*[/\\])") or ""
 local mc = dofile(script_dir .. "Multichannel Library.lua")
 
 if not reaper.APIExists("ImGui_GetVersion") then
-  reaper.MB("ReaImGui is not installed or not loaded.", "Render MC Carto Synth", 0)
+  reaper.MB("ReaImGui is not installed or not loaded.", "Carto Synth Render", 0)
   return
 end
 
@@ -19,7 +19,7 @@ package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
 
 local FX_NAME = "s3g MC Carto Synth Engine"
-local FX_NAME_CLEAN = "MC Carto Synth Engine"
+local FX_NAME_CLEAN = "Carto Synth Engine"
 local CARTO_GMEM_NAME = "s3g_carto_synth"
 local EXTSTATE_SECTION = "s3g_mc_render_carto_synth"
 local MAX_ROUTE_POINTS = 32
@@ -438,7 +438,7 @@ local function render_texture(settings)
   reaper.Undo_BeginBlock()
   mc.with_ui_refresh_block(function()
     local insert_index = reaper.CountTracks(0)
-    local synth_track = mc.insert_track_at(insert_index, "tmp MC Carto Synth", mc.reaper_track_channel_count(channels))
+    local synth_track = mc.insert_track_at(insert_index, "tmp Carto Synth", mc.reaper_track_channel_count(channels))
     reaper.SetMediaTrackInfo_Value(synth_track, "B_MAINSEND", 0)
     local placeholder = reaper.AddMediaItemToTrack(synth_track)
     reaper.SetMediaItemInfo_Value(placeholder, "D_POSITION", start_pos)
@@ -480,7 +480,7 @@ local function render_texture(settings)
         render_track = mc.find_new_track(before_guids) or mc.get_selected_track_excluding({ synth_track })
         if render_track then
           reaper.GetSetMediaTrackInfo_String(render_track, "P_NAME",
-            "MC Carto Synth render (" .. tostring(channels) .. "ch)", true)
+            "Carto Synth render (" .. tostring(channels) .. "ch)", true)
           reaper.SetMediaTrackInfo_Value(render_track, "I_NCHAN", mc.reaper_track_channel_count(channels))
           reaper.SetMediaTrackInfo_Value(render_track, "B_MAINSEND", 1)
           reaper.SetMediaTrackInfo_Value(render_track, "D_VOL", settings.insert_gain or 0.25)
@@ -502,12 +502,12 @@ local function render_texture(settings)
       mc.select_only_track(render_track)
     end
   end)
-  reaper.Undo_EndBlock("Render MC Carto Synth", -1)
+  reaper.Undo_EndBlock("Carto Synth Render", -1)
 
   if render_error then
-    reaper.MB(render_error .. "\n\nMake sure the s3g JSFX files are installed in REAPER/Effects/s3g.", "Render MC Carto Synth", 0)
+    reaper.MB(render_error .. "\n\nMake sure the s3g JSFX files are installed in REAPER/Effects/s3g.", "Carto Synth Render", 0)
   elseif not did_render then
-    reaper.MB("REAPER did not create a rendered multichannel Carto synth item.\n\nThe temporary synth track was left in place if possible. Check the render action:\n" .. mc.RENDER_MULTICHANNEL_POST_FADER_STEM_NAME, "Render MC Carto Synth", 0)
+    reaper.MB("REAPER did not create a rendered multichannel Carto synth item.\n\nThe temporary synth track was left in place if possible. Check the render action:\n" .. mc.RENDER_MULTICHANNEL_POST_FADER_STEM_NAME, "Carto Synth Render", 0)
   else
     local lines = {
       "Algorithm: " .. (ALGO_NAMES[settings.algorithm] or "?"),
@@ -532,7 +532,7 @@ local function render_texture(settings)
     elseif settings.routes then
       lines[#lines + 1] = "Amplitude curve: baked into synth render when active"
     end
-    reaper.ShowConsoleMsg("\n[Render MC Carto Synth]\n" .. table.concat(lines, "\n") .. "\n")
+    reaper.ShowConsoleMsg("\n[Carto Synth Render]\n" .. table.concat(lines, "\n") .. "\n")
   end
 end
 
@@ -1004,7 +1004,7 @@ local function draw_route_overview(ctx, route_points, route_enabled, selected_ro
 end
 
 local start_pos, duration, from_time_selection = get_time_defaults()
-local ctx = ImGui.CreateContext("Render MC Carto Synth")
+local ctx = ImGui.CreateContext("Carto Synth Render")
 math.randomseed(math.floor(((reaper.time_precise and reaper.time_precise()) or os.clock()) * 1000000))
 local open = true
 local channel_index = 4 -- 8ch
@@ -1177,7 +1177,7 @@ end
 local function loop()
   ImGui.SetNextWindowSize(ctx, 860, route_editor_was_open and route_expanded_window_h or route_compact_window_h, ImGui.Cond_Always)
   local visible
-  visible, open = ImGui.Begin(ctx, "Render MC Carto Synth", open)
+  visible, open = ImGui.Begin(ctx, "Carto Synth Render", open)
   if visible then
     local changed
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)

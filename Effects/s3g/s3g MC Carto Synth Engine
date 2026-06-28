@@ -16,6 +16,14 @@ slider11:0<0,1,0.001>Crush / decimate
 slider12:-18<-60,0,0.1>Output gain (dB)
 slider13:1<1,9999,1>Seed
 slider14:1<0,1,1{Keep extra channels,Clear extra channels}>Extra channel output
+slider15:0<0,1,1{Off,On}>MIDI control
+slider16:0<0,2,1{Pitch sets frequency,Pitch transposes base,Gate only}>MIDI pitch mode
+slider17:1<0,1,1{All channels,Focus by MIDI channel}>MIDI channel focus
+slider18:0.55<0,1,0.001>Velocity to density
+slider19:0.35<0,1,0.001>Velocity to rate
+slider20:0.70<0,1,0.001>Velocity to gain
+slider21:0.45<0,1,0.001>Note gate depth
+slider22:0.30<0.02,1,0.001>Focus width
 
 @init
 MAX_CH = 128;
@@ -48,6 +56,16 @@ amp_curve_active = 0;
 amp_curve_points = 0;
 amp_curve_duration_samples = 1;
 render_sample = 0;
+midi_gate = 0;
+midi_gate_target = 0;
+midi_vel = 0;
+midi_vel_target = 0;
+midi_freq = 120;
+midi_freq_target = 120;
+midi_focus = 0.5;
+midi_focus_target = 0.5;
+midi_active_notes = 0;
+midi_last_note = 60;
 
 function clamp01(x)
 (
@@ -174,9 +192,12 @@ function update_slider_state()
 (
   chan_count = max(1, min(MAX_CH, floor(slider1 + 0.5)));
   algorithm = floor(slider2 + 0.5);
-  rate = clamp01(slider3);
-  base_freq = max(1, slider4);
-  density = clamp01(slider5);
+  rate_base = clamp01(slider3);
+  base_freq_base = max(1, slider4);
+  density_base = clamp01(slider5);
+  rate = rate_base;
+  base_freq = base_freq_base;
+  density = density_base;
   brightness = clamp01(slider6);
   decay = clamp01(slider7);
   field_spread = clamp01(slider8);
@@ -186,6 +207,14 @@ function update_slider_state()
   out_gain = db_to_amp(slider12) / sqrt(max(1, chan_count));
   seed = floor(slider13 + 0.5);
   clear_extra = floor(slider14 + 0.5);
+  midi_control = floor(slider15 + 0.5);
+  midi_pitch_mode = floor(slider16 + 0.5);
+  midi_focus_mode = floor(slider17 + 0.5);
+  midi_vel_density = clamp01(slider18);
+  midi_vel_rate = clamp01(slider19);
+  midi_vel_gain = clamp01(slider20);
+  midi_gate_depth = clamp01(slider21);
+  midi_focus_width = max(0.02, slider22);
 
   decay_coef = exp(-1 / max(8, (0.004 + decay * 1.6) * srate));
   lp_coef = exp(-1 / max(1, (0.0006 + (1 - brightness) * 0.08) * srate));
@@ -257,9 +286,48 @@ last_algorithm != algorithm ? (
 @block
 update_slider_state();
 update_amp_curve_state();
+while (
+  midirecv(midi_offset, midi_msg1, midi_msg23) ? (
+    midi_status = midi_msg1 & 240;
+    midi_channel = midi_msg1 & 15;
+    midi_note = midi_msg23 & 127;
+    midi_velocity = floor(midi_msg23 / 256) & 127;
+    (midi_status == 144 && midi_velocity > 0) ? (
+      midi_active_notes += 1;
+      midi_last_note = midi_note;
+      midi_vel_target = midi_velocity / 127;
+      midi_freq_target = 440 * (2 ^ ((midi_note - 69) / 12));
+      midi_gate_target = 1;
+      midi_focus_target = chan_count <= 1 ? 0.5 : min(1, midi_channel / max(1, chan_count - 1));
+    ) : (midi_status == 128 || (midi_status == 144 && midi_velocity == 0)) ? (
+      midi_active_notes = max(0, midi_active_notes - 1);
+      midi_active_notes <= 0 ? (
+        midi_gate_target = 0;
+        midi_vel_target = 0;
+      );
+    );
+    midisend(midi_offset, midi_msg1, midi_msg23);
+    1;
+  );
+);
 
 @sample
+rate = rate_base;
+density = density_base;
+base_freq = base_freq_base;
+midi_control ? (
+  midi_coef = exp(-1 / max(8, 0.018 * srate));
+  midi_gate = midi_gate * midi_coef + midi_gate_target * (1 - midi_coef);
+  midi_vel = midi_vel * midi_coef + midi_vel_target * (1 - midi_coef);
+  midi_freq = midi_freq * midi_coef + midi_freq_target * (1 - midi_coef);
+  midi_focus = midi_focus * midi_coef + midi_focus_target * (1 - midi_coef);
+  midi_pitch_mode == 0 ? base_freq = midi_freq :
+  midi_pitch_mode == 1 ? base_freq = base_freq_base * (midi_freq / 261.625565);
+  density = clamp01(density_base + midi_gate * midi_vel * midi_vel_density);
+  rate = clamp01(rate_base + midi_gate * midi_vel * midi_vel_rate);
+);
 sample_gain = amp_curve_active ? amp_curve_at(render_sample / amp_curve_duration_samples) / sqrt(max(1, chan_count)) : out_gain;
+midi_control ? sample_gain *= (1 - midi_gate_depth * (1 - midi_gate)) * (1 + midi_gate * midi_vel * midi_vel_gain);
 i = 0;
 loop(chan_count,
   field = channel_field(i, 1);
@@ -455,6 +523,14 @@ loop(chan_count,
       decim_hold[i] = floor(y * levels) / levels;
     );
     y = decim_hold[i];
+  );
+
+  midi_control && midi_focus_mode ? (
+    focus_pos = chan_count <= 1 ? 0.5 : i / max(1, chan_count - 1);
+    focus_dist = abs(focus_pos - midi_focus);
+    focus_dist = min(focus_dist, 1 - focus_dist);
+    focus_gain = exp(-(focus_dist * focus_dist) / max(0.0001, midi_focus_width * midi_focus_width));
+    y *= (1 - midi_gate * 0.78) + midi_gate * (0.22 + focus_gain * 1.05);
   );
 
   spl(i) = max(-1, min(1, y * sample_gain));

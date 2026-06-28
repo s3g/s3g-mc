@@ -32,8 +32,8 @@ toc:
 
 For step-by-step notes on selected render processes, see the [Process Guides](process-guides.md).
 
-Current package snapshot: 85 user-facing tools/controllers plus the Package
-Browser. Of those, 35 are Python/NumPy-backed offline processes, 17 are
+Current package snapshot: 87 user-facing tools/controllers plus the Package
+Browser. Of those, 35 are Python/NumPy-backed offline processes, 19 are
 JSFX-backed actions or controllers, and 33 are Lua-only REAPER actions. The
 package also includes 19 JSFX engines/effects.
 
@@ -49,16 +49,22 @@ package also includes 19 JSFX engines/effects.
 
 ## Procedural Synthesis
 
-These render actions drive included JSFX synth engines offline.
+These tools use included JSFX synth engines in two ways: render actions create
+new media items offline, while MIDI controllers configure the same engines for
+timeline-driven realtime use.
 
-- `Render MC Carto Synth`: renders multichannel dust, pulse-packet,
+- `Carto Synth Render`: renders multichannel dust, pulse-packet,
   logic/fractal-drone, byte-mask, and spline-drift materials.
-- `Render MC Spectra Synth`: renders slower spectral-mass and resonant
+- `Carto Synth MIDI Controller`: loads the Carto engine on the selected track
+  and maps MIDI notes, velocity, gate, and MIDI channel focus to synth behavior.
+- `Spectra Synth Render`: renders slower spectral-mass and resonant
   materials: partial clouds, comb strata, formant bands, impulse resonators,
   and noise spectra.
+- `Spectra Synth MIDI Controller`: loads the Spectra engine on the selected
+  track with the same MIDI response layer.
 
-Both use breakpoint curves for parameter motion and channel behavior, then
-write a new multichannel media item.
+The render actions use breakpoint curves for parameter motion and channel
+behavior, then write a new multichannel media item.
 
 ## Offline Synthesis / IR
 
