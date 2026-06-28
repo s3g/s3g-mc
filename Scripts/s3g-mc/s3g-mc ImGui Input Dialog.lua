@@ -1,3 +1,6 @@
+-- @description s3g-mc ImGui Input Dialog
+-- @browser hidden
+
 local M = {}
 
 local has_imgui = reaper.APIExists and reaper.APIExists("ImGui_CreateContext")

@@ -46,6 +46,14 @@ layout, width, rotation, weighting, 3D projection attenuation, output trim, and
 autogain controls so the fold-down can be shaped without losing the
 multichannel source.
 
+Use `Transaural Crosstalk Canceller` after a binaural decoder or binaural
+stereo render when that signal needs to play over loudspeakers from a fixed
+listening position. It is not a binaural headphone decoder; it is the
+loudspeaker playback stage that tries to reduce speaker-to-opposite-ear
+crosstalk. The `Matrix inverse` mode is the more reference-aligned transaural
+approximation, while `Feedforward` is a gentler option for rooms or setups where
+the cancellation becomes too strong.
+
 ## Item and Stem Workflows
 
 The item and stem tools are for changing the channel structure of existing
@@ -99,6 +107,23 @@ There is also a NumPy-backed offline renderer, `3OAFX Offline Renderer.lua`.
 It works directly from a selected ACN/SN3D ambisonic media item, supports 1OA,
 2OA, and 3OA, and writes a new ambisonic item with the selected focus movement,
 dry attenuation, and regional effect baked into the render.
+
+`Ambisonic Stereo Decoder` is a package-native JSFX option for stereo
+loudspeaker monitoring or rendering. It is not a binaural headphone decoder.
+Instead, it decodes the ambisonic signal to a virtual speaker field, then places
+a stereo pickup model inside that field using methods such as XY, MS, Blumlein,
+ORTF-style, and spaced omni.
+
+If that stereo output is intended for loudspeaker transaural playback, place
+`Transaural Crosstalk Canceller` after the stereo decoder and tune it from the
+listening position. The more typical chain is still binaural decoder/render
+into transaural loudspeaker playback. For ordinary stereo renders, leave the
+transaural stage off.
+
+For smaller monitoring setups, `6ch Ambisonic Decoder Router` provides a
+package-native JSFX decoder/router for ACN/SN3D 1OA, 2OA, or 3OA into a compact
+4-speaker bed plus 2 elevated side speakers. It can also bypass decoding and
+route direct 6-channel material to the same outputs.
 
 ### Required Files
 
@@ -242,6 +267,9 @@ mask lanes.
 If the JSFX do not appear, confirm that this package's `Effects/s3g`
 folder was copied or symlinked to `REAPER/Effects/s3g`, then rescan JSFX or
 restart REAPER.
+
+If JSFX defaults or labels look stale after updating the package, rescan JSFX
+and reopen the affected effect/controller.
 
 If the 3OA chain does not pass audio, confirm that the track is set to 72
 channels and that the plugin order is AmbiDEC, Send, insert effect, Return Mask,

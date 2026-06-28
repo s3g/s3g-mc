@@ -32,12 +32,20 @@ toc:
 
 For step-by-step notes on selected render processes, see the [Process Guides](process-guides.md).
 
+Current package snapshot: 85 user-facing tools/controllers plus the Package
+Browser. Of those, 35 are Python/NumPy-backed offline processes, 17 are
+JSFX-backed actions or controllers, and 33 are Lua-only REAPER actions. The
+package also includes 19 JSFX engines/effects.
+
 ## Channel Mixing / Automation
 
 - `128ch Automation Mixer`: faders, mute/solo, channel groups, meters, and
   plugin pin remapping for high-channel-count tracks.
 - `MC to Stereo Autogain`: multichannel fold-down with layout modes, width,
   rotation, weighting, 3D projection attenuation, autogain, and output trim.
+- `Transaural Crosstalk Canceller`: stereo loudspeaker playback processor with
+  feedforward and matrix-inverse crosstalk cancellation modes, speaker
+  geometry, low protection, stereo preservation, and safety gain controls.
 
 ## Procedural Synthesis
 
@@ -111,9 +119,13 @@ behaviors.
 
 ## 3OAFX
 
+- `Ambisonic Stereo Decoder`: package-native JSFX stereo decoder for ACN/SN3D
+  1OA, 2OA, or 3OA. It decodes to an internal virtual speaker field, then
+  derives a practical loudspeaker stereo fold-down using stereo pickup models
+  such as XY, MS, Blumlein, ORTF-style, and spaced omni.
 - `6ch Ambisonic Decoder Router`: package-native JSFX monitor decoder/router
-  for ACN/SN3D 1OA, 2OA, or 3OA into an editable 6-speaker layout, with direct
-  6-channel routing mode.
+  for ACN/SN3D 1OA, 2OA, or 3OA into a compact 4-speaker bed plus 2 elevated
+  side speakers, with direct 6-channel routing mode.
 - `3OAFX Ambiance Extractor`: extracts room tone, noise bed, or other
   profile-like material from an ambisonic source while preserving the directional
   decode/re-encode workflow.

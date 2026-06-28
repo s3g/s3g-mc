@@ -7,7 +7,12 @@ It includes Lua actions, ReaImGui controllers, and JSFX for channel editing,
 automation, fold-down monitoring, dome panning, 3OA send/return routing, and
 render-based multichannel processes.
 
-Documentation and workflow notes: <a href="https://s3g.github.io/s3g-mc/" target="_blank" rel="noopener noreferrer">s3g-mc docs site</a>.
+Current package snapshot: 85 user-facing tools/controllers plus the Package
+Browser. Of those, 35 are Python/NumPy-backed offline processes, 17 are
+JSFX-backed actions or controllers, and 33 are Lua-only REAPER actions. The
+package also includes 19 JSFX engines/effects in `Effects/s3g`.
+
+Documentation, workflow notes, and references: <a href="https://s3g.github.io/s3g-mc/" target="_blank" rel="noopener noreferrer">s3g-mc docs site</a>.
 
 Many of these tools are inspired by or extend existing computer music
 practices, with references mentioned in the documentation where they are
@@ -21,6 +26,9 @@ useful.
   plugin pin remapping for high-channel-count tracks.
 - `MC to Stereo Autogain`: multichannel fold-down with layout modes, width,
   rotation, weighting, 3D projection attenuation, autogain, and output trim.
+- `Transaural Crosstalk Canceller`: stereo loudspeaker playback processor with
+  feedforward and matrix-inverse crosstalk cancellation modes, speaker
+  geometry, low protection, stereo preservation, and safety gain controls.
 
 ### Procedural Synthesis
 
@@ -97,9 +105,13 @@ for the ambisonic send/return workflow.
 
 ### 3OAFX
 
+- `Ambisonic Stereo Decoder`: package-native JSFX stereo decoder for ACN/SN3D
+  1OA, 2OA, or 3OA. It decodes to an internal virtual speaker field, then
+  derives a practical loudspeaker stereo fold-down using stereo pickup models
+  such as XY, MS, Blumlein, ORTF-style, and spaced omni.
 - `6ch Ambisonic Decoder Router`: package-native JSFX monitor decoder/router
-  for ACN/SN3D 1OA, 2OA, or 3OA into an editable 6-speaker layout, with direct
-  6-channel routing mode.
+  for ACN/SN3D 1OA, 2OA, or 3OA into a compact 4-speaker bed plus 2 elevated
+  side speakers, with direct 6-channel routing mode.
 - `3OAFX Ambiance Extractor`: extracts room tone, noise bed, or other
   profile-like material from an ambisonic source while preserving the directional
   decode/re-encode workflow.

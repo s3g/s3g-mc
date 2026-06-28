@@ -4,6 +4,9 @@ title: Gallery
 prev_page:
   title: Process Guides
   url: /process-guides.html
+next_page:
+  title: References
+  url: /references.html
 toc:
   - title: Interface Screenshots
     href: "#interface-screenshots"

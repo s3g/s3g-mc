@@ -1,0 +1,395 @@
+desc:s3g Ambisonic Stereo Decoder
+tags: ambisonic stereo decoder ACN SN3D fold-down monitor
+
+slider1:2<0,2,1{1OA / 4ch,2OA / 9ch,3OA / 16ch}>Ambisonic order
+slider2:3<0,4,1{Quad virtual,8ch cube,12ch dodeca,24ch dome,32ch sphere}>Virtual speaker field
+slider3:0<0,4,1{XY cardioid,ORTF-style,MS cardioid,Blumlein,Spaced omni}>Stereo method
+slider4:110<0,200,1>Stereo width (%)
+slider5:90<20,140,1>Mic angle (degrees)
+slider6:0<-180,180,0.1>Listening rotation (degrees)
+slider7:70<0,100,1>Directivity (%)
+slider8:35<0,100,1>Rear rejection (%)
+slider9:30<0,100,1>Height fold (%)
+slider10:0<0,100,1>Diffuse blend (%)
+slider11:1<0,3,1{Projection,Energy-normalized,Max-rE-ish,Custom}>Decode weighting
+slider12:1<0,2,1{Off,Power/sqrt(N),Energy sum}>Autogain
+slider13:0<-24,24,0.1>Output gain (dB)
+slider14:1<0,1,1{Keep extra channels,Clear extra channels}>Extra channel output
+slider15:100<0,100,1>Custom W weight (%)
+slider16:100<0,100,1>Custom 1st order weight (%)
+slider17:82<0,100,1>Custom 2nd order weight (%)
+slider18:64<0,100,1>Custom 3rd order weight (%)
+slider19:40<0,120,1>A/B spacing (cm)
+slider20:0<0,300,1>Bass mono below (Hz)
+slider21:2<0,3,1{Fold center,Fold wide,Attenuate,Diffuse}>Height image mode
+slider22:0<-100,100,1>Front/rear balance (%)
+slider23:1<0,2,1{Quieter,Narrower,Wrap wide}>Rear image mode
+slider24:0<-90,90,0.1>Mic elevation (degrees)
+slider25:100<0,200,1>Rotation image (%)
+
+@init
+deg2rad = $pi / 180;
+EPS = 0.000000001;
+MAX_CH = 16;
+lcoef = 0;
+rcoef = 32;
+AB_BUF = 128;
+ab_lbuf = 256;
+ab_rbuf = 384;
+
+function clamp(v, lo, hi) (
+  max(lo, min(hi, v));
+);
+
+function wrap_deg(v) (
+  v > 180 ? v -= 360;
+  v < -180 ? v += 360;
+  v;
+);
+
+function channel_count_for_order(order) (
+  order <= 1 ? 4 : order == 2 ? 9 : 16;
+);
+
+function order_weight(ch, order, mode) local(w)
+(
+  w = 1;
+  mode == 2 ? (
+    ch == 0 ? w = 1 :
+    ch < 4 ? w = 1 :
+    ch < 9 ? w = order >= 2 ? 0.82 : 0 :
+    w = order >= 3 ? 0.64 : 0;
+  ) : mode == 3 ? (
+    ch == 0 ? w = custom_w :
+    ch < 4 ? w = custom_o1 :
+    ch < 9 ? w = order >= 2 ? custom_o2 : 0 :
+    w = order >= 3 ? custom_o3 : 0;
+  );
+  w;
+);
+
+function ring_pos(index, count, start_az, el)
+(
+  proj_az = wrap_deg(start_az - index * 360 / max(1, count));
+  proj_el = el;
+);
+
+function cube_pos(index) local(slot)
+(
+  slot = index % 8;
+  proj_az = slot == 0 ? -45 :
+            slot == 1 ? -135 :
+            slot == 2 ? 135 :
+            slot == 3 ? 45 :
+            slot == 4 ? -45 :
+            slot == 5 ? -135 :
+            slot == 6 ? 135 : 45;
+  proj_el = slot < 4 ? -35.2644 : 35.2644;
+);
+
+function dodeca_pos(index) local(slot)
+(
+  slot = index % 12;
+  slot == 0 ? (proj_az = -31.717474; proj_el = 0;) :
+  slot == 1 ? (proj_az = -90; proj_el = -31.717474;) :
+  slot == 2 ? (proj_az = -90; proj_el = 31.717474;) :
+  slot == 3 ? (proj_az = -148.282526; proj_el = 0;) :
+  slot == 4 ? (proj_az = 180; proj_el = -58.282526;) :
+  slot == 5 ? (proj_az = 180; proj_el = 58.282526;) :
+  slot == 6 ? (proj_az = 148.282526; proj_el = 0;) :
+  slot == 7 ? (proj_az = 90; proj_el = 31.717474;) :
+  slot == 8 ? (proj_az = 90; proj_el = -31.717474;) :
+  slot == 9 ? (proj_az = 31.717474; proj_el = 0;) :
+  slot == 10 ? (proj_az = 0; proj_el = 58.282526;) :
+  (proj_az = 0; proj_el = -58.282526;);
+);
+
+function dome24_pos(index) local(slot)
+(
+  slot = index % 24;
+  slot < 12 ? (
+    ring_pos(slot, 12, -30, 0);
+  ) : slot < 20 ? (
+    ring_pos(slot - 12, 8, -45, 32);
+  ) : (
+    ring_pos(slot - 20, 4, -90, 66.6);
+  );
+);
+
+function sphere32_pos(index) local(frac, z)
+(
+  frac = (index + 0.5) / 32;
+  z = 1 - 2 * frac;
+  proj_el = asin(z) / $pi * 180;
+  proj_az = wrap_deg(-30 - index * 137.507764);
+);
+
+function virtual_pos(layout, index)
+(
+  layout == 0 ? ring_pos(index, 4, -45, 0) :
+  layout == 1 ? cube_pos(index) :
+  layout == 2 ? dodeca_pos(index) :
+  layout == 3 ? dome24_pos(index) :
+  sphere32_pos(index);
+);
+
+function virtual_count(layout) (
+  layout == 0 ? 4 :
+  layout == 1 ? 8 :
+  layout == 2 ? 12 :
+  layout == 3 ? 24 :
+  32;
+);
+
+function basis_value(ch, az_deg, el_deg)
+local(az, el, ca, sa, c2a, s2a, c3a, s3a, ce, se, ce2, ce3, se2, v)
+(
+  az = az_deg * deg2rad;
+  el = el_deg * deg2rad;
+  ca = cos(az); sa = sin(az);
+  c2a = cos(2 * az); s2a = sin(2 * az);
+  c3a = cos(3 * az); s3a = sin(3 * az);
+  ce = cos(el); se = sin(el);
+  ce2 = ce * ce; ce3 = ce2 * ce; se2 = se * se;
+  v = ch == 0 ? 1 :
+      ch == 1 ? sa * ce :
+      ch == 2 ? se :
+      ch == 3 ? ca * ce :
+      ch == 4 ? 0.8660254038 * s2a * ce2 :
+      ch == 5 ? 0.8660254038 * sa * sin(2 * el) :
+      ch == 6 ? 0.5 * (3 * se2 - 1) :
+      ch == 7 ? 0.8660254038 * ca * sin(2 * el) :
+      ch == 8 ? 0.8660254038 * c2a * ce2 :
+      ch == 9 ? 0.7905694150 * s3a * ce3 :
+      ch == 10 ? 1.9364916731 * s2a * se * ce2 :
+      ch == 11 ? 0.6123724357 * sa * ce * (5 * se2 - 1) :
+      ch == 12 ? 0.5 * se * (5 * se2 - 3) :
+      ch == 13 ? 0.6123724357 * ca * ce * (5 * se2 - 1) :
+      ch == 14 ? 1.9364916731 * c2a * se * ce2 :
+      0.7905694150 * c3a * ce3;
+  v;
+);
+
+function mic_response(src_az, src_el, mic_az, mic_el, shape)
+local(delta, src_elr, mic_elr, d, resp)
+(
+  delta = (src_az - mic_az) * deg2rad;
+  src_elr = src_el * deg2rad;
+  mic_elr = mic_el * deg2rad;
+  d = sin(src_elr) * sin(mic_elr) + cos(src_elr) * cos(mic_elr) * cos(delta);
+  resp = (1 - shape) + shape * (0.5 + 0.5 * d);
+  max(0, resp);
+);
+
+function stereo_pickup(method, az_deg, el_deg)
+local(azr, width, angle, direct, rear, height, base, pan, theta, mid, side, left_mic, right_mic, diffuse, height_amt, rear_amt, front_amt, rear_gain, vertical_match)
+(
+  az_deg = wrap_deg(az_deg - rotation_deg * rotation_image);
+  azr = az_deg * deg2rad;
+  width = stereo_width;
+  angle = mic_angle_deg * 0.5;
+  direct = directivity;
+  rear = (1 - cos(azr)) * 0.5;
+  height = abs(el_deg) / 90;
+  vertical_match = cos((el_deg - mic_el_deg) * deg2rad);
+  base = (1 - rear_reject * rear);
+  base = max(0.05, base);
+  diffuse = diffuse_blend * 0.7071067812 * base;
+
+  method == 0 ? (
+    left_mic = mic_response(az_deg, el_deg, angle, mic_el_deg, direct);
+    right_mic = mic_response(az_deg, el_deg, -angle, mic_el_deg, direct);
+    pick_l = left_mic * base * (1 - diffuse_blend) + diffuse;
+    pick_r = right_mic * base * (1 - diffuse_blend) + diffuse;
+  ) : method == 1 ? (
+    left_mic = mic_response(az_deg, el_deg, angle + 10, mic_el_deg, min(1, direct + 0.18));
+    right_mic = mic_response(az_deg, el_deg, -angle - 10, mic_el_deg, min(1, direct + 0.18));
+    pan = clamp(-sin(azr) * 0.35, -0.35, 0.35);
+    pick_l = left_mic * base * (1 - pan) * (1 - diffuse_blend) + diffuse;
+    pick_r = right_mic * base * (1 + pan) * (1 - diffuse_blend) + diffuse;
+  ) : method == 2 ? (
+    mid = mic_response(az_deg, el_deg, 0, mic_el_deg, direct);
+    side = -sin(azr) * max(0, vertical_match);
+    pick_l = (mid + side) * base * (1 - diffuse_blend) + diffuse;
+    pick_r = (mid - side) * base * (1 - diffuse_blend) + diffuse;
+  ) : method == 3 ? (
+    left_mic = sin(el_deg * deg2rad) * sin(mic_el_deg * deg2rad) + cos(el_deg * deg2rad) * cos(mic_el_deg * deg2rad) * cos((az_deg - 45) * deg2rad);
+    right_mic = sin(el_deg * deg2rad) * sin(mic_el_deg * deg2rad) + cos(el_deg * deg2rad) * cos(mic_el_deg * deg2rad) * cos((az_deg + 45) * deg2rad);
+    pick_l = left_mic * base * (1 - diffuse_blend) + diffuse;
+    pick_r = right_mic * base * (1 - diffuse_blend) + diffuse;
+  ) : (
+    pan = clamp(-sin(azr), -1, 1);
+    theta = (pan + 1) * $pi / 4;
+    pick_l = cos(theta) * base * (1 - diffuse_blend) + diffuse;
+    pick_r = sin(theta) * base * (1 - diffuse_blend) + diffuse;
+  );
+
+  mid = (pick_l + pick_r) * 0.5;
+  side = (pick_l - pick_r) * 0.5 * width;
+  pick_l = mid + side;
+  pick_r = mid - side;
+
+  rear_amt = rear * abs(front_rear_balance);
+  front_amt = (1 - rear) * max(0, -front_rear_balance);
+  front_rear_balance > 0 ? (
+    rear_mode == 0 ? (
+      rear_gain = 1 - rear_amt * 0.85;
+      pick_l *= rear_gain;
+      pick_r *= rear_gain;
+    ) : rear_mode == 1 ? (
+      mid = (pick_l + pick_r) * 0.5;
+      side = (pick_l - pick_r) * 0.5 * (1 - rear_amt);
+      pick_l = mid + side;
+      pick_r = mid - side;
+    ) : (
+      mid = (pick_l + pick_r) * 0.5;
+      side = (pick_l - pick_r) * 0.5 * (1 + rear_amt * 0.85);
+      pick_l = mid + side;
+      pick_r = mid - side;
+    );
+  ) : front_rear_balance < 0 ? (
+    pick_l *= 1 - front_amt * 0.65;
+    pick_r *= 1 - front_amt * 0.65;
+  );
+
+  height_amt = clamp(height_fold * height, 0, 1);
+  height_mode == 0 ? (
+    mid = (pick_l + pick_r) * 0.5;
+    pick_l = pick_l * (1 - height_amt) + mid * height_amt;
+    pick_r = pick_r * (1 - height_amt) + mid * height_amt;
+  ) : height_mode == 1 ? (
+    mid = (pick_l + pick_r) * 0.5;
+    side = (pick_l - pick_r) * 0.5 * (1 + height_amt);
+    pick_l = mid + side;
+    pick_r = mid - side;
+  ) : height_mode == 2 ? (
+    pick_l *= 1 - height_amt;
+    pick_r *= 1 - height_amt;
+  ) : (
+    mid = (pick_l + pick_r) * 0.5;
+    pick_l = pick_l * (1 - height_amt) + (mid + diffuse) * 0.5 * height_amt;
+    pick_r = pick_r * (1 - height_amt) + (mid + diffuse) * 0.5 * height_amt;
+  );
+);
+
+@slider
+order = floor(slider1 + 0.5) + 1;
+layout = floor(slider2 + 0.5);
+method = floor(slider3 + 0.5);
+stereo_width = max(0, slider4 / 100);
+mic_angle_deg = slider5;
+rotation_deg = slider6;
+directivity = clamp(slider7 / 100, 0, 1);
+rear_reject = clamp(slider8 / 100, 0, 1);
+height_fold = clamp(slider9 / 100, 0, 1);
+diffuse_blend = clamp(slider10 / 100, 0, 1);
+decode_mode = floor(slider11 + 0.5);
+autogain = floor(slider12 + 0.5);
+out_gain = 10 ^ (slider13 / 20);
+clear_extra = floor(slider14 + 0.5);
+custom_w = clamp(slider15 / 100, 0, 1);
+custom_o1 = clamp(slider16 / 100, 0, 1);
+custom_o2 = clamp(slider17 / 100, 0, 1);
+custom_o3 = clamp(slider18 / 100, 0, 1);
+ab_spacing_cm = max(0, slider19);
+bass_mono_hz = max(0, slider20);
+height_mode = floor(slider21 + 0.5);
+front_rear_balance = clamp(slider22 / 100, -1, 1);
+rear_mode = floor(slider23 + 0.5);
+mic_el_deg = slider24;
+rotation_image = max(0, slider25 / 100);
+ch_count = channel_count_for_order(order);
+vcount = virtual_count(layout);
+bass_a = bass_mono_hz > 0 ? exp(-2 * $pi * bass_mono_hz / srate) : 0;
+ab_delay_spl = min(AB_BUF - 2, ab_spacing_cm * 0.01 / 343 * srate);
+
+ch = 0;
+loop(MAX_CH,
+  lcoef[ch] = 0;
+  rcoef[ch] = 0;
+  ch += 1;
+);
+
+spk = 0;
+loop(vcount,
+  virtual_pos(layout, spk);
+  stereo_pickup(method, proj_az, proj_el);
+  sumsq = 0;
+  ch = 0;
+  loop(ch_count,
+    w = order_weight(ch, order, decode_mode);
+    b = basis_value(ch, proj_az, proj_el) * w;
+    sumsq += b * b;
+    ch += 1;
+  );
+  norm = decode_mode >= 1 ? 1 / sqrt(max(EPS, sumsq)) : 1;
+  scale = norm / sqrt(vcount);
+  ch = 0;
+  loop(ch_count,
+    w = order_weight(ch, order, decode_mode);
+    b = basis_value(ch, proj_az, proj_el) * w * scale;
+    lcoef[ch] += b * pick_l;
+    rcoef[ch] += b * pick_r;
+    ch += 1;
+  );
+  spk += 1;
+);
+
+auto =
+  autogain == 1 ? 1 / sqrt(ch_count) :
+  autogain == 2 ? 1 / max(1, ch_count) :
+  1;
+
+@sample
+in0 = spl0; in1 = spl1; in2 = spl2; in3 = spl3; in4 = spl4; in5 = spl5;
+in6 = spl6; in7 = spl7; in8 = spl8; in9 = spl9; in10 = spl10; in11 = spl11; in12 = spl12; in13 = spl13; in14 = spl14; in15 = spl15;
+
+left =
+  in0 * lcoef[0] + in1 * lcoef[1] + in2 * lcoef[2] + in3 * lcoef[3] +
+  in4 * lcoef[4] + in5 * lcoef[5] + in6 * lcoef[6] + in7 * lcoef[7] +
+  in8 * lcoef[8] + in9 * lcoef[9] + in10 * lcoef[10] + in11 * lcoef[11] +
+  in12 * lcoef[12] + in13 * lcoef[13] + in14 * lcoef[14] + in15 * lcoef[15];
+
+right =
+  in0 * rcoef[0] + in1 * rcoef[1] + in2 * rcoef[2] + in3 * rcoef[3] +
+  in4 * rcoef[4] + in5 * rcoef[5] + in6 * rcoef[6] + in7 * rcoef[7] +
+  in8 * rcoef[8] + in9 * rcoef[9] + in10 * rcoef[10] + in11 * rcoef[11] +
+  in12 * rcoef[12] + in13 * rcoef[13] + in14 * rcoef[14] + in15 * rcoef[15];
+
+method == 4 && ab_delay_spl > 0 ? (
+  read_a = (ab_pos - floor(ab_delay_spl) + AB_BUF) % AB_BUF;
+  read_b = (read_a - 1 + AB_BUF) % AB_BUF;
+  frac = ab_delay_spl - floor(ab_delay_spl);
+  delayed_l = ab_lbuf[read_a] * (1 - frac) + ab_lbuf[read_b] * frac;
+  delayed_r = ab_rbuf[read_a] * (1 - frac) + ab_rbuf[read_b] * frac;
+  ab_lbuf[ab_pos] = left;
+  ab_rbuf[ab_pos] = right;
+  ab_pos = (ab_pos + 1) % AB_BUF;
+  mid = (left + right) * 0.5;
+  side = (left - right) * 0.5;
+  delayed_side = (delayed_l - delayed_r) * 0.5;
+  side_mix = min(0.70, ab_spacing_cm / 120 * 0.70);
+  side = side * (1 - side_mix) + delayed_side * side_mix;
+  left = mid + side;
+  right = mid - side;
+) : (
+  ab_lbuf[ab_pos] = left;
+  ab_rbuf[ab_pos] = right;
+  ab_pos = (ab_pos + 1) % AB_BUF;
+);
+
+bass_mono_hz > 0 ? (
+  bass_l = bass_l * bass_a + left * (1 - bass_a);
+  bass_r = bass_r * bass_a + right * (1 - bass_a);
+  bass_m = (bass_l + bass_r) * 0.5;
+  left = left - bass_l + bass_m;
+  right = right - bass_r + bass_m;
+);
+
+spl0 = left * auto * out_gain;
+spl1 = right * auto * out_gain;
+
+clear_extra ? (
+  spl2 = 0; spl3 = 0; spl4 = 0; spl5 = 0; spl6 = 0; spl7 = 0;
+  spl8 = 0; spl9 = 0; spl10 = 0; spl11 = 0; spl12 = 0; spl13 = 0; spl14 = 0; spl15 = 0;
+);

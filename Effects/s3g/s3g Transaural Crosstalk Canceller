@@ -1,0 +1,99 @@
+desc:s3g Transaural Crosstalk Canceller
+tags: transaural crosstalk cancellation stereo speakers
+
+slider1:100<0,140,1>Cancellation amount (%)
+slider2:1<0,1,1{Feedforward,Matrix inverse}>Cancellation mode
+slider3:30<10,60,0.1>Speaker half-angle (degrees)
+slider4:18<12,24,0.1>Head width (cm)
+slider5:0<-0.5,0.5,0.001>Delay trim (ms)
+slider6:6500<1000,16000,10>Cancel HF rolloff (Hz)
+slider7:120<20,500,1>Low protect (Hz)
+slider8:0<0,100,1>Stereo preserve (%)
+slider9:1<0,1,1{Off,On}>Safety limiter
+slider10:-6<-24,12,0.1>Output gain (dB)
+slider11:1<0,1,1{Keep extra channels,Clear extra channels}>Extra channel output
+
+@init
+MAX_DELAY = 4096;
+lbuf = 0;
+rbuf = 4096;
+EPS = 0.000000001;
+
+function clamp(v, lo, hi) (
+  max(lo, min(hi, v));
+);
+
+function db2gain(db) (
+  10 ^ (db / 20);
+);
+
+@slider
+amount = slider1 / 100;
+mode = floor(slider2 + 0.5);
+angle = slider3 * $pi / 180;
+head_m = slider4 * 0.01;
+trim_spl = slider5 * 0.001 * srate;
+hf_hz = max(20, slider6);
+low_hz = max(1, slider7);
+stereo_preserve = slider8 / 100;
+limiter_on = floor(slider9 + 0.5);
+out_gain = db2gain(slider10);
+clear_extra = floor(slider11 + 0.5);
+
+geom_delay = head_m * sin(angle) / 343 * srate;
+delay_spl = clamp(geom_delay + trim_spl, 0, MAX_DELAY - 2);
+delay_i = floor(delay_spl);
+delay_f = delay_spl - delay_i;
+
+hf_a = exp(-2 * $pi * hf_hz / srate);
+low_a = exp(-2 * $pi * low_hz / srate);
+
+@sample
+in_l = spl0;
+in_r = spl1;
+
+read_a = (pos - delay_i + MAX_DELAY) % MAX_DELAY;
+read_b = (read_a - 1 + MAX_DELAY) % MAX_DELAY;
+dl = lbuf[read_a] * (1 - delay_f) + lbuf[read_b] * delay_f;
+dr = rbuf[read_a] * (1 - delay_f) + rbuf[read_b] * delay_f;
+lbuf[pos] = in_l;
+rbuf[pos] = in_r;
+pos = (pos + 1) % MAX_DELAY;
+
+hf_l = hf_l * hf_a + dl * (1 - hf_a);
+hf_r = hf_r * hf_a + dr * (1 - hf_a);
+low_l = low_l * low_a + hf_l * (1 - low_a);
+low_r = low_r * low_a + hf_r * (1 - low_a);
+
+cancel_l = hf_l - low_l;
+cancel_r = hf_r - low_r;
+
+work_l = in_l - amount * cancel_r;
+work_r = in_r - amount * cancel_l;
+mode == 1 ? (
+  inv_gain = 1 / max(0.50, 1 - amount * amount * 0.25);
+  work_l *= inv_gain;
+  work_r *= inv_gain;
+);
+out_l = work_l * (1 - stereo_preserve) + in_l * stereo_preserve;
+out_r = work_r * (1 - stereo_preserve) + in_r * stereo_preserve;
+
+out_l *= out_gain;
+out_r *= out_gain;
+
+limiter_on ? (
+  peak = max(abs(out_l), abs(out_r));
+  peak > 0.98 ? (
+    gain = 0.98 / max(EPS, peak);
+    out_l *= gain;
+    out_r *= gain;
+  );
+);
+
+spl0 = out_l;
+spl1 = out_r;
+
+clear_extra ? (
+  spl2 = 0; spl3 = 0; spl4 = 0; spl5 = 0; spl6 = 0; spl7 = 0;
+  spl8 = 0; spl9 = 0; spl10 = 0; spl11 = 0; spl12 = 0; spl13 = 0; spl14 = 0; spl15 = 0;
+);
