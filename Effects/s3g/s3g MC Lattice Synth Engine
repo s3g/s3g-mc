@@ -1,0 +1,313 @@
+desc:s3g MC Lattice Synth Engine
+tags: multichannel lattice synth midi generator engine
+options:gmem=s3g_lattice_synth
+
+slider1:8<1,128,1>Output channels
+slider2:0<0,4,1{Circulating,Diagonal fold,Spiral,Cross address,Egress pull}>Gesture template
+slider3:7<3,12,1>Rows
+slider4:7<3,12,1>Columns
+slider5:4<1,8,1>Layers
+slider6:2<1,12,1>Ingress row
+slider7:2<1,12,1>Ingress column
+slider8:6<1,12,1>Egress row
+slider9:6<1,12,1>Egress column
+slider10:0.35<0,1,0.001>Gesture position
+slider11:0.18<0,1,0.001>Gesture mutation
+slider12:0.72<0,1,0.001>Resonance
+slider13:0.44<0,1,0.001>Damping
+slider14:0.56<0,1,0.001>Brightness
+slider15:0.30<0,1,0.001>Divider shadow
+slider16:0.18<0,1,0.001>Feedback drive
+slider17:0.60<0,1,0.001>Channel spread
+slider18:110<20,4000,0.1>Base frequency (Hz)
+slider19:-18<-60,0,0.1>Output gain (dB)
+slider20:1<1,9999,1>Seed
+slider21:1<0,1,1{Keep extra channels,Clear extra channels}>Extra channel output
+slider22:1<0,1,1{Off,On}>MIDI control
+slider23:0<0,2,1{Pitch sets frequency,Pitch transposes base,Gate only}>MIDI pitch mode
+slider24:1<0,1,1{All channels,Focus by MIDI channel}>MIDI channel focus
+slider25:0.80<0,1,0.001>Velocity to excitation
+slider26:0.35<0,1,0.001>Velocity to brightness
+slider27:0.42<0,1,0.001>Note gate depth
+slider28:0.26<0.02,1,0.001>Focus width
+
+@init
+MAX_CH = 128;
+STRIDE = 4096;
+MAX_DELAY = STRIDE - 2;
+TWO_PI = 2 * $pi;
+
+phase = 0;
+env = 256;
+excite = 512;
+lp = 768;
+shadow_phase = 1024;
+write_pos = 1280;
+state = 1536;
+cell_a = 1792;
+cell_b = 2048;
+cell_c = 2304;
+buffer = 4096;
+
+last_seed = -1;
+last_rows = -1;
+last_cols = -1;
+last_layers = -1;
+midi_gate = 0;
+midi_gate_target = 0;
+midi_vel = 0;
+midi_vel_target = 0;
+midi_freq = 110;
+midi_freq_target = 110;
+midi_focus = 0.5;
+midi_focus_target = 0.5;
+midi_active_notes = 0;
+
+function clamp01(x)
+(
+  x < 0 ? 0 : x > 1 ? 1 : x;
+);
+
+function db_to_amp(db)
+(
+  10 ^ (db / 20);
+);
+
+function softclip(x)
+(
+  x / (1 + abs(x));
+);
+
+function hash01(x) local(v)
+(
+  v = sin((x + 1.2345) * 12.9898) * 43758.5453;
+  v - floor(v);
+);
+
+function noise_next(idx) local(x)
+(
+  x = state[idx];
+  x = (x * 1664525 + 1013904223) % 4294967296;
+  state[idx] = x;
+  (x / 2147483648) - 1;
+);
+
+function wrapi(v, count)
+(
+  ((floor(v) - 1) % max(1, count)) + 1;
+);
+
+function table_value(row, col, layer) local(diag, wave, value)
+(
+  row = wrapi(row, rows);
+  col = wrapi(col, cols);
+  layer = wrapi(layer, layers);
+  diag = (row * 7 + col * 11 + layer * 13 + seed * 3) % 23;
+  wave = sin(row * 1.73 + col * 2.11 + layer * 0.83 + seed * 0.07);
+  value = (diag / 22) * 0.62 + ((wave + 1) * 0.5) * 0.38;
+  clamp01(value);
+);
+
+function init_channel(idx) local(h, base)
+(
+  h = hash01(seed * 97 + idx * 23.17);
+  state[idx] = floor(1 + h * 4294967294);
+  phase[idx] = h;
+  env[idx] = 0;
+  excite[idx] = 0;
+  lp[idx] = 0;
+  shadow_phase[idx] = hash01(seed * 131 + idx * 7.9);
+  write_pos[idx] = 0;
+  cell_a[idx] = table_value(idx + 1, idx * 2 + 1, 1);
+  cell_b[idx] = table_value(idx * 2 + 1, idx + 2, 2);
+  cell_c[idx] = table_value(idx + 3, idx * 3 + 1, 3);
+  base = buffer + idx * STRIDE;
+  j = 0;
+  loop(STRIDE,
+    base[j] = 0;
+    j += 1;
+  );
+);
+
+function reseed_all() local(i)
+(
+  i = 0;
+  loop(MAX_CH,
+    init_channel(i);
+    i += 1;
+  );
+);
+
+function update_slider_state()
+(
+  chan_count = max(1, min(MAX_CH, floor(slider1 + 0.5)));
+  template = floor(slider2 + 0.5);
+  rows = max(3, min(12, floor(slider3 + 0.5)));
+  cols = max(3, min(12, floor(slider4 + 0.5)));
+  layers = max(1, min(8, floor(slider5 + 0.5)));
+  in_row = max(1, min(rows, floor(slider6 + 0.5)));
+  in_col = max(1, min(cols, floor(slider7 + 0.5)));
+  out_row = max(1, min(rows, floor(slider8 + 0.5)));
+  out_col = max(1, min(cols, floor(slider9 + 0.5)));
+  gesture_pos = clamp01(slider10);
+  mutation = clamp01(slider11);
+  resonance = clamp01(slider12);
+  damping = clamp01(slider13);
+  brightness = clamp01(slider14);
+  divider_shadow = clamp01(slider15);
+  feedback_drive = clamp01(slider16);
+  spread = clamp01(slider17);
+  base_freq_base = max(1, slider18);
+  out_gain = db_to_amp(slider19) / sqrt(max(1, chan_count));
+  seed = floor(slider20 + 0.5);
+  clear_extra = floor(slider21 + 0.5);
+  midi_control = floor(slider22 + 0.5);
+  midi_pitch_mode = floor(slider23 + 0.5);
+  midi_focus_mode = floor(slider24 + 0.5);
+  midi_vel_excitation = clamp01(slider25);
+  midi_vel_brightness = clamp01(slider26);
+  midi_gate_depth = clamp01(slider27);
+  midi_focus_width = max(0.02, slider28);
+);
+
+function lattice_cell_for_channel(idx) local(t, row, col, layer, rr, cc)
+(
+  t = gesture_pos * (rows + cols + layers);
+  template == 1 ? (
+    row = in_row + t;
+    col = in_col + ((floor(t) % 2) ? -t * 0.7 : t * 0.7);
+  ) : template == 2 ? (
+    rr = floor(t) % 4;
+    row = in_row + (rr == 1 ? t : rr == 3 ? -t : 0);
+    col = in_col + (rr == 0 ? t : rr == 2 ? -t : 0);
+  ) : template == 3 ? (
+    row = (floor(t) % 3 == 0) ? out_row : in_row + t * 0.65;
+    col = (floor(t) % 3 == 1) ? out_col : in_col - t * 0.45;
+  ) : template == 4 ? (
+    row = in_row + (out_row - in_row) * gesture_pos;
+    col = in_col + (out_col - in_col) * gesture_pos;
+  ) : (
+    row = in_row + floor(t / max(1, cols));
+    col = in_col + t;
+  );
+  row += (idx / max(1, chan_count - 1) - 0.5) * spread * rows;
+  col += (hash01(seed * 17 + idx * 19) - 0.5) * mutation * cols;
+  layer = 1 + floor((idx + t) % max(1, layers));
+  cell_a[idx] = table_value(row, col, layer);
+  cell_b[idx] = table_value(row + 1, col - 1, layer + 1);
+  cell_c[idx] = table_value(row - 1, col + 1, layer + 2);
+);
+
+@slider
+update_slider_state();
+last_seed != seed || last_rows != rows || last_cols != cols || last_layers != layers ? (
+  last_seed = seed;
+  last_rows = rows;
+  last_cols = cols;
+  last_layers = layers;
+  reseed_all();
+);
+
+@block
+update_slider_state();
+i = 0;
+loop(chan_count,
+  lattice_cell_for_channel(i);
+  i += 1;
+);
+
+while (
+  midirecv(midi_offset, midi_msg1, midi_msg23) ? (
+    midi_status = midi_msg1 & 240;
+    midi_channel = midi_msg1 & 15;
+    midi_note = midi_msg23 & 127;
+    midi_velocity = floor(midi_msg23 / 256) & 127;
+    (midi_status == 144 && midi_velocity > 0) ? (
+      midi_active_notes += 1;
+      midi_vel_target = midi_velocity / 127;
+      midi_freq_target = 440 * (2 ^ ((midi_note - 69) / 12));
+      midi_gate_target = 1;
+      midi_focus_target = chan_count <= 1 ? 0.5 : min(1, midi_channel / max(1, chan_count - 1));
+      i = 0;
+      loop(chan_count,
+        focus_pos = chan_count <= 1 ? 0.5 : i / max(1, chan_count - 1);
+        focus_dist = abs(focus_pos - midi_focus_target);
+        focus_dist = min(focus_dist, 1 - focus_dist);
+        focus_gain = midi_focus_mode ? exp(-(focus_dist * focus_dist) / max(0.0001, midi_focus_width * midi_focus_width)) : 1;
+        excite[i] += (0.12 + midi_vel_target * midi_vel_excitation) * (0.18 + focus_gain);
+        env[i] = max(env[i], 0.45 + midi_vel_target * 0.55);
+        i += 1;
+      );
+    ) : (midi_status == 128 || (midi_status == 144 && midi_velocity == 0)) ? (
+      midi_active_notes = max(0, midi_active_notes - 1);
+      midi_active_notes <= 0 ? (
+        midi_gate_target = 0;
+        midi_vel_target = 0;
+      );
+    );
+    midisend(midi_offset, midi_msg1, midi_msg23);
+    1;
+  );
+);
+
+@sample
+base_freq = base_freq_base;
+midi_brightness = brightness;
+midi_control ? (
+  midi_coef = exp(-1 / max(8, 0.015 * srate));
+  midi_gate = midi_gate * midi_coef + midi_gate_target * (1 - midi_coef);
+  midi_vel = midi_vel * midi_coef + midi_vel_target * (1 - midi_coef);
+  midi_freq = midi_freq * midi_coef + midi_freq_target * (1 - midi_coef);
+  midi_focus = midi_focus * midi_coef + midi_focus_target * (1 - midi_coef);
+  midi_pitch_mode == 0 ? base_freq = midi_freq :
+  midi_pitch_mode == 1 ? base_freq = base_freq_base * (midi_freq / 261.625565);
+  midi_brightness = clamp01(brightness + midi_gate * midi_vel * midi_vel_brightness);
+);
+
+sample_gain = out_gain;
+midi_control ? sample_gain *= (1 - midi_gate_depth * (1 - midi_gate));
+
+i = 0;
+loop(chan_count,
+  a = cell_a[i];
+  b = cell_b[i];
+  c = cell_c[i];
+  freq_ratio = 2 ^ (((a - 0.5) * 24 + (b - 0.5) * 9) / 12);
+  ch_freq = max(20, min(6000, base_freq * freq_ratio));
+  delay = max(6, min(MAX_DELAY, floor(srate / ch_freq)));
+  base = buffer + i * STRIDE;
+  wi = floor(write_pos[i]);
+  ri = (wi - delay) & (STRIDE - 1);
+  y = base[ri];
+  fb = 0.72 + resonance * 0.245 - damping * 0.16 - ch_freq / srate * 0.15;
+  fb = max(0.05, min(0.988, fb));
+  n = noise_next(i);
+  exc = excite[i] * n * (0.45 + midi_brightness * 0.75);
+  excite[i] *= exp(-1 / max(2, (0.0015 + damping * 0.020) * srate));
+  lp_coef = 0.04 + midi_brightness * 0.34;
+  lp[i] += (y - lp[i]) * lp_coef;
+  shadow_phase[i] += (ch_freq / max(1, 2 + floor(c * 7))) / srate;
+  shadow_phase[i] -= floor(shadow_phase[i]);
+  shadow = sin(TWO_PI * shadow_phase[i]) * divider_shadow * env[i] * (0.08 + c * 0.16);
+  write = (lp[i] * fb) + exc + shadow * feedback_drive;
+  base[wi] = max(-1, min(1, write));
+  write_pos[i] = (wi + 1) & (STRIDE - 1);
+  env[i] *= exp(-1 / max(10, (0.018 + damping * 1.2 + (1 - resonance) * 0.35) * srate));
+  tone = y * (0.80 + a * 0.35) + lp[i] * (0.18 + (1 - midi_brightness) * 0.32) + shadow;
+  midi_control && midi_focus_mode ? (
+    focus_pos = chan_count <= 1 ? 0.5 : i / max(1, chan_count - 1);
+    focus_dist = abs(focus_pos - midi_focus);
+    focus_dist = min(focus_dist, 1 - focus_dist);
+    focus_gain = exp(-(focus_dist * focus_dist) / max(0.0001, midi_focus_width * midi_focus_width));
+    tone *= (1 - midi_gate * 0.60) + midi_gate * (0.38 + focus_gain * 0.92);
+  );
+  spl(i) = max(-1, min(1, softclip(tone * (0.8 + feedback_drive * 1.4)) * sample_gain));
+  i += 1;
+);
+
+clear_extra ? (
+  loop(MAX_CH - chan_count,
+    spl(i) = 0;
+    i += 1;
+  );
+);

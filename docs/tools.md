@@ -34,9 +34,9 @@ toc:
 
 For step-by-step notes on selected processes, see the [Process Guides](process-guides.md).
 
-Current package snapshot: the browser exposes 89 user-facing tools/controllers
+Current package snapshot: the browser exposes 90 user-facing tools/controllers
 plus the Package Browser. Of those, 35 are Python/NumPy-backed offline
-processes, 35 are Lua/ReaImGui REAPER actions, and 19 load, control, or render
+processes, 36 are Lua/ReaImGui REAPER actions, and 19 load, control, or render
 included JSFX. The repository also ships 19 underlying JSFX engine/effect files.
 
 ## Channel Mixing / Automation
@@ -51,6 +51,9 @@ included JSFX. The repository also ships 19 underlying JSFX engine/effect files.
 
 ## MIDI Composition
 
+- `Generate Lattice MIDI`: creates an editable MIDI item from a table-scanning
+  gesture model, translating visible lattice cells into pitch, velocity,
+  duration, and MIDI-channel focus.
 - `Generate Musical Space MIDI`: creates an editable MIDI item from a path
   through scale-degree, contour, triadic, or axis-mirror spaces, with Euclidean
   timing, density, velocity shaping, MIDI-channel focus, and geometric preview.

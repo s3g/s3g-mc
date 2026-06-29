@@ -136,4 +136,4 @@ Core decisions:
 - Minimum spacing keeps impulses from collapsing into dense clicks.
 - Profile controls change impulse shape, decay, and brightness.
 
-For convolution use, start shorter than you think. A sparse one- or two-second impulse field can already create a strong spatial response. Use longer durations when you want tail behavior, echo fields, or unstable room-like motion.
+For convolution use, short durations often produce a clear spatial response. Longer durations emphasize tail behavior, echo fields, or unstable room-like motion.

@@ -19,7 +19,7 @@ toc:
 
 # Process Guides
 
-These pages are practical notes for selected tools. The Package Browser and [Tools](tools.md) page remain the authoritative catalog of processes; these guides follow the same category order as the Package Browser so the documentation does not become a second, conflicting navigation system.
+These pages provide practical notes for selected tools. The guide categories follow the Package Browser and [Tools](tools.md) page.
 
 ## General Pattern
 

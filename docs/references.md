@@ -151,4 +151,7 @@ Archived March 1, 2024:
 <p class="bib-entry">Lyon, Eric. 2023. <em>Automated Sound Design</em>. First edition. Computer Music and Digital Audio Series, vol. DAS028. Middleton, WI: A-R Editions. 426 pages. ISBN 9780895799036; 9780895798947.
 <a href="https://www.areditions.com/lyon-automated-sound-design-das028.html" target="_blank" rel="noopener noreferrer">https://www.areditions.com/lyon-automated-sound-design-das028.html</a>.</p>
 
+<p class="bib-entry">Hunt, Jerry. 1993. "Gesture Modulation of Templates." Accessed June 29, 2026.
+<a href="http://www.jerryhunt.org/gesture_mod.htm" target="_blank" rel="noopener noreferrer">http://www.jerryhunt.org/gesture_mod.htm</a>.</p>
+
 </div>

@@ -9,6 +9,8 @@ next_page:
   title: Procedural Synthesis Guides
   url: /process-guides-procedural-synthesis.html
 toc:
+  - title: Generate Lattice MIDI
+    href: "#generate-lattice-midi"
   - title: Generate Musical Space MIDI
     href: "#generate-musical-space-midi"
   - title: Generate Polymetric MIDI Lanes
@@ -18,6 +20,21 @@ toc:
 # MIDI Composition Guides
 
 These guides match the Package Browser's MIDI Composition group. The scripts create ordinary editable REAPER MIDI items for procedural synths and algorithmic composition.
+
+## Generate Lattice MIDI
+
+Use this to create a MIDI item from a visible table-scanning path. The script is inspired by Jerry Hunt's use of layered tables, ingress/egress locations, and event progressions, but it writes ordinary REAPER MIDI for procedural synths or other instruments.
+
+Starting approach:
+
+- Set `Rows`, `Columns`, and `Layers` to define the table.
+- Move `Ingress` and `Egress` to set the start and goal areas of the gesture.
+- Choose a `Gesture template`: `Circulating` is the most direct, while `Spiral`, `Cross address`, and `Egress pull` create more explicit path behavior.
+- Choose a `Layer translation` to decide how table values become pitch, velocity, duration, and MIDI channel.
+- Use `Density` for event admission and `Gesture mutation` for controlled deviation from the visible path.
+- Keep `MIDI channels / source lanes` at 8 when driving the procedural synth source-lane model.
+
+The preview shows the table, the active ingress-to-egress path, and the translation layers. The same path shown in the graphic is used when the MIDI item is generated, so the diagram is a readable score rather than decoration.
 
 ## Generate Musical Space MIDI
 

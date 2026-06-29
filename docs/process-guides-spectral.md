@@ -53,7 +53,7 @@ Selection:
 2. Select the shaper item second. This supplies the spectral color.
 3. Run `Spectral Shaper`.
 
-The classic way to think about it: one sound keeps the contour of its performance while another sound changes what that performance seems to be made from.
+In use, one sound keeps the contour of its performance while another sound changes what that performance seems to be made from.
 
 Try the standard spectral envelope mode first. Use the formant-vocode algorithm when you want broader vocal-like or resonant contour transfer instead of dense frame-by-frame spectral matching.
 
