@@ -38,6 +38,7 @@ local COLORS = {
 local CATEGORY_ORDER = {
   "All",
   "Channel Mixing / Automation",
+  "MIDI Composition",
   "Procedural Synthesis",
   "Offline Synthesis / IR",
   "Spatial Panners",
@@ -52,6 +53,7 @@ local CATEGORY_ORDER = {
 local CATEGORY_LABELS = {
   ["All"] = "All",
   ["Channel Mixing / Automation"] = "Channel Mixing",
+  ["MIDI Composition"] = "MIDI",
   ["Procedural Synthesis"] = "Procedural Synth",
   ["Offline Synthesis / IR"] = "Offline Synth / IR",
   ["Spatial Panners"] = "Spatial Panners",
@@ -149,6 +151,7 @@ end
 local function classify(name, description)
   local hay = (name .. " " .. (description or "")):lower()
   if hay:find("cdp") or hay:find("reacoma") then return "Personal / Advanced" end
+  if hay:find("midi") or hay:find("euclidean") or hay:find("polymetric") then return "MIDI Composition" end
   if hay:find("carto synth") or hay:find("procedural synth") then return "Procedural Synthesis" end
   if hay:find("shred") or hay:find("fracture") or hay:find("zigzag") or hay:find("cascade") or hay:find("crumble") or hay:find("spatial repeater") then return "Multichannel Texture / Montage" end
   if hay:find("3oafx") then return "3OAFX" end
@@ -255,8 +258,9 @@ end
 
 local function draw_category_buttons()
   local rows = {
-    { "All", "Channel Mixing / Automation", "Procedural Synthesis", "Offline Synthesis / IR", "Spatial Panners" },
-    { "3OAFX", "Spectral / Convolution", "Multichannel Texture / Montage", "Item Channel Transforms", "Track Building / Routing", "Package / Utilities" },
+    { "All", "Channel Mixing / Automation", "MIDI Composition", "Procedural Synthesis", "Offline Synthesis / IR" },
+    { "Spatial Panners", "3OAFX", "Spectral / Convolution", "Multichannel Texture / Montage" },
+    { "Item Channel Transforms", "Track Building / Routing", "Package / Utilities" },
   }
   for _, row in ipairs(rows) do
     for index, category in ipairs(row) do

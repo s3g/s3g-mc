@@ -19,7 +19,7 @@ s3g-mc is a collection of REAPER tools for multichannel composition, spatial aud
 
 It includes Lua actions, ReaImGui controllers, and JSFX for channel editing, automation, fold-down monitoring, dome panning, 3OA send/return routing, and render-based multichannel processes.
 
-Current package snapshot: 87 user-facing tools/controllers plus the Package Browser. Of those, 35 are Python/NumPy-backed offline processes, 19 are JSFX-backed actions or controllers, and 33 are Lua-only REAPER actions. The package also includes 19 JSFX engines/effects.
+Current package snapshot: the browser exposes 89 user-facing tools/controllers plus the Package Browser. Of those, 35 are Python/NumPy-backed offline processes, 35 are Lua/ReaImGui REAPER actions, and 19 load, control, or render included JSFX. The repository also ships 19 underlying JSFX engine/effect files.
 
 Many of these tools are inspired by or extend existing computer music practices, with references mentioned in the documentation where they are useful.
 
@@ -29,22 +29,22 @@ Many of these tools are inspired by or extend existing computer music practices,
 - [Dependencies](dependencies.md)
 - [Tools](tools.md)
 - [Workflows](workflows.md)
-- [Process Guides](process-guides.md)
+- [Process Guides](process-guides.md): [MIDI](process-guides-midi.md), [Synthesis](process-guides-synthesis.md), [Spectral and Convolution](process-guides-spectral.md), [3OAFX](process-guides-3oafx.md), [Spatial and Channel](process-guides-spatial-channel.md)
 - [Gallery](gallery.md)
 - [References](references.md)
 
 ## Highlights
 
-- common-layout panning plus 12ch, 17ch, and 25ch panners for RISD SRST arrays
+- Common-layout panning plus 12ch, 17ch, and 25ch panners for RISD SRST arrays
 - 3OAFX ambisonic send/return workflow for 24-channel effect inserts
-- track-level automation mixer for up to 128 channels, with plugin pin control
-- stereo loudspeaker transaural crosstalk cancellation with matrix-inverse approximation
-- multichannel workflow helpers for item transforms, track routing, and stems
+- Track-level automation mixer for up to 128 channels, with plugin pin control
+- Ambisonic stereo fold-down based on virtual speaker fields and stereo pickup models
+- Stereo loudspeaker transaural crosstalk cancellation with matrix-inverse approximation
+- Multichannel workflow helpers for item transforms, track routing, and stems
+- MIDI rule generators for musical-space paths and polymetric lanes
 - Offline spectral, convolution, and resynthesis processes
-- Multichannel texture and montage actions 
-- Procedural synth engines rendered offline from controller actions
-- ambisonic stereo fold-down based on virtual speaker fields and stereo pickup models
-- package-native 6ch ambisonic monitor decoding and direct 6ch routing
+- Multichannel texture and montage actions
+- Procedural synth engines with offline render and MIDI-controller workflows
 
 ## License
 

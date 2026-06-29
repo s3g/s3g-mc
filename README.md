@@ -7,10 +7,10 @@ It includes Lua actions, ReaImGui controllers, and JSFX for channel editing,
 automation, fold-down monitoring, dome panning, 3OA send/return routing, and
 render-based multichannel processes.
 
-Current package snapshot: 87 user-facing tools/controllers plus the Package
-Browser. Of those, 35 are Python/NumPy-backed offline processes, 19 are
-JSFX-backed actions or controllers, and 33 are Lua-only REAPER actions. The
-package also includes 19 JSFX engines/effects in `Effects/s3g`.
+Current package snapshot: the browser exposes 89 user-facing tools/controllers
+plus the Package Browser. Of those, 35 are Python/NumPy-backed offline
+processes, 35 are Lua/ReaImGui REAPER actions, and 19 load, control, or render
+included JSFX. The repository also ships 19 underlying JSFX engine/effect files.
 
 Documentation, workflow notes, and references: <a href="https://s3g.github.io/s3g-mc/" target="_blank" rel="noopener noreferrer">s3g-mc docs site</a>.
 
@@ -29,6 +29,15 @@ useful.
 - `Transaural Crosstalk Canceller`: stereo loudspeaker playback processor with
   feedforward and matrix-inverse crosstalk cancellation modes, speaker
   geometry, low protection, stereo preservation, and safety gain controls.
+
+### MIDI Composition
+
+- `Generate Musical Space MIDI`: creates an editable MIDI item from a path
+  through scale-degree, contour, triadic, or axis-mirror spaces, with Euclidean
+  timing, density, velocity shaping, and MIDI-channel focus.
+- `Generate Polymetric MIDI Lanes`: creates multiple Euclidean lanes with
+  independent lengths, pulses, rotations, pitch degrees, and MIDI channels for
+  procedural synths or general algorithmic composition.
 
 ### Procedural Synthesis
 

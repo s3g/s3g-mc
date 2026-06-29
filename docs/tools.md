@@ -10,6 +10,8 @@ next_page:
 toc:
   - title: Channel Mixing
     href: "#channel-mixing--automation"
+  - title: MIDI Composition
+    href: "#midi-composition"
   - title: Procedural Synthesis
     href: "#procedural-synthesis"
   - title: Offline Synthesis / IR
@@ -30,12 +32,12 @@ toc:
 
 # Tools
 
-For step-by-step notes on selected render processes, see the [Process Guides](process-guides.md).
+For step-by-step notes on selected processes, see the [Process Guides](process-guides.md).
 
-Current package snapshot: 87 user-facing tools/controllers plus the Package
-Browser. Of those, 35 are Python/NumPy-backed offline processes, 19 are
-JSFX-backed actions or controllers, and 33 are Lua-only REAPER actions. The
-package also includes 19 JSFX engines/effects.
+Current package snapshot: the browser exposes 89 user-facing tools/controllers
+plus the Package Browser. Of those, 35 are Python/NumPy-backed offline
+processes, 35 are Lua/ReaImGui REAPER actions, and 19 load, control, or render
+included JSFX. The repository also ships 19 underlying JSFX engine/effect files.
 
 ## Channel Mixing / Automation
 
@@ -46,6 +48,15 @@ package also includes 19 JSFX engines/effects.
 - `Transaural Crosstalk Canceller`: stereo loudspeaker playback processor with
   feedforward and matrix-inverse crosstalk cancellation modes, speaker
   geometry, low protection, stereo preservation, and safety gain controls.
+
+## MIDI Composition
+
+- `Generate Musical Space MIDI`: creates an editable MIDI item from a path
+  through scale-degree, contour, triadic, or axis-mirror spaces, with Euclidean
+  timing, density, velocity shaping, and MIDI-channel focus.
+- `Generate Polymetric MIDI Lanes`: creates multiple Euclidean lanes with
+  independent lengths, pulses, rotations, pitch degrees, and MIDI channels for
+  procedural synths or general algorithmic composition.
 
 ## Procedural Synthesis
 
