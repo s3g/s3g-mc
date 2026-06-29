@@ -7,8 +7,8 @@ It includes Lua actions, ReaImGui controllers, and JSFX for channel editing,
 automation, fold-down monitoring, dome panning, 3OA send/return routing, and
 render-based multichannel processes.
 
-Current package snapshot: the browser exposes 92 user-facing tools/controllers
-plus the Package Browser. Of those, 35 are Python/NumPy-backed offline
+Current package snapshot: the browser exposes 94 user-facing tools/controllers
+plus the Package Browser. Of those, 37 are Python/NumPy-backed offline
 processes, 36 are Lua/ReaImGui REAPER actions, and 21 load, control, or render
 included JSFX. The repository also ships 20 underlying JSFX engine/effect files.
 The Lua folder also includes helper libraries and internal dialogs that are not
@@ -40,6 +40,12 @@ useful.
 - `Generate Musical Space MIDI`: creates an editable MIDI item from a path
   through scale-degree, contour, triadic, or axis-mirror spaces, with Euclidean
   timing, density, velocity shaping, MIDI-channel focus, and geometric preview.
+- `MIDI Form Learner`: NumPy-backed composer that analyzes selected MIDI items
+  and expands their rhythm, pitch, velocity, duration, and channel traits into a
+  longer editable MIDI form.
+- `MIDI Terrain Form`: NumPy-backed song-duration MIDI generator with section
+  maps, terrain-shaped density/register/channel fields, and optional project
+  markers.
 - `Generate Polymetric MIDI Lanes`: creates multiple Euclidean lanes with
   independent lengths, pulses, rotations, pitch degrees, and MIDI channels for
   procedural synths or general algorithmic composition, shown as concentric

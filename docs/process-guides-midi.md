@@ -13,6 +13,10 @@ toc:
     href: "#generate-lattice-midi"
   - title: Generate Musical Space MIDI
     href: "#generate-musical-space-midi"
+  - title: MIDI Form Learner
+    href: "#midi-form-learner"
+  - title: MIDI Terrain Form
+    href: "#midi-terrain-form"
   - title: Generate Polymetric MIDI Lanes
     href: "#generate-polymetric-midi-lanes"
 ---
@@ -50,6 +54,36 @@ Starting approach:
 - Use `Channel mode` to map notes across MIDI channels for procedural synth focus.
 
 The preview uses two geometric diagrams. The pitch-space wheel shows the selected scale and the path through pitch classes. The rhythm/channel ring shows Euclidean timing, with event radius and labels indicating MIDI-channel focus. `Scale walk` is the most direct mode. `Contour` favors melodic direction changes. `Triadic` makes larger harmonic moves. `Axis mirror` folds alternate moves around a center degree.
+
+## MIDI Form Learner
+
+Use this to generate a longer MIDI item from one or more selected MIDI items. The script analyzes the selected notes as source material, then uses NumPy to compose a new editable form from their timing, pitch, duration, velocity, channel, and recurrence behavior.
+
+Starting approach:
+
+- Select one or more MIDI items with notes.
+- Set `Duration beats` and `Sections` for the target form.
+- Choose a `Learning strategy`: `Expanded return` keeps source material recognizable, `Channel canon` emphasizes MIDI-channel motion, and `Fragmented blocks` creates stronger contrast between dense and open sections.
+- Use `Source influence` to decide how closely the result follows the selected material.
+- Use `Variation`, `Timing warp`, and `Transpose range` to move away from the source.
+- Keep `MIDI channels / lanes` at 8 when driving the procedural synth source-lane model.
+
+The preview shows selected source-note density and register above a generated section map. The generated MIDI remains ordinary REAPER MIDI, so it can be edited, routed to the included procedural synths, or used with external instruments.
+
+## MIDI Terrain Form
+
+Use this for song-duration MIDI generation. The process calls a NumPy backend to compute a section map, terrain-shaped event density, register motion, channel/lane motion, and recurring motifs, then writes the result as an ordinary editable REAPER MIDI item.
+
+Starting approach:
+
+- Set `Duration beats` to the target form length.
+- Choose a `Form`: `Arc`, `Return`, `Ritual`, and `Cascade` are useful starting points for longer spans.
+- Choose a `Terrain`: `Ridge` concentrates activity, `Basin` opens space, `Fault` makes sharper changes, and `Attractor` pulls events toward moving centers.
+- Use `Sections` to define the large-scale division of the item.
+- Use `Motif recurrence` to decide how much material returns across the form.
+- Keep `MIDI channels / lanes` at 8 for the procedural synth source-lane model.
+
+The generated item is not tied to a specific synth. It can drive Carto, Lattice, Spectra, or external instruments. When `Add project markers for sections` is enabled, the script also writes section markers at the generated boundaries.
 
 
 

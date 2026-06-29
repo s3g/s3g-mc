@@ -19,7 +19,7 @@ s3g-mc is a collection of REAPER tools for multichannel composition, spatial aud
 
 It includes Lua actions, ReaImGui controllers, and JSFX for channel editing, automation, fold-down monitoring, dome panning, 3OA send/return routing, and render-based multichannel processes.
 
-Current package snapshot: the browser exposes 92 user-facing tools/controllers plus the Package Browser. Of those, 35 are Python/NumPy-backed offline processes, 36 are Lua/ReaImGui REAPER actions, and 21 load, control, or render included JSFX. The repository also ships 20 underlying JSFX engine/effect files. The Lua folder also includes helper libraries and internal dialogs that are not shown as Package Browser entries.
+Current package snapshot: the browser exposes 94 user-facing tools/controllers plus the Package Browser. Of those, 37 are Python/NumPy-backed offline processes, 36 are Lua/ReaImGui REAPER actions, and 21 load, control, or render included JSFX. The repository also ships 20 underlying JSFX engine/effect files. The Lua folder also includes helper libraries and internal dialogs that are not shown as Package Browser entries.
 
 Many of these tools are inspired by or extend existing computer music practices, with references mentioned in the documentation where they are useful.
 
@@ -41,7 +41,7 @@ Many of these tools are inspired by or extend existing computer music practices,
 - Ambisonic stereo fold-down based on virtual speaker fields and stereo pickup models
 - Stereo loudspeaker transaural crosstalk cancellation with matrix-inverse approximation
 - Multichannel workflow helpers for item transforms, track routing, and stems
-- MIDI rule generators for musical-space paths and polymetric lanes
+- MIDI rule generators for musical-space paths, learned forms, and polymetric lanes
 - Offline spectral, convolution, and resynthesis processes
 - Multichannel texture and montage actions
 - Procedural synth engines with offline render and MIDI-controller workflows

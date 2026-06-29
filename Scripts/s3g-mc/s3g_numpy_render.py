@@ -4,6 +4,7 @@ import math
 import os
 import struct
 import sys
+import csv
 
 import numpy as np
 
@@ -3227,9 +3228,344 @@ def render_synthetic_ambisonic_ir_bank(cfg):
         print(path)
 
 
+def render_midi_terrain_form(cfg):
+    output_path = str(cfg["output_path"])
+    seed = int(cfg.get("seed", 1))
+    rng = np.random.default_rng(seed)
+    duration_beats = max(4.0, float(cfg.get("duration_beats", 256.0)))
+    sections = max(1, min(32, int(cfg.get("sections", 8))))
+    lanes = max(1, min(16, int(cfg.get("lanes", 8))))
+    density = max(0.0, min(1.0, float(cfg.get("density", 0.55))))
+    form = str(cfg.get("form", "arc")).lower()
+    terrain = str(cfg.get("terrain", "ridge")).lower()
+    root = int(cfg.get("root", 0)) % 12
+    scale_name = str(cfg.get("scale", "Dorian"))
+    octave = int(cfg.get("octave", 3))
+    register_span = max(1, int(cfg.get("register_span", 4)))
+    pitch_span = max(4, int(cfg.get("pitch_span", 28)))
+    min_note = max(0.03125, float(cfg.get("min_note_beats", 0.25)))
+    max_note = max(min_note, float(cfg.get("max_note_beats", 2.0)))
+    recurrence = max(0.0, min(1.0, float(cfg.get("recurrence", 0.35))))
+    contrast = max(0.0, min(1.0, float(cfg.get("contrast", 0.55))))
+    channel_motion = max(0.0, min(1.0, float(cfg.get("channel_motion", 0.65))))
+    velocity_base = max(1, min(127, int(cfg.get("velocity", 78))))
+    velocity_range = max(0, min(80, int(cfg.get("velocity_range", 34))))
+
+    scales = {
+        "Chromatic": list(range(12)),
+        "Major": [0, 2, 4, 5, 7, 9, 11],
+        "Natural minor": [0, 2, 3, 5, 7, 8, 10],
+        "Dorian": [0, 2, 3, 5, 7, 9, 10],
+        "Phrygian": [0, 1, 3, 5, 7, 8, 10],
+        "Lydian": [0, 2, 4, 6, 7, 9, 11],
+        "Mixolydian": [0, 2, 4, 5, 7, 9, 10],
+        "Minor pentatonic": [0, 3, 5, 7, 10],
+        "Whole tone": [0, 2, 4, 6, 8, 10],
+    }
+    scale = scales.get(scale_name, scales["Dorian"])
+
+    raw = rng.uniform(0.55, 1.45, sections)
+    if form == "blocks":
+        raw = np.ones(sections)
+    elif form == "cascade":
+        raw = np.linspace(0.72, 1.38, sections)
+    boundaries = np.concatenate(([0.0], np.cumsum(raw / np.sum(raw) * duration_beats)))
+    boundaries[-1] = duration_beats
+    centers = (boundaries[:-1] + boundaries[1:]) * 0.5 / duration_beats
+
+    if form == "arc":
+        section_energy = np.sin(np.pi * centers) ** (0.65 + contrast)
+    elif form == "episodes":
+        section_energy = rng.uniform(0.18, 1.0, sections)
+    elif form == "return":
+        base = np.sin(np.pi * centers) ** 0.7
+        section_energy = 0.35 + 0.55 * base
+        section_energy[::3] = 0.72 + 0.22 * recurrence
+    elif form == "drift":
+        section_energy = np.linspace(0.22, 0.92, sections)
+    elif form == "blocks":
+        section_energy = rng.choice([0.22, 0.48, 0.78, 0.94], sections)
+    elif form == "ritual":
+        section_energy = 0.42 + 0.32 * np.sin(np.arange(sections) * 0.85) ** 2
+    elif form == "cascade":
+        section_energy = np.linspace(0.12, 1.0, sections)
+    elif form == "constellation":
+        section_energy = np.linspace(0.18, 0.86, sections)
+        section_energy = np.where(np.arange(sections) % 2 == 0, section_energy, section_energy * 0.55)
+    else:
+        section_energy = 0.35 + 0.55 * np.sin(np.pi * centers) ** 0.8
+    section_energy = np.clip(section_energy, 0.04, 1.0)
+
+    motif_count = max(3, min(16, int(round(4 + recurrence * 10))))
+    motif_degrees = rng.integers(-pitch_span // 3, pitch_span, motif_count)
+    motif_lanes = rng.integers(0, lanes, motif_count)
+    motif_lengths = rng.uniform(min_note, max_note, motif_count)
+
+    events = []
+    grid = 0.25
+    total_steps = max(1, int(math.ceil(duration_beats / grid)))
+    lane_bias = rng.uniform(0.0, 1.0, lanes)
+    for step in range(total_steps):
+        t = step * grid
+        pos = t / duration_beats
+        sec = int(np.searchsorted(boundaries, t, side="right") - 1)
+        sec = max(0, min(sections - 1, sec))
+        local = (t - boundaries[sec]) / max(0.0001, boundaries[sec + 1] - boundaries[sec])
+        if terrain == "ridge":
+            terrain_value = math.exp(-((local - 0.5) ** 2) / (0.045 + 0.10 * (1.0 - contrast)))
+        elif terrain == "basin":
+            terrain_value = 1.0 - math.exp(-((local - 0.5) ** 2) / (0.060 + 0.12 * (1.0 - contrast)))
+        elif terrain == "spiral":
+            terrain_value = 0.5 + 0.5 * math.sin(2.0 * math.pi * (pos * (2.0 + contrast * 5.0) + local))
+        elif terrain == "fault":
+            terrain_value = 0.25 + 0.75 * (local > (0.35 + 0.20 * math.sin(sec)) )
+        elif terrain == "cellular":
+            cell = int(local * 8)
+            terrain_value = 0.35 + 0.65 * (math.sin(seed * 12.9898 + sec * 78.233 + cell * 37.719) * 43758.5453 % 1.0)
+        elif terrain == "attractor":
+            attract = (sec % max(1, sections // 3 + 1)) / max(1, sections // 3)
+            terrain_value = math.exp(-((local - attract) ** 2) / 0.09)
+        else:
+            terrain_value = 0.5 + 0.5 * math.sin(2.0 * math.pi * (pos + local * 0.5))
+        probability = density * (0.08 + 0.92 * section_energy[sec]) * (0.25 + 0.75 * terrain_value)
+        if form == "constellation" and rng.random() < 0.65:
+            probability *= 0.45
+        if rng.random() > probability:
+            continue
+
+        repeats = 1
+        if rng.random() < section_energy[sec] * density * 0.18:
+            repeats += int(rng.integers(1, 4))
+        for rep in range(repeats):
+            motif_idx = int(rng.integers(0, motif_count))
+            use_motif = rng.random() < recurrence
+            degree_center = motif_degrees[motif_idx] if use_motif else int((terrain_value - 0.35) * pitch_span)
+            degree = int(round(degree_center + rng.normal(0, 1.5 + contrast * 4.0) + (sec - sections / 2) * 0.35))
+            scale_degree = degree % len(scale)
+            octave_offset = degree // len(scale)
+            folded_octave = octave + (octave_offset % register_span)
+            pitch = int(np.clip((folded_octave + 1) * 12 + root + scale[scale_degree], 0, 127))
+            lane_float = (pos * channel_motion + terrain_value * (1 - channel_motion) + lane_bias[motif_lanes[motif_idx]] * 0.35) % 1.0
+            lane = int(np.clip(round(lane_float * max(0, lanes - 1)), 0, lanes - 1))
+            if use_motif and rng.random() < recurrence:
+                lane = int(motif_lanes[motif_idx])
+            dur = float(np.clip((motif_lengths[motif_idx] if use_motif else rng.uniform(min_note, max_note)) *
+                                (0.55 + terrain_value * 0.9), min_note, max_note * 1.6))
+            start = t + rep * min_note * 0.55 + float(rng.normal(0, grid * 0.10 * contrast))
+            if start < 0 or start >= duration_beats:
+                continue
+            vel = int(np.clip(velocity_base + (terrain_value - 0.5) * velocity_range + rng.normal(0, 7), 1, 127))
+            events.append((start, min(dur, duration_beats - start), pitch, vel, lane, sec))
+
+    events.sort(key=lambda e: (e[0], e[4], e[2]))
+    with open(output_path, "w", encoding="utf-8") as handle:
+        handle.write("type,index,start,duration,pitch,velocity,channel,section,label\n")
+        labels = ["A", "B", "C", "D", "E", "F", "G", "H"]
+        for sec in range(sections):
+            label = labels[sec % len(labels)]
+            if form == "return" and sec % 3 == 0:
+                label = "A"
+            handle.write(f"section,{sec+1},{boundaries[sec]:.6f},{(boundaries[sec+1]-boundaries[sec]):.6f},0,0,0,{sec+1},{label}{sec+1}\n")
+        for idx, (start, dur, pitch, vel, lane, sec) in enumerate(events, 1):
+            handle.write(f"event,{idx},{start:.6f},{dur:.6f},{pitch},{vel},{lane},{sec+1},E{idx}\n")
+    print("Process: MIDI Terrain Form")
+    print(f"Duration beats: {duration_beats:.2f}")
+    print(f"Sections: {sections}")
+    print(f"Events: {len(events)}")
+    print(f"Form: {form}")
+    print(f"Terrain: {terrain}")
+    print(f"Output: {output_path}")
+
+
+def read_midi_note_csv(path):
+    notes = []
+    with open(path, "r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            try:
+                notes.append({
+                    "start": float(row.get("start", 0.0)),
+                    "duration": max(0.03125, float(row.get("duration", 0.25))),
+                    "pitch": int(float(row.get("pitch", 60))),
+                    "velocity": int(float(row.get("velocity", 80))),
+                    "channel": int(float(row.get("channel", 0))),
+                })
+            except ValueError:
+                continue
+    notes.sort(key=lambda n: (n["start"], n["channel"], n["pitch"]))
+    return notes
+
+
+def render_midi_form_learner(cfg):
+    output_path = str(cfg["output_path"])
+    source_path = str(cfg["source_path"])
+    notes = read_midi_note_csv(source_path)
+    if not notes:
+        raise RuntimeError("No MIDI notes were available for learning.")
+
+    seed = int(cfg.get("seed", 1))
+    rng = np.random.default_rng(seed)
+    duration_beats = max(4.0, float(cfg.get("duration_beats", 384.0)))
+    sections = max(1, min(32, int(cfg.get("sections", 9))))
+    lanes = max(1, min(16, int(cfg.get("lanes", 8))))
+    bar_beats = max(0.25, float(cfg.get("bar_beats", 4.0)))
+    density_scale = max(0.05, min(2.5, float(cfg.get("density_scale", 1.0))))
+    source_influence = max(0.0, min(1.0, float(cfg.get("source_influence", 0.72))))
+    variation = max(0.0, min(1.0, float(cfg.get("variation", 0.35))))
+    recurrence = max(0.0, min(1.0, float(cfg.get("recurrence", 0.55))))
+    transpose_range = max(0, min(36, int(cfg.get("transpose_range", 12))))
+    time_warp = max(0.0, min(1.0, float(cfg.get("time_warp", 0.22))))
+    strategy = str(cfg.get("strategy", "expanded_return")).lower()
+
+    starts = np.array([n["start"] for n in notes], dtype=np.float64)
+    durations = np.array([n["duration"] for n in notes], dtype=np.float64)
+    pitches = np.array([n["pitch"] for n in notes], dtype=np.int32)
+    velocities = np.array([n["velocity"] for n in notes], dtype=np.int32)
+    channels = np.array([n["channel"] for n in notes], dtype=np.int32)
+    source_span = max(bar_beats, float(np.max(starts + durations)))
+    bar_count = max(1, int(math.ceil(source_span / bar_beats)))
+    bars = [[] for _ in range(bar_count)]
+    for idx, start in enumerate(starts):
+        bars[min(bar_count - 1, max(0, int(start // bar_beats)))].append(idx)
+    nonempty_bars = [idx for idx, members in enumerate(bars) if members]
+    if not nonempty_bars:
+        nonempty_bars = [0]
+        bars[0] = list(range(len(notes)))
+
+    density_by_bar = np.array([len(members) for members in bars], dtype=np.float64)
+    if float(np.max(density_by_bar)) > 0:
+        density_by_bar = density_by_bar / float(np.max(density_by_bar))
+    pitch_center = float(np.median(pitches))
+    pitch_spread = max(1.0, float(np.std(pitches)))
+    vel_center = float(np.median(velocities))
+
+    if strategy == "blocks":
+        raw = np.ones(sections)
+    elif strategy == "source_echo":
+        raw = np.full(sections, 1.0)
+    else:
+        raw = rng.uniform(0.75, 1.30, sections)
+    boundaries = np.concatenate(([0.0], np.cumsum(raw / np.sum(raw) * duration_beats)))
+    boundaries[-1] = duration_beats
+    centers = (boundaries[:-1] + boundaries[1:]) * 0.5 / duration_beats
+
+    if strategy == "fragmented_blocks":
+        section_energy = np.where(np.arange(sections) % 2 == 0, 0.82, 0.34)
+    elif strategy == "drift_variation":
+        section_energy = np.linspace(0.30, 0.95, sections)
+    elif strategy == "channel_canon":
+        section_energy = 0.55 + 0.35 * np.sin(np.arange(sections) * 0.73) ** 2
+    elif strategy == "source_echo":
+        section_energy = np.interp(centers, np.linspace(0.0, 1.0, bar_count), density_by_bar)
+        section_energy = 0.34 + 0.62 * section_energy
+    elif strategy == "terrain_hybrid":
+        section_energy = 0.20 + 0.75 * np.sin(np.pi * centers) ** 0.55
+    else:
+        section_energy = 0.38 + 0.54 * np.sin(np.pi * centers) ** 0.75
+        section_energy[::3] = np.maximum(section_energy[::3], 0.72 + 0.20 * recurrence)
+    section_energy = np.clip(section_energy, 0.08, 1.0)
+
+    target_bars = max(1, int(math.ceil(duration_beats / bar_beats)))
+    events = []
+    labels = ["A", "B", "C", "D", "E", "F", "G", "H"]
+
+    def choose_source_bar(target_bar, sec):
+        if strategy == "source_echo":
+            return nonempty_bars[target_bar % len(nonempty_bars)]
+        if strategy == "expanded_return" and sec % 3 == 0:
+            return nonempty_bars[target_bar % len(nonempty_bars)]
+        if strategy == "drift_variation":
+            return nonempty_bars[int(round((len(nonempty_bars) - 1) * target_bar / max(1, target_bars - 1)))]
+        if strategy == "fragmented_blocks":
+            return nonempty_bars[(target_bar * 3 + sec) % len(nonempty_bars)]
+        if strategy == "channel_canon":
+            return nonempty_bars[(target_bar + sec) % len(nonempty_bars)]
+        if strategy == "terrain_hybrid":
+            ridge = abs(math.sin((target_bar + seed * 0.017) * 0.51))
+            return nonempty_bars[int(np.clip(round(ridge * (len(nonempty_bars) - 1)), 0, len(nonempty_bars) - 1))]
+        if rng.random() < recurrence:
+            return nonempty_bars[target_bar % len(nonempty_bars)]
+        return int(rng.choice(nonempty_bars))
+
+    for target_bar in range(target_bars):
+        bar_start = target_bar * bar_beats
+        if bar_start >= duration_beats:
+            break
+        sec = int(np.searchsorted(boundaries, bar_start, side="right") - 1)
+        sec = max(0, min(sections - 1, sec))
+        src_bar = choose_source_bar(target_bar, sec)
+        members = bars[src_bar] if bars[src_bar] else [int(rng.integers(0, len(notes)))]
+        local_density = density_scale * section_energy[sec] * (0.45 + 0.55 * density_by_bar[src_bar])
+        local_density *= 0.65 + 0.35 * source_influence
+        if strategy == "fragmented_blocks" and sec % 2 == 1:
+            local_density *= 0.45
+        if strategy == "terrain_hybrid":
+            local_density *= 0.60 + 0.65 * abs(math.sin(target_bar * 0.37 + sec))
+
+        section_transpose = 0
+        if transpose_range > 0:
+            drift = ((sec / max(1, sections - 1)) * 2.0 - 1.0) * transpose_range
+            random_part = float(rng.integers(-transpose_range, transpose_range + 1))
+            section_transpose = int(round(drift * (1.0 - source_influence) * 0.65 + random_part * variation * 0.35))
+
+        copies = 1 + (1 if rng.random() < max(0.0, local_density - 1.0) * 0.45 else 0)
+        for copy_idx in range(copies):
+            for note_idx in members:
+                if rng.random() > min(1.0, local_density):
+                    continue
+                src = notes[note_idx]
+                rel = src["start"] - src_bar * bar_beats
+                rel = max(0.0, min(bar_beats - 0.03125, rel))
+                warp = 1.0 + rng.normal(0.0, time_warp * 0.16)
+                jitter = rng.normal(0.0, bar_beats * 0.015 * variation)
+                if copy_idx > 0:
+                    jitter += rng.uniform(0.0625, min(0.75, bar_beats * 0.25))
+                start = bar_start + rel * warp + jitter
+                if start < 0 or start >= duration_beats:
+                    continue
+                dur = src["duration"] * float(np.clip(rng.normal(1.0, 0.22 * variation + 0.03), 0.25, 2.8))
+                dur = max(0.03125, min(dur, duration_beats - start))
+                pitch_rand = rng.normal(0.0, (1.0 - source_influence) * pitch_spread * 0.40 + variation * 1.5)
+                pitch = int(np.clip(src["pitch"] + section_transpose + round(pitch_rand), 0, 127))
+                if source_influence < 0.45 and rng.random() < (0.45 - source_influence):
+                    pitch = int(np.clip(round(pitch_center + rng.normal(0.0, pitch_spread * (0.8 + variation))), 0, 127))
+                vel = int(np.clip(src["velocity"] + rng.normal((section_energy[sec] - 0.5) * 18.0, 5.0 + variation * 16.0), 1, 127))
+                if source_influence < 0.35:
+                    vel = int(np.clip(vel_center + rng.normal(0.0, 18.0), 1, 127))
+                if strategy == "channel_canon":
+                    lane = (src["channel"] + sec + copy_idx + target_bar) % lanes
+                else:
+                    learned_lane = src["channel"] % lanes
+                    random_lane = int(rng.integers(0, lanes))
+                    lane = learned_lane if rng.random() < source_influence else random_lane
+                    if variation > 0.55 and rng.random() < variation * 0.25:
+                        lane = (lane + int(rng.integers(-2, 3))) % lanes
+                events.append((start, dur, pitch, vel, lane, sec))
+
+    events.sort(key=lambda e: (e[0], e[4], e[2]))
+    with open(output_path, "w", encoding="utf-8") as handle:
+        handle.write("type,index,start,duration,pitch,velocity,channel,section,label\n")
+        for sec in range(sections):
+            label = labels[sec % len(labels)]
+            if strategy == "expanded_return" and sec % 3 == 0:
+                label = "A"
+            handle.write(f"section,{sec+1},{boundaries[sec]:.6f},{(boundaries[sec+1]-boundaries[sec]):.6f},0,0,0,{sec+1},{label}{sec+1}\n")
+        for idx, (start, dur, pitch, vel, lane, sec) in enumerate(events, 1):
+            handle.write(f"event,{idx},{start:.6f},{dur:.6f},{pitch},{vel},{lane},{sec+1},E{idx}\n")
+
+    print("Process: MIDI Form Learner")
+    print(f"Source notes: {len(notes)}")
+    print(f"Source span beats: {source_span:.2f}")
+    print(f"Duration beats: {duration_beats:.2f}")
+    print(f"Sections: {sections}")
+    print(f"Events: {len(events)}")
+    print(f"Strategy: {strategy}")
+    print(f"Output: {output_path}")
+
+
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|foafx_offline|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|foafx_offline|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -3271,6 +3607,10 @@ def main():
         render_ambisonic_kernel_collage(cfg)
     elif mode == "synthetic_ambisonic_ir_bank":
         render_synthetic_ambisonic_ir_bank(cfg)
+    elif mode == "midi_terrain_form":
+        render_midi_terrain_form(cfg)
+    elif mode == "midi_form_learner":
+        render_midi_form_learner(cfg)
     else:
         raise RuntimeError(f"Unknown render mode: {mode}")
 
