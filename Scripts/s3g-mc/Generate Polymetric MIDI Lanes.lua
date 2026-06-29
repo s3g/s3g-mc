@@ -60,29 +60,71 @@ local COLORS = {
   muted = color(0.22, 0.24, 0.25, 1),
 }
 
+local RING_COLORS = {
+  color(1.00, 0.78, 0.18, 1),
+  color(0.08, 0.78, 0.92, 1),
+  color(0.96, 0.22, 0.34, 1),
+  color(0.26, 0.86, 0.36, 1),
+  color(0.70, 0.42, 1.00, 1),
+  color(1.00, 0.45, 0.08, 1),
+  color(0.24, 0.48, 1.00, 1),
+  color(0.90, 0.92, 0.22, 1),
+}
+
+local function ring_color(index)
+  return RING_COLORS[((index - 1) % #RING_COLORS) + 1]
+end
+
+local function point_on_circle(cx, cy, radius, step, steps)
+  local angle = -math.pi * 0.5 + (math.pi * 2 * step / math.max(1, steps))
+  return cx + math.cos(angle) * radius, cy + math.sin(angle) * radius
+end
+
 local function draw_lane_preview()
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
-  local row_h = 22
-  local h = 18 + lane_count * row_h
+  local h = 320
   ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, COLORS.panel)
   ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, COLORS.edge)
-  local left = x + 52
-  local right = x + w - 14
+
+  local legend_w = 150
+  local cx = x + (w - legend_w) * 0.5
+  local cy = y + h * 0.54
+  local max_r = math.max(34, math.min(w - legend_w, h - 38) * 0.5 - 12)
+  local spacing = math.max(7, math.min(20, (max_r - 14) / math.max(1, lane_count)))
+
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, COLORS.dim, "POLYMETRIC RINGS")
   for i = 1, lane_count do
     local lane = lanes[i]
-    local yy = y + 10 + (i - 0.5) * row_h
-    ImGui.DrawList_AddText(draw_list, x + 12, yy - 6, lane.muted and COLORS.dim or COLORS.lane, "ch " .. tostring(i))
-    ImGui.DrawList_AddLine(draw_list, left, yy, right, yy, COLORS.grid, 1)
+    local radius = max_r - (i - 1) * spacing
+    if radius < 14 then break end
+    local col = lane.muted and COLORS.dim or ring_color(i)
+    ImGui.DrawList_AddCircle(draw_list, cx, cy, radius, lane.muted and COLORS.muted or COLORS.grid, 96, 1)
     if not lane.muted then
       local pattern = midi.euclidean_pattern(lane.pulses, lane.steps, lane.rotate)
+      local hit_points = {}
       for step = 1, lane.steps do
-        local px = left + (right - left) * ((step - 1) / math.max(1, lane.steps - 1))
-        local col = pattern[step] and COLORS.hit or COLORS.grid
-        local r = pattern[step] and 3.2 or 1.4
-        ImGui.DrawList_AddCircleFilled(draw_list, px, yy, r, col)
+        local p1x, p1y = point_on_circle(cx, cy, radius - 3, step - 1, lane.steps)
+        local p2x, p2y = point_on_circle(cx, cy, radius + 3, step - 1, lane.steps)
+        ImGui.DrawList_AddLine(draw_list, p1x, p1y, p2x, p2y, pattern[step] and col or COLORS.grid, 1)
+        if pattern[step] then
+          local hx, hy = point_on_circle(cx, cy, radius - spacing * 0.42, step - 1, lane.steps)
+          hit_points[#hit_points + 1] = { x = hx, y = hy }
+          ImGui.DrawList_AddCircleFilled(draw_list, hx, hy, 3.4, col)
+        end
       end
+      for p = 1, #hit_points do
+        local a = hit_points[p]
+        local b = hit_points[(p % #hit_points) + 1]
+        if b then ImGui.DrawList_AddLine(draw_list, a.x, a.y, b.x, b.y, col, 1.1) end
+      end
+    end
+    local label_y = y + 34 + (i - 1) * 16
+    if label_y < y + h - 8 then
+      ImGui.DrawList_AddRectFilled(draw_list, x + w - legend_w + 14, label_y - 8, x + w - legend_w + 23, label_y + 1, col)
+      ImGui.DrawList_AddText(draw_list, x + w - legend_w + 30, label_y - 10, lane.muted and COLORS.dim or col,
+        "ch " .. tostring(i) .. "  " .. tostring(lane.pulses) .. "/" .. tostring(lane.steps))
     end
   end
   ImGui.SetCursorScreenPos(ctx, x, y + h + 12)

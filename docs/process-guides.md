@@ -1,24 +1,25 @@
 ---
 layout: default
 title: Process Guides
+guide_nav: true
 prev_page:
   title: Workflows
   url: /workflows.html
 next_page:
-  title: MIDI Guides
-  url: /process-guides-midi.html
+  title: Channel Mixing / Automation Guides
+  url: /process-guides-channel-mixing.html
 toc:
   - title: General Pattern
     href: "#general-pattern"
   - title: Breakpoint Envelopes
     href: "#breakpoint-envelopes"
-  - title: Guide Pages
-    href: "#guide-pages"
+  - title: Category Guides
+    href: "#category-guides"
 ---
 
 # Process Guides
 
-These notes describe how to approach selected s3g-mc processes in practice. They are intentionally more direct than the tool list: what to select, what the action creates, and which settings are worth touching first.
+These pages are practical notes for selected tools. The Package Browser and [Tools](tools.md) page remain the authoritative catalog of processes; these guides follow the same category order as the Package Browser so the documentation does not become a second, conflicting navigation system.
 
 ## General Pattern
 
@@ -34,7 +35,6 @@ Render actions generally create a new media item rather than destructively editi
 
 For NumPy-backed processes, use WAV-backed media. Convert compressed formats to WAV first; the offline analysis and render scripts expect WAV sources.
 
-
 ## Breakpoint Envelopes
 
 Several offline processes include compact breakpoint lanes plus a `Detailed Breakpoint Editor`. The compact lanes show the active time-shape for each mapped parameter. The detailed editor lets you choose a lane, activate it, add or delete points, apply preset shapes, and randomize points.
@@ -46,12 +46,14 @@ Useful habits:
 - `Random selected` changes one chosen lane; `Random all` changes every active lane.
 - If an envelope is not active, the current slider value is used instead.
 
+## Category Guides
 
-
-## Guide Pages
-
-- [MIDI Guides](process-guides-midi.md): MIDI rule generation, musical-space paths, and polymetric lanes.
-- [Synthesis Guides](process-guides-synthesis.md): procedural synths, resynthesis, grain clouds, loop tools, and impulse fields.
-- [Spectral and Convolution Guides](process-guides-spectral.md): convolution, spectral shaping, and multichannel spectral profile tools.
-- [3OAFX Guides](process-guides-3oafx.md): ambisonic offline rendering, ambisonic convolution, spatial grains, and 3OAFX spectral tools.
-- [Spatial and Channel Guides](process-guides-spatial-channel.md): panners, fold-down, transaural playback, automation mixer, and track/item helpers.
+- [Channel Mixing / Automation](process-guides-channel-mixing.md): automation mixer, fold-down, transaural playback, and monitor decoders.
+- [MIDI Composition](process-guides-midi.md): MIDI rule generation, musical-space paths, and polymetric lanes.
+- [Procedural Synthesis](process-guides-procedural-synthesis.md): Carto/Spectra render and MIDI-controller workflows.
+- [Offline Synthesis / IR](process-guides-offline-synthesis-ir.md): offline synth, resynthesis, grain-cloud, and impulse tools.
+- [Spatial Panners](process-guides-spatial-panners.md): panner workflows and spatial layout controls.
+- [3OAFX](process-guides-3oafx.md): ambisonic offline rendering, ambisonic convolution, spatial grains, and 3OAFX spectral tools.
+- [Spectral / Convolution](process-guides-spectral.md): non-ambisonic convolution, spectral shaping, and spectral profile tools.
+- [Multichannel Texture / Montage](process-guides-texture-montage.md): slice, loop, and montage-oriented multichannel processes.
+- [Track Building / Routing](process-guides-track-routing.md): project structure, routing, stems, and item helper actions.

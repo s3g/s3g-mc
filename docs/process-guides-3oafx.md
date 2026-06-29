@@ -1,12 +1,13 @@
 ---
 layout: default
 title: 3OAFX Guides
+guide_nav: true
 prev_page:
-  title: Spectral and Convolution Guides
-  url: /process-guides-spectral.html
+  title: Spatial Panners Guides
+  url: /process-guides-spatial-panners.html
 next_page:
-  title: Spatial and Channel Guides
-  url: /process-guides-spatial-channel.html
+  title: Spectral / Convolution Guides
+  url: /process-guides-spectral.html
 toc:
   - title: 3OAFX Ambisonic Kernel Collage
     href: "#3oafx-ambisonic-kernel-collage"
@@ -24,7 +25,7 @@ toc:
 
 # 3OAFX Guides
 
-These guides cover the 3OAFX family: offline ambisonic rendering, ambisonic convolution, spatial grains, and ambisonic spectral profile tools.
+These guides match the Package Browser's 3OAFX group. They cover ambisonic offline rendering, ambisonic convolution, spatial grains, and ambisonic spectral profile tools.
 
 ## 3OAFX Ambisonic Kernel Collage
 
@@ -46,6 +47,7 @@ Start conservatively:
 `Adapt mixed-order kernels` lets 1OA, 2OA, and 3OA kernel recordings be used together. The selected output order is set by the source/order menu. Higher-order kernels are reduced to that order. Lower-order kernels keep their available channels, and missing higher-order channels are inferred from the lower-order directional energy. This is useful for collage work, but it is not the same as having native measured material at every order.
 
 The kernel window, fade, wet pre-gain, soft limit, and peak normalize controls are there because a whole recording used as a convolution kernel can build level quickly. Shorter kernel windows usually keep the source identity clearer; longer windows push toward suspended, imprint-like fields.
+
 
 
 ## 3OAFX Offline Ambisonic Convolve
@@ -80,6 +82,7 @@ For testing and designed spaces, run `3OAFX Synthetic Ambisonic IR Bank` to crea
 The designer can write separate ambisonic WAVs, one per virtual direction, or one stacked multichannel bank where each direction occupies a block of ambisonic channels. The convolver detects either format. The practical 2OA and 3OA stacked banks are designed to fit REAPER's 128-channel track limit. The designer writes a direction-map CSV next to the generated IRs, and the convolver prints the same azimuth/elevation map in the console so measured banks can be checked against the expected order.
 
 
+
 ## 3OAFX Offline Renderer
 
 Use this when you want the 3OAFX idea rendered offline directly from an ambisonic media item.
@@ -104,6 +107,7 @@ Important controls:
 - Breakpoint envelopes can animate focus and mix parameters over the item.
 
 For a clear moving-spotlight test, use a strong effect amount, low dry remaining at focus, and an azimuth breakpoint moving from `-180` to `180`.
+
 
 
 ## 3OAFX Spectral Profile Subtract
@@ -135,6 +139,7 @@ Settings:
   frame-to-frame changes.
 
 
+
 ## 3OAFX Spectral Profile Tools
 
 These actions share the same source/profile workflow as `3OAFX Spectral Profile
@@ -161,6 +166,7 @@ Useful first controls:
   result feels too narrow, watery, or frame-like.
 
 
+
 ## 3OAFX Spatial Grains
 
 `3OAFX Spatial Grains` follows the spatial-grain principle described by E.
@@ -180,4 +186,3 @@ Use `Navigation mode` to decide how source time is used as a spatial index:
 `Room memory` increases minimum grain length and overlap to help retain
 reverberant or time-based spatial cues. `Yaw` controls add optional HOA-domain
 rotation; order weighting can soften or emphasize higher-order spatial detail.
-

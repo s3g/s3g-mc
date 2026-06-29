@@ -2,8 +2,8 @@
 layout: default
 title: Gallery
 prev_page:
-  title: Spatial and Channel Guides
-  url: /process-guides-spatial-channel.html
+  title: Track Building / Routing Guides
+  url: /process-guides-track-routing.html
 next_page:
   title: References
   url: /references.html

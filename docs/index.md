@@ -29,7 +29,7 @@ Many of these tools are inspired by or extend existing computer music practices,
 - [Dependencies](dependencies.md)
 - [Tools](tools.md)
 - [Workflows](workflows.md)
-- [Process Guides](process-guides.md): [MIDI](process-guides-midi.md), [Synthesis](process-guides-synthesis.md), [Spectral and Convolution](process-guides-spectral.md), [3OAFX](process-guides-3oafx.md), [Spatial and Channel](process-guides-spatial-channel.md)
+- [Process Guides](process-guides.md)
 - [Gallery](gallery.md)
 - [References](references.md)
 

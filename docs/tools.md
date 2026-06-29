@@ -53,10 +53,11 @@ included JSFX. The repository also ships 19 underlying JSFX engine/effect files.
 
 - `Generate Musical Space MIDI`: creates an editable MIDI item from a path
   through scale-degree, contour, triadic, or axis-mirror spaces, with Euclidean
-  timing, density, velocity shaping, and MIDI-channel focus.
+  timing, density, velocity shaping, MIDI-channel focus, and geometric preview.
 - `Generate Polymetric MIDI Lanes`: creates multiple Euclidean lanes with
   independent lengths, pulses, rotations, pitch degrees, and MIDI channels for
-  procedural synths or general algorithmic composition.
+  procedural synths or general algorithmic composition, shown as concentric
+  rhythm rings.
 
 ## Procedural Synthesis
 

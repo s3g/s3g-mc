@@ -1,12 +1,13 @@
 ---
 layout: default
-title: Spectral and Convolution Guides
+title: Spectral / Convolution Guides
+guide_nav: true
 prev_page:
-  title: Synthesis Guides
-  url: /process-guides-synthesis.html
-next_page:
   title: 3OAFX Guides
   url: /process-guides-3oafx.html
+next_page:
+  title: Multichannel Texture / Montage Guides
+  url: /process-guides-texture-montage.html
 toc:
   - title: Convolve Selected Items
     href: "#convolve-selected-items"
@@ -16,9 +17,9 @@ toc:
     href: "#multichannel-spectral-profile-tools"
 ---
 
-# Spectral and Convolution Guides
+# Spectral / Convolution Guides
 
-These guides cover non-ambisonic spectral and convolution tools. For ambisonic/3OAFX variants, use the 3OAFX guide page.
+These guides match the Package Browser's Spectral / Convolution group for non-ambisonic spectral and convolution tools. For ambisonic variants, use the 3OAFX guide page.
 
 ## Convolve Selected Items
 
@@ -39,6 +40,7 @@ Starting settings:
 - Normalize peak: around `-6 dB`
 
 If the result is silent or unexpectedly long, check that both selected items are readable audio files and that the impulse has audible content. If the waveform takes a moment to appear, REAPER may still be building peaks for the rendered file.
+
 
 
 ## Spectral Shaper
@@ -62,6 +64,7 @@ Starting settings:
 - Normalize: on
 
 
+
 ## Multichannel Spectral Profile Tools
 
 These are the non-ambisonic counterparts to the 3OAFX profile tools. Select a
@@ -83,4 +86,3 @@ The `Channel mode` setting controls how the profile channels are assigned:
 - `Wrap profile channels`: profile channels repeat across the source channels.
 - `Summed profile to all`: the profile is analyzed as one composite spectrum and
   applied to every source channel.
-

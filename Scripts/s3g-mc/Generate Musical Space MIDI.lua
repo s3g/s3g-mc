@@ -66,6 +66,8 @@ local COLORS = {
   muted = color(0.34, 0.37, 0.38, 1),
 }
 
+local PC_NAMES = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
+
 local preview = {}
 
 local function combo(label, labels, value, width)
@@ -110,32 +112,84 @@ local function generate_preview()
   preview = events
 end
 
+local function point_on_circle(cx, cy, radius, index, count)
+  local angle = -math.pi * 0.5 + (math.pi * 2 * index / math.max(1, count))
+  return cx + math.cos(angle) * radius, cy + math.sin(angle) * radius
+end
+
+local function pitch_class(pitch)
+  return ((math.floor(pitch or 0) % 12) + 12) % 12
+end
+
+local function scale_pc_lookup()
+  local lookup = {}
+  local root = midi.ROOTS[ROOTS[state.root]] or 0
+  local scale = midi.SCALES[SCALES[state.scale]] or midi.SCALES.Major
+  for _, interval in ipairs(scale) do
+    lookup[(root + interval) % 12] = true
+  end
+  return lookup
+end
+
 local function draw_preview()
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
-  local h = 180
+  local h = 250
   ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, COLORS.panel)
   ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, COLORS.edge)
-  local left = x + 18
-  local right = x + w - 18
-  local top = y + 24
-  local bottom = y + h - 24
-  for i = 0, 8 do
-    local yy = top + (bottom - top) * i / 8
-    ImGui.DrawList_AddLine(draw_list, left, yy, right, yy, COLORS.muted, 1)
+
+  local left_cx = x + math.min(160, w * 0.26)
+  local cy = y + h * 0.55
+  local pc_radius = math.min(92, h * 0.36)
+  local scale_lookup = scale_pc_lookup()
+
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, COLORS.dim, "PITCH SPACE")
+  ImGui.DrawList_AddCircle(draw_list, left_cx, cy, pc_radius, COLORS.muted, 96, 1)
+  for pc = 0, 11 do
+    local px, py = point_on_circle(left_cx, cy, pc_radius, pc, 12)
+    local active = scale_lookup[pc] == true
+    ImGui.DrawList_AddCircleFilled(draw_list, px, py, active and 4.5 or 2.2, active and COLORS.line or COLORS.muted)
+    ImGui.DrawList_AddText(draw_list, px + 6, py - 6, active and COLORS.text or COLORS.dim, PC_NAMES[pc + 1])
   end
+
   local last_x, last_y = nil, nil
-  for _, event in ipairs(preview) do
-    local px = left + (right - left) * ((event.step - 1) / math.max(1, state.steps - 1))
-    local py = bottom - (bottom - top) * ((event.pitch - 36) / 48)
-    py = midi.clamp(py, top, bottom)
+  for index, event in ipairs(preview) do
+    local pc = pitch_class(event.pitch)
+    local register_r = pc_radius * (0.42 + 0.36 * ((event.channel or 0) / math.max(1, state.channels - 1)))
+    local px, py = point_on_circle(left_cx, cy, register_r, pc, 12)
     if last_x then ImGui.DrawList_AddLine(draw_list, last_x, last_y, px, py, COLORS.line, 1.2) end
     local radius = 3 + (event.velocity / 127) * 3
     ImGui.DrawList_AddCircleFilled(draw_list, px, py, radius, COLORS.hit)
-    ImGui.DrawList_AddText(draw_list, px + 5, py - 6, COLORS.dim, tostring(event.channel + 1))
+    if index == 1 or index == #preview then
+      ImGui.DrawList_AddText(draw_list, px + 6, py - 7, COLORS.text, index == 1 and "start" or "end")
+    end
     last_x, last_y = px, py
   end
+
+  local ring_cx = x + w - math.min(160, w * 0.27)
+  local ring_r = math.min(92, h * 0.36)
+  ImGui.DrawList_AddText(draw_list, ring_cx - 58, y + 10, COLORS.dim, "RHYTHM / CHANNEL")
+  ImGui.DrawList_AddCircle(draw_list, ring_cx, cy, ring_r, COLORS.muted, 96, 1)
+  local pattern = midi.euclidean_pattern(state.pulses, state.steps, state.rotate)
+  local event_by_step = {}
+  for _, event in ipairs(preview) do event_by_step[event.step] = event end
+  for step = 1, state.steps do
+    local p1x, p1y = point_on_circle(ring_cx, cy, ring_r - 4, step - 1, state.steps)
+    local p2x, p2y = point_on_circle(ring_cx, cy, ring_r + 4, step - 1, state.steps)
+    local event = event_by_step[step]
+    ImGui.DrawList_AddLine(draw_list, p1x, p1y, p2x, p2y, pattern[step] and COLORS.line or COLORS.muted, 1)
+    if event then
+      local event_r = ring_r * (0.42 + 0.44 * ((event.channel or 0) / math.max(1, state.channels - 1)))
+      local hx, hy = point_on_circle(ring_cx, cy, event_r, step - 1, state.steps)
+      ImGui.DrawList_AddCircleFilled(draw_list, hx, hy, 3.5 + event.velocity / 127 * 2.5, COLORS.hit)
+      ImGui.DrawList_AddText(draw_list, hx + 5, hy - 6, COLORS.dim, tostring(event.channel + 1))
+    end
+  end
+
+  local mid_x = x + w * 0.5
+  ImGui.DrawList_AddText(draw_list, mid_x - 62, y + h - 28, COLORS.dim,
+    tostring(#preview) .. " events  /  " .. SPACES[state.space])
   ImGui.SetCursorScreenPos(ctx, x + 12, y + h + 10)
 end
 

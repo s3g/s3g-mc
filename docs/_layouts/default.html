@@ -46,12 +46,31 @@
         {% endif %}
       </main>
 
-      {% if page.toc %}
-      <aside class="toc" aria-label="On this page">
-        <h2>On This Page</h2>
-        {% for item in page.toc %}
-          <a href="{{ item.href }}">{{ item.title }}</a>
-        {% endfor %}
+      {% if page.toc or page.guide_nav %}
+      <aside class="toc" aria-label="Page navigation">
+        {% if page.toc %}
+        <div class="toc-section">
+          <h2>On This Page</h2>
+          {% for item in page.toc %}
+            <a href="{{ item.href }}">{{ item.title }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if page.guide_nav %}
+        <div class="toc-section guide-nav">
+          <h2>Guide Groups</h2>
+          <a href="{{ '/process-guides.html' | relative_url }}">Process Guides</a>
+          <a href="{{ '/process-guides-channel-mixing.html' | relative_url }}">Channel Mixing / Automation</a>
+          <a href="{{ '/process-guides-midi.html' | relative_url }}">MIDI Composition</a>
+          <a href="{{ '/process-guides-procedural-synthesis.html' | relative_url }}">Procedural Synthesis</a>
+          <a href="{{ '/process-guides-offline-synthesis-ir.html' | relative_url }}">Offline Synthesis / IR</a>
+          <a href="{{ '/process-guides-spatial-panners.html' | relative_url }}">Spatial Panners</a>
+          <a href="{{ '/process-guides-3oafx.html' | relative_url }}">3OAFX</a>
+          <a href="{{ '/process-guides-spectral.html' | relative_url }}">Spectral / Convolution</a>
+          <a href="{{ '/process-guides-texture-montage.html' | relative_url }}">Multichannel Texture / Montage</a>
+          <a href="{{ '/process-guides-track-routing.html' | relative_url }}">Track Building / Routing</a>
+        </div>
+        {% endif %}
       </aside>
       {% endif %}
     </div>

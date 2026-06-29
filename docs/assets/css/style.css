@@ -109,11 +109,21 @@ a:focus-visible {
   text-transform: uppercase;
 }
 
+.toc-section + .toc-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
 .toc a {
   display: block;
   padding: 5px 0;
   color: #b7c0bb;
   font-size: 12px;
+}
+
+.guide-nav a {
+  line-height: 1.25;
 }
 
 .toc a:hover,

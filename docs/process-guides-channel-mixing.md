@@ -1,32 +1,29 @@
 ---
 layout: default
-title: Spatial and Channel Guides
+title: Channel Mixing / Automation Guides
+guide_nav: true
 prev_page:
-  title: 3OAFX Guides
-  url: /process-guides-3oafx.html
+  title: Process Guides
+  url: /process-guides.html
 next_page:
-  title: Gallery
-  url: /gallery.html
+  title: MIDI Composition Guides
+  url: /process-guides-midi.html
 toc:
   - title: Ambisonic Stereo Decoder
     href: "#ambisonic-stereo-decoder"
   - title: 6ch Ambisonic Decoder Router
     href: "#6ch-ambisonic-decoder-router"
-  - title: Panners
-    href: "#panners"
   - title: MC Channel Automation Mixer
     href: "#mc-channel-automation-mixer"
   - title: MC to Stereo Autogain
     href: "#mc-to-stereo-autogain"
   - title: Transaural Crosstalk Canceller
     href: "#transaural-crosstalk-canceller"
-  - title: Track and Item Helpers
-    href: "#track-and-item-helpers"
 ---
 
-# Spatial and Channel Guides
+# Channel Mixing / Automation Guides
 
-These guides cover spatial monitoring, panners, channel control, fold-down, transaural playback, and project-structure helpers.
+These guides match the Package Browser's Channel Mixing / Automation group and related monitoring tools. They cover track-level channel control, fold-down, monitor decoding, and transaural playback.
 
 ## Ambisonic Stereo Decoder
 
@@ -84,6 +81,7 @@ ambisonic order: `Stable Stereo`, `Wide Field`, `Front Focus`, `Room Image`,
 `MS Master`, `Blumlein`, and `A/B Soft`.
 
 
+
 ## 6ch Ambisonic Decoder Router
 
 This JSFX is a package-native monitor decoder/router for a compact 6-speaker
@@ -108,34 +106,6 @@ decoded ambisonic layer, which is useful when combining non-ambisonic materials
 with the same monitor rig.
 
 
-## Panners
-
-The panner controllers are companion interfaces for JSFX. Insert or load the JSFX on a track, then use the matching controller from the package browser or Action List for a larger spatial interface.
-
-General workflow:
-
-1. Put mono sources on an 8-channel track or bus where the panner expects up to 8 input sources.
-2. Load the matching `s3g` panner JSFX.
-3. Open the controller.
-4. Use the visual panel, source controls, and automation controls from the controller rather than the raw JSFX fader list.
-
-The `Layout Panner` is the general option for quad, rings, cube, double-ring, and 24-channel dome layouts. Use it when you want a common speaker arrangement without committing to one SRST-specific array.
-
-The 25-channel dome panners share the RISD SRST dome layout but use different panning ideas:
-
-- `LBAP` is a practical default for smooth dome movement.
-- `VBAP` emphasizes nearest-region vector behavior.
-- `DBAP` emphasizes distance-weighted motion.
-- `Cosine` gives softer angular focus.
-- `Region` constrains sources to named arcs, rings, triangles, and custom constellations.
-- `Vector Morph` stores scenes and interpolates between them.
-
-The `17ch Cube XYZ Panner` is an XYZ-native panner. Use smaller spread values when you want a source to focus near a single speaker, and larger distance or offset gestures when you want a source to feel beyond the cube.
-
-The `12ch Dodeca Panner` uses an AED-native spherical layout drawn as a dodecahedron. It supports discrete spherical motion with a smaller speaker count.
-
-For automation, use the controller's automation controls to show, hide, arm, and write relevant lanes. In `Trim/Read`, the GUI can audition control changes without writing automation. Use write modes when you intentionally want controller motion recorded.
-
 
 ## MC Channel Automation Mixer
 
@@ -153,6 +123,7 @@ The visible mixer adapts to the track channel count, up to REAPER's 128-channel 
 Use shift-click to select or release channels. Quick channel groups highlight related faders and let a group move together. The pin matrix is for channel remapping and should be treated as routing, not gain.
 
 
+
 ## MC to Stereo Autogain
 
 Use this at the end of a multichannel sketch when you need a stereo monitor or print. It is not a substitute for an actual multichannel render; it is a controlled fold-down.
@@ -166,6 +137,7 @@ Important controls:
 - Autogain helps keep the fold-down from jumping in level as channel count changes.
 
 Use ring projection for circular layouts, sphere or hemisphere projection for dome-like material, and cube-style projection for XYZ/cube work. Watch the graphic: smaller dots indicate channels receiving stronger 3D attenuation.
+
 
 
 ## Transaural Crosstalk Canceller
@@ -221,18 +193,3 @@ then tune by ear from the intended listening position.
 
 Preset buttons provide starting points for common situations: `Gentle`,
 `Standard`, `Narrow Setup`, `Wide Setup`, and `Careful / Roomy`.
-
-
-## Track and Item Helpers
-
-These are utility actions for building and reorganizing multichannel projects. They usually do one structural task, so duplicated test items are a useful way to confirm the result before working on source material.
-
-Useful starting points:
-
-- `Route Selected Tracks to Multichannel Bus` gathers selected mono or lower-channel tracks into a new multichannel folder/bus and assigns channel routing in order.
-- `Build multichannel stem from selected tracks` creates a rendered multichannel stem from selected tracks.
-- `Explode multichannel item to mono tracks` separates a multichannel media item into one mono track per channel.
-- `Resize item channel count` repeats or downmixes channels to reach a target count.
-- `Reorder`, `Rotate`, `Mirror`, `Interleave`, and `Deinterleave` change channel order without changing the musical content.
-
-For routing actions, select only the tracks you want included. If the requested result would exceed REAPER's 128-channel limit, the action should stop rather than build an invalid bus. For render-based helpers, expect a new media item or track and keep the source material until you have checked the result.
