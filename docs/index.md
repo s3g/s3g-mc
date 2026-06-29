@@ -19,7 +19,7 @@ s3g-mc is a collection of REAPER tools for multichannel composition, spatial aud
 
 It includes Lua actions, ReaImGui controllers, and JSFX for channel editing, automation, fold-down monitoring, dome panning, 3OA send/return routing, and render-based multichannel processes.
 
-Current package snapshot: the browser exposes 94 user-facing tools/controllers plus the Package Browser. Of those, 37 are Python/NumPy-backed offline processes, 36 are Lua/ReaImGui REAPER actions, and 21 load, control, or render included JSFX. The repository also ships 20 underlying JSFX engine/effect files. The Lua folder also includes helper libraries and internal dialogs that are not shown as Package Browser entries.
+Current package snapshot: the browser exposes 99 user-facing tools/controllers plus the Package Browser. Of those, 42 are Python/NumPy-backed offline processes, 36 are Lua/ReaImGui REAPER actions, and 21 load, control, or render included JSFX. The repository also ships 20 underlying JSFX engine/effect files. The Lua folder also includes helper libraries and internal dialogs that are not shown as Package Browser entries.
 
 Many of these tools are inspired by or extend existing computer music practices, with references mentioned in the documentation where they are useful.
 
@@ -39,6 +39,8 @@ Many of these tools are inspired by or extend existing computer music practices,
 - 3OAFX ambisonic send/return workflow for 24-channel effect inserts
 - Track-level automation mixer for up to 128 channels, with plugin pin control
 - Ambisonic stereo fold-down based on virtual speaker fields and stereo pickup models
+- Stereo-to-ambisonic source expansion for building 3OAFX beds from mono or stereo material
+- Multi-source ambisonic scene navigation with editable node maps and listener paths
 - Stereo loudspeaker transaural crosstalk cancellation with matrix-inverse approximation
 - Multichannel workflow helpers for item transforms, track routing, and stems
 - MIDI rule generators for musical-space paths, learned forms, and polymetric lanes

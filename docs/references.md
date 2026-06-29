@@ -26,16 +26,30 @@ toc:
 ## Note
 
 References identify historical, technical, and conceptual context for the
-package. The scripts are original REAPER/Lua, JSFX, and Python/NumPy
+package. The s3g-mc scripts are original REAPER/Lua, JSFX, and Python/NumPy
 implementations unless otherwise noted.
 
 ## Spatial Audio and Ambisonics
 
 <div class="bibliography">
 
+<p class="bib-entry">Barrett, Natasha. 2002. "Spatio-Musical Composition Strategies." <em>Organised Sound</em> 7 (3): 313-323.</p>
+
 <p class="bib-entry">Zotter, Franz, and Matthias Frank. 2019. <em>Ambisonics: A Practical 3D Audio Theory for Recording, Studio Production, Sound Reinforcement, and Virtual Reality</em>. Cham: Springer.</p>
 
 <p class="bib-entry">Gerzon, Michael A. 1973. "Periphony: With-Height Sound Reproduction." <em>Journal of the Audio Engineering Society</em> 21 (1): 2-10.</p>
+
+<p class="bib-entry">Gerzon, Michael A. n.d. "Surround Sound from 2-Channel Stereo." Accessed June 29, 2026.
+<a href="https://intothesoundfield.music.ox.ac.uk/sites/default/files/intothesoundfield/documents/media/surround_sound_from_2-channel_stereo_a4.pdf" target="_blank" rel="noopener noreferrer">PDF</a>.</p>
+
+<p class="bib-entry">Gerzon, Michael A. n.d. "Technical Papers." <em>Into the Soundfield</em>. Accessed June 29, 2026.
+<a href="https://intothesoundfield.music.ox.ac.uk/technical-papers" target="_blank" rel="noopener noreferrer">https://intothesoundfield.music.ox.ac.uk/technical-papers</a>.</p>
+
+<p class="bib-entry">Gerzon, Michael A. 1992. "Panpot Laws for Multispeaker Stereo." Paper presented at the AES 92nd Convention, Vienna.</p>
+
+<p class="bib-entry">Gerzon, Michael A. 1992. "The Design of Precisely Coincident Microphone Arrays for Stereo and Surround Sound." Paper presented at the AES 92nd Convention, Vienna.</p>
+
+<p class="bib-entry">Gerzon, Michael A. 1992. "Distance Panpots." Paper presented at the AES 92nd Convention, Vienna.</p>
 
 <p class="bib-entry">Institute of Electronic Music and Acoustics, University of Music and Performing Arts Graz. n.d. <em>IEM Plug-in Suite</em>. Software, documentation, and source repository. Accessed June 28, 2026.
 <a href="https://plugins.iem.at/" target="_blank" rel="noopener noreferrer">Project site</a>;
@@ -51,6 +65,9 @@ implementations unless otherwise noted.
 <a href="https://github.com/risdsound/foafx" target="_blank" rel="noopener noreferrer">https://github.com/risdsound/foafx</a>.</p>
 
 <p class="bib-entry">Kronlachner, Matthias. 2014. <em>Spatial Transformations for the Alteration of Ambisonic Recordings</em>. Master's thesis, Institute of Electronic Music and Acoustics, University of Music and Performing Arts Graz, and Graz University of Technology.</p>
+
+<p class="bib-entry">Leitner, Bernhard. n.d. <em>Works</em>. Accessed June 29, 2026.
+<a href="https://bernhardleitner.at/works" target="_blank" rel="noopener noreferrer">https://bernhardleitner.at/works</a>.</p>
 
 <p class="bib-entry">Pulkki, Ville. 1997. "Virtual Sound Source Positioning Using Vector Base Amplitude Panning." <em>Journal of the Audio Engineering Society</em> 45 (6): 456-466.</p>
 
@@ -165,9 +182,13 @@ Archived March 1, 2024:
 <p class="bib-entry">Hunt, Jerry. 1993. "Gesture Modulation of Templates." Accessed June 29, 2026.
 <a href="http://www.jerryhunt.org/gesture_mod.htm" target="_blank" rel="noopener noreferrer">http://www.jerryhunt.org/gesture_mod.htm</a>.</p>
 
+<p class="bib-entry">Hook, Julian. 2023. <em>Exploring Musical Spaces: A Synthesis of Mathematical Approaches</em>. New York: Oxford University Press.</p>
+
 <p class="bib-entry">Nierhaus, Gerhard. 2009. <em>Algorithmic Composition: Paradigms of Automated Music Generation</em>. Vienna: Springer.</p>
 
 <p class="bib-entry">Roads, Curtis. 2015. <em>Composing Electronic Music: A New Aesthetic</em>. New York: Oxford University Press.</p>
+
+<p class="bib-entry">Toussaint, Godfried T. 2019. <em>The Geometry of Musical Rhythm: What Makes a "Good" Rhythm Good?</em> 2nd ed. AK Peters/CRC Recreational Mathematics Series. Boca Raton, FL: CRC Press.</p>
 
 <p class="bib-entry">Tymoczko, Dmitri. 2011. <em>A Geometry of Music: Harmony and Counterpoint in the Extended Common Practice</em>. New York: Oxford University Press.</p>
 

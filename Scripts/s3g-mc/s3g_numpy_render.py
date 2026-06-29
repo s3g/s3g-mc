@@ -2029,6 +2029,159 @@ def render_foafx_profile_subtract(cfg):
     render_foafx_spectral_profile_tool(cfg)
 
 
+def spectral_object_field_split_region(signal, sample_rate, cfg):
+    fft_size = int(cfg.get("fft_size", 2048))
+    fft_size = max(256, min(8192, fft_size))
+    hop = int(cfg.get("hop_size", fft_size // 4))
+    hop = max(64, min(fft_size, hop))
+    window = np.hanning(fft_size).astype(np.float32)
+    object_bias = float(np.clip(cfg.get("object_bias", 0.55), 0.0, 1.0))
+    transient_weight = float(np.clip(cfg.get("transient_weight", 0.45), 0.0, 1.0))
+    coherence_weight = float(np.clip(cfg.get("coherence_weight", 0.45), 0.0, 1.0))
+    contrast_weight = float(np.clip(cfg.get("contrast_weight", 0.30), 0.0, 1.0))
+    field_smoothing = float(np.clip(cfg.get("field_smoothing", 0.45), 0.0, 0.98))
+    crossfade = float(np.clip(cfg.get("crossfade", 0.18), 0.0, 0.75))
+    freq_smoothing = int(max(0, cfg.get("frequency_smoothing_bins", 3)))
+    temporal_smoothing = float(np.clip(cfg.get("temporal_smoothing", 0.35), 0.0, 0.98))
+    eps = 1e-10
+
+    pad = fft_size
+    padded = np.pad(signal, ((pad, pad), (0, 0)), mode="constant")
+    object_out = np.zeros_like(padded, dtype=np.float32)
+    field_out = np.zeros_like(padded, dtype=np.float32)
+    norm = np.zeros(padded.shape[0], dtype=np.float32)
+    frame_count = 1 + max(0, (padded.shape[0] - fft_size) // hop)
+    previous_mag = None
+    previous_object = None
+    object_mask_min = 1.0
+    object_mask_max = 0.0
+    object_mask_mean_sum = 0.0
+
+    for frame_index in range(frame_count):
+        start = frame_index * hop
+        frame = padded[start:start + fft_size] * window[:, None]
+        spec = np.fft.rfft(frame, axis=0)
+        mag = np.abs(spec)
+        phase = np.exp(1j * np.angle(spec))
+        bins, channels = mag.shape
+
+        total = np.sum(mag, axis=1, keepdims=True)
+        max_dir = np.max(mag, axis=1, keepdims=True)
+        coherence = np.clip((max_dir / np.maximum(total, eps) - (1.0 / max(1, channels))) /
+                            max(eps, 1.0 - (1.0 / max(1, channels))), 0.0, 1.0)
+        coherence = np.repeat(coherence, channels, axis=1)
+
+        if previous_mag is None:
+            transient = np.zeros_like(mag)
+        else:
+            flux = np.maximum(0.0, mag - previous_mag)
+            transient = np.clip(flux / np.maximum(mag + previous_mag, eps), 0.0, 1.0)
+        previous_mag = mag
+
+        if freq_smoothing > 0:
+            local_mean = smooth_profile_bins(mag, freq_smoothing)
+            contrast = np.clip(np.maximum(0.0, mag - local_mean) / np.maximum(mag + local_mean, eps), 0.0, 1.0)
+        else:
+            contrast = np.zeros_like(mag)
+
+        combined_weight = transient_weight + coherence_weight + contrast_weight + eps
+        object_score = (
+            transient * transient_weight +
+            coherence * coherence_weight +
+            contrast * contrast_weight
+        ) / combined_weight
+        object_score = np.clip(object_score * (0.55 + object_bias * 1.85), 0.0, 1.0)
+        object_score = np.clip(object_score * (1.0 - crossfade) + crossfade * 0.5, 0.0, 1.0)
+        if previous_object is not None and temporal_smoothing > 0.0:
+            object_score = previous_object * temporal_smoothing + object_score * (1.0 - temporal_smoothing)
+        previous_object = object_score
+        field_score = 1.0 - object_score
+        if field_smoothing > 0.0:
+            field_blur = smooth_profile_bins(field_score, max(1, freq_smoothing + 1))
+            field_score = field_score * (1.0 - field_smoothing) + field_blur * field_smoothing
+            field_score = np.clip(field_score, 0.0, 1.0)
+            object_score = np.clip(1.0 - field_score, 0.0, 1.0)
+
+        object_mask_min = min(object_mask_min, float(np.min(object_score)))
+        object_mask_max = max(object_mask_max, float(np.max(object_score)))
+        object_mask_mean_sum += float(np.mean(object_score))
+        object_spec = mag * object_score * phase
+        field_spec = mag * field_score * phase
+        object_frame = np.fft.irfft(object_spec, n=fft_size, axis=0).real.astype(np.float32)
+        field_frame = np.fft.irfft(field_spec, n=fft_size, axis=0).real.astype(np.float32)
+        object_out[start:start + fft_size] += object_frame * window[:, None]
+        field_out[start:start + fft_size] += field_frame * window[:, None]
+        norm[start:start + fft_size] += window * window
+
+    object_out /= np.maximum(norm[:, None], 1e-8)
+    field_out /= np.maximum(norm[:, None], 1e-8)
+    stats = {
+        "source_frames": frame_count,
+        "fft_size": fft_size,
+        "hop_size": hop,
+        "object_mask_min": object_mask_min,
+        "object_mask_max": object_mask_max,
+        "object_mask_mean": object_mask_mean_sum / max(1, frame_count),
+    }
+    return object_out[pad:pad + signal.shape[0]].astype(np.float32), field_out[pad:pad + signal.shape[0]].astype(np.float32), stats
+
+
+def render_foafx_object_field_split(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    order = int(cfg.get("order", 3))
+    order = max(1, min(3, order))
+    ambi_channels = (order + 1) * (order + 1)
+    if audio.shape[1] < ambi_channels:
+        raise RuntimeError(f"Selected source has {audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+    audio = audio[:, :ambi_channels].astype(np.float32, copy=False)
+
+    layout = foafx_layout(order)
+    basis = np.array([ambisonic_basis(order, az, el) for az, el in layout], dtype=np.float64)
+    decode = basis.T
+    encode = np.linalg.pinv(basis).T
+    virtual_source = (audio.astype(np.float64) @ decode).astype(np.float32)
+    object_virtual, field_virtual, stats = spectral_object_field_split_region(virtual_source, sample_rate, cfg)
+    object_out = (object_virtual.astype(np.float64) @ encode).astype(np.float32)
+    field_out = (field_virtual.astype(np.float64) @ encode).astype(np.float32)
+    if bool(cfg.get("dc_protect", True)):
+        object_out -= np.mean(object_out, axis=0, keepdims=True)
+        field_out -= np.mean(field_out, axis=0, keepdims=True)
+    object_pre = float(np.max(np.abs(object_out))) if object_out.size else 0.0
+    field_pre = float(np.max(np.abs(field_out))) if field_out.size else 0.0
+    if bool(cfg.get("normalize", True)):
+        object_out, object_pre = normalize_peak(object_out, float(cfg.get("normalize_db", -6.0)))
+        field_out, field_pre = normalize_peak(field_out, float(cfg.get("normalize_db", -6.0)))
+
+    output_mode = str(cfg.get("output_mode", "both")).lower()
+    written = []
+    if output_mode in ("both", "object"):
+        write_pcm24_wav(cfg["object_output_path"], object_out[:, :ambi_channels], sample_rate)
+        written.append(cfg["object_output_path"])
+    if output_mode in ("both", "field"):
+        write_pcm24_wav(cfg["field_output_path"], field_out[:, :ambi_channels], sample_rate)
+        written.append(cfg["field_output_path"])
+
+    print("Process: 3OAFX Object / Field Split")
+    print(f"Ambisonic order: {order}OA")
+    print(f"Ambisonic channels: {ambi_channels}")
+    print(f"Virtual speakers: {len(layout)}")
+    print(f"Output mode: {output_mode}")
+    print(f"Object bias: {float(cfg.get('object_bias', 0.55)):.3f}")
+    print(f"Transient weight: {float(cfg.get('transient_weight', 0.45)):.3f}")
+    print(f"Coherence weight: {float(cfg.get('coherence_weight', 0.45)):.3f}")
+    print(f"Contrast weight: {float(cfg.get('contrast_weight', 0.30)):.3f}")
+    print(f"FFT / hop: {stats['fft_size']} / {stats['hop_size']}")
+    print(f"Source STFT frames: {stats['source_frames']}")
+    print(f"Object mask min/mean/max: {stats['object_mask_min']:.3f} / {stats['object_mask_mean']:.3f} / {stats['object_mask_max']:.3f}")
+    print(f"Object pre-normalize peak: {object_pre:.6f}")
+    print(f"Field pre-normalize peak: {field_pre:.6f}")
+    print(f"Written files: {len(written)}")
+    for path in written:
+        print(f"Output: {path}")
+
+
 def map_profile_channels(profile_audio, source_channels, mode):
     mode = str(mode or "matched")
     profile_channels = int(profile_audio.shape[1])
@@ -2416,6 +2569,706 @@ def render_chaotic_resonant_eq(cfg):
     print(f"Frequency range: {low:.2f} - {high:.2f} Hz")
     print(f"Feedback: {feedback:.3f}")
     print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
+def exact_ambisonic_order_from_channels(channels):
+    channels = int(channels)
+    if channels == 16:
+        return 3
+    if channels in (9, 10):
+        return 2
+    if channels == 4:
+        return 1
+    return 0
+
+
+def virtual_blur_matrix(layout, width_deg):
+    count = len(layout)
+    width = max(1.0, float(width_deg))
+    matrix = np.zeros((count, count), dtype=np.float64)
+    for dst in range(count):
+        for src in range(count):
+            dist = angular_distance_deg(layout[dst], layout[src])
+            matrix[dst, src] = math.exp(-0.5 * (dist / width) ** 2)
+        norm = math.sqrt(float(np.sum(matrix[dst] * matrix[dst]))) + 1e-12
+        matrix[dst] /= norm
+    return matrix.astype(np.float32)
+
+
+def rotate_virtual_blocks(signal, amount, rng, mode="smooth"):
+    amount = float(np.clip(amount, 0.0, 1.0))
+    if amount <= 1e-5 or signal.shape[1] <= 1:
+        return signal.astype(np.float32, copy=True)
+    out = np.zeros_like(signal, dtype=np.float32)
+    frames, channels = signal.shape
+    block = 1024
+    max_shift = max(1, int(round(channels * amount * 0.5)))
+    for start in range(0, frames, block):
+        end = min(frames, start + block)
+        t = (start + end) * 0.5 / max(1, frames)
+        if mode == "counterpoint":
+            shift = int(round(math.sin(2.0 * math.pi * (0.35 + amount) * t) * max_shift))
+        elif mode == "stepped":
+            shift = int(rng.integers(-max_shift, max_shift + 1))
+        else:
+            shift = int(round((t * 2.0 - 1.0) * max_shift))
+        out[start:end] = np.roll(signal[start:end], shift, axis=1)
+    return out
+
+
+def prepare_object_space_virtual(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    output_order = max(1, min(3, int(cfg.get("output_order", 3))))
+    layout = foafx_layout(output_order)
+    out_channels = (output_order + 1) * (output_order + 1)
+    basis_out = np.array([ambisonic_basis(output_order, az, el) for az, el in layout], dtype=np.float64)
+    encode = np.linalg.pinv(basis_out).T
+    source_format = str(cfg.get("source_format", "auto")).lower()
+    if source_format == "auto":
+        source_order = exact_ambisonic_order_from_channels(audio.shape[1])
+    elif source_format in ("1oa", "foa", "ambisonic_1"):
+        source_order = 1
+    elif source_format in ("2oa", "ambisonic_2"):
+        source_order = 2
+    elif source_format in ("3oa", "ambisonic_3"):
+        source_order = 3
+    else:
+        source_order = 0
+
+    if source_order > 0:
+        source_channels = (source_order + 1) * (source_order + 1)
+        if audio.shape[1] < source_channels:
+            raise RuntimeError(f"Source format needs {source_channels} channels, but selected media has {audio.shape[1]}.")
+        basis_src = np.array([ambisonic_basis(source_order, az, el) for az, el in layout], dtype=np.float64)
+        virtual = (audio[:, :source_channels].astype(np.float64) @ basis_src.T).astype(np.float32)
+        source_label = f"{source_order}OA ACN/SN3D"
+    else:
+        spread = float(np.clip(cfg.get("source_spread", 0.18), 0.0, 1.0))
+        virtual = np.zeros((audio.shape[0], len(layout)), dtype=np.float32)
+        width_deg = 8.0 + spread * 82.0
+        for ch in range(audio.shape[1]):
+            center = int(round((ch / max(1, audio.shape[1])) * len(layout))) % len(layout)
+            weights = np.array([
+                math.exp(-0.5 * (angular_distance_deg(layout[idx], layout[center]) / width_deg) ** 2)
+                for idx in range(len(layout))
+            ], dtype=np.float64)
+            weights /= math.sqrt(float(np.sum(weights * weights))) + 1e-12
+            virtual += audio[:, ch:ch + 1] * weights.astype(np.float32)[None, :]
+        source_label = f"non-ambisonic {audio.shape[1]}ch encoded"
+    return virtual, encode, layout, sample_rate, output_order, out_channels, source_label
+
+
+def non_ambisonic_to_virtual(audio, layout, source_spread, stereo_expand=True):
+    spread = float(np.clip(source_spread, 0.0, 1.0))
+    virtual = np.zeros((audio.shape[0], len(layout)), dtype=np.float32)
+    width_deg = 8.0 + spread * 82.0
+
+    def add_object(signal, az, el=0.0, gain=1.0):
+        weights = np.array([
+            math.exp(-0.5 * (angular_distance_deg(layout[idx], (az, el)) / width_deg) ** 2)
+            for idx in range(len(layout))
+        ], dtype=np.float64)
+        weights /= math.sqrt(float(np.sum(weights * weights))) + 1e-12
+        virtual[:] += signal[:, None].astype(np.float32) * weights.astype(np.float32)[None, :] * float(gain)
+
+    if stereo_expand and audio.shape[1] == 2:
+        left = audio[:, 0]
+        right = audio[:, 1]
+        mid = 0.5 * (left + right)
+        side = 0.5 * (left - right)
+        add_object(left, 35.0, 0.0, 0.82)
+        add_object(right, -35.0, 0.0, 0.82)
+        add_object(mid, 0.0, 0.0, 0.55)
+        add_object(-mid, 180.0, 0.0, 0.28)
+        add_object(side, 90.0, 0.0, 0.40)
+        add_object(-side, -90.0, 0.0, 0.40)
+        return virtual
+
+    for ch in range(audio.shape[1]):
+        center = int(round((ch / max(1, audio.shape[1])) * len(layout))) % len(layout)
+        add_object(audio[:, ch], layout[center][0], layout[center][1], 1.0)
+    return virtual
+
+
+def render_stereo_expand_ambisonic_bed(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    output_order = max(1, min(3, int(cfg.get("output_order", 3))))
+    out_channels = (output_order + 1) * (output_order + 1)
+    layout = foafx_layout(output_order)
+    basis_out = np.array([ambisonic_basis(output_order, az, el) for az, el in layout], dtype=np.float64)
+    encode = np.linalg.pinv(basis_out).T
+    frames = audio.shape[0]
+
+    left = audio[:, 0].astype(np.float32, copy=False)
+    if audio.shape[1] >= 2:
+        right = audio[:, 1].astype(np.float32, copy=False)
+        source_label = "stereo"
+    else:
+        right = left.copy()
+        source_label = "mono copied to stereo expansion"
+
+    mid = 0.5 * (left + right)
+    side = 0.5 * (left - right)
+    low_hz = float(cfg.get("bass_mono_hz", 0.0))
+    if low_hz > 20.0:
+        low_mid = one_pole_lowpass(mid[:, None], sample_rate, low_hz)[:, 0]
+        low_l = one_pole_lowpass(left[:, None], sample_rate, low_hz)[:, 0]
+        low_r = one_pole_lowpass(right[:, None], sample_rate, low_hz)[:, 0]
+        left = left - low_l + low_mid
+        right = right - low_r + low_mid
+        mid = 0.5 * (left + right)
+        side = 0.5 * (left - right)
+
+    mode = str(cfg.get("mode", "balanced")).lower()
+    width = float(np.clip(cfg.get("stereo_width", 1.0), 0.0, 2.0))
+    front = float(np.clip(cfg.get("front_weight", 0.80), 0.0, 1.5))
+    rear = float(np.clip(cfg.get("rear_amount", 0.35), 0.0, 1.5))
+    side_amount = float(np.clip(cfg.get("side_amount", 0.65), 0.0, 1.5))
+    height = float(np.clip(cfg.get("height_amount", 0.12), 0.0, 1.0))
+    decorrelation = float(np.clip(cfg.get("decorrelation", 0.20), 0.0, 1.0))
+    spread = float(np.clip(cfg.get("source_spread", 0.16), 0.0, 1.0))
+    width_deg = 6.0 + spread * 96.0
+    virtual = np.zeros((frames, len(layout)), dtype=np.float32)
+
+    def add_object(signal, az, el=0.0, gain=1.0, width_scale=1.0):
+        local_width = max(2.0, width_deg * float(width_scale))
+        weights = np.array([
+            math.exp(-0.5 * (angular_distance_deg(layout[idx], (az, el)) / local_width) ** 2)
+            for idx in range(len(layout))
+        ], dtype=np.float64)
+        weights /= math.sqrt(float(np.sum(weights * weights))) + 1e-12
+        virtual[:] += signal[:, None].astype(np.float32) * weights.astype(np.float32)[None, :] * float(gain)
+
+    stereo_angle = 30.0 + width * 35.0
+    center_gain = float(np.clip(cfg.get("center_amount", 0.55), 0.0, 1.5))
+    if mode == "front_focus":
+        rear *= 0.45
+        side_amount *= 0.70
+        center_gain *= 1.25
+        stereo_angle *= 0.78
+    elif mode == "wide_room":
+        rear *= 1.25
+        side_amount *= 1.35
+        stereo_angle *= 1.15
+    elif mode == "height_lift":
+        height = max(height, 0.35)
+        rear *= 0.90
+        side_amount *= 1.05
+
+    add_object(left, stereo_angle, 0.0, 0.82 * front, 0.85)
+    add_object(right, -stereo_angle, 0.0, 0.82 * front, 0.85)
+    add_object(mid, 0.0, 0.0, center_gain * front, 0.75)
+    add_object(-mid, 180.0, 0.0, 0.32 * rear, 1.25)
+    add_object(side, 90.0, 0.0, side_amount, 1.05)
+    add_object(-side, -90.0, 0.0, side_amount, 1.05)
+    if height > 0.0:
+        add_object(mid, 0.0, 52.0, height * 0.55, 1.35)
+        add_object(side, 90.0, 38.0, height * 0.28, 1.25)
+        add_object(-side, -90.0, 38.0, height * 0.28, 1.25)
+
+    if decorrelation > 0.0:
+        diffuse = diffusion_region(virtual, sample_rate, 8.0 + 42.0 * decorrelation, 0.18 + 0.36 * decorrelation, 0.42)
+        blur = virtual_blur_matrix(layout, 18.0 + decorrelation * 92.0)
+        virtual = virtual * (1.0 - 0.45 * decorrelation) + (diffuse @ blur.T) * (0.45 * decorrelation)
+
+    out = (virtual.astype(np.float64) @ encode).astype(np.float32)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out[:, :out_channels], sample_rate)
+    print("Process: Stereo Expand to Ambisonic Bed")
+    print(f"Source interpretation: {source_label}")
+    print(f"Mode: {mode}")
+    print(f"Output: {output_order}OA ACN/SN3D")
+    print(f"Stereo width: {width:.3f}")
+    print(f"Rear amount: {rear:.3f}")
+    print(f"Height amount: {height:.3f}")
+    print(f"Decorrelation: {decorrelation:.3f}")
+    print(f"Bass mono below: {low_hz:.1f} Hz")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+    print(f"Output: {cfg['output_path']}")
+
+
+def render_foafx_object_space(cfg):
+    virtual, encode, layout, sample_rate, output_order, out_channels, source_label = prepare_object_space_virtual(cfg)
+    mode = str(cfg.get("mode", "resonance_bloom")).lower()
+    dry_level = float(np.clip(cfg.get("dry_level", 0.35), 0.0, 1.5))
+    space_amount = float(np.clip(cfg.get("space_amount", 0.85), 0.0, 2.0))
+    object_clarity = float(np.clip(cfg.get("object_clarity", 0.55), 0.0, 1.0))
+    spread_deg = float(np.clip(cfg.get("spread_deg", 42.0), 1.0, 180.0))
+    motion = float(np.clip(cfg.get("motion", 0.35), 0.0, 1.0))
+    resonance_hz = float(np.clip(cfg.get("resonance_hz", 220.0), 30.0, 6000.0))
+    feedback = float(np.clip(cfg.get("feedback", 0.35), 0.0, 0.92))
+    smear = float(np.clip(cfg.get("smear", 0.45), 0.0, 1.0))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+
+    blur = virtual_blur_matrix(layout, spread_deg)
+    dry = virtual * dry_level * object_clarity
+    center = virtual - one_pole_lowpass(virtual, sample_rate, 45.0)
+
+    if mode == "spatial_occupation":
+        field = spectral_smear_region(center, 4 + int(round(smear * 18)), smear)
+        field = diffusion_region(field, sample_rate, 10.0 + spread_deg * 0.22, feedback, 0.45)
+        field = rotate_virtual_blocks(field @ blur.T, motion, rng, "stepped")
+        dry *= 0.45 + object_clarity * 0.55
+    elif mode == "motion_counterpoint":
+        low = one_pole_lowpass(virtual, sample_rate, max(80.0, resonance_hz))
+        mid = biquad_bandpass(virtual, sample_rate, resonance_hz * 2.0, 3.0 + smear * 12.0)
+        high = virtual - one_pole_lowpass(virtual, sample_rate, min(sample_rate * 0.42, resonance_hz * 4.0))
+        field = (rotate_virtual_blocks(low, motion * 0.45, rng, "smooth") +
+                 rotate_virtual_blocks(mid, motion * 0.75, rng, "counterpoint") +
+                 rotate_virtual_blocks(high, motion, rng, "stepped")) / 3.0
+        field = diffusion_region(field @ blur.T, sample_rate, 6.0 + spread_deg * 0.10, feedback * 0.55, 0.35)
+    elif mode == "spatial_allusion":
+        field = biquad_bandpass(virtual, sample_rate, resonance_hz, 1.2 + smear * 6.0)
+        field = spectral_smear_region(field, 8 + int(round(smear * 28)), 0.55 + 0.4 * smear)
+        field = diffusion_region(field @ blur.T, sample_rate, 22.0 + spread_deg * 0.28, feedback, 0.72)
+        field = rotate_virtual_blocks(field, motion * 0.5, rng, "smooth")
+        dry *= object_clarity * 0.55
+    else:
+        resonant = comb_resonator(biquad_bandpass(center, sample_rate, resonance_hz, 2.0 + smear * 12.0),
+                                  sample_rate, resonance_hz, feedback, 0.55 + 0.30 * smear)
+        field = spectral_smear_region(resonant, 6 + int(round(smear * 24)), smear)
+        field = diffusion_region(field @ blur.T, sample_rate, 14.0 + spread_deg * 0.18, feedback * 0.85, 0.62)
+        field = rotate_virtual_blocks(field, motion * 0.6, rng, "smooth")
+
+    virtual_out = dry + field * space_amount
+    out = (virtual_out.astype(np.float64) @ encode).astype(np.float32)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out[:, :out_channels], sample_rate)
+    print("Process: 3OAFX Object Space")
+    print(f"Mode: {mode}")
+    print(f"Source interpretation: {source_label}")
+    print(f"Output: {output_order}OA ACN/SN3D")
+    print(f"Virtual directions: {len(layout)}")
+    print(f"Spread: {spread_deg:.2f} deg")
+    print(f"Motion: {motion:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+    print(f"Output: {cfg['output_path']}")
+
+
+def render_foafx_spatial_occupation_montage(cfg):
+    output_order = max(1, min(3, int(cfg.get("output_order", 3))))
+    out_channels = (output_order + 1) * (output_order + 1)
+    layout = foafx_layout(output_order)
+    basis_out = np.array([ambisonic_basis(output_order, az, el) for az, el in layout], dtype=np.float64)
+    encode = np.linalg.pinv(basis_out).T
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    duration = max(0.25, float(cfg.get("duration", 20.0)))
+    frames = max(1, int(round(duration * sample_rate)))
+    out_virtual = np.zeros((frames, len(layout)), dtype=np.float32)
+    event_count = int(max(1, min(20000, cfg.get("events", 180))))
+    min_ms = float(np.clip(cfg.get("min_segment_ms", 80.0), 5.0, 10000.0))
+    max_ms = max(min_ms, float(np.clip(cfg.get("max_segment_ms", 900.0), min_ms, 30000.0)))
+    density = float(np.clip(cfg.get("density", 0.72), 0.0, 1.0))
+    overlap = float(np.clip(cfg.get("overlap", 0.55), 0.0, 1.0))
+    source_spread = float(np.clip(cfg.get("source_spread", 0.22), 0.0, 1.0))
+    occupation = float(np.clip(cfg.get("occupation", 0.72), 0.0, 1.0))
+    motion = float(np.clip(cfg.get("motion", 0.35), 0.0, 1.0))
+    stereo_expand = bool(cfg.get("stereo_expand", True))
+    source_format = str(cfg.get("source_format", "auto")).lower()
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+    paths = [line for line in str(cfg.get("source_paths", "")).splitlines() if line.strip()]
+    starts = [float(x) for x in str(cfg.get("source_starts", "")).split(",") if x.strip()]
+    durations = [float(x) for x in str(cfg.get("source_durations", "")).split(",") if x.strip()]
+    if not paths:
+        raise RuntimeError("No source paths were provided.")
+
+    sources = []
+    labels = []
+    for idx, path in enumerate(paths):
+        data, source_rate = read_wav(path)
+        start = starts[idx] if idx < len(starts) else 0.0
+        src_dur = durations[idx] if idx < len(durations) else data.shape[0] / max(1, source_rate)
+        audio = segment(data, source_rate, start, src_dur, sample_rate)
+        if source_format == "auto":
+            order = exact_ambisonic_order_from_channels(audio.shape[1])
+        elif source_format == "non_ambisonic":
+            order = 0
+        elif source_format in ("1oa", "foa"):
+            order = 1
+        elif source_format == "2oa":
+            order = 2
+        elif source_format == "3oa":
+            order = 3
+        else:
+            order = 0
+        if order > 0:
+            needed = (order + 1) * (order + 1)
+            if audio.shape[1] < needed:
+                raise RuntimeError(f"Source {idx + 1} needs {needed} channels for selected source format.")
+            basis_src = np.array([ambisonic_basis(order, az, el) for az, el in layout], dtype=np.float64)
+            virtual = (audio[:, :needed].astype(np.float64) @ basis_src.T).astype(np.float32)
+            labels.append(f"{idx + 1}:{order}OA")
+        else:
+            virtual = non_ambisonic_to_virtual(audio, layout, source_spread, stereo_expand)
+            labels.append(f"{idx + 1}:non-ambi {audio.shape[1]}ch")
+        if virtual.shape[0] > 8:
+            sources.append(virtual)
+    if not sources:
+        raise RuntimeError("Sources were too short for montage rendering.")
+
+    blur = virtual_blur_matrix(layout, 12.0 + occupation * 118.0)
+    accepted = 0
+    for event in range(event_count):
+        if rng.random() > density:
+            continue
+        src = sources[int(rng.integers(0, len(sources)))]
+        seg_frames = int(round(rng.uniform(min_ms, max_ms) * sample_rate / 1000.0))
+        seg_frames = max(8, min(seg_frames, src.shape[0], frames))
+        if seg_frames <= 8:
+            continue
+        out_start = int(round(rng.random() * max(1, frames - seg_frames)))
+        src_start = int(round(rng.random() * max(1, src.shape[0] - seg_frames)))
+        grain = src[src_start:src_start + seg_frames].copy()
+        if motion > 0.0:
+            grain = rotate_virtual_blocks(grain, motion * rng.random(), rng, "counterpoint" if event % 3 else "stepped")
+        if occupation > 0.0:
+            grain = grain @ blur.T
+        window = np.hanning(seg_frames).astype(np.float32)
+        gain = (0.30 + 0.70 * rng.random()) / math.sqrt(max(1.0, event_count * (0.35 + overlap)))
+        out_virtual[out_start:out_start + seg_frames] += grain * window[:, None] * gain
+        accepted += 1
+
+    out = (out_virtual.astype(np.float64) @ encode).astype(np.float32)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out[:, :out_channels], sample_rate)
+    print("Process: 3OAFX Spatial Occupation Montage")
+    print(f"Sources: {len(sources)} ({', '.join(labels)})")
+    print(f"Output: {output_order}OA ACN/SN3D")
+    print(f"Duration: {duration:.2f} sec")
+    print(f"Events requested/used: {event_count}/{accepted}")
+    print(f"Stereo expansion: {'on' if stereo_expand else 'off'}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+    print(f"Output: {cfg['output_path']}")
+
+
+def parse_float_list(text, fallback=None):
+    values = []
+    for part in str(text or "").replace("\n", ",").split(","):
+        part = part.strip()
+        if part:
+            try:
+                values.append(float(part))
+            except ValueError:
+                pass
+    if values:
+        return values
+    return list(fallback or [])
+
+
+def parse_point_rows(text, width, fallback_rows):
+    rows = []
+    for row in str(text or "").split(";"):
+        row = row.strip()
+        if not row:
+            continue
+        vals = parse_float_list(row)
+        if len(vals) >= width:
+            rows.append(vals[:width])
+    return rows if rows else [list(row[:width]) for row in fallback_rows]
+
+
+def loop_or_trim_audio(audio, frames):
+    frames = int(max(1, frames))
+    if audio.shape[0] == frames:
+        return audio.astype(np.float32, copy=False)
+    if audio.shape[0] <= 0:
+        return np.zeros((frames, audio.shape[1]), dtype=np.float32)
+    if audio.shape[0] > frames:
+        return audio[:frames].astype(np.float32, copy=False)
+    reps = int(math.ceil(frames / max(1, audio.shape[0])))
+    tiled = np.tile(audio, (reps, 1))
+    return tiled[:frames].astype(np.float32, copy=False)
+
+
+def seamless_loop_or_trim_audio(audio, frames, sample_rate, crossfade_ms=80.0):
+    frames = int(max(1, frames))
+    audio = audio.astype(np.float32, copy=False)
+    if audio.shape[0] <= 0:
+        return np.zeros((frames, audio.shape[1]), dtype=np.float32)
+    if audio.shape[0] >= frames:
+        return audio[:frames].astype(np.float32, copy=False)
+    source_frames = int(audio.shape[0])
+    fade = int(round(float(crossfade_ms) * sample_rate / 1000.0))
+    fade = max(0, min(fade, source_frames // 3, frames // 3))
+    if fade < 4:
+        reps = int(math.ceil(frames / max(1, source_frames)))
+        return np.tile(audio, (reps, 1))[:frames].astype(np.float32, copy=False)
+
+    body_len = max(1, source_frames - fade)
+    out = np.zeros((frames, audio.shape[1]), dtype=np.float32)
+    norm = np.zeros(frames, dtype=np.float32)
+    win = np.ones(source_frames, dtype=np.float32)
+    ramp = np.linspace(0.0, 1.0, fade, endpoint=False, dtype=np.float32)
+    win[:fade] = ramp
+    win[-fade:] = ramp[::-1]
+
+    pos = -fade
+    while pos < frames:
+        src_start = 0
+        dst_start = pos
+        dst_end = pos + source_frames
+        if dst_start < 0:
+            src_start = -dst_start
+            dst_start = 0
+        if dst_end > frames:
+            dst_end = frames
+        count = dst_end - dst_start
+        if count > 0:
+            segment = audio[src_start:src_start + count]
+            weights = win[src_start:src_start + count]
+            out[dst_start:dst_end] += segment * weights[:, None]
+            norm[dst_start:dst_end] += weights
+        pos += body_len
+    out /= np.maximum(norm[:, None], 1e-8)
+    return out.astype(np.float32, copy=False)
+
+
+def interp_path_rows(rows, t):
+    if not rows:
+        return [0.0] * 7
+    if len(rows) == 1:
+        return rows[0]
+    t = float(np.clip(t, 0.0, 1.0))
+    ordered = sorted(rows, key=lambda row: float(row[6]) if len(row) > 6 else 0.0)
+    if t <= float(ordered[0][6]):
+        return ordered[0]
+    for idx in range(len(ordered) - 1):
+        a = ordered[idx]
+        b = ordered[idx + 1]
+        at = float(a[6]) if len(a) > 6 else idx / max(1, len(ordered) - 1)
+        bt = float(b[6]) if len(b) > 6 else (idx + 1) / max(1, len(ordered) - 1)
+        if t <= bt:
+            span = max(1e-9, bt - at)
+            frac = float(np.clip((t - at) / span, 0.0, 1.0))
+            out = []
+            for col in range(min(len(a), len(b))):
+                if col in (3, 4, 5):
+                    diff = ((b[col] - a[col] + 180.0) % 360.0) - 180.0
+                    out.append(a[col] + diff * frac)
+                elif col == 6:
+                    out.append(t)
+                else:
+                    out.append(a[col] * (1.0 - frac) + b[col] * frac)
+            return out
+    return ordered[-1]
+
+
+def path_facing_orientation(rows, t):
+    before = interp_path_rows(rows, max(0.0, float(t) - 0.006))
+    after = interp_path_rows(rows, min(1.0, float(t) + 0.006))
+    dx = after[0] - before[0]
+    dy = after[1] - before[1]
+    dz = after[2] - before[2]
+    horiz = math.sqrt(dx * dx + dy * dy)
+    if horiz < 1e-8 and abs(dz) < 1e-8:
+        return 0.0, 0.0, 0.0
+    yaw = -math.degrees(math.atan2(dx, dy))
+    pitch = math.degrees(math.atan2(dz, max(1e-8, horiz)))
+    return yaw, max(-90.0, min(90.0, pitch)), 0.0
+
+
+def aed_from_unit(vec):
+    x, y, z = float(vec[0]), float(vec[1]), float(vec[2])
+    hyp = max(1e-12, math.sqrt(x * x + y * y))
+    return math.degrees(math.atan2(y, x)), math.degrees(math.atan2(z, hyp))
+
+
+def rotate_direction_aed(az_deg, el_deg, yaw_deg, pitch_deg, roll_deg):
+    vec = unit_from_aed(az_deg, el_deg)
+    yaw = math.radians(float(yaw_deg))
+    pitch = math.radians(float(pitch_deg))
+    roll = math.radians(float(roll_deg))
+    cy, sy = math.cos(yaw), math.sin(yaw)
+    cp, sp = math.cos(pitch), math.sin(pitch)
+    cr, sr = math.cos(roll), math.sin(roll)
+    rz = np.array([[cy, -sy, 0.0], [sy, cy, 0.0], [0.0, 0.0, 1.0]], dtype=np.float64)
+    ry = np.array([[cp, 0.0, sp], [0.0, 1.0, 0.0], [-sp, 0.0, cp]], dtype=np.float64)
+    rx = np.array([[1.0, 0.0, 0.0], [0.0, cr, -sr], [0.0, sr, cr]], dtype=np.float64)
+    return aed_from_unit(rz @ ry @ rx @ vec)
+
+
+def orientation_remap_matrix(layout, yaw_deg, pitch_deg, roll_deg, spread_deg):
+    width = max(1.0, float(spread_deg))
+    count = len(layout)
+    matrix = np.zeros((count, count), dtype=np.float64)
+    for dst, (az, el) in enumerate(layout):
+        target = rotate_direction_aed(az, el, yaw_deg, pitch_deg, roll_deg)
+        for src in range(count):
+            dist = angular_distance_deg(layout[src], target)
+            matrix[dst, src] = math.exp(-0.5 * (dist / width) ** 2)
+        norm = math.sqrt(float(np.sum(matrix[dst] * matrix[dst]))) + 1e-12
+        matrix[dst] /= norm
+    return matrix.astype(np.float32)
+
+
+def render_foafx_scene_navigator(cfg):
+    output_order = max(1, min(3, int(cfg.get("output_order", 3))))
+    source_order = max(1, min(3, int(cfg.get("source_order", 3))))
+    source_channels = (source_order + 1) * (source_order + 1)
+    out_channels = (output_order + 1) * (output_order + 1)
+    layout = foafx_layout(output_order)
+    basis_out = np.array([ambisonic_basis(output_order, az, el) for az, el in layout], dtype=np.float64)
+    encode = np.linalg.pinv(basis_out).T
+    basis_src = np.array([ambisonic_basis(source_order, az, el) for az, el in layout], dtype=np.float64)
+
+    paths = [line.strip() for line in str(cfg.get("source_paths", "")).splitlines() if line.strip()]
+    starts = parse_float_list(cfg.get("source_starts", ""), [0.0] * len(paths))
+    durations = parse_float_list(cfg.get("source_durations", ""), [0.0] * len(paths))
+    if not paths:
+        raise RuntimeError("No source paths were provided.")
+
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    duration = max(0.05, float(cfg.get("duration", 10.0)))
+    frames = max(1, int(round(duration * sample_rate)))
+    node_rows = parse_point_rows(cfg.get("node_positions", ""), 4, [])
+    if not node_rows:
+        legacy_nodes = parse_point_rows(cfg.get("node_positions", ""), 3, [])
+        node_rows = [list(row[:3]) + [1.0] for row in legacy_nodes]
+    if len(node_rows) < len(paths):
+        for idx in range(len(node_rows), len(paths)):
+            angle = 2.0 * math.pi * idx / max(1, len(paths))
+            node_rows.append([math.cos(angle), math.sin(angle), 0.0, 1.0])
+    path_rows = parse_point_rows(cfg.get("path_points", ""), 7, [
+        [-0.85, -0.55, 0.0, 0.0, 0.0, 0.0, 0.0],
+        [-0.25, 0.35, 0.15, 35.0, 0.0, 0.0, 0.33],
+        [0.35, -0.15, -0.10, -35.0, 0.0, 0.0, 0.66],
+        [0.85, 0.55, 0.0, 0.0, 0.0, 0.0, 1.0],
+    ])
+
+    influence = max(0.05, float(cfg.get("influence_radius", 1.25)))
+    falloff = max(0.2, float(cfg.get("distance_falloff", 1.4)))
+    sharpness = max(0.1, float(cfg.get("blend_sharpness", 1.2)))
+    perspective = float(np.clip(cfg.get("perspective_rotation", 0.80), 0.0, 1.0))
+    near_blur = float(np.clip(cfg.get("near_field_blur", 0.25), 0.0, 1.0))
+    motion_smoothing = float(np.clip(cfg.get("motion_smoothing", 0.35), 0.0, 0.98))
+    height_sensitivity = float(np.clip(cfg.get("height_sensitivity", 0.65), 0.0, 2.0))
+    loop_crossfade_ms = float(np.clip(cfg.get("loop_crossfade_ms", 80.0), 0.0, 2000.0))
+    output_gain = 10.0 ** (float(cfg.get("output_gain_db", 0.0)) / 20.0)
+    mode = str(cfg.get("navigation_mode", "blend")).lower()
+    orientation_mode = str(cfg.get("orientation_mode", "path")).lower()
+    block = int(max(128, min(8192, cfg.get("block_size", 1024))))
+
+    sources = []
+    labels = []
+    for idx, path in enumerate(paths):
+        data, source_rate = read_wav(path)
+        start = starts[idx] if idx < len(starts) else 0.0
+        src_dur = durations[idx] if idx < len(durations) and durations[idx] > 0.0 else data.shape[0] / max(1, source_rate)
+        audio = segment(data, source_rate, start, src_dur, sample_rate)
+        if audio.shape[1] < source_channels:
+            raise RuntimeError(f"Source {idx + 1} has {audio.shape[1]} channels, but {source_order}OA needs {source_channels}.")
+        audio = seamless_loop_or_trim_audio(audio[:, :source_channels], frames, sample_rate, loop_crossfade_ms)
+        virtual = (audio.astype(np.float64) @ basis_src.T).astype(np.float32)
+        sources.append(virtual)
+        labels.append(os.path.basename(path))
+    if not sources:
+        raise RuntimeError("No usable source files were found.")
+
+    out_virtual = np.zeros((frames, len(layout)), dtype=np.float32)
+    previous_weights = None
+    previous_matrix = None
+    max_active = 0
+    min_distance_seen = 1e9
+
+    for start in range(0, frames, block):
+        end = min(frames, start + block)
+        t = (start + end) * 0.5 / max(1, frames)
+        row = interp_path_rows(path_rows, t)
+        lx, ly, lz = row[0], row[1], row[2]
+        if orientation_mode == "manual":
+            yaw, pitch, roll = row[3], row[4], row[5]
+        else:
+            yaw, pitch, roll = path_facing_orientation(path_rows, t)
+        distances = []
+        raw = []
+        effective_radii = []
+        for node in node_rows[:len(sources)]:
+            dx = node[0] - lx
+            dy = node[1] - ly
+            dz = (node[2] - lz) * height_sensitivity
+            distance = math.sqrt(dx * dx + dy * dy + dz * dz)
+            min_distance_seen = min(min_distance_seen, distance)
+            distances.append(distance)
+            local_influence = max(0.02, influence * (node[3] if len(node) > 3 else 1.0))
+            effective_radii.append(local_influence)
+            if mode == "nearest":
+                raw.append(0.0)
+            else:
+                raw.append(math.exp(-((distance / local_influence) ** falloff) * sharpness))
+        if mode == "nearest":
+            nearest = int(np.argmin(np.array(distances)))
+            raw = [1.0 if i == nearest else 0.0 for i in range(len(sources))]
+        weights = np.array(raw, dtype=np.float64)
+        if np.sum(weights) <= 1e-12:
+            nearest = int(np.argmin(np.array(distances)))
+            weights[nearest] = 1.0
+        weights /= math.sqrt(float(np.sum(weights * weights))) + 1e-12
+        if previous_weights is not None and motion_smoothing > 0.0:
+            weights = previous_weights * motion_smoothing + weights * (1.0 - motion_smoothing)
+            weights /= math.sqrt(float(np.sum(weights * weights))) + 1e-12
+        previous_weights = weights
+        max_active = max(max_active, int(np.sum(weights > 0.05)))
+
+        nearest_margin = max(0.0, min([r - d for r, d in zip(effective_radii, distances)] or [0.0]))
+        spread = 7.0 + near_blur * 58.0 + min(40.0, nearest_margin * 8.0)
+        matrix = orientation_remap_matrix(layout, yaw * perspective, pitch * perspective, roll * perspective, spread)
+        if previous_matrix is not None and motion_smoothing > 0.0:
+            matrix = previous_matrix * motion_smoothing + matrix * (1.0 - motion_smoothing)
+        previous_matrix = matrix
+
+        mixed = np.zeros((end - start, len(layout)), dtype=np.float32)
+        for idx, src in enumerate(sources):
+            if weights[idx] > 1e-5:
+                mixed += src[start:end] * float(weights[idx])
+        out_virtual[start:end] = mixed @ matrix.T
+
+    out = (out_virtual.astype(np.float64) @ encode).astype(np.float32) * output_gain
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("soft_limit", True)):
+        peak = float(np.max(np.abs(out))) if out.size else 0.0
+        if peak > 1.0:
+            ceiling = 0.92
+            out = (ceiling * np.tanh(out / ceiling)).astype(np.float32)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out[:, :out_channels], sample_rate)
+    print("Process: 3OAFX Scene Navigator")
+    print(f"Sources: {len(sources)}")
+    print(f"Source order: {source_order}OA")
+    print(f"Output: {output_order}OA ACN/SN3D")
+    print(f"Duration: {duration:.2f} sec")
+    print(f"Navigation mode: {mode}")
+    print(f"Head orientation: {orientation_mode}")
+    print(f"Source loop crossfade: {loop_crossfade_ms:.1f} ms")
+    print(f"Path points: {len(path_rows)}")
+    print(f"Global node radius: {influence:.3f}")
+    print(f"Node radius multipliers: {', '.join([f'{(row[3] if len(row) > 3 else 1.0):.2f}' for row in node_rows[:len(sources)]])}")
+    print(f"Max active nodes: {max_active}")
+    print(f"Closest listener-node distance: {min_distance_seen:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+    print(f"Output: {cfg['output_path']}")
 
 
 def render_foafx_offline(cfg):
@@ -3565,7 +4418,7 @@ def render_midi_form_learner(cfg):
 
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|foafx_offline|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|stereo_expand_ambisonic_bed|foafx_offline|foafx_object_space|foafx_spatial_occupation_montage|foafx_scene_navigator|foafx_object_field_split|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -3585,8 +4438,18 @@ def main():
         render_partial_trace_resynth(cfg)
     elif mode == "fata_morgana":
         render_fata_morgana(cfg)
+    elif mode == "stereo_expand_ambisonic_bed":
+        render_stereo_expand_ambisonic_bed(cfg)
     elif mode == "foafx_offline":
         render_foafx_offline(cfg)
+    elif mode == "foafx_object_space":
+        render_foafx_object_space(cfg)
+    elif mode == "foafx_spatial_occupation_montage":
+        render_foafx_spatial_occupation_montage(cfg)
+    elif mode == "foafx_scene_navigator":
+        render_foafx_scene_navigator(cfg)
+    elif mode == "foafx_object_field_split":
+        render_foafx_object_field_split(cfg)
     elif mode == "foafx_profile_subtract":
         render_foafx_profile_subtract(cfg)
     elif mode == "foafx_spectral_profile_tool":

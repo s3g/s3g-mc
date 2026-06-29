@@ -8,8 +8,8 @@ slider4:0<-360,360,0.1>Global azimuth (deg)
 slider5:0<0,90,0.1>Global elevation (deg)
 slider6:0<-3,3,0.01>Global distance offset (dome radius)
 slider7:0<-48,24,0.1>Output gain (dB)
-slider8:0<0,1,1>Reserved 1
-slider9:0<0,1,1>Reserved 2
+slider8:35<0,100,1>Distance diffusion (%)
+slider9:1<0,1,1>Energy preserve
 
 slider10:0<-360,360,0.1>S1 azimuth (deg)
 slider11:0<0,90,0.1>S1 elevation (deg)
@@ -149,19 +149,31 @@ function distance_amp(distance)
   1 / (distance ^ (distance_rolloff_db / 6));
 );
 
+function panlaw_norm(sum_squares)
+(
+  sum_squares < EPS ? 1 : sqrt(sum_squares);
+);
+
+function distance_diffusion_factor(distance)
+(
+  1 + max(0, distance - 1) * distance_diffusion;
+);
+
 function lbap_ring_gain(source_az, speaker_az, step_degrees, layer_gain) local(diff, v)
 (
   layer_gain <= EPS ? (
     0;
   ) : (
     diff = abs_degrees(wrap_degrees(source_az - speaker_az));
+    step_degrees *= distance_focus_factor;
     diff > step_degrees ? (
       0;
     ) : (
       v = cos(diff / step_degrees * $pi / 2);
-      lbap_sharpness == 1 ? layer_gain * v :
-      lbap_sharpness == 2 ? layer_gain * v * v :
-      layer_gain * (v ^ lbap_sharpness);
+      effective_sharpness = max(0.25, lbap_sharpness / distance_focus_factor);
+      effective_sharpness == 1 ? layer_gain * v :
+      effective_sharpness == 2 ? layer_gain * v * v :
+      layer_gain * (v ^ effective_sharpness);
     );
   );
 );
@@ -183,6 +195,8 @@ global_az = slider4;
 global_el = max(0, min(90, slider5));
 global_dist = slider6;
 out_gain = 10 ^ (slider7 / 20);
+distance_diffusion = slider8 / 100;
+energy_preserve = slider9 >= 0.5;
 distance_coef = exp(-1000 / (distance_smoothing_ms * srate));
 gain_coef = exp(-1000 / (distance_smoothing_ms * srate));
 
@@ -231,6 +245,7 @@ loop(NUM_SOURCES,
     source_dist = dist_z[src];
     source_radius = clamp_distance(source_dist);
     source_amp = distance_amp(source_dist);
+    distance_focus_factor = distance_diffusion_factor(source_dist);
     wrapped_az = wrap_degrees(source_az);
 
     w1 = 0; w2 = 0; w3 = 0; w4 = 0;
@@ -257,7 +272,7 @@ loop(NUM_SOURCES,
       spk += 1;
     );
 
-    scale = scale < EPS ? 1 : sqrt(scale);
+    scale = energy_preserve ? panlaw_norm(scale) : 1;
     weighted = input * src_level[src] * source_amp;
     spk = 0;
     loop(NUM_SPEAKERS,

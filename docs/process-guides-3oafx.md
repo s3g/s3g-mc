@@ -9,6 +9,18 @@ next_page:
   title: Spectral / Convolution Guides
   url: /process-guides-spectral.html
 toc:
+  - title: Source Format Convention
+    href: "#source-format-convention"
+  - title: 3OAFX Object Space
+    href: "#3oafx-object-space"
+  - title: 3OAFX Object / Field Split
+    href: "#3oafx-object--field-split"
+  - title: 3OAFX Scene Navigator
+    href: "#3oafx-scene-navigator"
+  - title: 3OAFX Spatial Occupation Montage
+    href: "#3oafx-spatial-occupation-montage"
+  - title: Stereo Expand to Ambisonic Bed
+    href: "#stereo-expand-to-ambisonic-bed"
   - title: 3OAFX Ambisonic Kernel Collage
     href: "#3oafx-ambisonic-kernel-collage"
   - title: 3OAFX Offline Ambisonic Convolve
@@ -26,6 +38,159 @@ toc:
 # 3OAFX Guides
 
 These guides match the Package Browser's 3OAFX group. They cover ambisonic offline rendering, ambisonic convolution, spatial grains, and ambisonic spectral profile tools.
+
+## Source Format Convention
+
+3OAFX processes use `ACN/SN3D` for ambisonic media and rendered ambisonic output. When a process accepts both ambisonic and non-ambisonic material, it should infer the source type from the selected item channel count: `4ch` as 1OA, `10ch` as 2OA using the first 9 channels, and `16ch` as 3OA. A true `9ch` WAV may also be accepted as 2OA. Other channel counts are treated as non-ambisonic source material and encoded into the selected `ACN/SN3D` output order. Processes should also provide an explicit source-format override when ambiguity matters.
+
+When a process follows a specific published idea closely, the relevant guide should say so. Other processes may use published work as historical or conceptual context while extending those ideas into package-specific workflows.
+
+## 3OAFX Object Space
+
+Use this when you want to transform a selected source into an ambisonic object/space relationship. The process accepts either `ACN/SN3D` ambisonic media or non-ambisonic media. In `Auto by channel count`, `4ch`, `10ch`, and `16ch` are interpreted as 1OA, 2OA, and 3OA respectively; true `9ch` WAVs are also accepted as 2OA. Other channel counts are treated as separate source objects and encoded into the selected ambisonic output order.
+
+This process directly draws on Natasha Barrett's distinction between sound-object, sounding space, spatial illusion, spatial allusion, and object-to-resonance transformation. The modes are package-specific extensions of those ideas rather than recreations of a specific Barrett work. Bernhard Leitner's sound-space work is also useful context for hearing sound as architectural material, path, and spatial occupation.
+
+Modes:
+
+- `Resonance bloom` transforms localized object energy into a resonant diffuse field.
+- `Spatial occupation` builds an occupied volume from smeared, distributed source energy.
+- `Motion counterpoint` separates spectral regions into different spatial motion layers.
+- `Spatial allusion` emphasizes partial spatial cues, resonance, and ambiguity rather than a plausible room model.
+
+Start conservatively:
+
+1. Select one WAV-backed media item.
+2. Leave `Source format` on `Auto by channel count` unless the item is ambiguous.
+3. Choose the target `Output order`.
+4. Start with `Object clarity` around `0.5`, `Space amount` below `1.0`, and `Peak normalize` enabled.
+
+For non-ambisonic sources, `Source object spread` controls how broadly each input channel is encoded into the virtual direction layer before the object-space process. For ambisonic sources, the selected order is decoded to the virtual direction layer, transformed, and re-encoded to `ACN/SN3D`.
+
+## 3OAFX Object / Field Split
+
+Use this when you want to separate an ambisonic recording into a foreground
+object stream and a field-like spatial bed. Select one WAV-backed `ACN/SN3D`
+ambisonic item. The renderer decodes it to the 3OAFX directional layer,
+estimates object-like material from transient energy, directional concentration,
+and local spectral contrast, then re-encodes the object and field outputs as new
+ambisonic WAVs.
+
+This first version is automatic. It does not need a reference file. A guided
+variant using object or field reference profiles would be a separate workflow,
+closer to the spectral profile tools.
+
+Starting approach:
+
+1. Select one ambisonic WAV-backed media item.
+2. Choose the source order: `1OA / 4ch`, `2OA / 9ch`, or `3OA / 16ch`.
+3. Leave `Output` on `Both object and field`.
+4. Start with `Object bias` around `0.55`, `Transient weight` and
+   `Directional coherence` around `0.45`, and `Peak normalize` enabled.
+
+Raise `Transient weight` when attacks should be captured as object material.
+Raise `Directional coherence` when focused directional energy should stay in the
+object stream. Raise `Field smoothing` when the bed should be broader and less
+edge-like. `Object / field crossfade` prevents the two outputs from becoming too
+binary.
+
+## 3OAFX Scene Navigator
+
+Use this when you want several ambisonic recordings to behave like soundfield
+nodes on a navigable scene surface. Select two or more WAV-backed `ACN/SN3D`
+ambisonic media items. Each item becomes a draggable node in the map. Node size
+is editable: larger nodes keep influence over a wider area, while smaller nodes
+make tighter zones. The listener path is drawn through those nodes with editable
+XYZ position and normalized time breakpoints. By default, the listener head
+faces the direction of travel. A manual AED orientation mode is available when
+yaw, pitch, and roll should be controlled independently from the trajectory. The
+editor includes a visual preview transport so the trajectory and head direction
+can be checked before rendering. The renderer writes a new ambisonic WAV
+representing that traversal.
+
+This is a scene-interpolation and perspective-traversal process. It should not
+be read as literal physical six-degrees-of-freedom translation inside a single
+ambisonic recording. Instead, it composes a path through multiple encoded
+soundfields by decoding each selected file to the same 3OAFX direction layer,
+weighting nearby nodes, rotating the virtual field from the listener
+perspective, and re-encoding the result.
+
+Starting approach:
+
+1. Select two or more same-order ambisonic WAV-backed items.
+2. Leave `Source order` and `Output order` at `3OA / 16ch` for third-order
+   material.
+3. Drag the blue node spheres to arrange the selected files on the scene map.
+4. Drag the purple/red path points to define the listener trajectory. Leave
+   `Head orientation` on `Face trajectory` unless independent head movement is
+   needed.
+5. Start with `Blend field`, `Global node radius` around `1.25`,
+   `Perspective rotation` around `0.8`, and `Peak normalize` enabled.
+
+The scene viewer has `3/4`, `Top`, and `Side` camera presets plus camera
+azimuth/elevation controls. `Top` is best for placing nodes and path points
+across X/Y. `Side` is useful for height changes because dragging edits X/Z.
+`3/4` gives the clearest overview of the node field and listener trajectory.
+
+If the render duration is longer than one or more selected media items, those
+sources are looped under the hood with `Source loop crossfade ms`. This keeps
+the listener trajectory independent from file length: each selected soundfield
+can remain available as a node and becomes audible when the path enters its
+area.
+
+`Global node radius`, the selected node's `Node radius`, `Distance falloff`, and
+`Blend sharpness` determine how quickly the renderer moves from one soundfield
+node to another. When the listener trajectory moves outside a node, that node
+rolls off by distance rather than switching off abruptly. `Near-field blur`
+softens transitions close to nodes. `Height sensitivity` controls how strongly
+Z-distance affects node weighting. `Perspective rotation` controls how strongly
+the listener's derived or manual head orientation rotates the decoded direction
+layer.
+The `Time` value on each listener breakpoint controls traversal pacing:
+breakpoints placed close together in time move quickly, while wider spacing
+slows that part of the path.
+
+## 3OAFX Spatial Occupation Montage
+
+Use this to create an ambisonic montage from one or more selected WAV-backed media items. The process fragments the selected sources into overlapping events, distributes those events through a virtual direction layer, and re-encodes the result as `ACN/SN3D` ambisonic output.
+
+The source-format convention is the same as `3OAFX Object Space`: `4ch`, `10ch`, and `16ch` are treated as 1OA, 2OA, and 3OA in `Auto by channel count`, with true `9ch` WAVs also accepted as 2OA. Other channel counts are treated as non-ambisonic source objects.
+
+The optional stereo expansion is informed by Michael Gerzon's writing on deriving surround information from two-channel stereo. In this process it is used as a practical source-expansion step: stereo material contributes left/right object cues plus mid/side-derived front, rear, and side occupation cues before ambisonic encoding. It is not intended as a strict decoder for a historical matrix format.
+
+Starting approach:
+
+1. Select one or more WAV-backed source items.
+2. Leave `Source format` on `Auto by channel count` unless the items need an override.
+3. Choose the target `Output order`.
+4. Start with `Events` around `180`, `Spatial occupation` around `0.7`, and `Peak normalize` enabled.
+
+`Event density` controls how many requested events are admitted. `Min segment ms` and `Max segment ms` set the fragment size range. `Spatial occupation` spreads each event through the virtual direction layer, while `Spatial motion` rotates or offsets event material over short blocks. Dense settings and long segments can build level quickly, so normalization is recommended while exploring.
+
+## Stereo Expand to Ambisonic Bed
+
+Use this when you want mono or stereo source material to become an ambisonic bed
+for later 3OAFX processing. The renderer writes a new `ACN/SN3D` 1OA, 2OA, or
+3OA WAV. Mono sources are treated as a center object. Stereo sources are split
+into left/right plus mid/side cues, then distributed as front, side, rear, and
+optional height material before ambisonic encoding.
+
+This process is informed by Michael Gerzon's work on deriving surround
+information from two-channel stereo, but it is a package-specific expansion
+tool rather than a decoder for a named matrix format.
+
+Starting approach:
+
+1. Select one WAV-backed mono or stereo media item.
+2. Choose the target `Output order`.
+3. Start with `Balanced bed`, `Stereo width` near `1.0`, and `Peak normalize`
+   enabled.
+4. Raise `Rear amount`, `Side amount`, or `Height amount` to make a broader bed.
+
+`Decorrelation` adds diffuse support to the derived field. `Source spread`
+controls how tightly the derived components land on the virtual direction layer.
+`Bass mono below Hz` centers low frequencies before expansion, useful when the
+output will later be folded down or decoded to compact speaker layouts.
 
 ## 3OAFX Ambisonic Kernel Collage
 

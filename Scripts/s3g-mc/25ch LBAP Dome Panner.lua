@@ -209,6 +209,8 @@ local PARAM = {
   global_el = 4,
   global_dist = 5,
   out_gain = 6,
+  distance_diffusion = 7,
+  energy_preserve = 8,
 }
 
 local function source_param(source_index, offset)
@@ -928,7 +930,9 @@ local function loop()
         if ImGui.CollapsingHeader(ctx, "Global", nil, ImGui.TreeNodeFlags_DefaultOpen) then
           slider_double(track, fx, "LBAP sharpness", PARAM.sharpness, 0.25, 4, "%.2f", spatial_writes)
           slider_double(track, fx, "Distance rolloff", PARAM.rolloff, 0, 48, "%.1f dB/oct", spatial_writes)
+          slider_double(track, fx, "Distance diffusion", PARAM.distance_diffusion, 0, 100, "%.0f%%", spatial_writes)
           slider_double(track, fx, "Motion smoothing", PARAM.smoothing, 1, 250, "%.0f ms", spatial_writes)
+          toggle_param(track, fx, "Energy preserve", PARAM.energy_preserve, spatial_writes)
           slider_double(track, fx, "Global azimuth (deg)", PARAM.global_az, -360, 360, "%.1f", spatial_writes)
           slider_double(track, fx, "Global elevation (deg)", PARAM.global_el, 0, 90, "%.1f", spatial_writes)
           slider_double(track, fx, "Global distance offset (dome radius)", PARAM.global_dist, -3, 3, "%.2f", spatial_writes)

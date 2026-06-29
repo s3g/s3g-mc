@@ -9,7 +9,7 @@ slider5:0<-360,360,0.1>Global azimuth (deg)
 slider6:0<-90,90,0.1>Global elevation (deg)
 slider7:0<-3,3,0.01>Global distance offset (radius)
 slider8:0<-48,24,0.1>Output gain (dB)
-slider9:0<0,1,1>Reserved
+slider9:35<0,100,1>Distance diffusion (%)
 
 slider10:0<-360,360,0.1>S1 azimuth (deg)
 slider11:0<-90,90,0.1>S1 elevation (deg)
@@ -206,6 +206,16 @@ function distance_amp(distance)
   1 / (distance ^ (distance_rolloff_db / 6));
 );
 
+function panlaw_norm(sum_squares)
+(
+  sum_squares < EPS ? 1 : sqrt(sum_squares);
+);
+
+function distance_diffusion_factor(distance)
+(
+  1 + max(0, distance - 1) * distance_diffusion;
+);
+
 function flat_elevation_amp(elevation_degrees) local(v, effective_distance)
 (
   layout_flat ? (
@@ -223,7 +233,7 @@ local(dx, dy, dz, dist, v)
   dz = source_z - spk_z[speaker_index];
   dist = sqrt(dx * dx + dy * dy + dz * dz);
   v = dist + 0.04;
-  1 / (v ^ layout_focus);
+  1 / (v ^ max(0.25, layout_focus / distance_focus_factor));
 );
 
 function clear_smooth_gains() local(i)
@@ -251,6 +261,7 @@ global_az = slider5;
 global_el = max(-90, min(90, slider6));
 global_dist = slider7;
 out_gain = 10 ^ (slider8 / 20);
+distance_diffusion = slider9 / 100;
 distance_coef = exp(-1000 / (distance_smoothing_ms * srate));
 gain_coef = exp(-1000 / (distance_smoothing_ms * srate));
 
@@ -306,6 +317,7 @@ loop(NUM_SOURCES,
     source_dist = dist_z[src];
     source_radius = clamp_distance(source_dist);
     source_amp = distance_amp(source_dist) * flat_elevation_amp(source_el);
+    distance_focus_factor = distance_diffusion_factor(source_dist);
     wrapped_az = wrap_degrees(source_az);
     source_azr = wrapped_az * deg2rad;
     source_elr = source_el * deg2rad;
@@ -322,7 +334,7 @@ loop(NUM_SOURCES,
       spk += 1;
     );
 
-    scale = scale < EPS ? 1 : sqrt(scale);
+    scale = panlaw_norm(scale);
     weighted = input * src_level[src] * source_amp;
     spk = 0;
     loop(layout_channels,

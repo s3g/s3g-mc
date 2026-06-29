@@ -7,8 +7,8 @@ It includes Lua actions, ReaImGui controllers, and JSFX for channel editing,
 automation, fold-down monitoring, dome panning, 3OA send/return routing, and
 render-based multichannel processes.
 
-Current package snapshot: the browser exposes 94 user-facing tools/controllers
-plus the Package Browser. Of those, 37 are Python/NumPy-backed offline
+Current package snapshot: the browser exposes 99 user-facing tools/controllers
+plus the Package Browser. Of those, 42 are Python/NumPy-backed offline
 processes, 36 are Lua/ReaImGui REAPER actions, and 21 load, control, or render
 included JSFX. The repository also ships 20 underlying JSFX engine/effect files.
 The Lua folder also includes helper libraries and internal dialogs that are not
@@ -152,6 +152,20 @@ for the ambisonic send/return workflow.
   ambisonic source, with mixed-order kernel adaptation.
 - `3OAFX Offline Renderer`: NumPy-backed ambisonic decode/process/re-encode
   action for 1OA, 2OA, and 3OA media, with moving AED focus and dry attenuation.
+- `3OAFX Object Space`: NumPy-backed object-to-space render for ambisonic or
+  non-ambisonic source material, with resonance bloom, spatial occupation,
+  motion counterpoint, and spatial allusion modes.
+- `3OAFX Object / Field Split`: automatic NumPy-backed split of an ambisonic
+  source into object-like foreground and field-like spatial bed outputs.
+- `3OAFX Scene Navigator`: multi-source ambisonic scene surface where selected
+  soundfield files become nodes and an editable listener path renders a new
+  perspective traversal.
+- `3OAFX Spatial Occupation Montage`: event montage from one or more source
+  items into ACN/SN3D ambisonic space, with source-format inference and stereo
+  sum/difference expansion for non-ambisonic stereo sources.
+- `Stereo Expand to Ambisonic Bed`: NumPy-backed mono/stereo source expansion
+  to 1OA, 2OA, or 3OA ACN/SN3D, deriving front, side, rear, and optional height
+  cues from left/right and mid/side material.
 - `3OAFX Offline Ambisonic Convolve`: NumPy-backed ambisonic convolution. It
   can convolve one ambisonic source with one same-order ambisonic IR, or use
   direction-accurate IR banks for P-format first order and 8-direction 2OA/3OA,

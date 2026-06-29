@@ -142,6 +142,7 @@ local PARAM = {
   global_el = 5,
   global_dist = 6,
   out_gain = 7,
+  distance_diffusion = 8,
 }
 
 local function source_param(source_index, offset)
@@ -827,6 +828,7 @@ local function loop()
           layout_combo(track, fx)
           slider_double(track, fx, "Layout focus", PARAM.focus, 0.25, 4, "%.2f", spatial_writes)
           slider_double(track, fx, "Distance rolloff", PARAM.rolloff, 0, 48, "%.1f dB/oct", spatial_writes)
+          slider_double(track, fx, "Distance diffusion", PARAM.distance_diffusion, 0, 100, "%.0f%%", spatial_writes)
           slider_double(track, fx, "Motion smoothing", PARAM.smoothing, 1, 250, "%.0f ms", spatial_writes)
           slider_double(track, fx, "Global azimuth (deg)", PARAM.global_az, -360, 360, "%.1f", spatial_writes)
           slider_double(track, fx, "Global elevation (deg)", PARAM.global_el, -90, 90, "%.1f", spatial_writes)
