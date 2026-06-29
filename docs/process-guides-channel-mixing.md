@@ -15,6 +15,8 @@ toc:
     href: "#6ch-ambisonic-decoder-router"
   - title: MC Channel Automation Mixer
     href: "#mc-channel-automation-mixer"
+  - title: 128ch Node Track Mixer
+    href: "#128ch-node-track-mixer"
   - title: MC to Stereo Autogain
     href: "#mc-to-stereo-autogain"
   - title: Transaural Crosstalk Canceller
@@ -121,6 +123,83 @@ Workflow:
 The visible mixer adapts to the track channel count, up to REAPER's 128-channel limit. Faders use a dB-style response, double-click returns to unity, and direct dB entry can make relative changes across selected faders.
 
 Use shift-click to select or release channels. Quick channel groups highlight related faders and let a group move together. The pin matrix is for channel remapping and should be treated as routing, not gain.
+
+
+## 128ch Node Track Mixer
+
+Use this when selected source tracks should become spatial mix nodes on a new
+multichannel bus. The action creates a bus, routes each selected source track
+as a true multichannel send block, loads `s3g 128ch Node Track Mixer`, and
+opens a node controller.
+
+The JSFX does not decode or encode ambisonics. It treats the bus outputs as a
+layout-aware speaker or channel field. Each node can have its own source shape
+and source channel count, so an 8-channel track can be treated as an 8-channel
+ring by default, or changed to a cube, dome, or other supported shape. Four
+8-channel cube tracks, for example, are packed into 32 input channels on the
+bus, then mixed down by the JSFX into the selected 8-channel mix bed.
+
+When source and mix-bed channel counts differ, assignment is based on shape
+coordinates rather than channel-number matching. Each source channel has a
+position inside its node shape, and the JSFX weights that channel into the
+nearest channels of the selected mix bed.
+
+`Mix mode` changes the meaning of the nodes. `Spatial objects` treats each node
+as a separate channel shape placed in the field, so two quad nodes beside each
+other behave like two neighboring quad arrays. `Stacked shapes` aligns the node
+shapes to the same mix bed, so channel 1 of each quad belongs to the same
+corner family, channel 2 belongs to the next, and so on. In stacked mode,
+`Channel rotate` shifts a node's channel order before it is aligned, which is
+useful for rotating quad corners, ring positions, cube corners, or other
+multichannel source layouts against the shared bed.
+
+The `Mix Cursor` is the main automation target. In `Spatial objects`, automate
+`Cursor X`, `Cursor Y`, and `Cursor Z` to move through the node field. In
+`Stacked shapes`, automate `Stack position` to move through aligned node
+layers. `Cursor influence` blends the cursor behavior in or out, while `Cursor
+radius`, `Cursor focus`, and `Cursor gate` control how many nearby nodes
+contribute. Use the falloff curve display to tune the curve: radius sets reach,
+focus changes the slope, and gate cuts low node weights to zero. Set
+`Cursor influence` to `1.0` when distant nodes should disappear completely.
+
+The controller opens in a top camera view. `3/4`, `Top`, and `Side` camera
+presets are available for checking node placement, shape overlap, and Z
+position. Source track names are stored on the node bus and shown in the node
+labels, selected-node panel, routing overview, and matrix rows.
+
+The matrix mask limits which output channels a node can reach. Leave the matrix
+fully enabled for layout interpolation, or disable cells to restrict a node to
+a ring, cube layer, speaker group, or custom region.
+
+The `Routing overview` gives a compact source-to-output summary for each node:
+track name, input channel range, source shape, active output count, and a small
+output strip. Use the detailed matrix below it when exact output masks are
+needed.
+
+The `Automation` section mirrors the panner controllers. It can switch the bus
+track between `Trim/Read` and `Write`, show or hide cursor lanes, show or hide
+curve lanes, and show or hide the stacked-position lane.
+
+Starting approach:
+
+1. Select up to 16 source tracks.
+2. Run `128ch Node Track Mixer`.
+3. Choose a `Mix mode`, `Mix bed shape`, and channel count.
+4. Check each node's `Node source shape`, `Source channels`, and `Input start
+   channel`.
+5. In `Spatial objects`, move nodes in the viewer and adjust `Shape scale` and
+   `Focus`.
+6. In `Stacked shapes`, use `Channel rotate`, node level, and `Focus` to align
+   or offset each source against the shared bed.
+7. Adjust `Cursor radius`, `Cursor focus`, and `Cursor gate` while watching the
+   falloff curve.
+8. Use `Show cursor lanes`, `Show curve lanes`, or `Show stack` when the mix
+   movement should be written as REAPER automation.
+9. Use the matrix only when a node should avoid or prefer a defined output
+   region.
+
+The script turns off the selected source tracks' master sends when it creates
+the node bus, so the bus becomes the monitored/output path.
 
 
 

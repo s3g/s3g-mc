@@ -46,6 +46,13 @@ layout, width, rotation, weighting, 3D projection attenuation, output trim, and
 autogain controls so the fold-down can be shaped without losing the
 multichannel source.
 
+Use `128ch Node Track Mixer` when several source tracks should remain intact as
+multichannel objects but be mixed through a shared cursor. Selected tracks are
+routed to a new multichannel bus, labeled as nodes, and mixed as spatial
+objects or stacked channel-shapes. The controller provides a routing overview,
+camera presets, cursor falloff/gate tuning, and automation helpers for writing
+cursor or curve movement to REAPER lanes.
+
 Use `Transaural Crosstalk Canceller` after a binaural decoder or binaural
 stereo render when that signal needs to play over loudspeakers from a fixed
 listening position. It is not a binaural headphone decoder; it is the

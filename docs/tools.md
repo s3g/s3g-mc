@@ -34,17 +34,17 @@ toc:
 
 For step-by-step notes on selected processes, see the [Process Guides](process-guides.md).
 
-Current package snapshot: the browser exposes 99 user-facing tools/controllers
+Current package snapshot: the browser exposes 101 user-facing tools/controllers
 plus the Package Browser. Of those, 42 are Python/NumPy-backed offline
-processes, 36 are Lua/ReaImGui REAPER actions, and 21 load, control, or render
-included JSFX. The repository also ships 20 underlying JSFX engine/effect files.
+processes, 37 are Lua/ReaImGui REAPER actions, and 22 load, control, or render
+included JSFX. The repository also ships 21 underlying JSFX engine/effect files.
 The Lua folder also includes helper libraries and internal dialogs that are not
 shown as Package Browser entries.
 
 Package Browser group counts:
 
-- Channel Mixing / Automation: 3
-- MIDI Composition: 5
+- Channel Mixing / Automation: 4
+- MIDI Composition: 6
 - Procedural Synthesis: 6
 - Offline Synthesis / IR: 8
 - Spatial Panners: 10
@@ -58,6 +58,11 @@ Package Browser group counts:
 
 - `128ch Automation Mixer`: faders, mute/solo, channel groups, meters, and
   plugin pin remapping for high-channel-count tracks.
+- `128ch Node Track Mixer`: selected source tracks become movable
+  channel-shape nodes, so stereo, ring, cube, double-ring, or dome source
+  layouts can be mixed as spatial objects or aligned stacked shapes. The
+  controller includes track-name node labels, routing overview, top/side camera
+  views, cursor falloff/gate controls, and automation lane helpers.
 - `MC to Stereo Autogain`: multichannel fold-down with layout modes, width,
   rotation, weighting, 3D projection attenuation, autogain, and output trim.
 - `Transaural Crosstalk Canceller`: stereo loudspeaker playback processor with
@@ -78,6 +83,10 @@ Package Browser group counts:
 - `MIDI Terrain Form`: NumPy-backed song-duration MIDI generator with section
   maps, terrain-shaped density/register/channel fields, and optional project
   markers.
+- `Polymetric Drum States`: creates an editable drum MIDI item from changing
+  polymeter configurations, using Superior-style or GM drum maps, integer or
+  fractional state lengths, beat-grid snapping, and jump or glide transitions
+  between states.
 - `Generate Polymetric MIDI Lanes`: creates multiple Euclidean lanes with
   independent lengths, pulses, rotations, pitch degrees, and MIDI channels for
   procedural synths or general algorithmic composition, shown as concentric

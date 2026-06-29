@@ -1,0 +1,271 @@
+desc:s3g 128ch Node Track Mixer
+tags: multichannel node spatial weight mixer utility
+options:gmem=s3g_128ch_node_track_mixer
+
+<? loop(x=1; 128, printf("in_pin:bus ch %03d\n", x); x += 1); ?>
+<? loop(x=1; 128, printf("out_pin:mix ch %03d\n", x); x += 1); ?>
+
+slider1:1<0,5,1{Linear,Ring,Cube,Double ring,Dome,SRST dome}>Mix bed shape
+slider2:8<2,128,1>Output channels
+slider3:4<1,16,1>Node count
+<? loop(n=1; 16,
+  base = 4 + (n - 1) * 10;
+  printf("slider%d:1<0,1,1{off,on}>Node %02d active\n", base, n);
+  printf("slider%d:0<-60,12,0.1>Node %02d level (dB)\n", base + 1, n);
+  printf("slider%d:1<0,5,1{Linear,Ring,Cube,Double ring,Dome,SRST dome}>Node %02d source shape\n", base + 2, n);
+  printf("slider%d:8<1,128,1>Node %02d source channels\n", base + 3, n);
+  printf("slider%d:1<1,128,1>Node %02d input start\n", base + 4, n);
+  printf("slider%d:0<-2,2,0.001>Node %02d X\n", base + 5, n);
+  printf("slider%d:0<-2,2,0.001>Node %02d Y\n", base + 6, n);
+  printf("slider%d:0<-2,2,0.001>Node %02d Z\n", base + 7, n);
+  printf("slider%d:1<0.05,4,0.001>Node %02d shape scale\n", base + 8, n);
+  printf("slider%d:3<0.2,12,0.001>Node %02d focus\n", base + 9, n);
+  n += 1;
+); ?>
+slider164:0<0,1,1{Spatial objects,Stacked shapes}>Mix mode
+<? loop(n=1; 16,
+  printf("slider%d:0<-128,128,1>Node %02d channel rotate\n", 164 + n, n);
+  n += 1;
+); ?>
+slider181:0<0,1,0.001>Cursor influence
+slider182:0<-2,2,0.001>Cursor X
+slider183:0<-2,2,0.001>Cursor Y
+slider184:0<-2,2,0.001>Cursor Z
+slider185:1<1,16,0.001>Stack position
+slider186:1<0.05,8,0.001>Cursor radius
+slider187:2<0.2,12,0.001>Cursor focus
+slider188:0.02<0,0.95,0.001>Cursor gate
+
+@init
+ext_tail_size = -2;
+ext_noinit = 1;
+max_nodes = 16;
+max_ch = 128;
+matrix_magic = 128128;
+matrix_base = 1;
+matrix_trim_base = 1 + max_nodes * max_ch;
+weight_base = 4096;
+cursor_base = 280000;
+sig_base = 300000;
+fader_min_db = -60;
+
+function db_to_gain(db)
+(
+  db <= fader_min_db ? 0 : exp(log(10) * db / 20);
+);
+
+function clamp(v lo hi)
+(
+  v < lo ? lo : v > hi ? hi : v;
+);
+
+function even_floor(v)
+(
+  v = floor(v + 0.5);
+  v < 1 ? 1 : v > max_ch ? max_ch : v;
+);
+
+function safe_sample(v)
+(
+  v != v ? 0 : v > 8 ? 8 : v < -8 ? -8 : abs(v) < 0.0000000000000001 ? 0 : v;
+);
+
+function apply_cursor_gate(v gate)
+(
+  gate <= 0 ? v : v <= gate ? 0 : (v - gate) / max(0.0001, 1 - gate);
+);
+
+function set_layout_xyz(ch count layout) local(idx az el ring half layer pos)
+(
+  idx = ch - 1;
+  layout == 0 ? (
+    sp_x = count <= 1 ? 0 : idx / (count - 1) * 2 - 1;
+    sp_y = 0;
+    sp_z = 0;
+  ) : layout == 1 ? (
+    az = -45 - idx * 360 / max(1, count);
+    sp_x = -sin(az * $pi / 180);
+    sp_y = cos(az * $pi / 180);
+    sp_z = 0;
+  ) : layout == 2 ? (
+    sp_x = (idx & 1) ? -1 : 1;
+    sp_y = (idx & 2) ? -1 : 1;
+    sp_z = (idx & 4) ? 1 : -1;
+  ) : layout == 3 ? (
+    half = max(1, floor(count / 2));
+    layer = idx < half ? 0 : 1;
+    pos = idx % half;
+    az = -45 - pos * 360 / half;
+    ring = layer ? 0.74 : 1.0;
+    sp_x = -sin(az * $pi / 180) * ring;
+    sp_y = cos(az * $pi / 180) * ring;
+    sp_z = layer ? 0.65 : -0.10;
+  ) : layout == 4 ? (
+    layer = idx < 12 ? 0 : 1;
+    pos = layer ? idx - 12 : idx;
+    az = -45 - pos * 360 / (layer ? max(1, count - 12) : 12);
+    el = layer ? 45 : 0;
+    sp_x = -sin(az * $pi / 180) * cos(el * $pi / 180);
+    sp_y = cos(az * $pi / 180) * cos(el * $pi / 180);
+    sp_z = sin(el * $pi / 180);
+  ) : (
+    idx == 24 ? (
+      sp_x = 0; sp_y = 0; sp_z = 1;
+    ) : (
+      layer = idx < 12 ? 0 : 1;
+      pos = layer ? idx - 12 : idx;
+      az = -45 - pos * 360 / 12;
+      el = layer ? 45 : 0;
+      sp_x = -sin(az * $pi / 180) * cos(el * $pi / 180);
+      sp_y = cos(az * $pi / 180) * cos(el * $pi / 180);
+      sp_z = sin(el * $pi / 180);
+    );
+  );
+);
+
+@slider
+out_layout = floor(slider1 + 0.5);
+out_ch = floor(clamp(slider2, 2, max_ch) + 0.5);
+node_count = floor(clamp(slider3, 1, max_nodes) + 0.5);
+mix_mode = floor(slider164 + 0.5);
+cursor_influence = clamp(slider181, 0, 1);
+cursor_x = slider182;
+cursor_y = slider183;
+cursor_z = slider184;
+stack_pos = clamp(slider185, 1, max_nodes);
+cursor_radius = max(0.001, slider186);
+cursor_focus = max(0.1, slider187);
+cursor_gate = clamp(slider188, 0, 0.95);
+
+@block
+out_layout = floor(slider1 + 0.5);
+out_ch = floor(clamp(slider2, 2, max_ch) + 0.5);
+node_count = floor(clamp(slider3, 1, max_nodes) + 0.5);
+mix_mode = floor(slider164 + 0.5);
+cursor_influence = clamp(slider181, 0, 1);
+cursor_x = slider182;
+cursor_y = slider183;
+cursor_z = slider184;
+stack_pos = clamp(slider185, 1, max_nodes);
+cursor_radius = max(0.001, slider186);
+cursor_focus = max(0.1, slider187);
+cursor_gate = clamp(slider188, 0, 0.95);
+has_matrix = gmem[0] == matrix_magic;
+
+n = 0;
+loop(node_count,
+  n_active = slider(4 + n * 10);
+  n_gain = db_to_gain(slider(5 + n * 10));
+  src_layout = floor(slider(6 + n * 10) + 0.5);
+  src_ch = floor(clamp(slider(7 + n * 10), 1, max_ch) + 0.5);
+  input_start = floor(clamp(slider(8 + n * 10), 1, max_ch) + 0.5) - 1;
+  n_x = slider(9 + n * 10);
+  n_y = slider(10 + n * 10);
+  n_z = slider(11 + n * 10);
+  n_scale = max(0.001, slider(12 + n * 10));
+  n_focus = max(0.1, slider(13 + n * 10));
+  n_rotate = floor(slider(165 + n) + 0.5);
+  cursor_w = 1;
+  cursor_influence > 0 && n < node_count && n_active >= 0.5 ? (
+    mix_mode >= 0.5 ? (
+      cdist = abs((n + 1) - stack_pos);
+    ) : (
+      cdx = n_x - cursor_x;
+      cdy = n_y - cursor_y;
+      cdz = n_z - cursor_z;
+      cdist = sqrt(cdx * cdx + cdy * cdy + cdz * cdz);
+    );
+    cursor_raw = apply_cursor_gate(exp(-pow(cdist / cursor_radius, cursor_focus)), cursor_gate);
+    cursor_w = (1 - cursor_influence) + cursor_influence * cursor_raw;
+  );
+  cursor_base[n] = cursor_w;
+  sc = 0;
+  loop(src_ch,
+    norm = 0;
+    ch = 0;
+    loop(out_ch,
+      w = 0;
+      n < node_count && sc < src_ch && ch < out_ch && n_active >= 0.5 ? (
+        rotated_sc = (sc + n_rotate) % src_ch;
+        rotated_sc < 0 ? rotated_sc += src_ch;
+        set_layout_xyz(rotated_sc + 1, src_ch, src_layout);
+        mix_mode >= 0.5 ? (
+          src_x = sp_x;
+          src_y = sp_y;
+          src_z = sp_z;
+        ) : (
+          src_x = n_x + sp_x * n_scale;
+          src_y = n_y + sp_y * n_scale;
+          src_z = n_z + sp_z * n_scale;
+        );
+        set_layout_xyz(ch + 1, out_ch, out_layout);
+        dx = sp_x - src_x;
+        dy = sp_y - src_y;
+        dz = sp_z - src_z;
+        dist = sqrt(dx * dx + dy * dy + dz * dz);
+        w = 1 / pow(max(0.0001, dist), n_focus);
+        mask = has_matrix ? gmem[matrix_base + n * max_ch + ch] : 1;
+        trim = has_matrix ? gmem[matrix_trim_base + n * max_ch + ch] : 1;
+        trim <= 0 ? trim = 1;
+        mask <= 0 ? w = 0 : w *= min(4, trim);
+        norm += w * w;
+      );
+      wa = weight_base + ((n * max_ch + sc) * max_ch + ch);
+      wa[0] = w;
+      ch += 1;
+    );
+    norm = sqrt(max(0.0000000001, norm));
+    ch = 0;
+    loop(out_ch,
+      wa = weight_base + ((n * max_ch + sc) * max_ch + ch);
+      wa[0] = wa[0] / norm * n_gain * cursor_base[n];
+      ch += 1;
+    );
+    sc += 1;
+  );
+  n += 1;
+);
+
+@sample
+n = 0;
+loop(node_count,
+  src_ch = floor(clamp(slider(7 + n * 10), 1, max_ch) + 0.5);
+  input_start = floor(clamp(slider(8 + n * 10), 1, max_ch) + 0.5) - 1;
+  sc = 0;
+  loop(src_ch,
+    sig_base[n * max_ch + sc] = input_start + sc < max_ch ? safe_sample(spl(input_start + sc)) : 0;
+    sc += 1;
+  );
+  n += 1;
+);
+
+ch = 0;
+loop(max_ch,
+  spl(ch) = 0;
+  ch += 1;
+);
+
+n = 0;
+loop(node_count,
+  src_ch = floor(clamp(slider(7 + n * 10), 1, max_ch) + 0.5);
+  sc = 0;
+  loop(src_ch,
+    sig = sig_base[n * max_ch + sc];
+    sig != 0 && sc < src_ch ? (
+      ch = 0;
+      loop(out_ch,
+        wa = weight_base + ((n * max_ch + sc) * max_ch + ch);
+        spl(ch) += sig * safe_sample(wa[0]);
+        ch += 1;
+      );
+    );
+    sc += 1;
+  );
+  n += 1;
+);
+
+ch = 0;
+loop(out_ch,
+  spl(ch) = safe_sample(spl(ch));
+  ch += 1;
+);

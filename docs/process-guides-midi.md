@@ -17,6 +17,8 @@ toc:
     href: "#midi-form-learner"
   - title: MIDI Terrain Form
     href: "#midi-terrain-form"
+  - title: Polymetric Drum States
+    href: "#polymetric-drum-states"
   - title: Generate Polymetric MIDI Lanes
     href: "#generate-polymetric-midi-lanes"
 ---
@@ -24,6 +26,42 @@ toc:
 # MIDI Composition Guides
 
 These guides match the Package Browser's MIDI Composition group. The scripts create ordinary editable REAPER MIDI items for procedural synths and algorithmic composition.
+
+## Polymetric Drum States
+
+Use this to create an editable drum MIDI item from changing polymeter states. Each state stores Euclidean lane settings for drum tokens such as `KIK`, `SNR`, `CHH`, and `OHH`; the script can jump between states or glide between them before writing MIDI notes.
+
+Starting approach:
+
+- Choose `Superior-style` or `GM` as the drum note map.
+- Set `Lanes` to the number of drum voices you want to generate.
+- Use `Timeline preview` or `Play Preview` to move through the state sequence.
+- Choose `Jump` for hard changes between polymeter configurations, or `Glide` for interpolated transitions.
+- Use `Add State` and `Delete State` to change the number of configurations.
+- Leave `Snap beat sliders` on when you want state lengths, trigger lengths, and spacing guards to land on a beat division. Choose the division with `Grid`.
+- Leave `Integer state lengths` on for whole-beat state blocks, or turn it off when you want fractional state lengths.
+- Set `Selected state length beats`, or type directly into `Beats`, to place each state over the generated item's timeline.
+- Select a state, then edit each lane's `Steps`, `Pulses`, `Rotate`, `Hit probability`, `Velocity`, and `Accent`.
+- Keep `Note duration mode` on `Trigger` for Superior Drummer or other drum instruments. Use `Step fraction` only when driving instruments that respond musically to sustained MIDI note lengths.
+- Open `Advanced generation limits` for `Global probability trim`, spacing guards, swing, velocity jitter, seed, and the maximum note cap.
+- Keep `MIDI channel` at 10 for conventional drum instruments, or change it when driving another instrument.
+
+Each lane pattern runs over an internal 4-beat phrase. Different `Steps`,
+`Pulses`, and `Rotate` values create the polymetric feel without adding a
+separate per-lane cycle-length control.
+
+`Hit probability` is density in the probabilistic sense. The visible Euclidean
+pattern defines possible hits, and probability decides whether each possible
+hit is admitted when the MIDI item is written. `Global probability trim`
+multiplies the per-lane value.
+
+The result is normal REAPER MIDI. If a time selection exists, generation starts
+at the time selection start; otherwise it starts at the edit cursor. The item
+length is the sum of the state lengths. The script is especially useful with
+drum instruments because each lane keeps a fixed drum token while the rhythmic
+state, probability, and velocity shift over time.
+
+If a drum plugin glitches or REAPER DSP becomes unstable, lower `Global probability trim`, increase the spacing values, or reduce `Max generated notes` before generating another item.
 
 ## Generate Lattice MIDI
 
