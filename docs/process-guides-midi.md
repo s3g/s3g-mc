@@ -47,7 +47,7 @@ Starting approach:
 - Choose a root, scale, and space.
 - Use Euclidean `Steps`, `Pulses`, and `Rotate` to define timing.
 - Use `Density` and `Path surprise` to decide how continuous or disrupted the path feels.
-- Use `Channel mode` to map notes across MIDI channels for Carto/Spectra focus.
+- Use `Channel mode` to map notes across MIDI channels for procedural synth focus.
 
 The preview uses two geometric diagrams. The pitch-space wheel shows the selected scale and the path through pitch classes. The rhythm/channel ring shows Euclidean timing, with event radius and labels indicating MIDI-channel focus. `Scale walk` is the most direct mode. `Contour` favors melodic direction changes. `Triadic` makes larger harmonic moves. `Axis mirror` folds alternate moves around a center degree.
 
@@ -63,6 +63,6 @@ Starting approach:
 - Set a duration in beats, or use the current edit position as the starting point.
 - Adjust each lane's `Steps`, `Pulses`, and `Rotate`.
 - Use `Degree` to assign lane pitch within the selected scale.
-- Keep lane count at 8 for the Carto/Spectra source-lane model, or raise it for denser MIDI-channel work.
+- Keep lane count at 8 for the procedural synth source-lane model, or raise it for denser MIDI-channel work.
 
 The preview uses concentric Euclidean rings: each MIDI lane is a ring, each step is a tick, and each active hit becomes a node. The hit polygon makes each lane's rhythmic shape visible. This script is useful for polymetric activity because each lane repeats over the same item duration with a different internal grid. For the procedural synths, MIDI channel number becomes a compositional dimension: it can steer channel focus while note pitch, velocity, and length steer the synth response.

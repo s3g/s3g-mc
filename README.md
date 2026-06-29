@@ -7,10 +7,12 @@ It includes Lua actions, ReaImGui controllers, and JSFX for channel editing,
 automation, fold-down monitoring, dome panning, 3OA send/return routing, and
 render-based multichannel processes.
 
-Current package snapshot: the browser exposes 90 user-facing tools/controllers
+Current package snapshot: the browser exposes 92 user-facing tools/controllers
 plus the Package Browser. Of those, 35 are Python/NumPy-backed offline
-processes, 36 are Lua/ReaImGui REAPER actions, and 19 load, control, or render
-included JSFX. The repository also ships 19 underlying JSFX engine/effect files.
+processes, 36 are Lua/ReaImGui REAPER actions, and 21 load, control, or render
+included JSFX. The repository also ships 20 underlying JSFX engine/effect files.
+The Lua folder also includes helper libraries and internal dialogs that are not
+shown as Package Browser entries.
 
 Documentation, workflow notes, and references: <a href="https://s3g.github.io/s3g-mc/" target="_blank" rel="noopener noreferrer">s3g-mc docs site</a>.
 
@@ -53,6 +55,11 @@ timeline-driven realtime use.
   logic/fractal-drone, byte-mask, and spline-drift materials.
 - `Carto Synth MIDI Controller`: loads the Carto engine on the selected track
   and maps MIDI notes, velocity, gate, and MIDI channel focus to synth behavior.
+- `Lattice Synth MIDI Controller`: loads a table-driven resonator synth on the
+  selected track, mapping generated MIDI to gesture paths, excitation,
+  resonance, divider shadow, and MIDI-channel focus.
+- `Lattice Synth Render`: creates a temporary Lattice MIDI score and renders
+  the Lattice Synth engine to a multichannel media item.
 - `Spectra Synth Render`: renders slower spectral-mass and resonant
   materials: partial clouds, comb strata, formant bands, impulse resonators,
   and noise spectra.

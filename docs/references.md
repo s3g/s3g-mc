@@ -25,14 +25,9 @@ toc:
 
 ## Note
 
-s3g-mc includes tools inspired by established practices in computer music,
-spatial audio, spectral processing, and multichannel composition. These
-references are provided as context for the methods, design vocabulary, and
-technical questions that informed the work. They do not mean the scripts reuse
-those techniques directly; in most cases, related ideas have been studied and
-new REAPER/Lua, JSFX, or Python/NumPy implementations have been developed for
-this package. When a process follows a particular method more closely, the
-relevant process guide says so.
+References identify historical, technical, and conceptual context for the
+package. The scripts are original REAPER/Lua, JSFX, and Python/NumPy
+implementations unless otherwise noted.
 
 ## Spatial Audio and Ambisonics
 

@@ -13,6 +13,10 @@ toc:
     href: "#carto-synth-render"
   - title: Carto Synth MIDI Controller
     href: "#carto-synth-midi-controller"
+  - title: Lattice Synth MIDI Controller
+    href: "#lattice-synth-midi-controller"
+  - title: Lattice Synth Render
+    href: "#lattice-synth-render"
   - title: Spectra Synth Render
     href: "#spectra-synth-render"
   - title: Spectra Synth MIDI Controller
@@ -55,6 +59,35 @@ Starting approach:
 
 The offline render action remains separate. Use `Carto Synth Render` when you want breakpoint-controlled file output instead of realtime playback.
 
+## Lattice Synth MIDI Controller
+
+Use this with MIDI items that contain table, path, or channel-focused material. The controller loads the Lattice Synth JSFX engine on the selected track and exposes its table, gesture, resonator, and MIDI response controls.
+
+Starting approach:
+
+- Run `Generate Lattice MIDI` or another MIDI generator on the same track.
+- Keep `MIDI control` on.
+- Use `Pitch sets frequency` for note-like plucked behavior, or `Gate only` when the table and base frequency should define the pitch field.
+- Set `Template`, `Ingress`, `Egress`, and `Gesture position` to shape the table scan.
+- Use `Resonance`, `Damping`, and `Brightness` first; then add `Divider shadow` or `Feedback drive`.
+- Use MIDI channels when `Focus by MIDI channel` is active.
+
+The synth uses resonant delay lines rather than a sampled sound source. MIDI notes excite the lattice; velocity changes excitation strength, and MIDI channel can steer source focus across the multichannel output. The visible table in the controller is a control map for the sound engine.
+
+## Lattice Synth Render
+
+Use this when the Lattice idea should produce a rendered multichannel media item rather than a live MIDI-driven instrument. The script generates a temporary MIDI score from the table, ingress/egress, and rhythm settings, feeds that score into the Lattice Synth engine, then renders the result.
+
+Starting approach:
+
+- Choose duration and output channel count.
+- Set `Gesture template`, `Ingress`, and `Egress` first.
+- Use `Rhythm` to decide how the table path becomes note events.
+- Use `Pitch sets frequency` for clear note response, or `Gate only` for a table-defined pitch field.
+- Keep peak normalize on for first tests.
+
+This renderer is closer to the MIDI composition scripts than to Carto/Spectra render. The sound is produced by the JSFX resonator engine, but the offline action first creates a score layer: pitch, velocity, duration, and MIDI-channel focus are derived from the lattice path.
+
 
 
 ## Spectra Synth Render
@@ -84,4 +117,3 @@ Starting approach:
 - Use MIDI-channel focus when different MIDI channels should pull energy toward different output-channel regions.
 
 The MIDI controller is for realtime/timeline use. Use `Spectra Synth Render` for offline breakpoint composition and rendered media items.
-

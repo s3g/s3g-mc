@@ -72,8 +72,8 @@ local preview = {}
 
 local function combo(label, labels, value, width)
   ImGui.SetNextItemWidth(ctx, width or 160)
-  local changed, next_value = ImGui.Combo(ctx, label, value, table.concat(labels, "\0") .. "\0")
-  return changed, next_value
+  local changed, next_value = ImGui.Combo(ctx, label, value - 1, table.concat(labels, "\0") .. "\0")
+  return changed, next_value + 1
 end
 
 local function generate_preview()

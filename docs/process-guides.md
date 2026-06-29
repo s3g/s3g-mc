@@ -50,7 +50,7 @@ Useful habits:
 
 - [Channel Mixing / Automation](process-guides-channel-mixing.md): automation mixer, fold-down, transaural playback, and monitor decoders.
 - [MIDI Composition](process-guides-midi.md): MIDI rule generation, musical-space paths, and polymetric lanes.
-- [Procedural Synthesis](process-guides-procedural-synthesis.md): Carto/Spectra render and MIDI-controller workflows.
+- [Procedural Synthesis](process-guides-procedural-synthesis.md): Carto, Lattice, and Spectra synth workflows.
 - [Offline Synthesis / IR](process-guides-offline-synthesis-ir.md): offline synth, resynthesis, grain-cloud, and impulse tools.
 - [Spatial Panners](process-guides-spatial-panners.md): panner workflows and spatial layout controls.
 - [3OAFX](process-guides-3oafx.md): ambisonic offline rendering, ambisonic convolution, spatial grains, and 3OAFX spectral tools.
