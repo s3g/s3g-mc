@@ -35,6 +35,8 @@ implementations unless otherwise noted.
 
 <p class="bib-entry">Zotter, Franz, and Matthias Frank. 2019. <em>Ambisonics: A Practical 3D Audio Theory for Recording, Studio Production, Sound Reinforcement, and Virtual Reality</em>. Cham: Springer.</p>
 
+<p class="bib-entry">Gerzon, Michael A. 1973. "Periphony: With-Height Sound Reproduction." <em>Journal of the Audio Engineering Society</em> 21 (1): 2-10.</p>
+
 <p class="bib-entry">Institute of Electronic Music and Acoustics, University of Music and Performing Arts Graz. n.d. <em>IEM Plug-in Suite</em>. Software, documentation, and source repository. Accessed June 28, 2026.
 <a href="https://plugins.iem.at/" target="_blank" rel="noopener noreferrer">Project site</a>;
 <a href="https://plugins.iem.at/docs/" target="_blank" rel="noopener noreferrer">documentation</a>;
@@ -49,6 +51,8 @@ implementations unless otherwise noted.
 <a href="https://github.com/risdsound/foafx" target="_blank" rel="noopener noreferrer">https://github.com/risdsound/foafx</a>.</p>
 
 <p class="bib-entry">Kronlachner, Matthias. 2014. <em>Spatial Transformations for the Alteration of Ambisonic Recordings</em>. Master's thesis, Institute of Electronic Music and Acoustics, University of Music and Performing Arts Graz, and Graz University of Technology.</p>
+
+<p class="bib-entry">Pulkki, Ville. 1997. "Virtual Sound Source Positioning Using Vector Base Amplitude Panning." <em>Journal of the Audio Engineering Society</em> 45 (6): 456-466.</p>
 
 <p class="bib-entry">Farina, Angelo. n.d. "SPS Conversion." Accessed June 28, 2026.
 <a href="https://www.angelofarina.it/SPS-conversion.htm" target="_blank" rel="noopener noreferrer">https://www.angelofarina.it/SPS-conversion.htm</a>.
@@ -99,6 +103,14 @@ Archived March 1, 2024:
 <p class="bib-entry">Harker, Alex, and Pierre Alexandre Tremblay. n.d. <em>HISSTools Impulse Response Toolbox</em>. GitHub repository. Accessed June 28, 2026.
 <a href="https://github.com/HISSTools/HISSTools_Impulse_Response_Toolbox" target="_blank" rel="noopener noreferrer">https://github.com/HISSTools/HISSTools_Impulse_Response_Toolbox</a>.</p>
 
+<p class="bib-entry">Roads, Curtis. 2001. <em>Microsound</em>. Cambridge, MA: MIT Press.</p>
+
+<p class="bib-entry">Smalley, Denis. 1997. "Spectromorphology: Explaining Sound-Shapes." <em>Organised Sound</em> 2 (2): 107-126.</p>
+
+<p class="bib-entry">Wishart, Trevor. 1994. <em>Audible Design: A Plain and Easy Introduction to Practical Sound Composition</em>. York: Orpheus the Pantomime.</p>
+
+<p class="bib-entry">Wishart, Trevor. 1996. <em>On Sonic Art</em>. Edited by Simon Emmerson. Amsterdam: Harwood Academic Publishers.</p>
+
 </div>
 
 ## Granular and Spatial Grains
@@ -146,7 +158,19 @@ Archived March 1, 2024:
 <p class="bib-entry">Lyon, Eric. 2023. <em>Automated Sound Design</em>. First edition. Computer Music and Digital Audio Series, vol. DAS028. Middleton, WI: A-R Editions. 426 pages. ISBN 9780895799036; 9780895798947.
 <a href="https://www.areditions.com/lyon-automated-sound-design-das028.html" target="_blank" rel="noopener noreferrer">https://www.areditions.com/lyon-automated-sound-design-das028.html</a>.</p>
 
+<p class="bib-entry">Bregman, Albert S. 1990. <em>Auditory Scene Analysis: The Perceptual Organization of Sound</em>. Cambridge, MA: MIT Press.</p>
+
+<p class="bib-entry">Cope, David. 2006. <em>Computer Models of Musical Creativity</em>. Cambridge, MA: MIT Press.</p>
+
 <p class="bib-entry">Hunt, Jerry. 1993. "Gesture Modulation of Templates." Accessed June 29, 2026.
 <a href="http://www.jerryhunt.org/gesture_mod.htm" target="_blank" rel="noopener noreferrer">http://www.jerryhunt.org/gesture_mod.htm</a>.</p>
+
+<p class="bib-entry">Nierhaus, Gerhard. 2009. <em>Algorithmic Composition: Paradigms of Automated Music Generation</em>. Vienna: Springer.</p>
+
+<p class="bib-entry">Roads, Curtis. 2015. <em>Composing Electronic Music: A New Aesthetic</em>. New York: Oxford University Press.</p>
+
+<p class="bib-entry">Tymoczko, Dmitri. 2011. <em>A Geometry of Music: Harmony and Counterpoint in the Extended Common Practice</em>. New York: Oxford University Press.</p>
+
+<p class="bib-entry">Xenakis, Iannis. 1992. <em>Formalized Music: Thought and Mathematics in Composition</em>. Revised edition. Stuyvesant, NY: Pendragon Press.</p>
 
 </div>
