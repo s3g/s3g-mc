@@ -2,9 +2,13 @@
 import json
 import math
 import os
+import re
+import shutil
 import struct
+import subprocess
 import sys
 import csv
+import tempfile
 
 import numpy as np
 
@@ -133,6 +137,18 @@ def normalize_peak(audio, db):
     if peak > 1e-12:
         audio = audio * ((10.0 ** (float(db) / 20.0)) / peak)
     return audio.astype(np.float32), peak
+
+
+def resample_audio(audio, source_rate, target_rate):
+    if source_rate == target_rate or audio.shape[0] <= 1:
+        return audio.astype(np.float32)
+    old_x = np.arange(audio.shape[0], dtype=np.float64)
+    new_size = max(1, int(round(audio.shape[0] * target_rate / source_rate)))
+    new_x = np.linspace(0, audio.shape[0] - 1, new_size, dtype=np.float64)
+    return np.stack([
+        np.interp(new_x, old_x, audio[:, ch]).astype(np.float32)
+        for ch in range(audio.shape[1])
+    ], axis=1)
 
 
 def mean_neighbor_correlation(audio):
@@ -2741,6 +2757,935 @@ def render_foafx_particle_cloud(cfg):
     print(f"Pre-normalize peak: {pre_peak:.6f}")
 
 
+def render_foafx_aed_granulator(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    order = 3
+    ambi_channels = 16
+    duration = max(0.05, float(cfg.get("duration", audio.shape[0] / sample_rate)))
+    out_frames = max(1, int(round(duration * sample_rate)))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+
+    density = max(0.1, float(cfg.get("density", 36.0)))
+    chance = float(np.clip(cfg.get("chance", 1.0), 0.0, 1.0))
+    voices = max(1, min(32, int(cfg.get("voices", 8))))
+    grain_ms = max(float(cfg.get("min_ms", 4.0)), float(cfg.get("grain_ms", 90.0)))
+    grain_jitter = float(np.clip(cfg.get("grain_jitter", 0.35), 0.0, 1.0))
+    spray_ms = max(0.0, float(cfg.get("spray_ms", 0.0)))
+    pitch_spread = max(0.0, float(cfg.get("pitch_spread_semi", 0.0)))
+    transpose = float(cfg.get("transpose_semi", 0.0))
+    reverse_probability = float(np.clip(cfg.get("reverse_probability", 0.0), 0.0, 1.0))
+    pos_quant = max(0, int(cfg.get("position_quantize", 0)))
+    window_shape = float(np.clip(cfg.get("window_shape", 0.0), 0.0, 1.0))
+    drift = float(np.clip(cfg.get("drift", 0.0), 0.0, 0.05))
+    drive = float(np.clip(cfg.get("drive", 0.18), 0.0, 1.0))
+    trim = float(np.clip(cfg.get("trim", 1.0), 0.0, 2.0))
+    gain = 10.0 ** (float(cfg.get("gain_db", -9.0)) / 20.0)
+    trajectory = str(cfg.get("trajectory", "braid")).lower()
+    source_mode = str(cfg.get("source_mode", "cycle")).lower()
+    source_position = float(np.clip(cfg.get("source_position", 0.0), 0.0, 1.0))
+    az_center = float(cfg.get("az_center", 0.0))
+    az_width = float(np.clip(cfg.get("az_width", 180.0), 0.0, 360.0))
+    el_center = float(np.clip(cfg.get("el_center", 0.0), -89.0, 89.0))
+    el_width = float(np.clip(cfg.get("el_width", 45.0), 0.0, 178.0))
+    distance = float(np.clip(cfg.get("distance", 1.0), 0.1, 4.0))
+    distance_depth = float(np.clip(cfg.get("distance_depth", 0.35), 0.0, 1.0))
+    event_count = max(1, int(round(duration * density)))
+    grain_base = max(8, int(round(grain_ms * sample_rate / 1000.0)))
+    out = np.zeros((out_frames + grain_base * 4 + 8, ambi_channels), dtype=np.float32)
+    norm = np.zeros(out.shape[0], dtype=np.float32)
+
+    def grain_window(n):
+        if n <= 2:
+            return np.ones(n, dtype=np.float32)
+        phase = np.linspace(0.0, 1.0, n, dtype=np.float32)
+        hann = 0.5 - 0.5 * np.cos(2.0 * np.pi * phase)
+        triangle = 1.0 - np.abs((phase * 2.0) - 1.0)
+        return ((1.0 - window_shape) * hann + window_shape * triangle).astype(np.float32)
+
+    def source_channel(event, u):
+        channels = audio.shape[1]
+        if source_mode == "random":
+            return int(rng.integers(0, channels))
+        if source_mode == "position":
+            return int(np.clip(round(u * (channels - 1)), 0, channels - 1))
+        if source_mode == "braid":
+            return int((event * 3 + math.floor(u * channels)) % channels)
+        return int(event % channels)
+
+    def aed_for(event, u):
+        stream = event % max(1, voices)
+        phase = (u + stream / max(1, voices)) % 1.0
+        if trajectory == "spray":
+            az = az_center + rng.uniform(-az_width, az_width)
+            el = el_center + rng.uniform(-el_width, el_width)
+        elif trajectory == "ribbon":
+            az = az_center + az_width * math.sin(2.0 * math.pi * phase)
+            el = el_center + el_width * math.sin(4.0 * math.pi * phase + stream)
+        elif trajectory == "lattice":
+            steps = max(3, min(24, voices))
+            az_step = round(phase * steps) / max(1, steps)
+            el_step = ((stream % 5) / 4.0) - 0.5
+            az = az_center + (az_step * 2.0 - 1.0) * az_width
+            el = el_center + el_step * el_width * 2.0
+        elif trajectory == "orbit":
+            az = az_center + (phase * 360.0 - 180.0) * (az_width / 180.0)
+            el = el_center + el_width * math.sin(2.0 * math.pi * u)
+        else:
+            az = az_center + az_width * math.sin(2.0 * math.pi * phase)
+            el = el_center + el_width * math.sin(2.0 * math.pi * (u * 0.5 + stream / max(1, voices)))
+        az = ((az + 180.0) % 360.0) - 180.0
+        el = float(np.clip(el, -89.0, 89.0))
+        dist = distance * (1.0 + distance_depth * (0.5 + 0.5 * math.sin(2.0 * math.pi * phase + stream)))
+        return az, el, dist
+
+    for event in range(event_count):
+        u = event / max(1, event_count - 1)
+        local_chance = env_value(cfg, "chance", u, chance)
+        if rng.random() > np.clip(local_chance, 0.0, 1.0):
+            continue
+        local_density = env_value(cfg, "density", u, density)
+        if density > 0 and rng.random() > np.clip(local_density / density, 0.0, 1.0):
+            continue
+        t = (event + rng.uniform(-0.45, 0.45)) / max(0.1, density)
+        if t < 0.0 or t >= duration:
+            continue
+        u = t / duration
+        local_grain_ms = env_value(cfg, "grain_ms", u, grain_ms)
+        n = max(8, int(round(local_grain_ms * sample_rate / 1000.0 * (1.0 + rng.uniform(-grain_jitter, grain_jitter)))))
+        out_start = int(round(t * sample_rate))
+        pos = env_value(cfg, "source_position", u, source_position)
+        if pos_quant > 1:
+            pos = math.floor(pos * pos_quant) / max(1, pos_quant - 1)
+        spray_frames = int(round(spray_ms * sample_rate / 1000.0))
+        src_center = int(round(pos * max(1, audio.shape[0] - 1))) + int(rng.integers(-spray_frames, spray_frames + 1) if spray_frames > 0 else 0)
+        src_center %= max(1, audio.shape[0])
+        ch = source_channel(event, u)
+        local_transpose = env_value(cfg, "transpose_semi", u, transpose)
+        local_rate = 2.0 ** ((local_transpose + rng.uniform(-pitch_spread, pitch_spread)) / 12.0)
+        if rng.random() < reverse_probability:
+            local_rate *= -1.0
+        local_rate += drift * rng.normal(0.0, 0.5) * np.linspace(0.0, 1.0, n, dtype=np.float64)
+        read = src_center + np.arange(n, dtype=np.float64) * local_rate
+        read %= max(1, audio.shape[0])
+        i0 = np.floor(read).astype(np.int64)
+        i1 = (i0 + 1) % audio.shape[0]
+        frac = (read - i0).astype(np.float32)
+        grain = audio[i0, ch] * (1.0 - frac) + audio[i1, ch] * frac
+        win = grain_window(n)
+        az, el, dist = aed_for(event, u)
+        az = env_value(cfg, "azimuth", u, az)
+        el = env_value(cfg, "elevation", u, el)
+        basis = np.array(ambisonic_basis(order, az, el), dtype=np.float32)
+        local_amp = env_value(cfg, "amplitude", u, 1.0)
+        dist_gain = 1.0 / max(0.25, dist)
+        shaped = grain * win * gain * trim * local_amp * dist_gain / math.sqrt(max(1.0, voices * 0.5))
+        end = min(out_start + n, out.shape[0])
+        count = end - out_start
+        if count <= 0:
+            continue
+        out[out_start:end] += shaped[:count, None] * basis[None, :]
+        norm[out_start:end] += win[:count] * win[:count]
+
+    out = out[:out_frames]
+    if bool(cfg.get("normalize_overlap", True)):
+        out /= np.maximum(np.sqrt(norm[:out_frames, None]), 0.28)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if drive > 0.0:
+        out = ((1.0 - drive) * out + drive * (np.tanh(out * (1.0 + drive * 8.0)) / (1.0 + drive * 2.0))).astype(np.float32)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out.astype(np.float32), sample_rate)
+    print("Process: 3OAFX AED Granulator")
+    print("Ambisonic order: 3OA")
+    print("Output channels: 16")
+    print(f"Source channels: {audio.shape[1]}")
+    print(f"Trajectory: {trajectory}")
+    print(f"Source mode: {source_mode}")
+    print(f"Events requested: {event_count}")
+    print(f"Density: {density:.2f}")
+    print(f"Voices: {voices}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
+def evp_layout_points(layout, channels):
+    layout = str(layout or "ring").lower()
+    channels = int(max(1, min(128, channels)))
+    if layout == "cube":
+        base = [(-45, 35), (-135, 35), (135, 35), (45, 35), (-45, -35), (-135, -35), (135, -35), (45, -35)]
+        if channels <= len(base):
+            return base[:channels]
+        return [base[i % len(base)] for i in range(channels)]
+    if layout == "dome":
+        if channels == 24:
+            return foafx_layout(3)
+        rings = []
+        lower = max(4, int(round(channels * 0.55)))
+        upper = max(0, channels - lower - 1)
+        for i in range(lower):
+            rings.append((-45.0 - i * 360.0 / lower, 0.0))
+        for i in range(upper):
+            rings.append((-45.0 - i * 360.0 / max(1, upper), 45.0))
+        if len(rings) < channels:
+            rings.append((0.0, 80.0))
+        return rings[:channels]
+    if layout == "double_ring":
+        bottom = channels // 2
+        top = channels - bottom
+        pts = [(-45.0 - i * 360.0 / max(1, bottom), -18.0) for i in range(bottom)]
+        pts += [(-45.0 - i * 360.0 / max(1, top), 32.0) for i in range(top)]
+        return pts
+    return [(-45.0 - i * 360.0 / channels, 0.0) for i in range(channels)]
+
+
+def find_espeak_ng():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    configured_path = os.path.join(script_dir, "espeak_ng_path.txt")
+    if os.path.exists(configured_path):
+        with open(configured_path, "r", encoding="utf-8") as handle:
+            configured = handle.read().strip()
+        if configured and os.path.exists(configured):
+            return configured
+    candidates = [
+        "/opt/homebrew/bin/espeak-ng",
+        "/usr/local/bin/espeak-ng",
+        "/usr/bin/espeak-ng",
+    ]
+    home = os.path.expanduser("~")
+    if home:
+        candidates.extend([
+            os.path.join(home, "homebrew/bin/espeak-ng"),
+            os.path.join(home, ".local/bin/espeak-ng"),
+        ])
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return shutil.which("espeak-ng")
+
+
+def synthesize_espeak_ng(text, sample_rate, voice="en-us", speed=150, pitch=45, amplitude=140):
+    exe = find_espeak_ng()
+    if not exe:
+        raise RuntimeError(
+            "EVP Field text-to-speech mode requires eSpeak NG. "
+            "Install it with Homebrew (`brew install espeak-ng`) or put the full path in espeak_ng_path.txt beside the scripts."
+        )
+    with tempfile.TemporaryDirectory(prefix="s3g_evp_espeak_") as temp_dir:
+        wav_path = os.path.join(temp_dir, "speech.wav")
+        command = [
+            exe,
+            "-w", wav_path,
+            "-v", str(voice or "en-us"),
+            "-s", str(int(max(80, min(280, speed)))),
+            "-p", str(int(max(0, min(99, pitch)))),
+            "-a", str(int(max(10, min(200, amplitude)))),
+            str(text or "the hidden signal speaks through the field"),
+        ]
+        completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if completed.returncode != 0 or not os.path.exists(wav_path):
+            detail = (completed.stderr or completed.stdout or "").strip()
+            raise RuntimeError("eSpeak NG failed to render speech." + (f"\n{detail}" if detail else ""))
+        speech, speech_rate = read_wav(wav_path)
+    if speech.ndim == 2 and speech.shape[1] > 1:
+        speech = np.mean(speech, axis=1, keepdims=True)
+    return resample_audio(speech.astype(np.float32), speech_rate, sample_rate)
+
+
+def evp_scale_steps(name):
+    scales = {
+        "minor_pentatonic": [0, 3, 5, 7, 10, 12],
+        "major_pentatonic": [0, 2, 4, 7, 9, 12],
+        "minor": [0, 2, 3, 5, 7, 8, 10, 12],
+        "dorian": [0, 2, 3, 5, 7, 9, 10, 12],
+        "whole_tone": [0, 2, 4, 6, 8, 10, 12],
+        "chromatic": list(range(13)),
+    }
+    return scales.get(str(name or "minor_pentatonic"), scales["minor_pentatonic"])
+
+
+def evp_pitch_layer(audio, sample_rate, semitone_at, wet=1.0, block_ms=92.0):
+    audio = np.asarray(audio, dtype=np.float32).reshape(-1)
+    if audio.size < 16 or wet <= 0:
+        return np.zeros_like(audio)
+    block = max(128, int(round(sample_rate * block_ms / 1000.0)))
+    hop = max(32, block // 4)
+    out = np.zeros_like(audio, dtype=np.float32)
+    norm = np.zeros_like(audio, dtype=np.float32)
+    window = np.hanning(block).astype(np.float32)
+    for start in range(0, audio.size, hop):
+        end = min(audio.size, start + block)
+        chunk = audio[start:end]
+        if chunk.size < 16:
+            continue
+        local_window = window[:chunk.size]
+        center_u = (start + chunk.size * 0.5) / max(1, audio.size - 1)
+        semis = float(semitone_at(center_u))
+        factor = 2.0 ** (semis / 12.0)
+        idx = (np.arange(chunk.size, dtype=np.float64) * factor) % max(1, chunk.size - 1)
+        shifted = np.interp(idx, np.arange(chunk.size, dtype=np.float64), chunk).astype(np.float32)
+        out[start:end] += shifted * local_window
+        norm[start:end] += local_window
+    out /= np.maximum(norm, 1e-6)
+    return (out * float(wet)).astype(np.float32)
+
+
+def evp_delay(audio, sample_rate, delay_ms, feedback=0.0, mix=0.35):
+    audio = np.asarray(audio, dtype=np.float32).reshape(-1)
+    delay = max(1, int(round(float(delay_ms) * sample_rate / 1000.0)))
+    out = np.zeros_like(audio)
+    if delay >= audio.size:
+        return out
+    out[delay:] += audio[:-delay]
+    if feedback > 0:
+        second = delay * 2
+        if second < audio.size:
+            out[second:] += audio[:-second] * float(feedback)
+    return (out * float(mix)).astype(np.float32)
+
+
+def evp_phase_vocoder_stretch(audio, factor, n_fft=2048, hop=512):
+    audio = np.asarray(audio, dtype=np.float32).reshape(-1)
+    factor = float(factor)
+    if audio.size < n_fft or abs(factor - 1.0) < 0.02:
+        return audio.copy()
+    n_fft = int(n_fft)
+    hop = int(hop)
+    padded = np.pad(audio.astype(np.float64), (0, n_fft), mode="constant")
+    frame_count = 1 + max(0, (padded.size - n_fft) // hop)
+    if frame_count < 2:
+        return audio.copy()
+    window = np.hanning(n_fft)
+    spec = np.empty((n_fft // 2 + 1, frame_count), dtype=np.complex128)
+    for frame in range(frame_count):
+        start = frame * hop
+        spec[:, frame] = np.fft.rfft(padded[start:start + n_fft] * window)
+    time_steps = np.arange(0, frame_count - 1, 1.0 / max(0.05, factor), dtype=np.float64)
+    if time_steps.size < 2:
+        return audio.copy()
+    omega = 2.0 * np.pi * hop * np.arange(n_fft // 2 + 1) / n_fft
+    phase = np.angle(spec[:, 0])
+    stretched = np.empty((n_fft // 2 + 1, time_steps.size), dtype=np.complex128)
+    for out_idx, step in enumerate(time_steps):
+        left = int(np.floor(step))
+        frac = step - left
+        right = min(left + 1, frame_count - 1)
+        mag = (1.0 - frac) * np.abs(spec[:, left]) + frac * np.abs(spec[:, right])
+        delta = np.angle(spec[:, right]) - np.angle(spec[:, left]) - omega
+        delta -= 2.0 * np.pi * np.round(delta / (2.0 * np.pi))
+        phase += omega + delta
+        stretched[:, out_idx] = mag * np.exp(1j * phase)
+    out_len = int((time_steps.size - 1) * hop + n_fft)
+    out = np.zeros(out_len, dtype=np.float64)
+    norm = np.zeros(out_len, dtype=np.float64)
+    for frame in range(time_steps.size):
+        start = frame * hop
+        chunk = np.fft.irfft(stretched[:, frame], n_fft).real * window
+        out[start:start + n_fft] += chunk
+        norm[start:start + n_fft] += window * window
+    out /= np.maximum(norm, 1e-8)
+    target_len = max(1, int(round(audio.size * factor)))
+    if out.size < target_len:
+        out = np.pad(out, (0, target_len - out.size), mode="constant")
+    out = out[:target_len]
+    peak_in = float(np.max(np.abs(audio))) if audio.size else 0.0
+    peak_out = float(np.max(np.abs(out))) if out.size else 0.0
+    if peak_in > 1e-9 and peak_out > 1e-9:
+        out *= peak_in / peak_out
+    fade = min(out.size // 8, int(0.015 * 48000))
+    if fade > 8:
+        ramp = np.linspace(0.0, 1.0, fade)
+        out[:fade] *= ramp
+        out[-fade:] *= ramp[::-1]
+    return out.astype(np.float32)
+
+
+def evp_expand_speech(mono, sample_rate, cfg, target_frames):
+    mono = np.asarray(mono, dtype=np.float32).reshape(-1)
+    if mono.size < 32:
+        return mono
+    mode = str(cfg.get("time_mode", "fill_duration")).lower()
+    if mode == "speech_length":
+        return mono
+    if mode == "manual_expand":
+        factor = float(np.clip(cfg.get("time_expand", 2.5), 1.0, 12.0))
+    else:
+        factor = float(target_frames) / max(1.0, float(mono.size))
+        factor = float(np.clip(factor, 0.25, 12.0))
+    if abs(factor - 1.0) < 0.02:
+        return mono
+    stretched = evp_phase_vocoder_stretch(mono, factor)
+    if mode == "fill_duration" and stretched.size < target_frames:
+        pad = target_frames - stretched.size
+        tail = min(stretched.size, int(0.25 * sample_rate))
+        if tail > 16:
+            loop = stretched[-tail:].copy()
+            window = np.hanning(tail * 2)[tail:]
+            pieces = []
+            while sum(piece.size for piece in pieces) < pad:
+                pieces.append(loop * window)
+            stretched = np.concatenate([stretched] + pieces)[:target_frames]
+        else:
+            stretched = np.pad(stretched, (0, pad), mode="constant")
+    return stretched.astype(np.float32)
+
+
+def evp_treatment_audio(mono, sample_rate, cfg, rng):
+    mono = np.asarray(mono, dtype=np.float32).reshape(-1)
+    if mono.size == 0:
+        return mono
+    treatment = str(cfg.get("treatment", "clear")).lower()
+    scale = evp_scale_steps(cfg.get("scale", "minor_pentatonic"))
+    root = int(np.clip(cfg.get("root_note", 0), -24, 24))
+    depth = float(np.clip(cfg.get("melody_depth", 0.55), 0.0, 1.0))
+    sustain = float(np.clip(cfg.get("vowel_sustain", 0.25), 0.0, 1.0))
+    choir_voices = int(max(1, min(8, cfg.get("choir_voices", 4))))
+    shadow = float(np.clip(cfg.get("shadow_voice", 0.45), 0.0, 1.0))
+    ghost = float(np.clip(cfg.get("ghost_mix", 0.35), 0.0, 1.0))
+    ghost_env = parse_envelope(cfg.get("env_ghost_mix", ""))
+    if ghost_env is not None:
+        ghost = float(np.clip(np.mean(ghost_env[:, 1]), 0.0, 1.0))
+    whisper = float(np.clip(cfg.get("whisper", 0.0), 0.0, 1.0))
+    breath = float(np.clip(cfg.get("breath", 0.0), 0.0, 1.0))
+    noise = float(np.clip(cfg.get("noise", 0.0), 0.0, 1.0))
+    smear = float(np.clip(cfg.get("smear", 0.0), 0.0, 1.0))
+
+    def melody(u):
+        local_depth = float(np.clip(env_value(cfg, "melody_depth", u, depth), 0.0, 1.0))
+        if local_depth <= 0:
+            return root
+        pos = int(math.floor(u * (4 + local_depth * 20)))
+        wobble = int(round(math.sin(2.0 * math.pi * (u * (0.8 + local_depth * 1.4))) * local_depth * 3.0))
+        step = scale[(pos + wobble) % len(scale)]
+        octave = 12 * int((pos // max(1, len(scale))) % 2)
+        return root + (step + octave) * local_depth
+
+    dry = mono.astype(np.float32)
+    out = dry.copy()
+
+    if treatment == "chant":
+        chant_note = root + scale[min(2, len(scale) - 1)] * depth
+        sung = evp_pitch_layer(dry, sample_rate, lambda _u: chant_note, 0.78, 130.0)
+        out = 0.35 * dry + 0.75 * sung
+    elif treatment == "melodic":
+        sung = evp_pitch_layer(dry, sample_rate, melody, 0.90, 86.0)
+        out = 0.25 * dry + 0.90 * sung
+    elif treatment == "choir":
+        out = 0.45 * dry
+        for voice in range(choir_voices):
+            offset = (voice - (choir_voices - 1) * 0.5) * (0.18 + depth * 0.38)
+            layer = evp_pitch_layer(dry, sample_rate, lambda u, off=offset: melody(u) + off, 0.55, 104.0)
+            delay = int(round((9.0 + voice * 13.0) * sample_rate / 1000.0))
+            if delay < layer.size:
+                layer = np.concatenate([np.zeros(delay, dtype=np.float32), layer[:-delay]])
+            out += layer / math.sqrt(max(1, choir_voices))
+    elif treatment == "whisper_ghost":
+        fric = rng.normal(0.0, 1.0, dry.size).astype(np.float32)
+        env = np.minimum(1.0, np.abs(dry) * (8.0 + 16.0 * ghost))
+        ghost_layer = evp_pitch_layer(dry, sample_rate, lambda u: -7.0 - 5.0 * math.sin(2.0 * math.pi * u), ghost, 120.0)
+        out = 0.55 * dry + ghost_layer + fric * env * (0.08 + 0.42 * max(ghost, whisper, breath))
+    elif treatment == "possession":
+        low = evp_pitch_layer(dry, sample_rate, lambda u: -12.0 - 5.0 * depth + 2.0 * math.sin(2.0 * math.pi * u * 0.7), shadow, 118.0)
+        high = evp_pitch_layer(dry, sample_rate, lambda u: 7.0 + 12.0 * depth * math.sin(2.0 * math.pi * u * 1.3), ghost * 0.75, 72.0)
+        rev = dry[::-1].copy()
+        rev = evp_pitch_layer(rev, sample_rate, lambda _u: -5.0, ghost * 0.28, 96.0)[::-1]
+        out = 0.55 * dry + low + high + rev
+    elif treatment == "broken_radio":
+        fast = np.sin(2.0 * np.pi * (23.0 + 38.0 * depth) * np.arange(dry.size) / sample_rate).astype(np.float32)
+        gate = (0.50 + 0.50 * fast) ** (1.5 + 4.0 * depth)
+        kernel = max(3, int(round(sample_rate * (0.0009 + 0.0025 * smear))))
+        smooth = np.convolve(dry, np.ones(kernel, dtype=np.float32) / kernel, mode="same")
+        out = np.tanh((dry - 0.55 * smooth) * (2.4 + 5.0 * depth)) * gate
+
+    env_sustain = parse_envelope(cfg.get("env_vowel_sustain", ""))
+    if env_sustain is not None and out.size:
+        x = np.linspace(0.0, 1.0, out.size, dtype=np.float64)
+        sustain_curve = np.interp(x, env_sustain[:, 0], env_sustain[:, 1]).astype(np.float32)
+        out = out * (0.75 + 0.25 * sustain_curve)
+        sustain = max(sustain, float(np.mean(sustain_curve)))
+    if sustain > 0:
+        out += evp_delay(out, sample_rate, 85.0 + 220.0 * sustain, 0.35 * sustain, 0.28 * sustain)
+    if noise > 0 and treatment not in ("whisper_ghost", "broken_radio"):
+        env = np.minimum(1.0, np.abs(out) * 10.0)
+        out += rng.normal(0.0, 1.0, out.size).astype(np.float32) * env * noise * 0.08
+    peak = float(np.max(np.abs(out))) if out.size else 0.0
+    dry_peak = float(np.max(np.abs(dry))) if dry.size else 0.0
+    if dry_peak > 1e-9 and 1e-9 < peak < dry_peak * 0.45:
+        out = out * ((dry_peak * 0.75) / peak)
+        peak = float(np.max(np.abs(out))) if out.size else 0.0
+    if peak > 1.5:
+        out = out / peak * 1.5
+    return out.astype(np.float32)
+
+
+def evp_note_frequency(token):
+    text = str(token or "").strip()
+    if not text:
+        return None
+    lower = text.lower()
+    try:
+        if lower.endswith("hz"):
+            return max(1.0, float(lower[:-2]))
+        value = float(text)
+        if 0.0 <= value <= 127.0 and abs(value - round(value)) < 1e-6:
+            return 440.0 * (2.0 ** ((value - 69.0) / 12.0))
+        return max(1.0, value)
+    except ValueError:
+        pass
+    m = re.match(r"^([a-gA-G])([#b]?)(-?\d+)$", text)
+    if not m:
+        return None
+    base = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11}[m.group(1).lower()]
+    accidental = {"#": 1, "b": -1, "": 0}[m.group(2)]
+    octave = int(m.group(3))
+    midi = (octave + 1) * 12 + base + accidental
+    return 440.0 * (2.0 ** ((midi - 69.0) / 12.0))
+
+
+def evp_parse_tone_list(text):
+    tones = []
+    for token in re.split(r"[\s,;]+", str(text or "")):
+        freq = evp_note_frequency(token)
+        if freq and 12.0 <= freq <= 16000.0:
+            tones.append(freq)
+    return tones
+
+
+def evp_gaussian_log(freqs, center, bandwidth):
+    center = max(1.0, float(center))
+    bw = max(0.025, float(bandwidth))
+    log_dist = np.log2(np.maximum(freqs, 1.0) / center)
+    return np.exp(-0.5 * (log_dist / bw) ** 2)
+
+
+def evp_preset_curve(freqs, preset, bandwidth):
+    preset = str(preset or "throat").lower()
+    curve = np.ones_like(freqs, dtype=np.float64)
+    if preset == "telephone":
+        curve *= 0.35
+        curve += 1.2 * evp_gaussian_log(freqs, 900, bandwidth * 1.2)
+        curve += 1.0 * evp_gaussian_log(freqs, 2200, bandwidth * 1.0)
+    elif preset == "glass":
+        curve *= 0.55
+        for f in (740, 1320, 2480, 3920, 6400):
+            curve += 0.95 * evp_gaussian_log(freqs, f, bandwidth * 0.55)
+    elif preset == "choir_air":
+        curve *= 0.75 + 0.55 * np.clip((freqs / 5000.0) ** 0.35, 0.0, 1.5)
+        curve += 0.45 * evp_gaussian_log(freqs, 1200, bandwidth * 1.4)
+    elif preset == "metal_mouth":
+        curve *= 0.50
+        for f in (280, 610, 970, 1550, 2510, 4070):
+            curve += 0.75 * evp_gaussian_log(freqs, f, bandwidth * 0.45)
+    elif preset == "submerged":
+        curve *= 1.1 / (1.0 + (freqs / 1150.0) ** 1.8)
+        curve += 0.45 * evp_gaussian_log(freqs, 260, bandwidth * 1.8)
+    elif preset == "thin_radio":
+        curve *= 0.30
+        curve += 1.15 * evp_gaussian_log(freqs, 1600, bandwidth * 0.9)
+        curve += 0.65 * evp_gaussian_log(freqs, 3200, bandwidth * 0.7)
+    else:
+        curve *= 0.70
+        curve += 1.1 * evp_gaussian_log(freqs, 420, bandwidth)
+        curve += 0.9 * evp_gaussian_log(freqs, 1050, bandwidth * 1.15)
+        curve += 0.55 * evp_gaussian_log(freqs, 2500, bandwidth * 1.1)
+    return curve
+
+
+def evp_tone_curve(freqs, tones, partials, bandwidth, brightness, root_shift=0.0):
+    curve = np.ones_like(freqs, dtype=np.float64) * 0.55
+    shift = 2.0 ** (float(root_shift) / 12.0)
+    for freq in tones:
+        base = float(freq) * shift
+        for partial in range(1, int(max(1, partials)) + 1):
+            center = base * partial
+            if center > freqs[-1] or center < 15:
+                continue
+            amp = (1.0 / (partial ** (0.65 - 0.25 * max(0.0, brightness))))
+            curve += amp * evp_gaussian_log(freqs, center, bandwidth)
+    return curve
+
+
+def evp_profile_curve(freqs, cfg, sample_rate):
+    path = str(cfg.get("profile_path", "") or "")
+    if not path:
+        return np.ones_like(freqs, dtype=np.float64)
+    profile, profile_rate = read_wav(path)
+    if profile.ndim == 2 and profile.shape[1] > 1:
+        profile = np.mean(profile, axis=1, keepdims=True)
+    profile = resample_audio(profile.astype(np.float32), profile_rate, sample_rate)[:, 0]
+    if profile.size < 32:
+        return np.ones_like(freqs, dtype=np.float64)
+    max_len = min(profile.size, max(4096, int(sample_rate * 12)))
+    profile = profile[:max_len]
+    window = np.hanning(profile.size)
+    mag = np.abs(np.fft.rfft(profile * window)) + 1e-9
+    pfreqs = np.fft.rfftfreq(profile.size, 1.0 / sample_rate)
+    log_mag = np.log(mag)
+    smooth = np.convolve(log_mag, np.ones(17) / 17.0, mode="same")
+    smooth -= float(np.median(smooth))
+    smooth /= max(1e-6, float(np.percentile(np.abs(smooth), 90)))
+    interp = np.interp(freqs, pfreqs, smooth, left=smooth[0], right=smooth[-1])
+    return np.exp(np.clip(interp, -1.5, 1.5))
+
+
+def evp_apply_spectral_shaper(mono, sample_rate, cfg):
+    mode = str(cfg.get("spectral_shaper", "off")).lower()
+    mono = np.asarray(mono, dtype=np.float32).reshape(-1)
+    if mode == "off" or mono.size < 64:
+        return mono
+    strength = float(np.clip(cfg.get("shaper_strength", 0.45), 0.0, 1.0))
+    if strength <= 0:
+        return mono
+    bandwidth = float(np.clip(cfg.get("shaper_bandwidth", 0.18), 0.03, 0.80))
+    partials = int(max(1, min(24, cfg.get("shaper_partials", 6))))
+    brightness = float(np.clip(cfg.get("shaper_brightness", 0.0), -1.0, 1.0))
+    n = int(2 ** math.ceil(math.log2(max(64, mono.size))))
+    padded = np.zeros(n, dtype=np.float32)
+    padded[:mono.size] = mono
+    spectrum = np.fft.rfft(padded)
+    freqs = np.fft.rfftfreq(n, 1.0 / sample_rate)
+    if mode == "preset":
+        curve = evp_preset_curve(freqs, cfg.get("shaper_preset", "throat"), bandwidth)
+    elif mode == "tone_list":
+        tones = evp_parse_tone_list(cfg.get("tone_list", "C3 Eb3 G3 Bb3"))
+        if not tones:
+            tones = [130.81, 155.56, 196.0, 233.08]
+        root_shift = float(cfg.get("root_note", 0.0)) if bool(cfg.get("shaper_follow_melody", True)) else 0.0
+        curve = evp_tone_curve(freqs, tones, partials, bandwidth, brightness, root_shift)
+    elif mode == "profile_item":
+        curve = evp_profile_curve(freqs, cfg, sample_rate)
+    else:
+        return mono
+    tilt = np.clip((np.maximum(freqs, 20.0) / 1000.0) ** (brightness * 0.35), 0.25, 4.0)
+    curve = curve * tilt
+    curve /= max(1e-9, float(np.exp(np.mean(np.log(np.maximum(curve, 1e-9))))))
+    gain_curve = (1.0 - strength) + strength * np.clip(curve, 0.08, 8.0)
+    gain_curve[0] = min(gain_curve[0], 1.0)
+    shaped = np.fft.irfft(spectrum * gain_curve, n)[:mono.size]
+    peak_in = float(np.max(np.abs(mono))) if mono.size else 0.0
+    peak_out = float(np.max(np.abs(shaped))) if shaped.size else 0.0
+    if peak_in > 1e-9 and peak_out > 1e-9:
+        shaped *= peak_in / peak_out
+    return shaped.astype(np.float32)
+
+
+def render_evp_field(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    duration = max(0.05, float(cfg.get("duration", 12.0)))
+    output_mode = str(cfg.get("output_mode", "3oa")).lower()
+    layout = str(cfg.get("layout", "ring")).lower()
+    requested_channels = int(max(1, min(128, cfg.get("channels", 8))))
+    if output_mode == "3oa":
+        channels = 16
+        order = 3
+        layout_points = None
+    else:
+        channels = requested_channels
+        order = 0
+        layout_points = evp_layout_points(layout, channels)
+    frames = max(1, int(round(duration * sample_rate)))
+    out = np.zeros((frames, channels), dtype=np.float32)
+    norm = np.zeros(frames, dtype=np.float32)
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+
+    text = str(cfg.get("text", "the hidden signal speaks through the field"))
+    mode = str(cfg.get("voice_mode", "glossolalia")).lower()
+    density = max(0.05, float(cfg.get("density", 3.6)))
+    syllable_ms = max(25.0, float(cfg.get("syllable_ms", 180.0)))
+    jitter = float(np.clip(cfg.get("timing_jitter", 0.35), 0.0, 1.0))
+    pitch = max(20.0, float(cfg.get("pitch_hz", 95.0)))
+    pitch_spread = float(np.clip(cfg.get("pitch_spread", 0.38), 0.0, 2.0))
+    formant_shift = float(np.clip(cfg.get("formant_shift", 0.0), -1.0, 1.0))
+    mouth = float(np.clip(cfg.get("mouth_size", 0.55), 0.0, 1.0))
+    breath = float(np.clip(cfg.get("breath", 0.35), 0.0, 1.0))
+    noise = float(np.clip(cfg.get("noise", 0.28), 0.0, 1.0))
+    intelligibility = float(np.clip(cfg.get("intelligibility", 0.35), 0.0, 1.0))
+    consonants = float(np.clip(cfg.get("consonants", 0.45), 0.0, 1.0))
+    smear = float(np.clip(cfg.get("smear", 0.18), 0.0, 1.0))
+    whisper = float(np.clip(cfg.get("whisper", 0.25), 0.0, 1.0))
+    az_width = float(np.clip(cfg.get("az_width", 180.0), 0.0, 360.0))
+    el_width = float(np.clip(cfg.get("el_width", 55.0), 0.0, 178.0))
+    spatial_motion = float(np.clip(cfg.get("spatial_motion", 0.65), 0.0, 1.0))
+    spatial_width = float(np.clip(cfg.get("spatial_width", 0.22), 0.02, 1.0))
+    distance = float(np.clip(cfg.get("distance", 1.0), 0.2, 4.0))
+    gain = 10.0 ** (float(cfg.get("gain_db", -12.0)) / 20.0)
+    drive = float(np.clip(cfg.get("drive", 0.12), 0.0, 1.0))
+    tts_voice = str(cfg.get("tts_voice", "en-us") or "en-us")
+    tts_speed = int(max(80, min(280, cfg.get("tts_speed", 150))))
+    tts_pitch = int(max(0, min(99, cfg.get("tts_pitch", 45))))
+    treatment = str(cfg.get("treatment", "clear")).lower()
+
+    def aed(event, u):
+        if mode in ("plain", "tts_espeak"):
+            az = az_width * 0.25 * math.sin(2.0 * math.pi * (u * 0.10 + event * 0.017))
+            el = el_width * 0.20 * math.sin(2.0 * math.pi * (u * 0.08 + event * 0.011))
+        elif mode == "residue":
+            az = rng.uniform(-az_width, az_width)
+            el = rng.uniform(-el_width, el_width)
+        elif mode == "choir":
+            lane = event % 7
+            az = -az_width * 0.5 + lane * az_width / 6.0
+            el = el_width * math.sin(2.0 * math.pi * (u + lane / 7.0)) * 0.5
+        elif mode == "apparition":
+            az = az_width * math.sin(2.0 * math.pi * (u * 0.18 + event * 0.021))
+            el = el_width * 0.65 * math.sin(2.0 * math.pi * (u * 0.13 + event * 0.034))
+        else:
+            az = az_width * math.sin(2.0 * math.pi * (u * (0.35 + spatial_motion) + event * 0.031))
+            el = el_width * math.sin(2.0 * math.pi * (u * 0.21 + event * 0.047))
+        return ((az + 180.0) % 360.0) - 180.0, float(np.clip(el, -89.0, 89.0))
+
+    def speaker_weights(az, el):
+        width_deg = 6.0 + spatial_width * 96.0
+        weights = np.array([
+            math.exp(-0.5 * (angular_distance_deg(point, (az, el)) / width_deg) ** 2)
+            for point in layout_points
+        ], dtype=np.float64)
+        weights /= math.sqrt(float(np.sum(weights * weights))) + 1e-12
+        return weights.astype(np.float32)
+
+    if mode == "tts_espeak":
+        try:
+            speech = synthesize_espeak_ng(text, sample_rate, tts_voice, tts_speed, tts_pitch, 150)
+        except RuntimeError as err:
+            raise SystemExit(str(err))
+        raw_speech_frames = speech.shape[0]
+        speech_mono = speech[:, 0].astype(np.float32)
+        speech_mono = evp_expand_speech(speech_mono, sample_rate, cfg, frames)
+        speech_frames = min(frames, speech_mono.shape[0])
+        if speech_frames > 0:
+            source_mono = speech_mono[:speech_frames].astype(np.float32)
+            treated = evp_treatment_audio(source_mono, sample_rate, cfg, rng)
+            treated = evp_apply_spectral_shaper(treated, sample_rate, cfg)
+            speech_frames = min(frames, treated.shape[0])
+            mono = treated[:speech_frames].astype(np.float32)
+            u_axis = np.linspace(0.0, 1.0, speech_frames, dtype=np.float64)
+            amp_env = env_array(cfg, "amplitude", speech_frames, 1.0)
+            mono = mono * amp_env * gain / max(0.3, distance)
+            if drive > 0:
+                mono = ((1.0 - drive) * mono + drive * np.tanh(mono * (1.0 + drive * 8.0)) / (1.0 + drive * 2.0)).astype(np.float32)
+            block = 512
+            for start in range(0, speech_frames, block):
+                end = min(speech_frames, start + block)
+                u = float(u_axis[(start + end - 1) // 2])
+                az, el = aed(start // block, u)
+                az = env_value(cfg, "azimuth", u, az)
+                el = env_value(cfg, "elevation", u, el)
+                if output_mode == "3oa":
+                    basis = np.array(ambisonic_basis(order, az, el), dtype=np.float32)
+                    out[start:end] += mono[start:end, None] * basis[None, :]
+                else:
+                    weights = speaker_weights(az, el)
+                    out[start:end] += mono[start:end, None] * weights[None, :]
+        if bool(cfg.get("dc_protect", True)):
+            out -= np.mean(out, axis=0, keepdims=True)
+        if bool(cfg.get("soft_limit", True)):
+            out = np.tanh(out * 1.15).astype(np.float32) / 1.15
+        if bool(cfg.get("normalize", True)):
+            out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -9.0)))
+        else:
+            pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+        write_pcm24_wav(cfg["output_path"], out.astype(np.float32), sample_rate)
+        print("Process: EVP Field")
+        print(f"Output mode: {output_mode}")
+        print(f"Layout: {layout}")
+        print(f"Output channels: {channels}")
+        print("Voice mode: tts_espeak")
+        print(f"eSpeak NG voice: {tts_voice}")
+        print(f"eSpeak NG speed: {tts_speed}")
+        print(f"eSpeak NG pitch: {tts_pitch}")
+        print(f"Treatment: {treatment}")
+        print(f"Scale: {cfg.get('scale', 'minor_pentatonic')}")
+        print(f"Time expansion: {cfg.get('time_mode', 'fill_duration')}")
+        print(f"Effective expansion: {speech_mono.shape[0] / max(1, raw_speech_frames):.3f}")
+        print(f"Spectral shaper: {cfg.get('spectral_shaper', 'off')}")
+        if str(cfg.get("spectral_shaper", "off")).lower() == "profile_item":
+            print(f"Spectral profile: {cfg.get('profile_path', '')}")
+        elif str(cfg.get("spectral_shaper", "off")).lower() == "tone_list":
+            print(f"Tone list: {cfg.get('tone_list', '')}")
+        print(f"Speech frames used: {speech_frames} of {speech_mono.shape[0] if 'speech_mono' in locals() else 0}")
+        print(f"Raw eSpeak frames: {raw_speech_frames if 'raw_speech_frames' in locals() else 0}")
+        print(f"Text length: {len(text)}")
+        print(f"Pre-normalize peak: {pre_peak:.6f}")
+        return
+
+    vowels = {
+        "a": (730, 1090, 2440), "e": (530, 1840, 2480), "i": (270, 2290, 3010),
+        "o": (570, 840, 2410), "u": (300, 870, 2240), "y": (400, 1900, 2550),
+    }
+    consonant_noise = set("fsvzshx")
+    consonant_burst = set("ptkbdgcq")
+    consonant_nasal = set("mnrlw")
+    vowel_keys = list(vowels.keys())
+    chars = [c.lower() for c in text if c.isalpha()]
+    if not chars:
+        chars = list("evpfield")
+
+    def plain_events():
+        events = []
+        cursor = 0.0
+        base_step = max(0.045, 1.0 / max(0.1, density))
+        for raw in text.lower():
+            if raw.isspace():
+                cursor += base_step * 1.25
+                continue
+            if raw in ".?!;:":
+                cursor += base_step * 1.8
+                continue
+            if not raw.isalpha():
+                continue
+            is_vowel = raw in vowels
+            length = syllable_ms * (1.05 if is_vowel else 0.38) / 1000.0
+            events.append((cursor, raw, length, is_vowel))
+            cursor += base_step * (0.86 if is_vowel else 0.42)
+        if not events:
+            events = [(0.0, "a", syllable_ms / 1000.0, True)]
+        scale = min(1.0, max(0.1, duration / max(duration, events[-1][0] + events[-1][2] + 0.05)))
+        return [(t * scale, ch, ln * scale, is_vowel) for t, ch, ln, is_vowel in events if t * scale < duration]
+
+    plain_sequence = plain_events() if mode == "plain" else None
+    event_count = len(plain_sequence) if plain_sequence is not None else max(1, int(round(duration * density)))
+
+    def formants_for(char, event):
+        if char in vowels and rng.random() < intelligibility:
+            base = vowels[char]
+        else:
+            base = vowels[vowel_keys[(ord(char) + event) % len(vowel_keys)]]
+        if mode == "plain":
+            if char not in vowels:
+                base = vowels[vowel_keys[(ord(char) + event) % len(vowel_keys)]]
+        elif mode == "whisper":
+            base = tuple(f * 1.08 for f in base)
+        elif mode == "broadcast":
+            base = (base[0] * 0.82, base[1] * 0.92, base[2] * 0.75)
+        elif mode == "choir":
+            base = tuple(f * rng.choice([0.92, 1.0, 1.08]) for f in base)
+        elif mode == "apparition":
+            base = (base[0] * 0.92, base[1] * 1.05, base[2] * 1.18)
+        shift = 2.0 ** (formant_shift * 0.65 + (mouth - 0.5) * 0.55)
+        return [max(80.0, f * shift * (2.0 ** rng.normal(0.0, 0.025 + smear * 0.08))) for f in base]
+
+    emitted = 0
+    for event in range(event_count):
+        if plain_sequence is not None:
+            plain_t, plain_char, plain_len, plain_is_vowel = plain_sequence[event]
+            base_u = plain_t / duration
+        else:
+            plain_t, plain_char, plain_len, plain_is_vowel = None, None, None, False
+            base_u = event / max(1, event_count - 1)
+        local_density = env_value(cfg, "density", base_u, density)
+        if plain_sequence is None and density > 0 and rng.random() > np.clip(local_density / density, 0.0, 1.0):
+            continue
+        if plain_sequence is not None:
+            t = plain_t + rng.uniform(-0.08, 0.08) * jitter / max(0.1, density)
+        else:
+            t = event / density + rng.uniform(-0.5, 0.5) * jitter / density
+        if t < 0.0 or t >= duration:
+            continue
+        u = t / duration
+        char = plain_char if plain_sequence is not None else chars[event % len(chars)]
+        local_ms = env_value(cfg, "syllable_ms", u, syllable_ms)
+        if plain_sequence is not None:
+            local_ms = max(24.0, plain_len * 1000.0)
+            size_random = 1.0 + rng.uniform(-0.08, 0.08) * jitter
+        else:
+            size_random = rng.uniform(0.65, 1.35)
+        n = max(32, int(round(local_ms * sample_rate / 1000.0 * size_random)))
+        start = int(round(t * sample_rate))
+        end = min(start + n, frames)
+        count = end - start
+        if count <= 0:
+            continue
+        x = np.arange(count, dtype=np.float64) / sample_rate
+        env = np.hanning(count).astype(np.float32)
+        pitch_wobble = pitch_spread * (0.06 if mode == "plain" else 0.25)
+        local_pitch = env_value(cfg, "pitch_hz", u, pitch) * (2.0 ** rng.normal(0.0, pitch_wobble))
+        if mode == "apparition":
+            local_pitch *= 1.0 + 0.025 * math.sin(2.0 * math.pi * (4.5 + 2.5 * spatial_motion) * t + event * 0.7)
+        local_breath = env_value(cfg, "breath", u, breath)
+        local_noise = env_value(cfg, "noise", u, noise)
+        local_whisper = env_value(cfg, "whisper", u, whisper)
+        if mode == "plain":
+            local_breath *= 0.35
+            local_noise *= 0.45
+            local_whisper *= 0.25
+        f1, f2, f3 = formants_for(char, event)
+        glottal = np.sin(2.0 * np.pi * local_pitch * x)
+        glottal += 0.35 * np.sin(2.0 * np.pi * local_pitch * 2.0 * x + rng.random() * 2.0 * np.pi)
+        glottal = np.tanh(glottal * (1.2 + drive * 3.0))
+        if mode == "apparition":
+            glide = 1.0 + 0.035 * np.sin(2.0 * np.pi * (0.75 + 0.2 * event) * x)
+            form = (
+                0.90 * np.sin(2.0 * np.pi * f1 * glide * x + rng.random() * 2.0 * np.pi) +
+                0.60 * np.sin(2.0 * np.pi * f2 * glide * x + rng.random() * 2.0 * np.pi) +
+                0.38 * np.sin(2.0 * np.pi * f3 * glide * x + rng.random() * 2.0 * np.pi)
+            )
+        else:
+            form = (
+                0.95 * np.sin(2.0 * np.pi * f1 * x + rng.random() * 2.0 * np.pi) +
+                0.55 * np.sin(2.0 * np.pi * f2 * x + rng.random() * 2.0 * np.pi) +
+                0.30 * np.sin(2.0 * np.pi * f3 * x + rng.random() * 2.0 * np.pi)
+            )
+        gate = 0.65 + 0.35 * np.sin(2.0 * np.pi * (local_pitch * 0.5) * x)
+        fric = rng.normal(0.0, 1.0, count).astype(np.float32)
+        if mode == "plain" and not plain_is_vowel:
+            burst_len = max(2, min(count, int(count * (0.18 if char in consonant_burst else 0.34))))
+            if char in consonant_noise:
+                fric[:burst_len] *= 1.8
+                fric[burst_len:] *= 0.38
+            elif char in consonant_nasal:
+                fric *= 0.18
+            else:
+                fric[:burst_len] *= 2.2
+                fric[burst_len:] *= 0.12
+        elif rng.random() < consonants:
+            burst_len = max(2, min(count, int(count * rng.uniform(0.06, 0.22))))
+            fric[burst_len:] *= 0.25
+        voiced_amount = 0.22 if mode == "plain" and not plain_is_vowel else 1.0
+        noise_amount = 1.35 if mode == "plain" and not plain_is_vowel else 1.0
+        voice = voiced_amount * (1.0 - local_whisper) * glottal * form * gate
+        voice += noise_amount * (local_breath + local_noise) * fric * (0.35 + 0.65 * local_whisper)
+        if mode == "broadcast":
+            voice = np.tanh(voice * 2.5) * (0.70 + 0.30 * np.sign(np.sin(2.0 * np.pi * 38.0 * x)))
+        elif mode == "apparition":
+            voice = 0.72 * voice + 0.28 * np.roll(voice, max(1, int(0.006 * sample_rate)))
+        voice = voice.astype(np.float32) * env * gain * env_value(cfg, "amplitude", u, 1.0) / max(0.3, distance)
+        if drive > 0:
+            voice = ((1.0 - drive) * voice + drive * np.tanh(voice * (1.0 + drive * 8.0)) / (1.0 + drive * 2.0)).astype(np.float32)
+        az, el = aed(event, u)
+        az = env_value(cfg, "azimuth", u, az)
+        el = env_value(cfg, "elevation", u, el)
+        if output_mode == "3oa":
+            basis = np.array(ambisonic_basis(order, az, el), dtype=np.float32)
+            out[start:end] += voice[:, None] * basis[None, :]
+        else:
+            weights = speaker_weights(az, el)
+            out[start:end] += voice[:, None] * weights[None, :]
+        norm[start:end] += env * env
+        emitted += 1
+
+    out /= np.maximum(np.sqrt(norm[:, None]), 0.35)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("soft_limit", True)):
+        out = np.tanh(out * 1.15).astype(np.float32) / 1.15
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -9.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out.astype(np.float32), sample_rate)
+    print("Process: EVP Field")
+    print(f"Output mode: {output_mode}")
+    print(f"Layout: {layout}")
+    print(f"Output channels: {channels}")
+    print(f"Voice mode: {mode}")
+    print(f"Events emitted: {emitted} of {event_count}")
+    print(f"Text length: {len(text)}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
 def spatial_weights(channels, center, width):
     idx = np.arange(channels, dtype=np.float64)
     dist = np.abs(((idx - center + channels / 2.0) % channels) - channels / 2.0)
@@ -4787,7 +5732,7 @@ def render_midi_form_learner(cfg):
 
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|stereo_expand_ambisonic_bed|foafx_offline|foafx_object_space|foafx_spatial_occupation_montage|foafx_scene_navigator|foafx_object_field_split|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|foafx_pulsar_field|foafx_particle_cloud|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|stereo_expand_ambisonic_bed|foafx_offline|foafx_object_space|foafx_spatial_occupation_montage|foafx_scene_navigator|foafx_object_field_split|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|foafx_aed_granulator|foafx_pulsar_field|foafx_particle_cloud|evp_field|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -4827,10 +5772,14 @@ def main():
         render_multichannel_spectral_profile_tool(cfg)
     elif mode == "foafx_spatial_grains":
         render_foafx_spatial_granulator(cfg)
+    elif mode == "foafx_aed_granulator":
+        render_foafx_aed_granulator(cfg)
     elif mode == "foafx_pulsar_field":
         render_foafx_pulsar_field(cfg)
     elif mode == "foafx_particle_cloud":
         render_foafx_particle_cloud(cfg)
+    elif mode == "evp_field":
+        render_evp_field(cfg)
     elif mode == "karplus_field":
         render_karplus_field(cfg)
     elif mode == "subharmonic_bank":

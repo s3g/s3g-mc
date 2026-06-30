@@ -11,6 +11,8 @@ next_page:
 toc:
   - title: Dense Grain Cloud
     href: "#dense-grain-cloud"
+  - title: EVP Field
+    href: "#evp-field"
   - title: Fata Morgana Resynth
     href: "#fata-morgana-resynth"
   - title: IR Toolkit
@@ -51,6 +53,49 @@ Important controls:
 
 Use lower grain counts while setting the event shape and spatial spread, then raise the count for denser renders. Use the amplitude envelope for fades instead of relying only on post-render gain.
 
+
+## EVP Field
+
+Use this to render synthetic speech-like formant material as a multichannel or
+ambisonic field. eSpeak NG creates the spoken source, then the selected voice
+treatment reshapes it before spatial rendering. eSpeak NG is required for this
+process.
+
+Output:
+
+- `3OA ACN/SN3D` writes a 16-channel ambisonic item.
+- `Multichannel shape` writes a speaker-shaped item using ring, double-ring,
+  cube, or dome placement.
+
+Main controls:
+
+- `Voice treatment` selects clear speech, sung chant, melodic, choir, whisper
+  ghost, possession, or broken radio behavior.
+- `eSpeak voice`, `Speech speed wpm`, and `Speech pitch` control the source
+  speech render. On macOS, install eSpeak NG with `brew install espeak-ng`.
+- `Time expansion` controls how the spoken source occupies the render:
+  `Fill duration` stretches the phrase to the requested duration, `Manual
+  expansion` uses the expansion factor, and `Speech length` keeps the natural
+  eSpeak phrase length.
+- `Scale`, `Root semitone`, and `Melody depth` shape the pitch contour used by
+  sung and melodic treatments.
+- `Vowel sustain`, `Choir voices`, `Shadow voice`, and `Ghost mix` shape layered
+  voice behavior.
+- `Spectral shaper` adds an end-stage color mask before spatial output:
+  `Preset` uses internal resonant shapes, `Tone list` builds a harmonic mask
+  from typed note names, MIDI numbers, or frequencies, and `Profile item`
+  imprints the spectrum of the first selected WAV media item.
+- `Shaper strength`, `Shaper bandwidth`, `Shaper partials`, and
+  `Shaper brightness` control how strongly the mask is applied.
+- `Pitch`, `Pitch spread`, `Formant shift`, and `Mouth size` shift the vocal
+  register and formant character.
+- `Breath`, `Noise`, `Whisper`, and `Formant smear` add air, residue, and
+  instability.
+- `Azimuth width`, `Elevation width`, `Spatial motion`, and `Speaker spread`
+  shape the spatial field.
+
+Breakpoint curves can vary amplitude, density, syllable length, pitch, breath,
+noise, whisper, azimuth, and elevation over the render.
 
 
 ## Fata Morgana Resynth

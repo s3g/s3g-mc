@@ -17,8 +17,8 @@ useful.
 
 For step-by-step notes on selected processes, see the [Process Guides](docs/process-guides.md).
 
-Current package snapshot: the browser exposes 104 user-facing tools/controllers,
-plus the Package Browser. Of those, 44 are Python/NumPy-backed offline
+Current package snapshot: the browser exposes 106 user-facing tools/controllers,
+plus the Package Browser. Of those, 46 are Python/NumPy-backed offline
 processes, 22 load, control, or render included JSFX, and 38 are native
 Lua/ReaImGui REAPER actions. The repository also ships 21 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and internal
@@ -29,9 +29,9 @@ Package Browser group counts:
 - Channel Mixing / Automation: 4
 - MIDI Composition: 7
 - Procedural Synthesis: 6
-- Offline Synthesis / IR: 8
+- Offline Synthesis / IR: 9
 - Spatial Panners: 10
-- 3OAFX: 20
+- 3OAFX: 21
 - Spectral / Convolution: 16
 - Multichannel Texture / Montage: 20
 - Item Channel Transforms: 10
@@ -110,6 +110,13 @@ time. Density means event or peak admission before synthesis, not gain
 modulation afterward.
 
 - `Dense Grain Cloud`: source-item grains scattered into a multichannel field.
+- `EVP Field`: eSpeak-backed speech/formant field for EVP, chant, choir,
+  possession, and damaged-broadcast textures. Voice treatments reshape the
+  spoken source, time expansion can fill the requested duration, and an
+  optional spectral shaper can apply preset masks, typed tone-list resonances,
+  or a selected-item profile imprint before fixed 3OA ACN/SN3D or multichannel
+  ring, double-ring, cube, and dome output. eSpeak NG is required for this
+  process.
 - `Fata Morgana Resynth`: hybrid oscillator resynthesis from 2-16 selected
   source items, recombining timing, pitch, amplitude, and spatial traits.
 - `IR Toolkit`: reshapes a selected impulse response item with silence trim,
@@ -168,6 +175,9 @@ behaviors.
 - `6ch Ambisonic Decoder Router`: package-native JSFX monitor decoder/router
   for ACN/SN3D 1OA, 2OA, or 3OA into a compact 4-speaker bed plus 2 elevated
   side speakers, with direct 6-channel routing mode.
+- `3OAFX AED Granulator`: NumPy-backed object-grain renderer that takes mono,
+  stereo, or multichannel WAV-backed media, reads grains from source channels,
+  assigns generated AED positions, and encodes directly to 3OA ACN/SN3D output.
 - `3OAFX Ambiance Extractor`: extracts room tone, noise bed, or other
   profile-like material from an ambisonic source while preserving the directional
   decode/re-encode workflow.
@@ -340,6 +350,11 @@ behaviors.
   is required for the NumPy-backed offline processes. If REAPER cannot find the
   intended Python, put a `python3_path.txt` file beside the scripts containing
   the full path to `python3`.
+- <a href="https://github.com/espeak-ng/espeak-ng" target="_blank" rel="noopener noreferrer">eSpeak NG</a>
+  is required by `EVP Field` only. On macOS it can be installed with
+  `brew install espeak-ng`. If REAPER cannot find it, put the full path in
+  `espeak_ng_path.txt` beside the scripts, for example
+  `/opt/homebrew/bin/espeak-ng`.
 - <a href="https://leomccormack.github.io/sparta-site/" target="_blank" rel="noopener noreferrer">SPARTA plugins</a>, specifically
   AmbiDEC and AmbiENC, are recommended for the 3OA workflow. Source and releases:
   <a href="https://github.com/leomccormack/SPARTA" target="_blank" rel="noopener noreferrer">leomccormack/SPARTA</a>.

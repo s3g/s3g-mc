@@ -11,6 +11,8 @@ next_page:
 toc:
   - title: Source Format Convention
     href: "#source-format-convention"
+  - title: 3OAFX AED Granulator
+    href: "#3oafx-aed-granulator"
   - title: 3OAFX Send Return Controller
     href: "#3oafx-send-return-controller"
   - title: 3OAFX Object Space
@@ -52,6 +54,42 @@ These guides match the Package Browser's 3OAFX group. They cover ambisonic offli
 3OAFX processes use `ACN/SN3D` for ambisonic media and rendered ambisonic output. When a process accepts both ambisonic and non-ambisonic material, `Auto by channel count` reads `4ch` as 1OA, `10ch` as 2OA using the first 9 channels, and `16ch` as 3OA. A true `9ch` WAV may also be accepted as 2OA. Other channel counts are treated as non-ambisonic source objects. Each input channel is placed onto the selected 3OAFX directional layer, then encoded into the selected `ACN/SN3D` output order. This is a directional-layer interpretation rather than a decode of a standard speaker format such as 5.1 or hexagonal ring. Use the source-format override when the selected item needs to be interpreted differently.
 
 References and related writings are listed separately in the documentation. The guide pages focus on how to use each process.
+
+## 3OAFX AED Granulator
+
+Use this to turn mono, stereo, or multichannel source material into a 3OA
+object-grain field. The selected media item is treated as ordinary source
+material, not as an ambisonic recording. Each grain reads one source channel,
+receives its own generated azimuth, elevation, and distance behavior, then is
+encoded directly to `3OA ACN/SN3D`.
+
+This differs from `3OAFX Spatial Grains`, which expects ambisonic input and
+keeps every grain coherent across encoded HOA channels. It also differs from
+`3OAFX Particle Cloud`, which can accept non-ambisonic sources but projects
+them into the direction layer before cloud processing. `3OAFX AED Granulator`
+keeps the grain as the spatial object.
+
+Method:
+
+The engine adapts a triggered voice-rotation granulator model for offline 3OA
+rendering. Trigger density and chance decide when grains happen. The voice
+rotation, source spray, pitch spread, reverse chance, source-position
+quantization, window morph, and drive controls shape the grain stream. AED
+trajectory modes decide where those grains appear in the ambisonic field.
+
+Main controls:
+
+- `AED trajectory` chooses braid, orbit, ribbon, lattice, or spray placement.
+- `Source channel mode` chooses how input channels are selected for grains.
+- `Trigger density`, `Trigger chance`, and `Voice rotation` shape event flow.
+- `Source spray`, `Source position`, and `Position quantize` shape where grains
+  read from the source file.
+- `Transpose`, `Pitch spread`, `Reverse chance`, `Window morph`, and `Rate
+  drift` shape grain playback.
+- `Azimuth`, `Elevation`, `Distance`, and related width/depth controls shape
+  the object field before 3OA encoding.
+- Breakpoint curves can vary amplitude, density, chance, grain duration, source
+  position, transpose, azimuth, and elevation over the rendered duration.
 
 ## 3OAFX Send Return Controller
 
