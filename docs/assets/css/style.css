@@ -301,7 +301,7 @@ a:focus-visible {
   inset: 0;
   z-index: 100;
   display: none;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   padding: 56px 92px;
   background: rgba(12, 14, 14, 0.88);
@@ -334,7 +334,7 @@ a:focus-visible {
   color: var(--ink);
   cursor: pointer;
   text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
-  transition: background 140ms ease, color 140ms ease, opacity 140ms ease;
+  transition: color 140ms ease, opacity 140ms ease;
 }
 
 .gallery-close:hover,
@@ -342,7 +342,7 @@ a:focus-visible {
 .gallery-close:focus-visible,
 .gallery-arrow:focus-visible {
   color: var(--accent-dark);
-  background: rgba(178, 188, 182, 0.12);
+  background: transparent;
   outline: 0;
 }
 

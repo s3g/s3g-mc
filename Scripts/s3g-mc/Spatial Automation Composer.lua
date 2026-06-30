@@ -1,14 +1,13 @@
 -- @description Spatial Automation Composer
 -- @author s3g
--- @version 0.1
+-- @version 0.2
 -- @requires ReaImGui
 -- @category Spatial Panners
 -- @method Offline spatial choreography writer for s3g panners. Detects AED or XYZ source parameters on the selected track, previews an algorithmic motion path, then commits automation points over the time selection or selected item range.
 -- @about
 --   Writes panner automation as an editable Reaper score rather than running
 --   choreography in realtime. First pass supports 8-source s3g AED and XYZ
---   panners with orbit, spiral, pendulum, Brownian, Lissajous, and scatter-hold
---   motion.
+--   panners with path, graph, topology, and source-relationship modes.
 
 if not reaper.APIExists("ImGui_GetVersion") then
   reaper.MB("ReaImGui is not installed or not loaded.", "Spatial Automation Composer", 0)
@@ -26,9 +25,13 @@ local last_status = ""
 local view_yaw_deg = -35
 local view_pitch_deg = -42
 local view_zoom = 1.0
+local preview_t = 0.0
+local preview_play = false
+local preview_speed = 1.0
+local last_frame_time = reaper.time_precise()
 
-local ALGORITHMS = { "Orbit", "Spiral", "Pendulum", "Brownian", "Lissajous", "Scatter holds" }
-local TARGET_MODES = { "Selected source", "All sources phased" }
+local ALGORITHMS = { "Orbit", "Arc", "Spiral", "Lissajous", "Brownian", "Graph walk", "Hole field", "Attractor", "Boundary trace", "Scatter holds" }
+local TARGET_MODES = { "Selected source", "Unison all", "Phase offset", "Canon", "Counter-rotation", "Scatter" }
 local TIME_MODES = { "Time selection", "Selected item", "Edit cursor + duration" }
 
 local settings = {
@@ -40,6 +43,7 @@ local settings = {
   point_rate = 8,
   cycles = 1,
   phase_spread = 1,
+  canon_delay = 0.12,
   az_center = 0,
   az_width = 180,
   el_center = 25,
@@ -47,6 +51,12 @@ local settings = {
   dist_center = 1,
   dist_width = 0.45,
   xyz_radius = 1.25,
+  continuity = 0.72,
+  tear = 0.0,
+  boundary_push = 0.25,
+  hole_radius = 0.28,
+  graph_nodes = 6,
+  graph_memory = 0.45,
   seed = 4321,
   clear_existing = true,
 }
@@ -162,6 +172,10 @@ local function target_sources()
   return sources
 end
 
+local function source_count_active()
+  return settings.target_mode == 1 and 1 or NUM_SOURCES
+end
+
 local function time_range()
   if settings.time_mode == 1 then
     local start_pos, end_pos = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
@@ -177,14 +191,37 @@ local function time_range()
   return start_pos, start_pos + math.max(0.1, settings.duration)
 end
 
-local function source_phase(source)
-  if settings.target_mode == 1 then return 0 end
-  return ((source - 1) / NUM_SOURCES) * math.pi * 2 * settings.phase_spread
-end
-
 local function hash_noise(n)
   local x = math.sin(n * 12.9898 + settings.seed * 78.233) * 43758.5453
   return x - math.floor(x)
+end
+
+local function source_phase(source)
+  if settings.target_mode == 1 or settings.target_mode == 2 then return 0 end
+  if settings.target_mode == 5 then
+    return (source % 2 == 0 and math.pi or 0) * settings.phase_spread
+  end
+  if settings.target_mode == 6 then
+    return hash_noise(source * 131 + 7) * math.pi * 2 * settings.phase_spread
+  end
+  return ((source - 1) / NUM_SOURCES) * math.pi * 2 * settings.phase_spread
+end
+
+local function source_time(source, t)
+  if settings.target_mode == 4 then
+    return (t - (source - 1) * settings.canon_delay) % 1
+  end
+  return t
+end
+
+local function source_direction(source)
+  if settings.target_mode == 5 and source % 2 == 0 then return -1 end
+  return 1
+end
+
+local function source_spread(source)
+  if settings.target_mode ~= 6 then return 1 end
+  return 0.45 + 0.9 * hash_noise(source * 71 + 19)
 end
 
 local function smooth_noise(source, step, channel_offset)
@@ -200,31 +237,141 @@ local function scatter_value(source, t, channel_offset, lo, hi)
   return lo + v * (hi - lo)
 end
 
+local function lerp(a, b, t)
+  return a + (b - a) * t
+end
+
+local function smoothstep(t)
+  t = clamp(t, 0, 1)
+  return t * t * (3 - 2 * t)
+end
+
+local function continuity_t(t)
+  local c = clamp(settings.continuity, 0, 1)
+  return lerp(t, smoothstep(t), c)
+end
+
+local function maybe_tear(source, t)
+  local tear = clamp(settings.tear, 0, 1)
+  if tear <= 0 then return t end
+  local zones = math.max(2, math.floor(settings.cycles * 5 + 0.5))
+  local zone = math.floor(t * zones)
+  local jump = hash_noise(source * 911 + zone * 41)
+  if jump < tear * 0.45 then
+    return (t + hash_noise(source * 317 + zone * 89) * tear) % 1
+  end
+  return t
+end
+
+local function graph_segment_t(source, t)
+  local nodes = math.max(3, math.floor(settings.graph_nodes + 0.5))
+  local travel = t * math.max(0.1, settings.cycles) * nodes
+  local index = math.floor(travel)
+  local frac = continuity_t(travel - index)
+  local a = (index % nodes) + 1
+  local memory = clamp(settings.graph_memory, 0, 1)
+  local skip = 1 + math.floor(hash_noise(source * 173 + index * 29) * math.max(1, nodes - 1) * (1 - memory))
+  local b = ((a - 1 + skip) % nodes) + 1
+  return nodes, a, b, frac
+end
+
+local function graph_aed_node(node, nodes)
+  local u = (node - 1) / math.max(1, nodes)
+  local az = settings.az_center + settings.az_width * math.sin(u * math.pi * 2)
+  local el = settings.el_center + settings.el_width * 0.5 * math.sin(u * math.pi * 4 + math.pi * 0.25)
+  local dist = settings.dist_center + settings.dist_width * 0.5 * math.cos(u * math.pi * 2)
+  return az, el, dist
+end
+
+local function graph_xyz_node(node, nodes, radius)
+  local u = (node - 1) / math.max(1, nodes)
+  local az = u * math.pi * 2
+  local z = math.sin(u * math.pi * 4 + math.pi * 0.25) * radius * 0.65
+  return math.sin(az) * radius, math.cos(az) * radius, z
+end
+
+local function apply_aed_hole(az, el)
+  local radius = math.max(1, settings.hole_radius * 180)
+  local da = wrap_degrees(az - settings.az_center)
+  local de = el - settings.el_center
+  local d = math.sqrt(da * da + de * de)
+  if d < radius and d > 0.0001 then
+    local push = (radius - d) / radius * settings.boundary_push
+    az = az + (da / d) * push * radius
+    el = el + (de / d) * push * radius * 0.5
+  elseif d <= 0.0001 then
+    az = az + radius * settings.boundary_push
+  end
+  return az, el
+end
+
+local function apply_xyz_hole(x, y, z)
+  local radius = math.max(0.05, settings.xyz_radius * settings.hole_radius)
+  local d = math.sqrt(x * x + y * y + z * z)
+  if d < radius and d > 0.0001 then
+    local push = (radius - d) / radius * settings.boundary_push
+    x = x + (x / d) * push * radius
+    y = y + (y / d) * push * radius
+    z = z + (z / d) * push * radius
+  elseif d <= 0.0001 then
+    x = x + radius * settings.boundary_push
+  end
+  return x, y, z
+end
+
 local function aed_position(source, t, spec)
+  t = maybe_tear(source, source_time(source, t))
   local phase = source_phase(source)
-  local cycle = math.pi * 2 * settings.cycles * t + phase
+  local direction = source_direction(source)
+  local spread = source_spread(source)
+  local cycle = direction * math.pi * 2 * settings.cycles * t + phase
   local az, el, dist
   if settings.algorithm == 1 then
-    az = settings.az_center + settings.az_width * math.sin(cycle)
+    az = settings.az_center + settings.az_width * spread * math.sin(cycle)
     el = settings.el_center + settings.el_width * 0.25 * math.sin(cycle * 0.5 + phase)
     dist = settings.dist_center + settings.dist_width * 0.25 * math.cos(cycle)
   elseif settings.algorithm == 2 then
+    az = settings.az_center + settings.az_width * spread * math.sin(cycle) * 0.65
+    el = settings.el_center + settings.el_width * 0.35 * math.sin(cycle * 0.5 + phase)
+    dist = settings.dist_center
+  elseif settings.algorithm == 3 then
     az = settings.az_center + math.deg(cycle)
     el = settings.el_center + settings.el_width * (t - 0.5)
     dist = settings.dist_center + settings.dist_width * math.sin(cycle * 0.5)
-  elseif settings.algorithm == 3 then
-    az = settings.az_center + settings.az_width * math.sin(cycle)
-    el = settings.el_center + settings.el_width * 0.5 * math.sin(cycle + math.pi * 0.5)
-    dist = settings.dist_center
   elseif settings.algorithm == 4 then
+    az = settings.az_center + settings.az_width * math.sin(cycle)
+    el = settings.el_center + settings.el_width * 0.5 * math.sin(cycle * 1.5 + phase)
+    dist = settings.dist_center + settings.dist_width * math.sin(cycle * 0.75 + phase * 0.5)
+  elseif settings.algorithm == 5 then
     local step = math.floor(t * settings.point_rate * math.max(1, settings.cycles))
     az = settings.az_center + settings.az_width * smooth_noise(source, step, 0)
     el = settings.el_center + settings.el_width * 0.5 * smooth_noise(source, step, 1)
     dist = settings.dist_center + settings.dist_width * smooth_noise(source, step, 2)
-  elseif settings.algorithm == 5 then
+  elseif settings.algorithm == 6 then
+    local nodes, a, b, frac = graph_segment_t(source, t)
+    local az1, el1, d1 = graph_aed_node(a, nodes)
+    local az2, el2, d2 = graph_aed_node(b, nodes)
+    az = lerp(az1, az2, frac)
+    el = lerp(el1, el2, frac)
+    dist = lerp(d1, d2, frac)
+  elseif settings.algorithm == 7 then
     az = settings.az_center + settings.az_width * math.sin(cycle)
-    el = settings.el_center + settings.el_width * 0.5 * math.sin(cycle * 1.5 + phase)
-    dist = settings.dist_center + settings.dist_width * math.sin(cycle * 0.75 + phase * 0.5)
+    el = settings.el_center + settings.el_width * 0.5 * math.sin(cycle * 0.75 + phase)
+    dist = settings.dist_center + settings.dist_width * 0.25 * math.cos(cycle)
+    az, el = apply_aed_hole(az, el)
+  elseif settings.algorithm == 8 then
+    local pull = 1 - math.exp(-t * (1.0 + settings.boundary_push * 4))
+    az = lerp(settings.az_center - settings.az_width, settings.az_center, pull) + settings.az_width * 0.2 * math.sin(cycle)
+    el = lerp(settings.el_center - settings.el_width * 0.5, settings.el_center, pull)
+    dist = lerp(settings.dist_center + settings.dist_width, settings.dist_center, pull)
+  elseif settings.algorithm == 9 then
+    local edge = (t * math.max(1, settings.graph_nodes)) % 1
+    local side = math.floor(t * math.max(4, settings.graph_nodes)) % 4
+    local a = side == 0 and edge or side == 1 and 1 or side == 2 and (1 - edge) or 0
+    local b = side == 0 and 0 or side == 1 and edge or side == 2 and 1 or (1 - edge)
+    az = settings.az_center + settings.az_width * (a * 2 - 1)
+    el = settings.el_center + settings.el_width * (b - 0.5)
+    dist = settings.dist_center
   else
     az = scatter_value(source, t, 0, settings.az_center - settings.az_width, settings.az_center + settings.az_width)
     el = scatter_value(source, t, 1, settings.el_center - settings.el_width * 0.5, settings.el_center + settings.el_width * 0.5)
@@ -234,21 +381,43 @@ local function aed_position(source, t, spec)
 end
 
 local function xyz_position(source, t, spec)
+  t = maybe_tear(source, source_time(source, t))
   local phase = source_phase(source)
-  local cycle = math.pi * 2 * settings.cycles * t + phase
+  local direction = source_direction(source)
+  local spread = source_spread(source)
+  local cycle = direction * math.pi * 2 * settings.cycles * t + phase
   local r = settings.xyz_radius
   local x, y, z
   if settings.algorithm == 1 then
-    x = r * math.sin(cycle); y = r * math.cos(cycle); z = 0.35 * r * math.sin(cycle * 0.5 + phase)
+    x = r * spread * math.sin(cycle); y = r * spread * math.cos(cycle); z = 0.35 * r * math.sin(cycle * 0.5 + phase)
   elseif settings.algorithm == 2 then
-    x = r * math.sin(cycle); y = r * math.cos(cycle); z = r * (t * 2 - 1)
+    x = r * 0.85 * math.sin(cycle); y = r * 0.25 * math.cos(cycle); z = r * 0.35 * math.sin(cycle * 0.5 + phase)
   elseif settings.algorithm == 3 then
-    x = r * math.sin(cycle); y = r * 0.35 * math.cos(cycle); z = 0
+    x = r * math.sin(cycle); y = r * math.cos(cycle); z = r * (t * 2 - 1)
   elseif settings.algorithm == 4 then
+    x = r * math.sin(cycle); y = r * math.sin(cycle * 1.5 + phase); z = r * math.sin(cycle * 0.75 + phase * 0.5)
+  elseif settings.algorithm == 5 then
     local step = math.floor(t * settings.point_rate * math.max(1, settings.cycles))
     x = r * smooth_noise(source, step, 0); y = r * smooth_noise(source, step, 1); z = r * smooth_noise(source, step, 2)
-  elseif settings.algorithm == 5 then
-    x = r * math.sin(cycle); y = r * math.sin(cycle * 1.5 + phase); z = r * math.sin(cycle * 0.75 + phase * 0.5)
+  elseif settings.algorithm == 6 then
+    local nodes, a, b, frac = graph_segment_t(source, t)
+    local x1, y1, z1 = graph_xyz_node(a, nodes, r)
+    local x2, y2, z2 = graph_xyz_node(b, nodes, r)
+    x = lerp(x1, x2, frac); y = lerp(y1, y2, frac); z = lerp(z1, z2, frac)
+  elseif settings.algorithm == 7 then
+    x = r * math.sin(cycle); y = r * math.cos(cycle); z = r * 0.45 * math.sin(cycle * 0.5 + phase)
+    x, y, z = apply_xyz_hole(x, y, z)
+  elseif settings.algorithm == 8 then
+    local pull = 1 - math.exp(-t * (1.0 + settings.boundary_push * 4))
+    x = lerp(-r, 0, pull) + r * 0.2 * math.sin(cycle)
+    y = lerp(r, 0, pull)
+    z = lerp(-r * 0.5, 0, pull)
+  elseif settings.algorithm == 9 then
+    local edge = (t * math.max(1, settings.graph_nodes)) % 1
+    local side = math.floor(t * math.max(4, settings.graph_nodes)) % 4
+    x = r * ((side == 0 and edge or side == 1 and 1 or side == 2 and (1 - edge) or 0) * 2 - 1)
+    y = r * ((side == 0 and 0 or side == 1 and edge or side == 2 and 1 or (1 - edge)) * 2 - 1)
+    z = r * 0.4 * math.sin(cycle)
   else
     x = scatter_value(source, t, 0, -r, r); y = scatter_value(source, t, 1, -r, r); z = scatter_value(source, t, 2, -r, r)
   end
@@ -411,6 +580,7 @@ local function draw_preview(spec, start_pos, end_pos)
   local paths = build_preview(spec, start_pos, end_pos)
   for source, path in pairs(paths) do
     local prev
+    local active_index = math.max(1, math.min(#path, math.floor(preview_t * math.max(1, #path - 1) + 1.5)))
     for i, p in ipairs(path) do
       local r = rotate_preview_point(p)
       local front = clamp((r.z + 2) / 4, 0.18, 1)
@@ -424,9 +594,17 @@ local function draw_preview(spec, start_pos, end_pos)
       elseif i == #path then
         ImGui.DrawList_AddRectFilled(draw_list, px - 4, py - 4, px + 4, py + 4, source_color(source, 0.95))
       end
+      if i == active_index then
+        ImGui.DrawList_AddCircleFilled(draw_list, px, py, 6.5, color(1.0, 0.88, 0.18, 0.95), 20)
+        ImGui.DrawList_AddCircle(draw_list, px, py, 9.5, source_color(source, 0.92), 20, 1.5)
+      end
       prev = { x = px, y = py }
     end
   end
+  local tx0, ty = x + 16, y + h - 20
+  local tx1 = x + canvas_w - 16
+  ImGui.DrawList_AddLine(draw_list, tx0, ty, tx1, ty, color(0.80, 0.84, 0.82, 0.28), 1)
+  ImGui.DrawList_AddCircleFilled(draw_list, tx0 + (tx1 - tx0) * preview_t, ty, 4.0, color(1.0, 0.88, 0.18, 0.95), 16)
   if controls_inline then
     ImGui.SameLine(ctx)
     ImGui.Dummy(ctx, control_gap, 1)
@@ -435,7 +613,24 @@ local function draw_preview(spec, start_pos, end_pos)
   draw_preview_camera_controls()
 end
 
+local function draw_preview_transport()
+  local changed
+  changed, preview_t = ImGui.SliderDouble(ctx, "Timeline preview", preview_t, 0, 1, "%.3f")
+  if ImGui.Button(ctx, preview_play and "Stop Preview" or "Play Preview", 130, 26) then
+    preview_play = not preview_play
+  end
+  ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, "Reset Preview", 110, 26) then preview_t = 0 end
+  changed, preview_speed = ImGui.SliderDouble(ctx, "Preview speed", preview_speed, 0.125, 4.0, "%.3fx")
+end
+
 local function loop()
+  local now = reaper.time_precise()
+  local dt = math.max(0, math.min(0.2, now - last_frame_time))
+  last_frame_time = now
+  if preview_play then
+    preview_t = (preview_t + dt * preview_speed / math.max(0.1, settings.duration)) % 1.0
+  end
   ImGui.SetNextWindowSize(ctx, 820, 860, ImGui.Cond_FirstUseEver)
   local visible
   visible, open = ImGui.Begin(ctx, "Spatial Automation Composer", open)
@@ -453,17 +648,34 @@ local function loop()
       ImGui.SameLine(ctx)
       ImGui.TextColored(ctx, COLORS.muted, spec.coord .. " / FX #" .. tostring(fx + 1))
 
-      settings.algorithm = draw_combo("Motion", settings.algorithm, ALGORITHMS)
-      settings.target_mode = draw_combo("Sources", settings.target_mode, TARGET_MODES)
+      settings.algorithm = draw_combo("Path method", settings.algorithm, ALGORITHMS)
+      settings.target_mode = draw_combo("Source relationship", settings.target_mode, TARGET_MODES)
       if settings.target_mode == 1 then
         local changed
         changed, settings.selected_source = ImGui.SliderInt(ctx, "Selected source", settings.selected_source, 1, NUM_SOURCES)
+      end
+      if settings.target_mode == 4 then
+        settings.canon_delay = slider("Canon delay", settings.canon_delay, 0.0, 0.5, "%.3f")
       end
       settings.time_mode = draw_combo("Range", settings.time_mode, TIME_MODES)
       if settings.time_mode == 3 then settings.duration = slider("Duration", settings.duration, 0.25, 240, "%.2f sec") end
       settings.point_rate = slider("Point rate", settings.point_rate, 1, 30, "%.0f / sec")
       settings.cycles = slider("Cycles", settings.cycles, 0.1, 12, "%.2f")
       settings.phase_spread = slider("Source phase spread", settings.phase_spread, 0, 3, "%.2f")
+      settings.continuity = slider("Continuity", settings.continuity, 0, 1, "%.2f")
+      settings.tear = slider("Tear / jump chance", settings.tear, 0, 1, "%.2f")
+      if settings.algorithm == 6 then
+        local changed
+        changed, settings.graph_nodes = ImGui.SliderInt(ctx, "Graph nodes", settings.graph_nodes, 3, 16)
+        settings.graph_memory = slider("Graph memory", settings.graph_memory, 0, 1, "%.2f")
+      elseif settings.algorithm == 7 then
+        settings.hole_radius = slider("Hole radius", settings.hole_radius, 0.02, 0.95, "%.2f")
+        settings.boundary_push = slider("Hole repulsion", settings.boundary_push, 0, 1, "%.2f")
+      elseif settings.algorithm == 8 or settings.algorithm == 9 then
+        settings.boundary_push = slider("Boundary force", settings.boundary_push, 0, 1, "%.2f")
+        local changed
+        changed, settings.graph_nodes = ImGui.SliderInt(ctx, "Path corners", settings.graph_nodes, 4, 16)
+      end
       local changed
       changed, settings.clear_existing = ImGui.Checkbox(ctx, "Clear existing points in range", settings.clear_existing)
 
@@ -482,6 +694,7 @@ local function loop()
 
       ImGui.Spacing(ctx)
       draw_preview(spec, start_pos, end_pos)
+      draw_preview_transport()
       ImGui.Spacing(ctx)
       ImGui.TextColored(ctx, COLORS.muted, string.format("Will write %d points per parameter over %.2f seconds.", point_count(start_pos, end_pos), end_pos - start_pos))
       if ImGui.Button(ctx, "Write automation", 180, 30) then
