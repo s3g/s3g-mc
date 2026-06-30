@@ -34,17 +34,17 @@ toc:
 
 For step-by-step notes on selected processes, see the [Process Guides](process-guides.md).
 
-Current package snapshot: the browser exposes 101 user-facing tools/controllers
+Current package snapshot: the browser exposes 101 user-facing tools/controllers,
 plus the Package Browser. Of those, 42 are Python/NumPy-backed offline
-processes, 37 are Lua/ReaImGui REAPER actions, and 22 load, control, or render
-included JSFX. The repository also ships 21 underlying JSFX engine/effect files.
-The Lua folder also includes helper libraries and internal dialogs that are not
-shown as Package Browser entries.
+processes, 22 load, control, or render included JSFX, and 37 are native
+Lua/ReaImGui REAPER actions. The repository also ships 21 underlying JSFX
+engine/effect files. The Lua folder includes helper libraries and internal
+dialogs that are not shown as Package Browser entries.
 
 Package Browser group counts:
 
 - Channel Mixing / Automation: 4
-- MIDI Composition: 6
+- MIDI Composition: 7
 - Procedural Synthesis: 6
 - Offline Synthesis / IR: 8
 - Spatial Panners: 10
@@ -71,23 +71,26 @@ Package Browser group counts:
 
 ## MIDI Composition
 
-- `Generate Lattice MIDI`: creates an editable MIDI item from a table-scanning
+- `Lattice Drums`: creates an editable drum MIDI item from a layered
+  table-scanning gesture, with each layer assigned to a drum voice and cells
+  shaping velocity, duration, and density with Superior-style or GM note maps.
+- `Lattice Tables`: creates an editable MIDI item from a table-scanning
   gesture model, translating visible lattice cells into pitch, velocity,
   duration, and MIDI-channel focus.
-- `Generate Musical Space MIDI`: creates an editable MIDI item from a path
-  through scale-degree, contour, triadic, or axis-mirror spaces, with Euclidean
-  timing, density, velocity shaping, MIDI-channel focus, and geometric preview.
-- `MIDI Form Learner`: NumPy-backed composer that analyzes selected MIDI items
+- `Musical Space`: creates an editable MIDI item from a path through melodic
+  and harmonic spaces, with selectable rhythm models, density, voicing,
+  velocity shaping, MIDI-channel focus, and geometric preview.
+- `Form Learner`: NumPy-backed composer that analyzes selected MIDI items
   and expands their rhythm, pitch, velocity, duration, and channel traits into a
   longer editable MIDI form.
-- `MIDI Terrain Form`: NumPy-backed song-duration MIDI generator with section
+- `Terrain Form`: NumPy-backed song-duration MIDI generator with section
   maps, terrain-shaped density/register/channel fields, and optional project
   markers.
 - `Polymetric Drum States`: creates an editable drum MIDI item from changing
   polymeter configurations, using Superior-style or GM drum maps, integer or
   fractional state lengths, beat-grid snapping, and jump or glide transitions
   between states.
-- `Generate Polymetric MIDI Lanes`: creates multiple Euclidean lanes with
+- `Polymetric Pitch Lanes`: creates multiple Euclidean lanes with
   independent lengths, pulses, rotations, pitch degrees, and MIDI channels for
   procedural synths or general algorithmic composition, shown as concentric
   rhythm rings.

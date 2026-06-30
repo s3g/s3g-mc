@@ -65,7 +65,7 @@ Use this with MIDI items that contain table, path, or channel-focused material. 
 
 Starting approach:
 
-- Run `Generate Lattice MIDI` or another MIDI generator on the same track.
+- Run `Lattice Tables` or another MIDI generator on the same track.
 - Keep `MIDI control` on.
 - Use `Pitch sets frequency` for note-like plucked behavior, or `Gate only` when the table and base frequency should define the pitch field.
 - Set `Template`, `Ingress`, `Egress`, and `Gesture position` to shape the table scan.

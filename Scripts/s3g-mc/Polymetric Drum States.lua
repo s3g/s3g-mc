@@ -28,7 +28,6 @@ local DRUM_TOKEN_ITEMS = table.concat(DRUM_TOKENS, "\0") .. "\0"
 local MAP_NAMES = { "Superior-style", "GM" }
 local MAP_ITEMS = table.concat(MAP_NAMES, "\0") .. "\0"
 local MAX_STATES = 16
-local DEFAULT_CYCLE_BEATS = 4.0
 local TRANSITION_NAMES = { "Jump", "Glide" }
 local TRANSITION_ITEMS = table.concat(TRANSITION_NAMES, "\0") .. "\0"
 local DURATION_NAMES = { "Trigger", "Step fraction" }
@@ -36,6 +35,25 @@ local DURATION_ITEMS = table.concat(DURATION_NAMES, "\0") .. "\0"
 local GRID_NAMES = { "1/64", "1/32", "1/16", "1/8", "1/4", "1/2", "1 beat", "2 beats", "4 beats" }
 local GRID_VALUES = { 1 / 16, 1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8, 16 }
 local GRID_ITEMS = table.concat(GRID_NAMES, "\0") .. "\0"
+local EUCLIDEAN_PRESETS = {
+  { name = "Manual", pulses = nil, steps = nil, rotate = nil },
+  { name = "Tresillo E(3,8)", pulses = 3, steps = 8, rotate = 0 },
+  { name = "Cinquillo E(5,8)", pulses = 5, steps = 8, rotate = 0 },
+  { name = "Take Five E(2,5)", pulses = 2, steps = 5, rotate = 0 },
+  { name = "Ruchenitza E(3,7)", pulses = 3, steps = 7, rotate = 0 },
+  { name = "Aksak E(4,9)", pulses = 4, steps = 9, rotate = 0 },
+  { name = "Fandango E(4,12)", pulses = 4, steps = 12, rotate = 0 },
+  { name = "West African Bell E(7,12)", pulses = 7, steps = 12, rotate = 0 },
+  { name = "Bossa E(5,16)", pulses = 5, steps = 16, rotate = 0 },
+  { name = "Samba E(7,16)", pulses = 7, steps = 16, rotate = 0 },
+  { name = "Sparse Marker E(1,16)", pulses = 1, steps = 16, rotate = 0 },
+}
+local EUCLIDEAN_PRESET_NAMES = {}
+for index, preset in ipairs(EUCLIDEAN_PRESETS) do EUCLIDEAN_PRESET_NAMES[index] = preset.name end
+local EUCLIDEAN_PRESET_ITEMS = table.concat(EUCLIDEAN_PRESET_NAMES, "\0") .. "\0"
+
+local BANK_NAMES = { "No bank", "Tresillo Engine", "Bell Web", "Aksak Machine", "Bossa / Samba Cross", "Sparse Polymeter" }
+local BANK_ITEMS = table.concat(BANK_NAMES, "\0") .. "\0"
 
 local DRUM_MAPS = {
   ["GM"] = {
@@ -63,6 +81,7 @@ COLORS.text = rgba(0.82, 0.86, 0.86, 1)
 COLORS.hot = rgba(1.00, 0.78, 0.22, 1)
 COLORS.state = rgba(0.22, 0.74, 0.72, 1)
 COLORS.play = rgba(1.00, 0.38, 0.28, 1)
+COLORS.playhead = rgba(1.00, 1.00, 1.00, 1)
 
 local LANE_COLORS = {
   rgba(1.00, 0.74, 0.20, 1),
@@ -86,19 +105,23 @@ local seed = 1
 local duration_mode = 1
 local trigger_len_beats = 0.05
 local step_note_len = 0.35
-local global_density = 0.65
-local min_lane_spacing = 0.0625
-local min_same_pitch_spacing = 0.03125
-local max_notes = 1500
+local global_density = 1.0
+local min_lane_spacing = 0.0
+local min_same_pitch_spacing = 0.0
+local max_notes = 8000
 local snap_to_grid = true
-local grid_index = 1
+local grid_index = 3
 local integer_state_lengths = true
 local velocity_jitter = 7
 local swing = 0.0
 local transition_index = 1
 local selected_state = 1
+local bank_index = 1
 local preview_t = 0.0
 local preview_play = false
+local preview_sync_project_bpm = true
+local preview_speed = 1.0
+local preview_loop_seconds = 8.0
 local last_time = reaper.time_precise()
 local states = {}
 local state_lengths = {}
@@ -178,7 +201,9 @@ local function make_lane_state(lane, state)
     steps = clamp(base_steps + (state - 1) * ((lane % 3) - 1), 4, 32),
     pulses = clamp(state_pulses[state] or 4, 0, 32),
     rotate = ((lane - 1) * 2 + (state - 1) * (lane % 5)) % 16,
-    density = clamp(0.62 - (state - 1) * 0.08 + (lane % 3) * 0.025, 0.05, 0.85),
+    custom_pattern = nil,
+    pattern_input = "",
+    density = 1.0,
     velocity = clamp(96 - (lane - 1) * 3 + (state - 1) * 5, 1, 127),
     accent = 18,
   }
@@ -230,12 +255,16 @@ local function interpolated_state(lane, beat)
   local a, b, frac = state_position_at_beat(beat)
   local sa = states[a][lane]
   local sb = states[b][lane]
+  local custom_source = nil
+  if sa.custom_pattern or sb.custom_pattern then custom_source = frac < 0.5 and sa or sb end
   local steps = math.floor(lerp(sa.steps, sb.steps, frac) + 0.5)
   local pulses = math.floor(lerp(sa.pulses, sb.pulses, frac) + 0.5)
   return {
-    steps = clamp(steps, 1, 64),
-    pulses = clamp(pulses, 0, math.max(1, steps)),
-    rotate = math.floor(lerp(sa.rotate, sb.rotate, frac) + 0.5),
+    steps = custom_source and custom_source.steps or clamp(steps, 1, 64),
+    pulses = custom_source and custom_source.pulses or clamp(pulses, 0, math.max(1, steps)),
+    rotate = custom_source and custom_source.rotate or math.floor(lerp(sa.rotate, sb.rotate, frac) + 0.5),
+    custom_pattern = custom_source and custom_source.custom_pattern or nil,
+    pattern_input = custom_source and (custom_source.pattern_input or "") or nil,
     density = clamp(lerp(sa.density, sb.density, frac), 0, 1),
     velocity = clamp(math.floor(lerp(sa.velocity, sb.velocity, frac) + 0.5), 1, 127),
     accent = clamp(math.floor(lerp(sa.accent, sb.accent, frac) + 0.5), 0, 64),
@@ -254,22 +283,185 @@ local function point_on_circle(cx, cy, radius, step, steps)
   return cx + math.cos(angle) * radius, cy + math.sin(angle) * radius
 end
 
+local function parse_custom_pattern(text)
+  local pattern = {}
+  local cleaned = {}
+  local pulses = 0
+  text = tostring(text or "")
+  for char in text:gmatch(".") do
+    if char == "x" or char == "X" or char == "1" or char == "*" then
+      if #pattern < 64 then
+        pattern[#pattern + 1] = true
+        cleaned[#cleaned + 1] = "x"
+        pulses = pulses + 1
+      end
+    elseif char == "-" or char == "." or char == "_" or char == "0" then
+      if #pattern < 64 then
+        pattern[#pattern + 1] = false
+        cleaned[#cleaned + 1] = "-"
+      end
+    end
+  end
+  if #pattern == 0 then return nil, "", 0 end
+  return pattern, table.concat(cleaned), pulses
+end
+
+local function pattern_to_text(pattern)
+  local out = {}
+  for index = 1, #(pattern or {}) do out[index] = pattern[index] and "x" or "-" end
+  return table.concat(out)
+end
+
+local function rotate_pattern(pattern, rotate)
+  local steps = #(pattern or {})
+  if steps <= 0 then return nil end
+  local out = {}
+  rotate = math.floor(rotate or 0)
+  for index = 1, steps do
+    local shifted = ((index - 1 - rotate) % steps) + 1
+    out[index] = pattern[shifted] and true or false
+  end
+  return out
+end
+
+local function pattern_from_state(st)
+  if st and st.custom_pattern and st.custom_pattern ~= "" then
+    local pattern = parse_custom_pattern(st.custom_pattern)
+    if pattern then return rotate_pattern(pattern, st.rotate) end
+  end
+  return midi.euclidean_pattern(st and st.pulses or 0, st and st.steps or 1, st and st.rotate or 0)
+end
+
+local function interval_vector(pattern)
+  local hits = {}
+  for index, hit in ipairs(pattern) do
+    if hit then hits[#hits + 1] = index end
+  end
+  if #hits == 0 then return "-" end
+  if #hits == 1 then return tostring(#pattern) end
+  local intervals = {}
+  for index = 1, #hits do
+    local a = hits[index]
+    local b = hits[(index % #hits) + 1]
+    if b <= a then b = b + #pattern end
+    intervals[#intervals + 1] = tostring(b - a)
+  end
+  return table.concat(intervals, "-")
+end
+
+local function apply_euclidean_preset(st, preset)
+  if not st or not preset or not preset.steps then return end
+  st.steps = clamp(preset.steps, 1, 64)
+  st.pulses = clamp(preset.pulses or 0, 0, st.steps)
+  st.rotate = preset.rotate or 0
+  st.custom_pattern = nil
+  st.pattern_input = ""
+end
+
+local function euclidean_preset_index(st)
+  if not st then return 0 end
+  if st.custom_pattern and st.custom_pattern ~= "" then return 0 end
+  local rot = ((st.rotate or 0) % math.max(1, st.steps or 1))
+  for index = 2, #EUCLIDEAN_PRESETS do
+    local preset = EUCLIDEAN_PRESETS[index]
+    if preset.steps == st.steps and preset.pulses == st.pulses then
+      local preset_rot = (preset.rotate or 0) % math.max(1, preset.steps or 1)
+      if rot == preset_rot then return index - 1 end
+    end
+  end
+  return 0
+end
+
+local function set_lane_pattern(st, pulses, steps, rotate)
+  if not st then return end
+  st.steps = clamp(steps or st.steps or 16, 1, 64)
+  st.pulses = clamp(pulses or st.pulses or 0, 0, st.steps)
+  st.rotate = rotate or 0
+  st.custom_pattern = nil
+  st.pattern_input = ""
+end
+
+local function apply_custom_pattern(st)
+  if not st then return false end
+  local pattern, cleaned, pulses = parse_custom_pattern(st.pattern_input or "")
+  if not pattern then return false end
+  st.custom_pattern = cleaned
+  st.pattern_input = cleaned
+  st.steps = #pattern
+  st.pulses = pulses
+  st.rotate = 0
+  return true
+end
+
+local BANKS = {
+  ["Tresillo Engine"] = {
+    { "KIK", 3, 8, 0, 0.96, 110 }, { "SNR", 2, 8, 4, 0.95, 100 },
+    { "CHH", 7, 16, 0, 0.85, 82 }, { "OHH", 3, 16, 6, 0.70, 78 },
+    { "RIM", 5, 16, 2, 0.82, 92 }, { "LT", 2, 7, 0, 0.62, 82 },
+    { "MT", 3, 11, 2, 0.58, 82 }, { "CR1", 1, 16, 0, 0.35, 96 },
+  },
+  ["Bell Web"] = {
+    { "KIK", 3, 8, 0, 0.92, 106 }, { "SNR", 5, 12, 4, 0.70, 94 },
+    { "CHH", 7, 12, 0, 0.86, 78 }, { "OHH", 4, 12, 3, 0.62, 76 },
+    { "RIM", 7, 12, 5, 0.78, 92 }, { "LT", 2, 9, 1, 0.55, 82 },
+    { "MT", 3, 10, 2, 0.55, 82 }, { "RD1", 7, 12, 0, 0.82, 88 },
+  },
+  ["Aksak Machine"] = {
+    { "KIK", 4, 9, 0, 0.95, 108 }, { "SNR", 3, 7, 3, 0.78, 100 },
+    { "CHH", 5, 9, 1, 0.80, 80 }, { "OHH", 2, 7, 4, 0.55, 78 },
+    { "RIM", 3, 11, 2, 0.72, 90 }, { "LT", 4, 13, 3, 0.60, 84 },
+    { "MT", 5, 14, 1, 0.56, 84 }, { "HT", 3, 8, 5, 0.50, 86 },
+  },
+  ["Bossa / Samba Cross"] = {
+    { "KIK", 4, 16, 0, 0.94, 108 }, { "SNR", 5, 16, 2, 0.86, 96 },
+    { "CHH", 7, 16, 0, 0.88, 78 }, { "OHH", 3, 16, 7, 0.58, 78 },
+    { "RIM", 5, 16, 5, 0.82, 92 }, { "LT", 2, 8, 2, 0.50, 82 },
+    { "MT", 3, 12, 4, 0.52, 84 }, { "RD1", 7, 16, 3, 0.76, 88 },
+  },
+  ["Sparse Polymeter"] = {
+    { "KIK", 1, 5, 0, 0.82, 106 }, { "SNR", 2, 7, 3, 0.72, 98 },
+    { "CHH", 3, 11, 1, 0.76, 78 }, { "OHH", 2, 13, 6, 0.48, 78 },
+    { "RIM", 4, 17, 2, 0.68, 90 }, { "LT", 3, 19, 5, 0.54, 82 },
+    { "MT", 4, 21, 8, 0.50, 82 }, { "CR1", 1, 16, 12, 0.38, 96 },
+  },
+}
+
+local function apply_bank(name)
+  local bank = BANKS[name]
+  if not bank then return end
+  lane_count = math.max(lane_count, math.min(8, #bank))
+  for lane = 1, math.min(#bank, 12) do
+    local data = bank[lane]
+    local st = states[selected_state][lane]
+    lane_tokens[lane] = data[1]
+    set_lane_pattern(st, data[2], data[3], data[4])
+    st.density = 1.0
+    st.velocity = data[6] or st.velocity
+    lane_enabled[lane] = true
+  end
+  status = "Applied " .. name .. " to state " .. state_name(selected_state) .. "."
+end
+
 local function draw_preview()
   local draw = ImGui.GetWindowDrawList(ctx)
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
-  local h = 340
+  local h = 380
+  local timeline_h = 46
+  local geo_h = h - timeline_h
   ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + h, COLORS.bg)
   ImGui.DrawList_AddRect(draw, x, y, x + w, y + h, COLORS.edge)
+  ImGui.DrawList_AddLine(draw, x, y + geo_h, x + w, y + geo_h, COLORS.edge, 1)
 
   local ring_w = math.max(300, w - 230)
   local cx = x + ring_w * 0.5
-  local cy = y + h * 0.50
-  local max_r = math.min(ring_w, h - 50) * 0.48
+  local cy = y + geo_h * 0.53
+  local max_r = math.min(ring_w, geo_h - 58) * 0.48
   local spacing = math.max(9, math.min(22, (max_r - 18) / math.max(1, lane_count)))
 
   local total_beats = total_state_beats()
   local preview_beat = preview_t * total_beats
+  local preview_grid_step = math.floor((preview_beat / math.max(0.0001, grid_beats())) + 0.000001)
   ImGui.DrawList_AddText(draw, x + 12, y + 10, COLORS.text, "POLYMETRIC DRUM STATES")
   local a, b, frac = state_position_at_beat(preview_beat)
   local state_label = transition_index == 1
@@ -283,7 +475,7 @@ local function draw_preview()
     if radius < 14 then break end
     local col = lane_enabled[lane] and lane_color(lane) or COLORS.dim
     ImGui.DrawList_AddCircle(draw, cx, cy, radius, lane_enabled[lane] and COLORS.grid or rgba(0.25, 0.27, 0.27, 0.5), 96, 1)
-    local pattern = midi.euclidean_pattern(state.pulses, state.steps, state.rotate)
+    local pattern = pattern_from_state(state)
     local hit_points = {}
     for step = 1, state.steps do
       local p1x, p1y = point_on_circle(cx, cy, radius - 3, step - 1, state.steps)
@@ -292,13 +484,28 @@ local function draw_preview()
       if pattern[step] and lane_enabled[lane] then
         local hx, hy = point_on_circle(cx, cy, radius - spacing * 0.42, step - 1, state.steps)
         hit_points[#hit_points + 1] = { x = hx, y = hy }
-        ImGui.DrawList_AddCircleFilled(draw, hx, hy, 3.2, col)
+        ImGui.DrawList_AddCircleFilled(draw, hx, hy, 4.8, col)
       end
     end
     for i = 1, #hit_points do
       local p = hit_points[i]
       local q = hit_points[(i % #hit_points) + 1]
       if q then ImGui.DrawList_AddLine(draw, p.x, p.y, q.x, q.y, col, 1.0) end
+    end
+    local active_point = nil
+    if #hit_points > 0 then
+      local passed_hits = 0
+      for step = 1, state.steps do
+        if pattern[step] and (step - 1) <= (preview_grid_step % math.max(1, state.steps)) then
+          passed_hits = passed_hits + 1
+        end
+      end
+      local hit_index = ((math.max(1, passed_hits) - 1) % #hit_points) + 1
+      active_point = hit_points[hit_index]
+    end
+    if active_point then
+      ImGui.DrawList_AddCircleFilled(draw, active_point.x, active_point.y, 6.8, COLORS.bg)
+      ImGui.DrawList_AddCircleFilled(draw, active_point.x, active_point.y, 5.0, COLORS.playhead)
     end
   end
 
@@ -311,27 +518,26 @@ local function draw_preview()
     ImGui.DrawList_AddRectFilled(draw, lx, yy, lx + 10, yy + 10, col)
     ImGui.DrawList_AddText(draw, lx + 16, yy - 3, col,
       string.format("%02d %s %d/%d", lane, lane_tokens[lane] or "KIK", state.pulses, state.steps))
+    ImGui.DrawList_AddText(draw, lx + 112, yy - 3, COLORS.dim,
+      interval_vector(pattern_from_state(state)))
   end
 
   local tx = x + 18
-  local ty = y + h - 42
+  local ty = y + geo_h + 17
   local tw = w - 36
-  ImGui.DrawList_AddLine(draw, tx, ty, tx + tw, ty, COLORS.grid, 1)
+  ImGui.DrawList_AddLine(draw, tx, ty, tx + tw, ty, rgba(0.55, 0.60, 0.58, 0.32), 1)
   local cursor = 0
   for state = 1, #states do
     local span = math.max(0.25, state_lengths[state] or 8)
     local x1 = tx + tw * (cursor / total_beats)
     local x2 = tx + tw * ((cursor + span) / total_beats)
     local col = state == selected_state and COLORS.hot or COLORS.state
-    ImGui.DrawList_AddRectFilled(draw, x1, ty - 9, x2, ty + 9, rgba(0.18, 0.42, 0.42, state == selected_state and 0.55 or 0.28))
-    ImGui.DrawList_AddRect(draw, x1, ty - 9, x2, ty + 9, col)
-    ImGui.DrawList_AddText(draw, x1 + 4, ty + 12, COLORS.text, state_name(state))
-    if span >= 4 then
-      ImGui.DrawList_AddText(draw, x1 + 4, ty - 26, COLORS.dim, string.format("%.0f-%.0f", cursor, cursor + span))
-    end
+    ImGui.DrawList_AddRectFilled(draw, x1, ty - 4, x2, ty + 4, rgba(0.18, 0.42, 0.42, state == selected_state and 0.52 or 0.22))
+    ImGui.DrawList_AddRect(draw, x1, ty - 4, x2, ty + 4, col)
+    ImGui.DrawList_AddText(draw, x1 + 4, ty + 8, COLORS.text, state_name(state))
     cursor = cursor + span
   end
-  ImGui.DrawList_AddCircleFilled(draw, tx + tw * preview_t, ty, 4.5, COLORS.play)
+  ImGui.DrawList_AddCircleFilled(draw, tx + tw * preview_t, ty, 3.4, COLORS.play)
 
   ImGui.SetCursorScreenPos(ctx, x, y + h + 10)
 end
@@ -343,6 +549,8 @@ local function copy_state(src, dst)
     d.steps = s.steps
     d.pulses = s.pulses
     d.rotate = s.rotate
+    d.custom_pattern = s.custom_pattern
+    d.pattern_input = s.pattern_input or ""
     d.density = s.density
     d.velocity = s.velocity
     d.accent = s.accent
@@ -357,6 +565,8 @@ local function clone_state(src)
       steps = s.steps,
       pulses = s.pulses,
       rotate = s.rotate,
+      custom_pattern = s.custom_pattern,
+      pattern_input = s.pattern_input or "",
       density = s.density,
       velocity = s.velocity,
       accent = s.accent,
@@ -397,7 +607,7 @@ local function randomize_state(state)
     st.steps = clamp(st.steps + math.random(-5, 5), 3, 64)
     st.pulses = clamp(st.pulses + math.random(-3, 3), 0, st.steps)
     st.rotate = math.random(0, math.max(1, st.steps - 1))
-    st.density = clamp(st.density + (math.random() * 2 - 1) * 0.22, 0.05, 0.85)
+    st.density = clamp(st.density + (math.random() * 2 - 1) * 0.22, 0.05, 1.0)
     st.velocity = clamp(st.velocity + math.random(-16, 16), 1, 127)
     st.accent = clamp(st.accent + math.random(-8, 8), 0, 48)
   end
@@ -418,6 +628,7 @@ local function write_midi()
   local note_channel = clamp(midi_channel - 1, 0, 15)
   local last_lane_note = {}
   local last_pitch_note = {}
+  local step_beats = math.max(0.0001, grid_beats())
   for lane = 1, lane_count do
     if lane_enabled[lane] then
       local beat = 0.0
@@ -425,38 +636,31 @@ local function write_midi()
       while beat < duration_beats - 0.0001 and guard < 10000 do
         guard = guard + 1
         local state = interpolated_state(lane, beat)
-        local pattern = midi.euclidean_pattern(state.pulses, state.steps, state.rotate)
-        local cycle = math.min(DEFAULT_CYCLE_BEATS, duration_beats - beat)
-        local step_beats = cycle / math.max(1, state.steps)
-        local hit_index = 0
-        for step = 1, state.steps do
-          if event_count >= max_notes then break end
-          if pattern[step] and midi.chance(state.density * global_density) then
-            hit_index = hit_index + 1
-            local offset = (step - 1) * step_beats
-            if swing ~= 0 and (step % 2) == 0 then
-              offset = offset + step_beats * swing * 0.42
-            end
-            local note_start = start_qn + beat + offset
-            if note_start < end_qn then
-              local note_end = math.min(end_qn, note_start + note_duration_beats(step_beats))
-              local pitch = drum_pitch(lane_tokens[lane])
-              local lane_ok = not last_lane_note[lane] or (note_start - last_lane_note[lane]) >= min_lane_spacing
-              local pitch_ok = not last_pitch_note[pitch] or (note_start - last_pitch_note[pitch]) >= min_same_pitch_spacing
-              local vel = midi.velocity(state.velocity, state.accent, hit_index, 4, velocity_jitter)
-              if lane_ok and pitch_ok then
-                midi.insert_note_qn(take, note_start, note_end, note_channel, pitch, vel)
-                last_lane_note[lane] = note_start
-                last_pitch_note[pitch] = note_start
-                event_count = event_count + 1
-              else
-                skipped_count = skipped_count + 1
-              end
+        local pattern = pattern_from_state(state)
+        local step = (math.floor((beat / step_beats) + 0.000001) % math.max(1, state.steps)) + 1
+        if pattern[step] and midi.chance(state.density * global_density) then
+          local note_start = start_qn + beat
+          if swing ~= 0 and (step % 2) == 0 then
+            note_start = note_start + step_beats * swing * 0.42
+          end
+          if note_start < end_qn then
+            local note_end = math.min(end_qn, note_start + note_duration_beats(step_beats))
+            local pitch = drum_pitch(lane_tokens[lane])
+            local lane_ok = not last_lane_note[lane] or (note_start - last_lane_note[lane]) >= min_lane_spacing
+            local pitch_ok = not last_pitch_note[pitch] or (note_start - last_pitch_note[pitch]) >= min_same_pitch_spacing
+            local vel = midi.velocity(state.velocity, state.accent, guard, 4, velocity_jitter)
+            if lane_ok and pitch_ok then
+              midi.insert_note_qn(take, note_start, note_end, note_channel, pitch, vel)
+              last_lane_note[lane] = note_start
+              last_pitch_note[pitch] = note_start
+              event_count = event_count + 1
+            else
+              skipped_count = skipped_count + 1
             end
           end
         end
         if event_count >= max_notes then break end
-        beat = beat + DEFAULT_CYCLE_BEATS
+        beat = beat + step_beats
       end
     end
     if event_count >= max_notes then break end
@@ -487,46 +691,50 @@ local function draw_global_controls()
     start_measures = 0
     start_beats = start_qn
   end
-  ImGui.TextColored(ctx, COLORS.dim, string.format(
-    "Start: %s | QN %.2f | %.2f sec | tempo %.2f BPM",
-    using_time_selection and "time selection" or "edit cursor",
-    start_qn,
-    start_time,
-    tempo_at_qn(start_qn)))
-  ImGui.TextColored(ctx, COLORS.dim, string.format(
-    "State timeline: %.1f beats, %d states | approx measure %d beat %.2f",
-    total_state_beats(),
-    #states,
-    start_measures + 1,
-    start_beats + 1))
-  changed, lane_count = ImGui.SliderInt(ctx, "Lanes", lane_count, 1, 12)
-  for lane = 1, 12 do
-    if lane > lane_count then lane_enabled[lane] = false elseif lane_enabled[lane] == nil then lane_enabled[lane] = true end
+  if ImGui.CollapsingHeader(ctx, "Setup / Output", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+    ImGui.TextColored(ctx, COLORS.dim, string.format(
+      "Start: %s | QN %.2f | %.2f sec | tempo %.2f BPM",
+      using_time_selection and "time selection" or "edit cursor",
+      start_qn,
+      start_time,
+      tempo_at_qn(start_qn)))
+    ImGui.TextColored(ctx, COLORS.dim, string.format(
+      "State timeline: %.1f beats, %d states | approx measure %d beat %.2f",
+      total_state_beats(),
+      #states,
+      start_measures + 1,
+      start_beats + 1))
+    changed, lane_count = ImGui.SliderInt(ctx, "Lanes", lane_count, 1, 12)
+    for lane = 1, 12 do
+      if lane > lane_count then lane_enabled[lane] = false elseif lane_enabled[lane] == nil then lane_enabled[lane] = true end
+    end
+    local map_zero = map_index - 1
+    changed, map_zero = ImGui.Combo(ctx, "Drum map", map_zero, MAP_ITEMS)
+    if changed then map_index = map_zero + 1 end
+    changed, midi_channel = ImGui.SliderInt(ctx, "MIDI channel", midi_channel, 1, 16)
+    local duration_zero = duration_mode - 1
+    changed, duration_zero = ImGui.Combo(ctx, "Note duration mode", duration_zero, DURATION_ITEMS)
+    if changed then duration_mode = duration_zero + 1 end
+    if duration_mode == 1 then
+      changed, trigger_len_beats = slider_beats("Trigger length beats", trigger_len_beats, 0.005, 0.25, "%.3f")
+    else
+      changed, step_note_len = ImGui.SliderDouble(ctx, "Step fraction length", step_note_len, 0.05, 1.5, "%.2f steps")
+    end
   end
-  local map_zero = map_index - 1
-  changed, map_zero = ImGui.Combo(ctx, "Drum map", map_zero, MAP_ITEMS)
-  if changed then map_index = map_zero + 1 end
-  changed, midi_channel = ImGui.SliderInt(ctx, "MIDI channel", midi_channel, 1, 16)
-  changed, snap_to_grid = ImGui.Checkbox(ctx, "Snap beat sliders", snap_to_grid)
-  ImGui.SameLine(ctx)
-  local grid_zero = grid_index - 1
-  ImGui.SetNextItemWidth(ctx, 112)
-  changed, grid_zero = ImGui.Combo(ctx, "Grid", grid_zero, GRID_ITEMS)
-  if changed then grid_index = grid_zero + 1 end
-  local duration_zero = duration_mode - 1
-  changed, duration_zero = ImGui.Combo(ctx, "Note duration mode", duration_zero, DURATION_ITEMS)
-  if changed then duration_mode = duration_zero + 1 end
-  if duration_mode == 1 then
-    changed, trigger_len_beats = slider_beats("Trigger length beats", trigger_len_beats, 0.005, 0.25, "%.3f")
-  else
-    changed, step_note_len = ImGui.SliderDouble(ctx, "Step fraction length", step_note_len, 0.05, 1.5, "%.2f steps")
-  end
-  local transition_zero = transition_index - 1
-  changed, transition_zero = ImGui.Combo(ctx, "Transition mode", transition_zero, TRANSITION_ITEMS)
-  if changed then transition_index = transition_zero + 1 end
-  changed, integer_state_lengths = ImGui.Checkbox(ctx, "Integer state lengths", integer_state_lengths)
-  if changed and integer_state_lengths then
-    for i = 1, #state_lengths do state_lengths[i] = state_length_value(state_lengths[i] or 16) end
+  if ImGui.CollapsingHeader(ctx, "Timing / State Movement", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+    changed, snap_to_grid = ImGui.Checkbox(ctx, "Snap beat sliders", snap_to_grid)
+    ImGui.SameLine(ctx)
+    local grid_zero = grid_index - 1
+    ImGui.SetNextItemWidth(ctx, 112)
+    changed, grid_zero = ImGui.Combo(ctx, "Grid", grid_zero, GRID_ITEMS)
+    if changed then grid_index = grid_zero + 1 end
+    local transition_zero = transition_index - 1
+    changed, transition_zero = ImGui.Combo(ctx, "Transition mode", transition_zero, TRANSITION_ITEMS)
+    if changed then transition_index = transition_zero + 1 end
+    changed, integer_state_lengths = ImGui.Checkbox(ctx, "Integer state lengths", integer_state_lengths)
+    if changed and integer_state_lengths then
+      for i = 1, #state_lengths do state_lengths[i] = state_length_value(state_lengths[i] or 16) end
+    end
   end
   if ImGui.CollapsingHeader(ctx, "Advanced generation limits") then
     changed, global_density = ImGui.SliderDouble(ctx, "Global probability trim", global_density, 0.05, 1.0, "%.3f")
@@ -546,6 +754,20 @@ local function draw_preview_controls()
     preview_play = not preview_play
     last_time = reaper.time_precise()
   end
+  ImGui.SameLine(ctx)
+  changed, preview_sync_project_bpm = ImGui.Checkbox(ctx, "Project BPM", preview_sync_project_bpm)
+  ImGui.SameLine(ctx)
+  ImGui.SetNextItemWidth(ctx, 120)
+  changed, preview_speed = ImGui.SliderDouble(ctx, "Preview speed", preview_speed, 0.125, 4.0, "%.3fx")
+  if not preview_sync_project_bpm then
+    ImGui.SameLine(ctx)
+    ImGui.SetNextItemWidth(ctx, 112)
+    changed, preview_loop_seconds = ImGui.SliderDouble(ctx, "Loop seconds", preview_loop_seconds, 1.0, 30.0, "%.1f")
+  else
+    local start_qn = current_start_qn()
+    ImGui.SameLine(ctx)
+    ImGui.TextColored(ctx, COLORS.dim, string.format("%.1f BPM", tempo_at_qn(start_qn)))
+  end
   local total = total_state_beats()
   local cursor = 0
   for state = 1, #states do
@@ -560,7 +782,7 @@ end
 
 local function draw_state_editor()
   ImGui.Separator(ctx)
-  ImGui.Text(ctx, "State")
+  ImGui.Text(ctx, "State / Drum Lanes")
   for state = 1, #states do
     if state > 1 then ImGui.SameLine(ctx) end
     local label = (selected_state == state and "*" or "") .. state_name(state) .. "##state_select_" .. tostring(state)
@@ -603,8 +825,17 @@ local function draw_state_editor()
     state_name(selected_state),
     state_start,
     state_end))
+  local bank_zero = bank_index - 1
+  ImGui.SetNextItemWidth(ctx, 190)
+  changed, bank_zero = ImGui.Combo(ctx, "State preset bank", bank_zero, BANK_ITEMS)
+  if changed then bank_index = bank_zero + 1 end
+  ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, "Apply Bank", 92, 24) then
+    local name = BANK_NAMES[bank_index] or "No bank"
+    apply_bank(name)
+  end
 
-  if ImGui.BeginChild(ctx, "##state_lanes", 0, 330) then
+  if ImGui.BeginChild(ctx, "##state_lanes", 0, 390) then
     for lane = 1, lane_count do
       local st = states[selected_state][lane]
       ImGui.PushID(ctx, lane)
@@ -622,16 +853,45 @@ local function draw_state_editor()
       local changed, token_index = ImGui.Combo(ctx, "Drum", current_token, DRUM_TOKEN_ITEMS)
       if changed then lane_tokens[lane] = DRUM_TOKENS[token_index + 1] or "KIK" end
       ImGui.SameLine(ctx)
-      ImGui.SetNextItemWidth(ctx, 76)
+      local preset_zero = euclidean_preset_index(st)
+      ImGui.SetNextItemWidth(ctx, 168)
+      changed, preset_zero = ImGui.Combo(ctx, "Preset", preset_zero, EUCLIDEAN_PRESET_ITEMS)
+      if changed then apply_euclidean_preset(st, EUCLIDEAN_PRESETS[preset_zero + 1]) end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "<##rotate_left", 24, 22) then st.rotate = st.rotate - 1 end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, ">##rotate_right", 24, 22) then st.rotate = st.rotate + 1 end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "Comp##complement", 42, 22) and lane > 1 then
+        local prev = states[selected_state][lane - 1]
+        set_lane_pattern(st, math.max(0, prev.steps - prev.pulses), prev.steps, prev.rotate)
+      end
+      ImGui.SetNextItemWidth(ctx, 90)
       changed, st.steps = ImGui.SliderInt(ctx, "Steps", st.steps, 1, 64)
       ImGui.SameLine(ctx)
-      ImGui.SetNextItemWidth(ctx, 76)
+      ImGui.SetNextItemWidth(ctx, 90)
       st.pulses = math.min(st.pulses, st.steps)
       changed, st.pulses = ImGui.SliderInt(ctx, "Pulses", st.pulses, 0, st.steps)
       ImGui.SameLine(ctx)
-      ImGui.SetNextItemWidth(ctx, 76)
+      ImGui.SetNextItemWidth(ctx, 90)
       changed, st.rotate = ImGui.SliderInt(ctx, "Rotate", st.rotate, -st.steps, st.steps)
-      ImGui.SetNextItemWidth(ctx, 130)
+      ImGui.SameLine(ctx)
+      ImGui.TextColored(ctx, COLORS.dim, interval_vector(pattern_from_state(st)))
+      ImGui.SetNextItemWidth(ctx, 300)
+      changed, st.pattern_input = ImGui.InputText(ctx, "Pattern", st.pattern_input or st.custom_pattern or "")
+      if changed then
+        if (st.pattern_input or "") == "" then
+          st.custom_pattern = nil
+        else
+          apply_custom_pattern(st)
+        end
+      end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "Clear Pattern", 104, 22) then
+        st.custom_pattern = nil
+        st.pattern_input = ""
+      end
+      ImGui.SetNextItemWidth(ctx, 150)
       changed, st.density = ImGui.SliderDouble(ctx, "Hit probability", st.density, 0, 1, "%.2f")
       ImGui.SameLine(ctx)
       ImGui.SetNextItemWidth(ctx, 130)
@@ -670,18 +930,33 @@ local function loop()
   local now = reaper.time_precise()
   if preview_play then
     local dt = now - last_time
-    preview_t = (preview_t + dt / 8.0) % 1.0
+    local total_beats = total_state_beats()
+    if preview_sync_project_bpm then
+      local start_qn = current_start_qn()
+      local bpm = tempo_at_qn(start_qn + preview_t * total_beats)
+      local beat_delta = dt * (bpm / 60.0) * preview_speed
+      preview_t = (preview_t + beat_delta / math.max(0.0001, total_beats)) % 1.0
+    else
+      preview_t = (preview_t + dt * preview_speed / math.max(0.1, preview_loop_seconds)) % 1.0
+    end
   end
   last_time = now
 
-  ImGui.SetNextWindowSize(ctx, 980, 900, ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 980, 980, ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    draw_preview()
-    draw_preview_controls()
-    draw_global_controls()
-    draw_state_editor()
+    local footer_height = 52
+    local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+    local content_height = math.max(220, avail_h - footer_height)
+    local child_visible = ImGui.BeginChild(ctx, "##main_content", 0, content_height)
+    if child_visible then
+      draw_preview()
+      draw_preview_controls()
+      draw_state_editor()
+      draw_global_controls()
+    end
+    ImGui.EndChild(ctx)
     draw_footer()
   end
   ImGui.End(ctx)

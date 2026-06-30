@@ -39,23 +39,26 @@ useful.
 
 ### MIDI Composition
 
-- `Generate Lattice MIDI`: creates an editable MIDI item from a table-scanning
+- `Lattice Drums`: creates an editable drum MIDI item from a layered
+  table-scanning gesture, with each layer assigned to a drum voice and cells
+  shaping velocity, duration, and density with Superior-style or GM note maps.
+- `Lattice Tables`: creates an editable MIDI item from a table-scanning
   gesture model, translating visible lattice cells into pitch, velocity,
   duration, and MIDI-channel focus.
-- `Generate Musical Space MIDI`: creates an editable MIDI item from a path
-  through scale-degree, contour, triadic, or axis-mirror spaces, with Euclidean
-  timing, density, velocity shaping, MIDI-channel focus, and geometric preview.
-- `MIDI Form Learner`: NumPy-backed composer that analyzes selected MIDI items
+- `Musical Space`: creates an editable MIDI item from a path through melodic
+  and harmonic spaces, with selectable rhythm models, density, voicing,
+  velocity shaping, MIDI-channel focus, and geometric preview.
+- `Form Learner`: NumPy-backed composer that analyzes selected MIDI items
   and expands their rhythm, pitch, velocity, duration, and channel traits into a
   longer editable MIDI form.
-- `MIDI Terrain Form`: NumPy-backed song-duration MIDI generator with section
+- `Terrain Form`: NumPy-backed song-duration MIDI generator with section
   maps, terrain-shaped density/register/channel fields, and optional project
   markers.
 - `Polymetric Drum States`: creates an editable drum MIDI item from changing
   polymeter configurations, using Superior-style or GM drum maps, integer or
   fractional state lengths, beat-grid snapping, and jump or glide transitions
   between states.
-- `Generate Polymetric MIDI Lanes`: creates multiple Euclidean lanes with
+- `Polymetric Pitch Lanes`: creates multiple Euclidean lanes with
   independent lengths, pulses, rotations, pitch degrees, and MIDI channels for
   procedural synths or general algorithmic composition, shown as concentric
   rhythm rings.

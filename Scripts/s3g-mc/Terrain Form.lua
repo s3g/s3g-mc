@@ -1,4 +1,4 @@
--- @description MIDI Terrain Form
+-- @description Terrain Form
 -- @author s3g
 -- @version 0.1
 -- @requires ReaImGui; Python 3; NumPy; MIDI Rule Library.lua; NumPy Render Library.lua
@@ -12,14 +12,14 @@ local midi = dofile(script_dir .. "MIDI Rule Library.lua")
 local nr = dofile(script_dir .. "NumPy Render Library.lua")
 
 if not reaper.APIExists("ImGui_GetVersion") then
-  reaper.MB("ReaImGui is not installed or not loaded.", "MIDI Terrain Form", 0)
+  reaper.MB("ReaImGui is not installed or not loaded.", "Terrain Form", 0)
   return
 end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
 
-local TITLE = "MIDI Terrain Form"
+local TITLE = "Terrain Form"
 local ctx = ImGui.CreateContext(TITLE)
 local open = true
 local status = ""
@@ -143,7 +143,7 @@ local function write_midi(sections, events)
   local track = midi.ensure_track()
   if not track then midi.show_error("Could not find or create a track.", TITLE) return end
   local start_qn = reaper.TimeMap2_timeToQN(0, reaper.GetCursorPosition())
-  local item, take = midi.create_midi_item(track, start_qn, start_qn + state.duration_beats, "MIDI Terrain Form")
+  local item, take = midi.create_midi_item(track, start_qn, start_qn + state.duration_beats, "Terrain Form")
   if not take then midi.show_error("Could not create MIDI item.", TITLE) return end
   for _, event in ipairs(events) do
     local note_start = start_qn + event.start
@@ -176,7 +176,7 @@ local function generate()
   reaper.Undo_EndBlock(TITLE, -1)
   last_sections, last_events = sections, events
   status = string.format("Wrote %d events across %d sections. NumPy %.2f sec.", #events, #sections, elapsed or 0)
-  reaper.ShowConsoleMsg("\n[MIDI Terrain Form]\n" .. log .. "\n")
+  reaper.ShowConsoleMsg("\n[Terrain Form]\n" .. log .. "\n")
 end
 
 local function draw_preview()

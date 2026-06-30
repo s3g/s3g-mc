@@ -35,9 +35,22 @@ implementations unless otherwise noted.
 
 <p class="bib-entry">Barrett, Natasha. 2002. "Spatio-Musical Composition Strategies." <em>Organised Sound</em> 7 (3): 313-323.</p>
 
-<p class="bib-entry">Zotter, Franz, and Matthias Frank. 2019. <em>Ambisonics: A Practical 3D Audio Theory for Recording, Studio Production, Sound Reinforcement, and Virtual Reality</em>. Cham: Springer.</p>
+<p class="bib-entry">Farina, Angelo. n.d. "Ambisonics Denoising." <em>Aurora</em>. Accessed June 28, 2026.
+<a href="http://pcfarina.eng.unipr.it/Aurora/Ambisonics-Denoising.htm" target="_blank" rel="noopener noreferrer">http://pcfarina.eng.unipr.it/Aurora/Ambisonics-Denoising.htm</a>.
+Archived March 1, 2024:
+<a href="https://web.archive.org/web/20240301083500/http://pcfarina.eng.unipr.it/Aurora/Ambisonics-Denoising.htm" target="_blank" rel="noopener noreferrer">Wayback Machine copy</a>.</p>
+
+<p class="bib-entry">Farina, Angelo. n.d. "SPS Conversion." Accessed June 28, 2026.
+<a href="https://www.angelofarina.it/SPS-conversion.htm" target="_blank" rel="noopener noreferrer">https://www.angelofarina.it/SPS-conversion.htm</a>.
+Live page available as of access date.</p>
 
 <p class="bib-entry">Gerzon, Michael A. 1973. "Periphony: With-Height Sound Reproduction." <em>Journal of the Audio Engineering Society</em> 21 (1): 2-10.</p>
+
+<p class="bib-entry">Gerzon, Michael A. 1992. "Distance Panpots." Paper presented at the AES 92nd Convention, Vienna.</p>
+
+<p class="bib-entry">Gerzon, Michael A. 1992. "Panpot Laws for Multispeaker Stereo." Paper presented at the AES 92nd Convention, Vienna.</p>
+
+<p class="bib-entry">Gerzon, Michael A. 1992. "The Design of Precisely Coincident Microphone Arrays for Stereo and Surround Sound." Paper presented at the AES 92nd Convention, Vienna.</p>
 
 <p class="bib-entry">Gerzon, Michael A. n.d. "Surround Sound from 2-Channel Stereo." Accessed June 29, 2026.
 <a href="https://intothesoundfield.music.ox.ac.uk/sites/default/files/intothesoundfield/documents/media/surround_sound_from_2-channel_stereo_a4.pdf" target="_blank" rel="noopener noreferrer">PDF</a>.</p>
@@ -45,11 +58,8 @@ implementations unless otherwise noted.
 <p class="bib-entry">Gerzon, Michael A. n.d. "Technical Papers." <em>Into the Soundfield</em>. Accessed June 29, 2026.
 <a href="https://intothesoundfield.music.ox.ac.uk/technical-papers" target="_blank" rel="noopener noreferrer">https://intothesoundfield.music.ox.ac.uk/technical-papers</a>.</p>
 
-<p class="bib-entry">Gerzon, Michael A. 1992. "Panpot Laws for Multispeaker Stereo." Paper presented at the AES 92nd Convention, Vienna.</p>
-
-<p class="bib-entry">Gerzon, Michael A. 1992. "The Design of Precisely Coincident Microphone Arrays for Stereo and Surround Sound." Paper presented at the AES 92nd Convention, Vienna.</p>
-
-<p class="bib-entry">Gerzon, Michael A. 1992. "Distance Panpots." Paper presented at the AES 92nd Convention, Vienna.</p>
+<p class="bib-entry">Greenlee, Shawn, Nick Thompson, and Alex Chechile. 2022. <em>FOAFX</em>. RISD Sound GitHub repository. Accessed June 28, 2026.
+<a href="https://github.com/risdsound/foafx" target="_blank" rel="noopener noreferrer">https://github.com/risdsound/foafx</a>.</p>
 
 <p class="bib-entry">Institute of Electronic Music and Acoustics, University of Music and Performing Arts Graz. n.d. <em>IEM Plug-in Suite</em>. Software, documentation, and source repository. Accessed June 28, 2026.
 <a href="https://plugins.iem.at/" target="_blank" rel="noopener noreferrer">Project site</a>;
@@ -57,28 +67,18 @@ implementations unless otherwise noted.
 <a href="https://plugins.iem.at/download/" target="_blank" rel="noopener noreferrer">download page</a>;
 <a href="https://git.iem.at/audioplugins/IEMPluginSuite" target="_blank" rel="noopener noreferrer">source repository</a>.</p>
 
-<p class="bib-entry">McCormack, Leo, and SPARTA contributors. n.d. <em>SPARTA: Spatial Audio Real-time Applications</em>. Project documentation and source repository. Accessed June 28, 2026.
-<a href="https://leomccormack.github.io/sparta-site/" target="_blank" rel="noopener noreferrer">Project site</a>;
-<a href="https://github.com/leomccormack/SPARTA" target="_blank" rel="noopener noreferrer">GitHub repository</a>.</p>
-
-<p class="bib-entry">RISD Sound. 2022. <em>FOAFX</em>. GitHub repository. Accessed June 28, 2026.
-<a href="https://github.com/risdsound/foafx" target="_blank" rel="noopener noreferrer">https://github.com/risdsound/foafx</a>.</p>
-
 <p class="bib-entry">Kronlachner, Matthias. 2014. <em>Spatial Transformations for the Alteration of Ambisonic Recordings</em>. Master's thesis, Institute of Electronic Music and Acoustics, University of Music and Performing Arts Graz, and Graz University of Technology.</p>
 
 <p class="bib-entry">Leitner, Bernhard. n.d. <em>Works</em>. Accessed June 29, 2026.
 <a href="https://bernhardleitner.at/works" target="_blank" rel="noopener noreferrer">https://bernhardleitner.at/works</a>.</p>
 
+<p class="bib-entry">McCormack, Leo, and SPARTA contributors. n.d. <em>SPARTA: Spatial Audio Real-time Applications</em>. Project documentation and source repository. Accessed June 28, 2026.
+<a href="https://leomccormack.github.io/sparta-site/" target="_blank" rel="noopener noreferrer">Project site</a>;
+<a href="https://github.com/leomccormack/SPARTA" target="_blank" rel="noopener noreferrer">GitHub repository</a>.</p>
+
 <p class="bib-entry">Pulkki, Ville. 1997. "Virtual Sound Source Positioning Using Vector Base Amplitude Panning." <em>Journal of the Audio Engineering Society</em> 45 (6): 456-466.</p>
 
-<p class="bib-entry">Farina, Angelo. n.d. "SPS Conversion." Accessed June 28, 2026.
-<a href="https://www.angelofarina.it/SPS-conversion.htm" target="_blank" rel="noopener noreferrer">https://www.angelofarina.it/SPS-conversion.htm</a>.
-Live page available as of access date.</p>
-
-<p class="bib-entry">Farina, Angelo. n.d. "Ambisonics Denoising." <em>Aurora</em>. Accessed June 28, 2026.
-<a href="http://pcfarina.eng.unipr.it/Aurora/Ambisonics-Denoising.htm" target="_blank" rel="noopener noreferrer">http://pcfarina.eng.unipr.it/Aurora/Ambisonics-Denoising.htm</a>.
-Archived March 1, 2024:
-<a href="https://web.archive.org/web/20240301083500/http://pcfarina.eng.unipr.it/Aurora/Ambisonics-Denoising.htm" target="_blank" rel="noopener noreferrer">Wayback Machine copy</a>.</p>
+<p class="bib-entry">Zotter, Franz, and Matthias Frank. 2019. <em>Ambisonics: A Practical 3D Audio Theory for Recording, Studio Production, Sound Reinforcement, and Virtual Reality</em>. Cham: Springer.</p>
 
 </div>
 
@@ -102,27 +102,27 @@ Archived March 1, 2024:
 <a href="https://www.composersdesktop.com/" target="_blank" rel="noopener noreferrer">Project site</a>;
 <a href="https://github.com/ComposersDesktop/CDP8" target="_blank" rel="noopener noreferrer">CDP8 source repository</a>.</p>
 
+<p class="bib-entry">Erbe, Tom. n.d. <em>SoundHack</em> and <em>The Boneyard</em>. Software and documentation. Accessed June 28, 2026.
+<a href="https://www.soundhack.com/freeware/the-boneyard/" target="_blank" rel="noopener noreferrer">The Boneyard</a>.</p>
+
+<p class="bib-entry">Harker, Alex, and Pierre Alexandre Tremblay. n.d. <em>HISSTools Impulse Response Toolbox</em>. GitHub repository. Accessed June 28, 2026.
+<a href="https://github.com/HISSTools/HISSTools_Impulse_Response_Toolbox" target="_blank" rel="noopener noreferrer">https://github.com/HISSTools/HISSTools_Impulse_Response_Toolbox</a>.</p>
+
 <p class="bib-entry">Higgins, J. P. n.d. <em>SoundThread</em>. GitHub repository. Accessed June 28, 2026.
 <a href="https://github.com/j-p-higgins/SoundThread/" target="_blank" rel="noopener noreferrer">https://github.com/j-p-higgins/SoundThread/</a>.</p>
 
 <p class="bib-entry">Lyon, Eric, and Christopher Penrose. n.d. <em>FFTease</em>. Max/MSP external collection and project documentation. Accessed June 28, 2026.
 <a href="https://github.com/ericlyon/FFTease3.0-MaxMSP" target="_blank" rel="noopener noreferrer">FFTease 3.0 MaxMSP repository</a>.</p>
 
-<p class="bib-entry">Erbe, Tom. n.d. <em>SoundHack</em> and <em>The Boneyard</em>. Software and documentation. Accessed June 28, 2026.
-<a href="https://www.soundhack.com/freeware/the-boneyard/" target="_blank" rel="noopener noreferrer">The Boneyard</a>.</p>
-
 <p class="bib-entry">Norris, Michael. n.d. <em>SoundMagic Spectral</em>. Software and documentation. Accessed June 28, 2026.
 <a href="https://www.michaelnorris.info/software/soundmagic-spectral" target="_blank" rel="noopener noreferrer">https://www.michaelnorris.info/software/soundmagic-spectral</a>.</p>
-
-<p class="bib-entry">Wiggins, Bruce. 2017. <em>Sounds in Space 2017</em>. Talk on ambisonic impulse response and measured-reverb workflows.
-<a href="https://www.youtube.com/watch?v=KhuW6xQhf6M&t=2772s" target="_blank" rel="noopener noreferrer">YouTube talk</a>.</p>
-
-<p class="bib-entry">Harker, Alex, and Pierre Alexandre Tremblay. n.d. <em>HISSTools Impulse Response Toolbox</em>. GitHub repository. Accessed June 28, 2026.
-<a href="https://github.com/HISSTools/HISSTools_Impulse_Response_Toolbox" target="_blank" rel="noopener noreferrer">https://github.com/HISSTools/HISSTools_Impulse_Response_Toolbox</a>.</p>
 
 <p class="bib-entry">Roads, Curtis. 2001. <em>Microsound</em>. Cambridge, MA: MIT Press.</p>
 
 <p class="bib-entry">Smalley, Denis. 1997. "Spectromorphology: Explaining Sound-Shapes." <em>Organised Sound</em> 2 (2): 107-126.</p>
+
+<p class="bib-entry">Wiggins, Bruce. 2017. <em>Sounds in Space 2017</em>. Talk on ambisonic impulse response and measured-reverb workflows.
+<a href="https://www.youtube.com/watch?v=KhuW6xQhf6M&t=2772s" target="_blank" rel="noopener noreferrer">YouTube talk</a>.</p>
 
 <p class="bib-entry">Wishart, Trevor. 1994. <em>Audible Design: A Plain and Easy Introduction to Practical Sound Composition</em>. York: Orpheus the Pantomime.</p>
 
@@ -145,11 +145,11 @@ Archived March 1, 2024:
 
 <div class="bibliography">
 
-<p class="bib-entry">Cockos Incorporated. n.d. "ReaScript." <em>REAPER SDK</em>. Accessed June 28, 2026.
-<a href="https://www.reaper.fm/sdk/reascript/reascript.php" target="_blank" rel="noopener noreferrer">https://www.reaper.fm/sdk/reascript/reascript.php</a>.</p>
-
 <p class="bib-entry">Cockos Incorporated. n.d. "JSFX Programming." <em>REAPER SDK</em>. Accessed June 28, 2026.
 <a href="https://www.reaper.fm/sdk/js/js.php" target="_blank" rel="noopener noreferrer">https://www.reaper.fm/sdk/js/js.php</a>.</p>
+
+<p class="bib-entry">Cockos Incorporated. n.d. "ReaScript." <em>REAPER SDK</em>. Accessed June 28, 2026.
+<a href="https://www.reaper.fm/sdk/reascript/reascript.php" target="_blank" rel="noopener noreferrer">https://www.reaper.fm/sdk/reascript/reascript.php</a>.</p>
 
 <p class="bib-entry">Cornut, Omar, and Dear ImGui contributors. n.d. <em>Dear ImGui</em>. GitHub repository. Accessed June 28, 2026.
 <a href="https://github.com/ocornut/imgui" target="_blank" rel="noopener noreferrer">https://github.com/ocornut/imgui</a>.</p>
@@ -172,17 +172,17 @@ Archived March 1, 2024:
 
 <div class="bibliography">
 
-<p class="bib-entry">Lyon, Eric. 2023. <em>Automated Sound Design</em>. First edition. Computer Music and Digital Audio Series, vol. DAS028. Middleton, WI: A-R Editions. 426 pages. ISBN 9780895799036; 9780895798947.
-<a href="https://www.areditions.com/lyon-automated-sound-design-das028.html" target="_blank" rel="noopener noreferrer">https://www.areditions.com/lyon-automated-sound-design-das028.html</a>.</p>
-
 <p class="bib-entry">Bregman, Albert S. 1990. <em>Auditory Scene Analysis: The Perceptual Organization of Sound</em>. Cambridge, MA: MIT Press.</p>
 
 <p class="bib-entry">Cope, David. 2006. <em>Computer Models of Musical Creativity</em>. Cambridge, MA: MIT Press.</p>
 
+<p class="bib-entry">Hook, Julian. 2023. <em>Exploring Musical Spaces: A Synthesis of Mathematical Approaches</em>. New York: Oxford University Press.</p>
+
 <p class="bib-entry">Hunt, Jerry. 1993. "Gesture Modulation of Templates." Accessed June 29, 2026.
 <a href="http://www.jerryhunt.org/gesture_mod.htm" target="_blank" rel="noopener noreferrer">http://www.jerryhunt.org/gesture_mod.htm</a>.</p>
 
-<p class="bib-entry">Hook, Julian. 2023. <em>Exploring Musical Spaces: A Synthesis of Mathematical Approaches</em>. New York: Oxford University Press.</p>
+<p class="bib-entry">Lyon, Eric. 2023. <em>Automated Sound Design</em>. First edition. Computer Music and Digital Audio Series, vol. DAS028. Middleton, WI: A-R Editions. 426 pages. ISBN 9780895799036; 9780895798947.
+<a href="https://www.areditions.com/lyon-automated-sound-design-das028.html" target="_blank" rel="noopener noreferrer">https://www.areditions.com/lyon-automated-sound-design-das028.html</a>.</p>
 
 <p class="bib-entry">Nierhaus, Gerhard. 2009. <em>Algorithmic Composition: Paradigms of Automated Music Generation</em>. Vienna: Springer.</p>
 
