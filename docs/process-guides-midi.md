@@ -21,6 +21,8 @@ toc:
     href: "#polymetric-drum-states"
   - title: Polymetric Pitch Lanes
     href: "#polymetric-pitch-lanes"
+  - title: Spectral Trace MIDI
+    href: "#spectral-trace-midi"
   - title: Terrain Form
     href: "#terrain-form"
 ---
@@ -263,6 +265,33 @@ sparse constellations, hockets, quartal meshes, octave phasing, mirror canons,
 low/high register splits, chromatic drifts, whole-tone tilts, tritone gates,
 clusters, wide-register spreads, and minimal pulse fields. Applying a bank sets
 the active lane count and mutes unused lanes.
+
+## Spectral Trace MIDI
+
+Use this to create editable MIDI from a selected WAV-backed audio item. The
+script analyzes the audio spectrum with NumPy, finds spectral peaks or centroid
+motion over time, then writes ordinary REAPER MIDI notes.
+
+Starting approach:
+
+- Select one WAV-backed media item.
+- Choose `Partial stack` when you want several spectral peaks per analysis
+  event, `Melody trace` when you want one dominant line, or `Centroid trace`
+  when you want a single moving brightness contour.
+- Use `Pitch mapping` to keep raw chromatic pitch estimates or quantize them
+  to the selected root and scale.
+- Use `Events per second`, `Density`, and `Spectral floor dB` to control how
+  many notes are written.
+- Use `Minimum Hz` and `Maximum Hz` to focus the trace on a register band.
+- Use `MIDI channel mode` when the trace should spread across MIDI channels
+  for procedural synth lane focus.
+- Leave `Follow selected item length` on when the MIDI item should match the
+  source item duration.
+
+The preview shows a symbolic spectral contour and, after generation, the
+events written by the previous pass. The generated item remains normal MIDI,
+so it can be edited, quantized, routed to the included procedural synths, or
+used with external instruments.
 
 ## Terrain Form
 

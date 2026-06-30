@@ -5730,9 +5730,196 @@ def render_midi_form_learner(cfg):
     print(f"Output: {output_path}")
 
 
+def render_midi_spectral_trace(cfg):
+    output_path = str(cfg["output_path"])
+    source_path = str(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    source, source_rate = read_wav(source_path)
+    source = segment(
+        source,
+        source_rate,
+        float(cfg.get("source_start", 0.0)),
+        float(cfg.get("source_duration", 1.0)),
+        sample_rate,
+    )
+    if source.shape[0] < 64:
+        raise RuntimeError("Selected audio item is too short for spectral MIDI tracing.")
+
+    seed = int(cfg.get("seed", 1))
+    rng = np.random.default_rng(seed)
+    duration_beats = max(0.25, float(cfg.get("duration_beats", 16.0)))
+    fft_size = max(256, min(8192, int(cfg.get("fft_size", 2048))))
+    hop = max(64, min(fft_size, int(cfg.get("hop", fft_size // 4))))
+    event_rate = max(0.25, min(32.0, float(cfg.get("event_rate", 6.0))))
+    max_partials = max(1, min(12, int(cfg.get("partials", 3))))
+    floor_db = max(-120.0, min(-6.0, float(cfg.get("floor_db", -48.0))))
+    density = max(0.0, min(1.0, float(cfg.get("density", 0.82))))
+    min_hz = max(20.0, float(cfg.get("min_hz", 55.0)))
+    max_hz = max(min_hz + 10.0, float(cfg.get("max_hz", 6000.0)))
+    min_note = max(0.03125, float(cfg.get("min_note_beats", 0.125)))
+    max_note = max(min_note, float(cfg.get("max_note_beats", 1.0)))
+    pitch_smooth = max(0.0, min(1.0, float(cfg.get("pitch_smooth", 0.35))))
+    velocity_floor = max(1, min(127, int(cfg.get("velocity_floor", 28))))
+    velocity_scale = max(1, min(127, int(cfg.get("velocity_scale", 96))))
+    lanes = max(1, min(16, int(cfg.get("lanes", 8))))
+    channel_mode = str(cfg.get("channel_mode", "rank")).lower()
+    mode = str(cfg.get("trace_mode", "partials")).lower()
+    quantize = str(cfg.get("quantize", "scale")).lower()
+    root = int(cfg.get("root", 0)) % 12
+    scale_name = str(cfg.get("scale", "Chromatic"))
+
+    scales = {
+        "Chromatic": list(range(12)),
+        "Major": [0, 2, 4, 5, 7, 9, 11],
+        "Natural minor": [0, 2, 3, 5, 7, 8, 10],
+        "Harmonic minor": [0, 2, 3, 5, 7, 8, 11],
+        "Melodic minor": [0, 2, 3, 5, 7, 9, 11],
+        "Dorian": [0, 2, 3, 5, 7, 9, 10],
+        "Phrygian": [0, 1, 3, 5, 7, 8, 10],
+        "Lydian": [0, 2, 4, 6, 7, 9, 11],
+        "Mixolydian": [0, 2, 4, 5, 7, 9, 10],
+        "Locrian": [0, 1, 3, 5, 6, 8, 10],
+        "Major pentatonic": [0, 2, 4, 7, 9],
+        "Minor pentatonic": [0, 3, 5, 7, 10],
+        "Whole tone": [0, 2, 4, 6, 8, 10],
+        "Diminished WH": [0, 2, 3, 5, 6, 8, 9, 11],
+        "Diminished HW": [0, 1, 3, 4, 6, 7, 9, 10],
+        "Acoustic": [0, 2, 4, 6, 7, 9, 10],
+        "Lydian dominant": [0, 2, 4, 6, 7, 9, 10],
+        "Phrygian dominant": [0, 1, 4, 5, 7, 8, 10],
+        "Prometheus": [0, 2, 4, 6, 9, 10],
+        "Mystic": [0, 2, 4, 6, 9, 10],
+    }
+    scale_steps = []
+    for part in str(cfg.get("scale_intervals", "")).replace(",", " ").split():
+        try:
+            scale_steps.append(int(float(part)) % 12)
+        except ValueError:
+            pass
+    scale = sorted(set(scale_steps)) if scale_steps else scales.get(scale_name, scales["Chromatic"])
+
+    mono = np.mean(source.astype(np.float32), axis=1)
+    mono = mono - float(np.mean(mono))
+    if float(np.max(np.abs(mono))) <= 1e-9:
+        raise RuntimeError("Selected audio item is silent.")
+
+    window = np.hanning(fft_size).astype(np.float32)
+    padded = np.pad(mono, (fft_size // 2, fft_size), mode="constant")
+    freqs = np.fft.rfftfreq(fft_size, 1.0 / sample_rate)
+    starts = list(range(0, max(1, padded.shape[0] - fft_size + 1), hop))
+    frame_times = np.array([max(0.0, (s - fft_size // 2) / sample_rate) for s in starts], dtype=np.float64)
+    mags = []
+    peak_max = 1e-12
+    for start in starts:
+        frame = padded[start:start + fft_size]
+        if frame.shape[0] < fft_size:
+            frame = np.pad(frame, (0, fft_size - frame.shape[0]), mode="constant")
+        mag = np.abs(np.fft.rfft(frame * window))
+        mags.append(mag)
+        peak_max = max(peak_max, float(np.max(mag)))
+    mags = np.asarray(mags, dtype=np.float64)
+    floor = peak_max * (10.0 ** (floor_db / 20.0))
+    band = (freqs >= min_hz) & (freqs <= max_hz)
+
+    def midi_from_freq(freq):
+        return 69.0 + 12.0 * math.log2(max(1e-9, float(freq)) / 440.0)
+
+    def quantize_pitch(raw_pitch):
+        if quantize == "raw":
+            return int(np.clip(round(raw_pitch), 0, 127))
+        best_pitch = int(np.clip(round(raw_pitch), 0, 127))
+        best_dist = 999.0
+        for octave in range(0, 11):
+            for pc in scale:
+                candidate = octave * 12 + root + pc
+                dist = abs(candidate - raw_pitch)
+                if dist < best_dist:
+                    best_dist = dist
+                    best_pitch = candidate
+        return int(np.clip(best_pitch, 0, 127))
+
+    source_duration = max(0.001, source.shape[0] / sample_rate)
+    step_seconds = 1.0 / event_rate
+    event_times = np.arange(0.0, source_duration, step_seconds, dtype=np.float64)
+    if event_times.size == 0:
+        event_times = np.array([0.0], dtype=np.float64)
+
+    events = []
+    last_pitch = None
+    accepted_frames = 0
+    for event_index, event_time in enumerate(event_times):
+        frame_index = int(np.clip(np.searchsorted(frame_times, event_time), 0, len(frame_times) - 1))
+        mag = mags[frame_index]
+        usable = np.where(band & (mag >= floor))[0]
+        if usable.size == 0:
+            continue
+        usable = usable[np.argsort(mag[usable])][::-1]
+        if mode == "centroid":
+            weights = mag[usable]
+            freq = float(np.sum(freqs[usable] * weights) / (np.sum(weights) + 1e-12))
+            chosen = [(freq, float(np.max(weights)), 0, 1)]
+        else:
+            count = max_partials
+            if mode == "melody":
+                count = 1
+            chosen = []
+            for rank, bin_index in enumerate(usable[:count]):
+                chosen.append((float(freqs[bin_index]), float(mag[bin_index]), rank, count))
+
+        frame_strength = max([c[1] for c in chosen]) / peak_max
+        local_probability = density * (0.25 + 0.75 * min(1.0, frame_strength * 2.8))
+        if rng.random() > local_probability:
+            continue
+        accepted_frames += 1
+
+        for freq, amp, rank, count in chosen:
+            raw_pitch = midi_from_freq(freq)
+            if last_pitch is not None and pitch_smooth > 0 and rank == 0:
+                raw_pitch = raw_pitch * (1.0 - pitch_smooth) + last_pitch * pitch_smooth
+            pitch = quantize_pitch(raw_pitch)
+            if rank == 0:
+                last_pitch = raw_pitch
+            strength = float(np.clip(amp / peak_max, 0.0, 1.0))
+            velocity = int(np.clip(velocity_floor + (strength ** 0.45) * velocity_scale, 1, 127))
+            start_beat = float(event_time / source_duration * duration_beats)
+            note_len = min_note + (max_note - min_note) * float(np.clip(strength ** 0.6, 0.0, 1.0))
+            note_len *= 0.72 + 0.28 * (1.0 - rank / max(1, count))
+            note_len = max(0.03125, min(note_len, duration_beats - start_beat))
+            if note_len <= 0:
+                continue
+            if channel_mode == "single":
+                lane = 0
+            elif channel_mode == "time":
+                lane = int(np.clip(round((event_time / source_duration) * max(0, lanes - 1)), 0, lanes - 1))
+            elif channel_mode == "source":
+                lane = event_index % lanes
+            else:
+                lane = rank % lanes
+            events.append((start_beat, note_len, pitch, velocity, lane, 1))
+
+    events.sort(key=lambda e: (e[0], e[4], e[2]))
+    with open(output_path, "w", encoding="utf-8") as handle:
+        handle.write("type,index,start,duration,pitch,velocity,channel,section,label\n")
+        handle.write(f"section,1,0.000000,{duration_beats:.6f},0,0,0,1,Trace\n")
+        for idx, (start, dur, pitch, vel, lane, sec) in enumerate(events, 1):
+            handle.write(f"event,{idx},{start:.6f},{dur:.6f},{pitch},{vel},{lane},{sec},T{idx}\n")
+
+    print("Process: Spectral Trace MIDI")
+    print(f"Source: {source_path}")
+    print(f"Source channels: {source.shape[1]}")
+    print(f"Duration beats: {duration_beats:.2f}")
+    print(f"Trace mode: {mode}")
+    print(f"Quantize: {quantize}")
+    print(f"FFT / hop: {fft_size} / {hop}")
+    print(f"Event rate: {event_rate:.2f} per sec")
+    print(f"Accepted analysis frames: {accepted_frames}")
+    print(f"Events: {len(events)}")
+    print(f"Output: {output_path}")
+
+
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|stereo_expand_ambisonic_bed|foafx_offline|foafx_object_space|foafx_spatial_occupation_montage|foafx_scene_navigator|foafx_object_field_split|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|foafx_aed_granulator|foafx_pulsar_field|foafx_particle_cloud|evp_field|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|stereo_expand_ambisonic_bed|foafx_offline|foafx_object_space|foafx_spatial_occupation_montage|foafx_scene_navigator|foafx_object_field_split|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|foafx_aed_granulator|foafx_pulsar_field|foafx_particle_cloud|evp_field|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner|midi_spectral_trace> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -5796,6 +5983,8 @@ def main():
         render_midi_terrain_form(cfg)
     elif mode == "midi_form_learner":
         render_midi_form_learner(cfg)
+    elif mode == "midi_spectral_trace":
+        render_midi_spectral_trace(cfg)
     else:
         raise RuntimeError(f"Unknown render mode: {mode}")
 

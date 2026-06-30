@@ -17,8 +17,8 @@ useful.
 
 For step-by-step notes on selected processes, see the [Process Guides](docs/process-guides.md).
 
-Current package snapshot: the browser exposes 106 user-facing tools/controllers,
-plus the Package Browser. Of those, 46 are Python/NumPy-backed offline
+Current package snapshot: the browser exposes 107 user-facing tools/controllers,
+plus the Package Browser. Of those, 47 are Python/NumPy-backed offline
 processes, 22 load, control, or render included JSFX, and 38 are native
 Lua/ReaImGui REAPER actions. The repository also ships 21 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and internal
@@ -27,7 +27,7 @@ dialogs that are not shown as Package Browser entries.
 Package Browser group counts:
 
 - Channel Mixing / Automation: 4
-- MIDI Composition: 7
+- MIDI Composition: 8
 - Procedural Synthesis: 6
 - Offline Synthesis / IR: 9
 - Spatial Panners: 10
@@ -74,6 +74,9 @@ Package Browser group counts:
 - `Polymetric Pitch Lanes`: creates multiple Euclidean lanes with
   preset banks, independent lengths, pulses, rotations, pitch degrees,
   note-length variation, and lane or single-channel MIDI output.
+- `Spectral Trace MIDI`: NumPy-backed audio-to-MIDI analyzer that traces
+  spectral peaks, centroid motion, or partial stacks from a selected WAV item
+  into editable MIDI, with scale quantization and MIDI-channel lane mapping.
 - `Terrain Form`: NumPy-backed song-duration MIDI generator with section
   maps, terrain-shaped density/register/channel fields, expanded scales, and
   optional project markers.

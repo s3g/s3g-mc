@@ -72,9 +72,9 @@ intermediate routing lanes rather than only as fixed left/right outputs.
 ## MIDI Composition
 
 The MIDI composition tools write ordinary editable REAPER MIDI items. They use
-geometry, tables, paths, Euclidean/polymetric rhythm, learned source traits, and
-song-duration form maps as visible ways to compose note data before it is sent
-to procedural synths or external instruments.
+geometry, tables, paths, Euclidean/polymetric rhythm, learned source traits,
+audio spectral traces, and song-duration form maps as visible ways to compose
+note data before it is sent to procedural synths or external instruments.
 
 Some of the visual approaches sit near broader composition references,
 including Jerry Hunt's layered table and gesture work, Godfried Toussaint's
