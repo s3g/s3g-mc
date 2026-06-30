@@ -173,8 +173,9 @@ modulation afterward.
   to 8 mono sources, driven by two automatable controls.
 - `25ch VBAP Dome Panner`: nearest-region vector-style panning for up to 8 mono
   sources across the 25-speaker dome.
-- `Spatial Automation Composer`: previews algorithmic AED or XYZ motion, then
-  writes editable automation lanes for supported 8-source s3g panners.
+- `Spatial Automation Composer`: previews path, graph, and topology-informed
+  AED or XYZ motion with source relationship modes, then writes editable
+  automation lanes for supported 8-source s3g panners.
 
 The included panners are intended for use with loudspeaker arrays available in
 the RISD Studio for Research in Sound & Technology (SRST). They include a

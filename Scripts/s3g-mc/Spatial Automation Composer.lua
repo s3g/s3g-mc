@@ -3,7 +3,7 @@
 -- @version 0.2
 -- @requires ReaImGui
 -- @category Spatial Panners
--- @method Offline spatial choreography writer for s3g panners. Detects AED or XYZ source parameters on the selected track, previews an algorithmic motion path, then commits automation points over the time selection or selected item range.
+-- @method Offline spatial choreography writer for s3g panners. Detects AED or XYZ source parameters on the selected track, previews path, graph, and topology-informed motion with source relationship modes, then commits automation points over the time selection or selected item range.
 -- @about
 --   Writes panner automation as an editable Reaper score rather than running
 --   choreography in realtime. First pass supports 8-source s3g AED and XYZ

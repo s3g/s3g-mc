@@ -223,8 +223,11 @@ map, source positions, and panner-specific controls.
 
 Use `Spatial Automation Composer` to compose spatial movement offline as
 editable REAPER automation. It detects supported 8-source AED and XYZ s3g
-panners on the selected track, previews the intended motion, and writes
-automation points across the time selection or selected item range.
+panners on the selected track, previews the intended motion with transport and
+camera controls, and writes automation points across the time selection or
+selected item range. Path methods include orbit, arc, graph walk, hole field,
+attractor, and boundary trace; source relationship modes include unison, phase
+offset, canon, counter-rotation, and scatter.
 
 The package includes these spatial panners:
 

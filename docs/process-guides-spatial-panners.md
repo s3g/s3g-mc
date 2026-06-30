@@ -51,3 +51,20 @@ The `17ch Cube XYZ Panner` is an XYZ-native panner. Use smaller spread values wh
 The `12ch Dodeca Panner` uses an AED-native spherical layout drawn as a dodecahedron. It supports discrete spherical motion with a smaller speaker count.
 
 For automation, use the controller's automation controls to show, hide, arm, and write relevant lanes. In `Trim/Read`, the GUI can audition control changes without writing automation. Use write modes when you intentionally want controller motion recorded.
+
+## Spatial Automation Composer
+
+`Spatial Automation Composer` writes motion as editable automation rather than
+recording controller movement in realtime. Select a track with a supported s3g
+AED or XYZ panner, choose a time range, preview the motion, then write the
+automation lanes.
+
+- `Path method` chooses the movement model, including orbit, arc, spiral,
+  Lissajous, Brownian, graph walk, hole field, attractor, boundary trace, and
+  scatter holds.
+- `Source relationship` controls how up to 8 source paths relate: selected
+  source, unison, phase offset, canon, counter-rotation, or scatter.
+- `Continuity`, `Tear / jump chance`, graph controls, and hole/boundary
+  controls shape how smooth, broken, constrained, or repelled the path becomes.
+- The preview panel has camera controls, a timeline slider, play/stop preview,
+  and a highlighted moving point. Nothing is written until `Write automation`.
