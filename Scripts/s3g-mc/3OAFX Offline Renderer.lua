@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category 3OAFX
 -- @render Yes; NumPy-backed offline ambisonic decode/process/re-encode render.
--- @method Select one ACN/SN3D ambisonic media item. The renderer decodes 1OA, 2OA, or 3OA to an order-specific virtual speaker layer, applies a moving AED focus with 3OAFX-style dry control, then re-encodes a new ambisonic item.
+-- @method Select one ACN/SN3D ambisonic media item. The renderer decodes 1OA, 2OA, or 3OA to an order-specific virtual speaker layer, applies one of the included regional effects over a moving AED focus with 3OAFX-style dry control, then re-encodes a new ambisonic item.
 
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""

@@ -186,7 +186,10 @@ behaviors.
   treats selected ambisonic recordings as spatial/spectral kernels for another
   ambisonic source, with mixed-order kernel adaptation.
 - `3OAFX Offline Renderer`: NumPy-backed ambisonic decode/process/re-encode
-  action for 1OA, 2OA, and 3OA media, with moving AED focus and dry attenuation.
+  action for 1OA, 2OA, and 3OA media, with moving AED focus, dry attenuation,
+  and included regional effects such as gain, filtering, delay, diffusion,
+  resonator, saturation, ring modulation, tremolo, pitch shift, and spectral
+  smear.
 - `3OAFX Object Space`: NumPy-backed object-to-space render for ambisonic or
   non-ambisonic source material, with resonance bloom, spatial occupation,
   motion counterpoint, and spatial allusion modes.

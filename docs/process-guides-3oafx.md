@@ -438,7 +438,10 @@ Main controls:
 
 ## 3OAFX Offline Renderer
 
-Use this when you want the 3OAFX idea rendered offline directly from an ambisonic media item.
+Use this when you want the 3OAFX idea rendered offline directly from an
+ambisonic media item. Unlike `3OAFX Send Return Controller`, this process does
+not host an external 24-channel insert effect. It uses built-in NumPy effects
+and bakes the result into a new ambisonic media item.
 
 Selection:
 
@@ -448,11 +451,27 @@ Selection:
 
 Method:
 
-The process decodes the ambisonic item to a virtual speaker layer, applies an effect over a moving AED focus region, mixes dry and wet behavior using the focus mask, then re-encodes to a new ambisonic item.
+The process decodes the ambisonic item to a virtual speaker layer, applies one
+of the included effects over a moving AED focus region, mixes dry and wet
+behavior using the focus mask, then re-encodes to a new ambisonic item.
+
+Included effects:
+
+- `Focus gain`: raises or lowers the focused region.
+- `Band-pass region`: emphasizes a frequency band inside the focus region.
+- `Low-pass region`: darkens the focused region above the cutoff.
+- `Comb resonator`: applies a tuned comb resonance.
+- `Delay region`: delays the focused region with optional feedback.
+- `Diffusion region`: spreads the focused region with short delay diffusion.
+- `Pitch shift`: shifts the focused region by semitones.
+- `Ring mod region`: applies ring modulation at the selected frequency.
+- `Soft saturation`: applies drive/saturation to the focused region.
+- `Spectral smear`: blurs spectral detail in the focused region.
+- `Tremolo region`: applies amplitude modulation to the focused region.
 
 Important controls:
 
-- `Effect region` chooses the processing type.
+- `Effect region` chooses one of the included processing types.
 - `Azimuth` and `Elevation` set the focus direction.
 - `Focus width` and `Focus sharpness` shape the region.
 - `Effect amount / gain` controls how strongly the effect is heard.
