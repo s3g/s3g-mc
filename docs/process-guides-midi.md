@@ -270,7 +270,9 @@ the active lane count and mutes unused lanes.
 
 Use this to create editable MIDI from a selected WAV-backed audio item. The
 script analyzes the audio spectrum with NumPy, finds spectral peaks or centroid
-motion over time, then writes ordinary REAPER MIDI notes.
+motion over time, then writes ordinary REAPER MIDI notes. Mono, stereo, and
+multichannel items can be used; when `MIDI channel mode` is set to `Audio
+channel`, source channels 1-16 write to MIDI channels 1-16.
 
 Starting approach:
 
@@ -284,7 +286,8 @@ Starting approach:
   many notes are written.
 - Use `Minimum Hz` and `Maximum Hz` to focus the trace on a register band.
 - Use `MIDI channel mode` when the trace should spread across MIDI channels
-  for procedural synth lane focus.
+  for procedural synth lane focus. `Audio channel` keeps each source channel on
+  its matching MIDI channel.
 - Leave `Follow selected item length` on when the MIDI item should match the
   source item duration.
 

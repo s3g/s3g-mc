@@ -376,7 +376,7 @@ local function draw_script_card(entry)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 820, 720, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 820, 720, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "s3g-mc Package Browser", open)
 

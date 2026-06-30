@@ -38,7 +38,7 @@ local swap = false
 local should_render = false
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 560, 520, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 560, 520, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Spectral Morph", open)
   if visible then

@@ -631,10 +631,15 @@ local function loop()
   if preview_play then
     preview_t = (preview_t + dt * preview_speed / math.max(0.1, settings.duration)) % 1.0
   end
-  ImGui.SetNextWindowSize(ctx, 820, 860, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 820, 740, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Spatial Automation Composer", open)
   if visible then
+    local footer_track, footer_fx, footer_spec, footer_start, footer_end = nil, nil, nil, nil, nil
+    local footer_h = 58
+    local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+    local control_h = math.max(280, avail_h - footer_h)
+    if ImGui.BeginChild(ctx, "##spatial_automation_controls", 0, control_h) then
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     local spec, fx = detect_panner(track)
     if not track then
@@ -644,6 +649,7 @@ local function loop()
       ImGui.TextColored(ctx, COLORS.muted, "Supported: Layout, 12ch Dodeca, 17ch Cube XYZ, 25ch Dome panners.")
     else
       local start_pos, end_pos = time_range()
+      footer_track, footer_fx, footer_spec, footer_start, footer_end = track, fx, spec, start_pos, end_pos
       ImGui.Text(ctx, "Target: " .. spec.label)
       ImGui.SameLine(ctx)
       ImGui.TextColored(ctx, COLORS.muted, spec.coord .. " / FX #" .. tostring(fx + 1))
@@ -697,23 +703,29 @@ local function loop()
       draw_preview_transport()
       ImGui.Spacing(ctx)
       ImGui.TextColored(ctx, COLORS.muted, string.format("Will write %d points per parameter over %.2f seconds.", point_count(start_pos, end_pos), end_pos - start_pos))
-      if ImGui.Button(ctx, "Write automation", 180, 30) then
-        local stats = commit_automation(track, fx, spec, start_pos, end_pos)
-        local first = stats and stats[1]
-        if first then
-          if spec.coord == "XYZ" then
-            last_status = string.format("Wrote %d source path(s). S%d X %.2f..%.2f / Y %.2f..%.2f / Z %.2f..%.2f",
-              #stats, first.source, first.p1_min, first.p1_max, first.p2_min, first.p2_max, first.p3_min, first.p3_max)
-          else
-            last_status = string.format("Wrote %d source path(s). S%d az %.1f..%.1f / el %.1f..%.1f / dist %.2f..%.2f",
-              #stats, first.source, first.p1_min, first.p1_max, first.p2_min, first.p2_max, first.p3_min, first.p3_max)
-          end
-        else
-          last_status = "No automation points written."
-        end
-      end
       if last_status ~= "" then ImGui.TextColored(ctx, COLORS.muted, last_status) end
     end
+    ImGui.EndChild(ctx)
+    end
+    if not footer_spec then ImGui.BeginDisabled(ctx) end
+    if ImGui.Button(ctx, "Write automation", 180, 30) and footer_spec then
+      local stats = commit_automation(footer_track, footer_fx, footer_spec, footer_start, footer_end)
+      local first = stats and stats[1]
+      if first then
+        if footer_spec.coord == "XYZ" then
+          last_status = string.format("Wrote %d source path(s). S%d X %.2f..%.2f / Y %.2f..%.2f / Z %.2f..%.2f",
+            #stats, first.source, first.p1_min, first.p1_max, first.p2_min, first.p2_max, first.p3_min, first.p3_max)
+        else
+          last_status = string.format("Wrote %d source path(s). S%d az %.1f..%.1f / el %.1f..%.1f / dist %.2f..%.2f",
+            #stats, first.source, first.p1_min, first.p1_max, first.p2_min, first.p2_max, first.p3_min, first.p3_max)
+        end
+      else
+        last_status = "No automation points written."
+      end
+    end
+    if not footer_spec then ImGui.EndDisabled(ctx) end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Close", 100, 30) then open = false end
     ImGui.End(ctx)
   end
   if open then reaper.defer(loop) end

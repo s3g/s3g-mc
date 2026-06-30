@@ -237,10 +237,13 @@ local function render()
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 720, 850, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 720, 760, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
+    local footer_h = 54
+    local control_h = math.max(260, ImGui.GetWindowHeight(ctx) - footer_h)
+    if ImGui.BeginChild(ctx, "##object_space_controls", 0, control_h) then
     ImGui.Text(ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
     draw_preview()
     settings.mode = combo("Mode", settings.mode, MODE_LABELS)
@@ -264,6 +267,8 @@ local function loop()
     changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
     ImGui.Separator(ctx)
     ImGui.TextWrapped(ctx, "Auto treats 4ch, 10ch, and 16ch as ACN/SN3D ambisonic in REAPER practice; 9ch WAVs are also accepted as 2OA. Other channel counts are encoded as source objects.")
+    ImGui.EndChild(ctx)
+    end
     if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end

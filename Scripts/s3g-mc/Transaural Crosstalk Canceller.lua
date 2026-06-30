@@ -380,7 +380,7 @@ local function draw_visual(track, fx)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 780, 760, ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 780, 760, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Transaural Crosstalk Canceller", open)
   if visible then

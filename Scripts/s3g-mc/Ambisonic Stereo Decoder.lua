@@ -612,7 +612,7 @@ local function draw_stereo_meter(track, fx)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 820, 900, ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 820, 760, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Ambisonic Stereo Decoder", open)
   if visible then

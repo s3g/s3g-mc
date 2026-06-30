@@ -887,7 +887,7 @@ local function draw_matrix(node_count, out_ch)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 1040, 980, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 1040, 760, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then

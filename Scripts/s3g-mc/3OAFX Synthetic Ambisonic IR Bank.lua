@@ -24,7 +24,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
-local WINDOW_OPEN_COND = ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver
+local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 local EXT = "s3g_mc_synthetic_ambi_ir_bank_v1"
 local COLOR_BG = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0)
 local COLOR_EDGE = ImGui.ColorConvertDouble4ToU32(0.34, 0.38, 0.38, 1.0)
@@ -355,10 +355,13 @@ local function main()
   end
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 660, 820, WINDOW_OPEN_COND)
+    ImGui.SetNextWindowSize(ctx, 660, 760, WINDOW_OPEN_COND)
     local visible
     visible, open = ImGui.Begin(ctx, TITLE, open)
     if visible then
+      local footer_h = 54
+      local control_h = math.max(260, ImGui.GetWindowHeight(ctx) - footer_h)
+      if ImGui.BeginChild(ctx, "##synthetic_ir_bank_controls", 0, control_h) then
       settings.order_index = combo(ctx, "Ambisonic order", settings.order_index, ORDER_NAMES)
       settings.output_mode_index = combo(ctx, "Output format", settings.output_mode_index, OUTPUT_MODE_NAMES)
       if settings.order_index == 1 then
@@ -411,6 +414,8 @@ local function main()
       end
       ImGui.Text(ctx, "Use these as the IR selection for 3OAFX Offline Ambisonic Convolve.")
       ImGui.Spacing(ctx)
+      ImGui.EndChild(ctx)
+      end
       if ImGui.Button(ctx, "Render IR Bank", 128, 28) then
         if settings.output_mode_index == 2 and stacked_channel_count(settings) > mc.MAX_REAPER_TRACK_CHANNELS then
           mc.show_error("This stacked bank would need " .. tostring(stacked_channel_count(settings)) .. " channels. REAPER tracks are limited to 128 channels, so use separate ambisonic WAVs for this order/layout.")

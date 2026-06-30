@@ -5798,27 +5798,8 @@ def render_midi_spectral_trace(cfg):
             pass
     scale = sorted(set(scale_steps)) if scale_steps else scales.get(scale_name, scales["Chromatic"])
 
-    mono = np.mean(source.astype(np.float32), axis=1)
-    mono = mono - float(np.mean(mono))
-    if float(np.max(np.abs(mono))) <= 1e-9:
-        raise RuntimeError("Selected audio item is silent.")
-
     window = np.hanning(fft_size).astype(np.float32)
-    padded = np.pad(mono, (fft_size // 2, fft_size), mode="constant")
     freqs = np.fft.rfftfreq(fft_size, 1.0 / sample_rate)
-    starts = list(range(0, max(1, padded.shape[0] - fft_size + 1), hop))
-    frame_times = np.array([max(0.0, (s - fft_size // 2) / sample_rate) for s in starts], dtype=np.float64)
-    mags = []
-    peak_max = 1e-12
-    for start in starts:
-        frame = padded[start:start + fft_size]
-        if frame.shape[0] < fft_size:
-            frame = np.pad(frame, (0, fft_size - frame.shape[0]), mode="constant")
-        mag = np.abs(np.fft.rfft(frame * window))
-        mags.append(mag)
-        peak_max = max(peak_max, float(np.max(mag)))
-    mags = np.asarray(mags, dtype=np.float64)
-    floor = peak_max * (10.0 ** (floor_db / 20.0))
     band = (freqs >= min_hz) & (freqs <= max_hz)
 
     def midi_from_freq(freq):
@@ -5845,57 +5826,87 @@ def render_midi_spectral_trace(cfg):
         event_times = np.array([0.0], dtype=np.float64)
 
     events = []
-    last_pitch = None
+    source_channels = int(source.shape[1])
+    analyzed_channels = min(16, source_channels)
     accepted_frames = 0
-    for event_index, event_time in enumerate(event_times):
-        frame_index = int(np.clip(np.searchsorted(frame_times, event_time), 0, len(frame_times) - 1))
-        mag = mags[frame_index]
-        usable = np.where(band & (mag >= floor))[0]
-        if usable.size == 0:
+    silent_channels = 0
+    for source_channel in range(analyzed_channels):
+        mono = source[:, source_channel].astype(np.float32)
+        mono = mono - float(np.mean(mono))
+        if float(np.max(np.abs(mono))) <= 1e-9:
+            silent_channels += 1
             continue
-        usable = usable[np.argsort(mag[usable])][::-1]
-        if mode == "centroid":
-            weights = mag[usable]
-            freq = float(np.sum(freqs[usable] * weights) / (np.sum(weights) + 1e-12))
-            chosen = [(freq, float(np.max(weights)), 0, 1)]
-        else:
-            count = max_partials
-            if mode == "melody":
-                count = 1
-            chosen = []
-            for rank, bin_index in enumerate(usable[:count]):
-                chosen.append((float(freqs[bin_index]), float(mag[bin_index]), rank, count))
 
-        frame_strength = max([c[1] for c in chosen]) / peak_max
-        local_probability = density * (0.25 + 0.75 * min(1.0, frame_strength * 2.8))
-        if rng.random() > local_probability:
-            continue
-        accepted_frames += 1
+        padded = np.pad(mono, (fft_size // 2, fft_size), mode="constant")
+        starts = list(range(0, max(1, padded.shape[0] - fft_size + 1), hop))
+        frame_times = np.array([max(0.0, (s - fft_size // 2) / sample_rate) for s in starts], dtype=np.float64)
+        mags = []
+        peak_max = 1e-12
+        for start in starts:
+            frame = padded[start:start + fft_size]
+            if frame.shape[0] < fft_size:
+                frame = np.pad(frame, (0, fft_size - frame.shape[0]), mode="constant")
+            mag = np.abs(np.fft.rfft(frame * window))
+            mags.append(mag)
+            peak_max = max(peak_max, float(np.max(mag)))
+        mags = np.asarray(mags, dtype=np.float64)
+        floor = peak_max * (10.0 ** (floor_db / 20.0))
+        last_pitch = None
 
-        for freq, amp, rank, count in chosen:
-            raw_pitch = midi_from_freq(freq)
-            if last_pitch is not None and pitch_smooth > 0 and rank == 0:
-                raw_pitch = raw_pitch * (1.0 - pitch_smooth) + last_pitch * pitch_smooth
-            pitch = quantize_pitch(raw_pitch)
-            if rank == 0:
-                last_pitch = raw_pitch
-            strength = float(np.clip(amp / peak_max, 0.0, 1.0))
-            velocity = int(np.clip(velocity_floor + (strength ** 0.45) * velocity_scale, 1, 127))
-            start_beat = float(event_time / source_duration * duration_beats)
-            note_len = min_note + (max_note - min_note) * float(np.clip(strength ** 0.6, 0.0, 1.0))
-            note_len *= 0.72 + 0.28 * (1.0 - rank / max(1, count))
-            note_len = max(0.03125, min(note_len, duration_beats - start_beat))
-            if note_len <= 0:
+        for event_index, event_time in enumerate(event_times):
+            frame_index = int(np.clip(np.searchsorted(frame_times, event_time), 0, len(frame_times) - 1))
+            mag = mags[frame_index]
+            usable = np.where(band & (mag >= floor))[0]
+            if usable.size == 0:
                 continue
-            if channel_mode == "single":
-                lane = 0
-            elif channel_mode == "time":
-                lane = int(np.clip(round((event_time / source_duration) * max(0, lanes - 1)), 0, lanes - 1))
-            elif channel_mode == "source":
-                lane = event_index % lanes
+            usable = usable[np.argsort(mag[usable])][::-1]
+            if mode == "centroid":
+                weights = mag[usable]
+                freq = float(np.sum(freqs[usable] * weights) / (np.sum(weights) + 1e-12))
+                chosen = [(freq, float(np.max(weights)), 0, 1)]
             else:
-                lane = rank % lanes
-            events.append((start_beat, note_len, pitch, velocity, lane, 1))
+                count = max_partials
+                if mode == "melody":
+                    count = 1
+                chosen = []
+                for rank, bin_index in enumerate(usable[:count]):
+                    chosen.append((float(freqs[bin_index]), float(mag[bin_index]), rank, count))
+
+            frame_strength = max([c[1] for c in chosen]) / peak_max
+            local_probability = density * (0.25 + 0.75 * min(1.0, frame_strength * 2.8))
+            if rng.random() > local_probability:
+                continue
+            accepted_frames += 1
+
+            for freq, amp, rank, count in chosen:
+                raw_pitch = midi_from_freq(freq)
+                if last_pitch is not None and pitch_smooth > 0 and rank == 0:
+                    raw_pitch = raw_pitch * (1.0 - pitch_smooth) + last_pitch * pitch_smooth
+                pitch = quantize_pitch(raw_pitch)
+                if rank == 0:
+                    last_pitch = raw_pitch
+                strength = float(np.clip(amp / peak_max, 0.0, 1.0))
+                velocity = int(np.clip(velocity_floor + (strength ** 0.45) * velocity_scale, 1, 127))
+                start_beat = float(event_time / source_duration * duration_beats)
+                note_len = min_note + (max_note - min_note) * float(np.clip(strength ** 0.6, 0.0, 1.0))
+                note_len *= 0.72 + 0.28 * (1.0 - rank / max(1, count))
+                note_len = max(0.03125, min(note_len, duration_beats - start_beat))
+                if note_len <= 0:
+                    continue
+                if channel_mode == "audio":
+                    lane = source_channel
+                elif channel_mode == "single":
+                    lane = 0
+                elif channel_mode == "time":
+                    lane = int(np.clip(round((event_time / source_duration) * max(0, lanes - 1)), 0, lanes - 1))
+                elif channel_mode == "source":
+                    lane = event_index % lanes
+                else:
+                    lane = rank % lanes
+                events.append((start_beat, note_len, pitch, velocity, lane, source_channel + 1))
+
+    if not events and silent_channels >= analyzed_channels:
+        raise RuntimeError("Selected audio item is silent across the analyzed channels.")
 
     events.sort(key=lambda e: (e[0], e[4], e[2]))
     with open(output_path, "w", encoding="utf-8") as handle:
@@ -5906,7 +5917,10 @@ def render_midi_spectral_trace(cfg):
 
     print("Process: Spectral Trace MIDI")
     print(f"Source: {source_path}")
-    print(f"Source channels: {source.shape[1]}")
+    print(f"Source channels: {source_channels}")
+    print(f"Analyzed channels: {analyzed_channels}")
+    if source_channels > analyzed_channels:
+        print("Channel limit: first 16 channels used for MIDI mapping")
     print(f"Duration beats: {duration_beats:.2f}")
     print(f"Trace mode: {mode}")
     print(f"Quantize: {quantize}")

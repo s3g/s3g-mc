@@ -25,7 +25,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
-local WINDOW_OPEN_COND = ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver
+local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 local EXT = "s3g_mc_ambisonic_convolve_v1"
 local COLOR_WARN = ImGui.ColorConvertDouble4ToU32(1.0, 0.70, 0.25, 1.0)
 local COLOR_ERROR = ImGui.ColorConvertDouble4ToU32(1.0, 0.35, 0.22, 1.0)
@@ -526,7 +526,7 @@ local function main()
   end
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 760, 960, WINDOW_OPEN_COND)
+    ImGui.SetNextWindowSize(ctx, 760, 760, WINDOW_OPEN_COND)
     local visible
     visible, open = ImGui.Begin(ctx, TITLE, open)
     if visible then
@@ -536,6 +536,9 @@ local function main()
       local stacked_bank = settings.method_index == 2 and #irs == 1 and irs[1].channels >= needed * directions
       local adapted_stacked = settings.method_index == 2 and settings.adapt_lower_order_ir and #irs == 1 and irs[1].channels < needed * directions
       local validation = validate_entries(source, irs, settings)
+      local footer_h = 54
+      local control_h = math.max(280, ImGui.GetWindowHeight(ctx) - footer_h)
+      if ImGui.BeginChild(ctx, "##ambisonic_convolve_controls", 0, control_h) then
       ImGui.Text(ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
       ImGui.Text(ctx, "IR items: " .. tostring(#irs))
       ImGui.Text(ctx, "Output: " .. ORDER_NAMES[settings.order_index])
@@ -604,6 +607,8 @@ local function main()
         ImGui.Text(ctx, "Renders offline from WAV media with NumPy.")
       end
       ImGui.Spacing(ctx)
+      ImGui.EndChild(ctx)
+      end
       if ImGui.Button(ctx, "Render", 104, 28) and not validation then
         should_render = true
       end

@@ -379,7 +379,7 @@ end
 load_last_settings()
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 560, 620, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 560, 620, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Render MC Impulse Field", open)
   if visible then

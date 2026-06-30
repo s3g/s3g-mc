@@ -182,7 +182,7 @@ local env_points, env_enabled = be.init(ENV_DEFS, settings)
 be.load_extstate(EXT, ENV_DEFS, env_points, env_enabled)
 local selected_env = 1
 local selected_env_point = nil
-local env_opts = { height = 150, overview_lane_h = 50, random_amount = 0.35, random_count = 10, random_dispersion = 0.25, random_smooth = true, collapse_editor = true, compact_window_h = 1020, expanded_window_h = 1160 }
+local env_opts = { height = 150, overview_lane_h = 50, random_amount = 0.35, random_count = 10, random_dispersion = 0.25, random_smooth = true, collapse_editor = true, compact_window_h = 760, expanded_window_h = 760 }
 
 local function render()
   local channels = output_channels()

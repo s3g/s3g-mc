@@ -72,7 +72,7 @@ function M.prompt_csv(title, labels_csv, defaults_csv, on_submit, opts)
       return
     end
 
-    ImGui.SetNextWindowSize(ctx, window_width, window_height, ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver)
+    ImGui.SetNextWindowSize(ctx, window_width, window_height, ImGui.Cond_Appearing)
     local visible
     visible, open = ImGui.Begin(ctx, title or "s3g-mc Input", open)
     if visible then

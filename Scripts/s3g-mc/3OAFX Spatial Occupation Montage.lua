@@ -236,10 +236,13 @@ local function render()
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 740, 900, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 740, 760, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
+    local footer_h = 54
+    local control_h = math.max(260, ImGui.GetWindowHeight(ctx) - footer_h)
+    if ImGui.BeginChild(ctx, "##spatial_occupation_controls", 0, control_h) then
     ImGui.Text(ctx, "Selected sources: " .. tostring(#entries))
     for index, entry in ipairs(entries) do
       if index <= 5 then ImGui.Text(ctx, "  " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)") end
@@ -267,6 +270,8 @@ local function loop()
     changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
     ImGui.Separator(ctx)
     ImGui.TextWrapped(ctx, "Stereo expansion uses L/R plus mid/side-derived cues to seed front, rear, and side occupation before ACN/SN3D encoding.")
+    ImGui.EndChild(ctx)
+    end
     if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end

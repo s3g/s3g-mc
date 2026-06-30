@@ -169,7 +169,7 @@ local function finish_section(x, y, h)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 760, 780, ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 760, 760, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, WINDOW_TITLE, open)
   if visible then

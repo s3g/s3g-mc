@@ -673,7 +673,7 @@ local function loop()
   end
   last_time = now
 
-  ImGui.SetNextWindowSize(ctx, 860, 760, ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 860, 760, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then

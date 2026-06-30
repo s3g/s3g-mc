@@ -17,7 +17,7 @@ function M.run(config)
 
   package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
   local ImGui = require("imgui")("0.10")
-  local WINDOW_OPEN_COND = ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver
+  local WINDOW_OPEN_COND = ImGui.Cond_Appearing
   local EXT = config.ext
 
   local COLOR_BG = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0)

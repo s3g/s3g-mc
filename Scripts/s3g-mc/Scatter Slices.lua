@@ -840,11 +840,14 @@ local function main()
   reset_density_points(density_points, "flat")
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 640, 860, ImGui.Cond_FirstUseEver)
+    ImGui.SetNextWindowSize(ctx, 640, 760, ImGui.Cond_Appearing)
     local visible
     visible, open = ImGui.Begin(ctx, "Scatter Slices", open)
 
     if visible then
+      local footer_h = 54
+      local control_h = math.max(260, ImGui.GetWindowHeight(ctx) - footer_h)
+      if ImGui.BeginChild(ctx, "##scatter_slices_controls", 0, control_h) then
       ImGui.Text(ctx, "Sources: " .. tostring(#sources) .. " selected audio item(s)")
       ImGui.Text(ctx, "Combined source length: " .. string.format("%.3f sec", total_length))
       ImGui.Spacing(ctx)
@@ -911,6 +914,8 @@ local function main()
         ImGui.Text(ctx, "Smear: each slice spreads to neighboring output channels.")
       else
         ImGui.Text(ctx, "Long target: slices receive scattered gaps across the duration.")
+      end
+      ImGui.EndChild(ctx)
       end
 
       if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end

@@ -1162,8 +1162,8 @@ end
 load_last_settings()
 
 local route_editor_was_open = false
-local route_compact_window_h = 1040
-local route_expanded_window_h = 1180
+local route_compact_window_h = 760
+local route_expanded_window_h = 760
 
 local function resize_current_window(height)
   local ok_get, get_window_size = pcall(function() return ImGui.GetWindowSize end)

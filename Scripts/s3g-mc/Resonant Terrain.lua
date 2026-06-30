@@ -19,7 +19,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
-local WINDOW_OPEN_COND = ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver
+local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 
 local EXT = "s3g_mc_resonant_terrain_v2"
 
@@ -125,7 +125,7 @@ local function main()
   local should_render = false
   local selected_env = 1
   local selected_env_point = nil
-  local env_opts = { height = 150, overview_lane_h = 56, random_amount = 0.35, random_count = 12, random_dispersion = 0.25, random_smooth = false, collapse_editor = true, compact_window_h = 1040, expanded_window_h = 1180 }
+  local env_opts = { height = 150, overview_lane_h = 56, random_amount = 0.35, random_count = 12, random_dispersion = 0.25, random_smooth = false, collapse_editor = true, compact_window_h = 760, expanded_window_h = 760 }
 
   local function loop()
     ImGui.SetNextWindowSize(ctx, 760, env_opts._editor_was_open and env_opts.expanded_window_h or env_opts.compact_window_h, ImGui.Cond_Always)

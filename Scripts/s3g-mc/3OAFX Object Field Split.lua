@@ -262,7 +262,7 @@ local function render()
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 720, 780, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 720, 760, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then

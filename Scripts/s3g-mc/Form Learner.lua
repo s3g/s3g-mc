@@ -294,7 +294,7 @@ local function draw_preview()
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 840, 780, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 840, 760, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then

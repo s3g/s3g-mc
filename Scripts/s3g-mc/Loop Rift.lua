@@ -19,7 +19,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
-local WINDOW_OPEN_COND = ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver
+local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 local EXT = "s3g_mc_loop_rift_v1"
 
 local ENV_DEFS = {
@@ -234,7 +234,7 @@ local function main()
   local env_opts = { height = 150, overview_lane_h = 58, random_amount = 0.35, random_count = 12, random_dispersion = 0.3, random_smooth = false }
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 720, 1000, WINDOW_OPEN_COND)
+    ImGui.SetNextWindowSize(ctx, 720, 760, WINDOW_OPEN_COND)
     local visible
     visible, open = ImGui.Begin(ctx, "Loop Rift", open)
     if visible then

@@ -75,8 +75,9 @@ Package Browser group counts:
   preset banks, independent lengths, pulses, rotations, pitch degrees,
   note-length variation, and lane or single-channel MIDI output.
 - `Spectral Trace MIDI`: NumPy-backed audio-to-MIDI analyzer that traces
-  spectral peaks, centroid motion, or partial stacks from a selected WAV item
-  into editable MIDI, with scale quantization and MIDI-channel lane mapping.
+  spectral peaks, centroid motion, or partial stacks from selected WAV items,
+  including multichannel sources up to 16 channels, into editable MIDI with
+  scale quantization and audio-channel-to-MIDI-channel mapping.
 - `Terrain Form`: NumPy-backed song-duration MIDI generator with section
   maps, terrain-shaped density/register/channel fields, expanded scales, and
   optional project markers.

@@ -20,7 +20,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
-local WINDOW_OPEN_COND = ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver
+local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 local EXT = "s3g_mc_ambisonic_kernel_collage_v1"
 local COLOR_BG = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0)
 local COLOR_PANEL = ImGui.ColorConvertDouble4ToU32(0.060, 0.066, 0.070, 1.0)
@@ -490,11 +490,14 @@ local function main()
   end
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 760, 940, WINDOW_OPEN_COND)
+    ImGui.SetNextWindowSize(ctx, 760, 760, WINDOW_OPEN_COND)
     local visible
     visible, open = ImGui.Begin(ctx, TITLE, open)
     if visible then
       local validation = validate(source, kernels, settings)
+      local footer_h = 54
+      local control_h = math.max(280, ImGui.GetWindowHeight(ctx) - footer_h)
+      if ImGui.BeginChild(ctx, "##kernel_collage_controls", 0, control_h) then
       ImGui.Text(ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
       ImGui.Text(ctx, "Kernel recordings: " .. tostring(#kernels))
       ImGui.Spacing(ctx)
@@ -559,6 +562,8 @@ local function main()
         ImGui.Text(ctx, "Renders offline from WAV media with NumPy.")
       end
       ImGui.Spacing(ctx)
+      ImGui.EndChild(ctx)
+      end
       if ImGui.Button(ctx, "Render", 104, 28) and not validation then should_render = true end
       ImGui.SameLine(ctx)
       if ImGui.Button(ctx, "Cancel", 104, 28) then open = false end

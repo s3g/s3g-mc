@@ -36,7 +36,7 @@ local normalize_db = -6.0
 local should_render = false
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 520, 460, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 520, 460, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Spectral Freeze", open)
   if visible then

@@ -813,10 +813,13 @@ local function render()
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 980, 1120, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 980, 760, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
+    local footer_h = 58
+    local control_h = math.max(300, ImGui.GetWindowHeight(ctx) - footer_h)
+    if ImGui.BeginChild(ctx, "##scene_navigator_controls", 0, control_h) then
     ImGui.Text(ctx, "Selected 3OAFX scene nodes: " .. tostring(#entries))
     ImGui.TextColored(ctx, COLORS.muted, "Each selected item is a movable soundfield node; the path is the listener trajectory.")
     local preview_row = draw_preview_transport(path_points, settings)
@@ -886,6 +889,8 @@ local function loop()
     changed, settings.soft_limit = ImGui.Checkbox(ctx, "Soft limit", settings.soft_limit)
     ImGui.Separator(ctx)
     ImGui.TextWrapped(ctx, "This is a scene-interpolation / perspective traversal renderer. It does not claim literal physical 6DoF translation inside a single HOA recording; it navigates between selected soundfield nodes.")
+    ImGui.EndChild(ctx)
+    end
     if ImGui.Button(ctx, "Render", 110, 30) then render() end
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Cancel", 110, 30) then open = false end

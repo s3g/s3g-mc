@@ -19,7 +19,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
-local WINDOW_OPEN_COND = ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver
+local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 
 local EXT = "s3g_mc_fata_morgana_resynth_v2"
 local FFT_SIZES = { 1024, 2048, 4096, 8192 }
@@ -235,7 +235,7 @@ local function main()
   local should_render = false
   local selected_env = 1
   local selected_env_point = nil
-  local env_opts = { height = 150, overview_lane_h = 58, random_amount = 0.35, random_count = 12, random_dispersion = 0.25, random_smooth = true, collapse_editor = true, compact_window_h = 1080, expanded_window_h = 1220 }
+  local env_opts = { height = 150, overview_lane_h = 58, random_amount = 0.35, random_count = 12, random_dispersion = 0.25, random_smooth = true, collapse_editor = true, compact_window_h = 760, expanded_window_h = 760 }
 
   local function loop()
     ImGui.SetNextWindowSize(ctx, 820, env_opts._editor_was_open and env_opts.expanded_window_h or env_opts.compact_window_h, ImGui.Cond_Always)

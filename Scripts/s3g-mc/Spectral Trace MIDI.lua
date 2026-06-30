@@ -30,33 +30,41 @@ local MODE_NAMES = { "Partial stack", "Melody trace", "Centroid trace" }
 local MODE_KEYS = { "partials", "melody", "centroid" }
 local QUANT_NAMES = { "Scale", "Raw chromatic" }
 local QUANT_KEYS = { "scale", "raw" }
-local CHANNEL_NAMES = { "Partial rank", "Time sweep", "Round-robin", "Single channel" }
-local CHANNEL_KEYS = { "rank", "time", "source", "single" }
+local CHANNEL_NAMES = { "Audio channel", "Partial rank", "Time sweep", "Round-robin", "Single channel" }
+local CHANNEL_KEYS = { "audio", "rank", "time", "source", "single" }
 local FFT_NAMES = { "1024", "2048", "4096", "8192" }
 local FFT_VALUES = { 1024, 2048, 4096, 8192 }
-
-local entries = nr.selected_entries()
-local entry = entries[1]
-if not entry then
-  reaper.MB("Select one WAV-backed audio media item.", TITLE, 0)
-  return
-end
 
 local function source_is_wav(path)
   return tostring(path or ""):lower():match("%.wav$") ~= nil
 end
 
-if not source_is_wav(entry.filename) then
-  reaper.MB("Spectral Trace MIDI requires a WAV-backed media item.", TITLE, 0)
-  return
-end
+local entry = nil
 
 local function selected_item_beats()
+  if not entry then return 16 end
   local start_time = entry.position or reaper.GetCursorPosition()
   local end_time = start_time + math.max(0.001, entry.length or 1.0)
   local start_qn = reaper.TimeMap2_timeToQN(0, start_time)
   local end_qn = reaper.TimeMap2_timeToQN(0, end_time)
   return math.max(0.25, end_qn - start_qn)
+end
+
+local function load_selected_source(show_message)
+  local entries = nr.selected_entries()
+  local next_entry = entries[1]
+  if not next_entry then
+    if show_message then status = "Select a WAV-backed audio item, then click Load Selected." end
+    return false
+  end
+  if not source_is_wav(next_entry.filename) then
+    status = "Selected item is not WAV-backed."
+    if show_message then reaper.MB("Spectral Trace MIDI requires a WAV-backed media item.", TITLE, 0) end
+    return false
+  end
+  entry = next_entry
+  status = "Loaded " .. entry.name
+  return true
 end
 
 local state = {
@@ -84,6 +92,8 @@ local state = {
 }
 
 local last_events = {}
+load_selected_source(false)
+if entry then state.duration_beats = math.floor(selected_item_beats() + 0.5) end
 
 local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
@@ -130,6 +140,7 @@ local function parse_plan(path)
 end
 
 local function call_backend(output_path)
+  if not entry then return nil end
   local duration_beats = state.follow_item_length and selected_item_beats() or state.duration_beats
   local scale_name = SCALES[state.scale]
   local scale_intervals = table.concat(midi.SCALES[scale_name] or midi.SCALES.Chromatic, " ")
@@ -166,6 +177,7 @@ local function call_backend(output_path)
 end
 
 local function write_midi(events)
+  if not entry then return end
   local track = midi.ensure_track()
   if not track then midi.show_error("Could not find or create a track.", TITLE) return end
   local start_qn = reaper.TimeMap2_timeToQN(0, reaper.GetCursorPosition())
@@ -182,6 +194,9 @@ local function write_midi(events)
 end
 
 local function generate()
+  if not entry then
+    if not load_selected_source(true) then return end
+  end
   local stamp = tostring(math.floor(reaper.time_precise() * 1000))
   local path = (os.getenv("TMPDIR") or "/tmp") .. "/s3g_midi_spectral_trace_" .. stamp .. ".csv"
   local log, elapsed = call_backend(path)
@@ -208,8 +223,10 @@ local function draw_preview()
   ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, COLORS.panel)
   ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, COLORS.edge)
   ImGui.DrawList_AddText(draw_list, x + 12, y + 10, COLORS.dim, "SPECTRAL TRACE MIDI")
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 28, COLORS.text,
-    entry.name .. "  /  " .. tostring(entry.channels) .. "ch  /  " .. string.format("%.2fs", entry.length or 0))
+  local source_label = entry and
+    (entry.name .. "  /  " .. tostring(entry.channels) .. "ch  /  " .. string.format("%.2fs", entry.length or 0)) or
+    "No source loaded. Select a WAV item and click Load Selected."
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 28, entry and COLORS.text or COLORS.dim, source_label)
 
   local left, top, right, bottom = x + 18, y + 62, x + w - 18, y + h - 34
   for i = 0, 8 do
@@ -247,16 +264,28 @@ local function draw_preview()
   local caption = string.format("%s / %s / %.1f events-sec / %d lanes",
     MODE_NAMES[state.mode], QUANT_NAMES[state.quantize], state.event_rate, state.lanes)
   ImGui.DrawList_AddText(draw_list, x + 18, y + h - 23, COLORS.dim, caption)
+  if entry and entry.channels > 16 then
+    ImGui.DrawList_AddText(draw_list, x + w - 210, y + h - 23, COLORS.dim, "first 16 source channels")
+  end
   ImGui.SetCursorScreenPos(ctx, x, y + h + 12)
 end
 
 local function draw_footer()
   ImGui.Separator(ctx)
+  if ImGui.Button(ctx, "Load Selected", 120, 28) then
+    if load_selected_source(true) then
+      state.duration_beats = math.floor(selected_item_beats() + 0.5)
+      last_events = {}
+    end
+  end
+  ImGui.SameLine(ctx)
   if ImGui.Button(ctx, "New Seed", 100, 28) then state.seed = state.seed + 1 end
   ImGui.SameLine(ctx)
+  if not entry then ImGui.BeginDisabled(ctx) end
   if ImGui.Button(ctx, "Generate MIDI", 140, 28) then generate() end
+  if not entry then ImGui.EndDisabled(ctx) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Cancel", 92, 28) then open = false end
+  if ImGui.Button(ctx, "Close", 92, 28) then open = false end
   ImGui.SameLine(ctx)
   ImGui.TextColored(ctx, COLORS.dim, status)
 end

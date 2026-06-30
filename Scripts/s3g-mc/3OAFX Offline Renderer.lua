@@ -19,7 +19,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
-local WINDOW_OPEN_COND = ImGui.Cond_Appearing or ImGui.Cond_FirstUseEver
+local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 local EXT = "s3g_mc_3oafx_offline_renderer_v1"
 local COLOR_WARN = ImGui.ColorConvertDouble4ToU32(1.0, 0.35, 0.22, 1.0)
 local COLOR_BG = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0)
@@ -484,7 +484,7 @@ function main()
   local env_opts = { height = 150, overview_lane_h = 54, random_amount = 0.28, random_count = 10, random_dispersion = 0.25, random_smooth = true }
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 900, 1060, WINDOW_OPEN_COND)
+    ImGui.SetNextWindowSize(ctx, 900, 760, WINDOW_OPEN_COND)
     local visible
     visible, open = ImGui.Begin(ctx, "3OAFX Offline Renderer", open)
     if visible then

@@ -738,7 +738,7 @@ local function draw_controls(track, send_fx, ret_fx, mix_fx)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 940, 980, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 940, 760, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "3OAFX Send Return Controller", open)
   if visible then

@@ -57,7 +57,7 @@ local function main()
   local should_render = false
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 420, 290, ImGui.Cond_FirstUseEver)
+    ImGui.SetNextWindowSize(ctx, 420, 290, ImGui.Cond_Appearing)
     local visible
     visible, open = ImGui.Begin(ctx, "Frame Shift", open)
     if visible then

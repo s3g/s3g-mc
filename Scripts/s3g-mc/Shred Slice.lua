@@ -338,7 +338,7 @@ local function main()
   local status = ""
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 440, 380, ImGui.Cond_FirstUseEver)
+    ImGui.SetNextWindowSize(ctx, 440, 380, ImGui.Cond_Appearing)
     local visible
     visible, open = ImGui.Begin(ctx, "Shred / Slice", open)
 

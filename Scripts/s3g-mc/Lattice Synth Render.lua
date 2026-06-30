@@ -453,11 +453,14 @@ local function draw_preview(settings)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 860, 940, ImGui.Cond_Always)
+  ImGui.SetNextWindowSize(ctx, 860, 760, ImGui.Cond_Always)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
     local settings = make_settings()
+    local footer_h = 54
+    local control_h = math.max(280, ImGui.GetWindowHeight(ctx) - footer_h)
+    if ImGui.BeginChild(ctx, "##lattice_synth_render_controls", 0, control_h) then
     draw_preview(settings)
     ImGui.SetNextItemWidth(ctx, 130)
     _, start_pos = ImGui.InputDouble(ctx, "Start time", start_pos, 0.1, 1.0, "%.3f")
@@ -517,8 +520,11 @@ local function loop()
     _, insert_gain = ImGui.SliderDouble(ctx, "Inserted item gain", insert_gain, 0.05, 1, "%.2f")
     _, seed = ImGui.InputInt(ctx, "Seed", seed)
     if ImGui.Button(ctx, "New Seed", 100, 28) then seed = seed + 1 end
-    ImGui.SameLine(ctx)
+    ImGui.EndChild(ctx)
+    end
     if ImGui.Button(ctx, "Render", 100, 28) then should_render = true end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Close", 100, 28) then open = false end
   end
   ImGui.End(ctx)
   if should_render then

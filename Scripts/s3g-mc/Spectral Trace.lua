@@ -37,7 +37,7 @@ local normalize_db = -6.0
 local should_render = false
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 540, 470, ImGui.Cond_FirstUseEver)
+  ImGui.SetNextWindowSize(ctx, 540, 470, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Spectral Trace", open)
   if visible then
