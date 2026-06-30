@@ -40,7 +40,7 @@ Screenshots of selected s3g-mc controllers, render tools, panners, and workflow 
 </div>
 
 <div class="gallery-lightbox" data-gallery-lightbox aria-hidden="true">
-  <button class="gallery-close" type="button" data-gallery-close aria-label="Close gallery">x</button>
+  <button class="gallery-close" type="button" data-gallery-close aria-label="Close gallery">×</button>
   <button class="gallery-arrow prev" type="button" data-gallery-prev aria-label="Previous screenshot">‹</button>
   <img data-gallery-image src="" alt="">
   <button class="gallery-arrow next" type="button" data-gallery-next aria-label="Next screenshot">›</button>

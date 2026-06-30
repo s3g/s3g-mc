@@ -2405,6 +2405,261 @@ def render_foafx_spatial_granulator(cfg):
     print(f"Sample rate: {sample_rate} Hz")
 
 
+def render_foafx_pulsar_field(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    duration = max(0.05, float(cfg.get("duration", 8.0)))
+    order = max(1, min(3, int(cfg.get("order", 3))))
+    ambi_channels = (order + 1) * (order + 1)
+    frames = max(1, int(round(duration * sample_rate)))
+    out = np.zeros((frames, ambi_channels), dtype=np.float32)
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+
+    streams = max(1, min(12, int(cfg.get("streams", 3))))
+    fund_start = max(0.05, float(cfg.get("fund_start", 8.0)))
+    fund_end = max(0.05, float(cfg.get("fund_end", 38.0)))
+    form_start = max(20.0, float(cfg.get("form_start", 220.0)))
+    form_end = max(20.0, float(cfg.get("form_end", 1800.0)))
+    train_curve = str(cfg.get("train_curve", "rise"))
+    mask_mode = str(cfg.get("mask_mode", "stochastic"))
+    pulse_probability = float(np.clip(cfg.get("pulse_probability", 0.86), 0.0, 1.0))
+    burst_on = max(1, int(cfg.get("burst_on", 5)))
+    burst_off = max(0, int(cfg.get("burst_off", 3)))
+    edge = float(np.clip(cfg.get("edge", 0.35), 0.0, 1.0))
+    pulsaret = str(cfg.get("pulsaret", "sine"))
+    envelope_shape = str(cfg.get("envelope", "hann"))
+    amp = 10.0 ** (float(cfg.get("gain_db", -12.0)) / 20.0)
+    yaw_start = float(cfg.get("yaw_start", -90.0))
+    yaw_end = float(cfg.get("yaw_end", 90.0))
+    elevation = float(np.clip(cfg.get("elevation", 0.0), -89.0, 89.0))
+    spatial_spread = float(np.clip(cfg.get("spatial_spread", 0.25), 0.0, 1.0))
+    formant_scatter = float(np.clip(cfg.get("formant_scatter", 0.18), 0.0, 1.0))
+    drift = float(np.clip(cfg.get("drift", 0.12), 0.0, 1.0))
+    channel_mask = float(np.clip(cfg.get("channel_mask", 0.0), 0.0, 1.0))
+
+    def curve_value(u):
+        u = float(np.clip(u, 0.0, 1.0))
+        if train_curve == "fall":
+            return 1.0 - u
+        if train_curve == "arch":
+            return math.sin(math.pi * u)
+        if train_curve == "valley":
+            return 1.0 - math.sin(math.pi * u)
+        if train_curve == "wander":
+            return np.clip(u + 0.18 * math.sin(2.0 * math.pi * u * 3.0), 0.0, 1.0)
+        return u
+
+    def pulse_env(n):
+        if envelope_shape == "expo":
+            x = np.linspace(0.0, 1.0, n, dtype=np.float32)
+            return np.exp(-5.0 * x).astype(np.float32)
+        if envelope_shape == "reverse expo":
+            x = np.linspace(0.0, 1.0, n, dtype=np.float32)
+            return np.exp(-5.0 * (1.0 - x)).astype(np.float32)
+        if envelope_shape == "rect":
+            return np.ones(n, dtype=np.float32)
+        alpha = 0.25 + 0.70 * (1.0 - edge)
+        if n <= 2:
+            return np.ones(n, dtype=np.float32)
+        x = np.linspace(0.0, 1.0, n, dtype=np.float32)
+        env = np.ones(n, dtype=np.float32)
+        attack = x < alpha * 0.5
+        release = x > 1.0 - alpha * 0.5
+        env[attack] = 0.5 - 0.5 * np.cos(np.pi * x[attack] / max(1e-6, alpha * 0.5))
+        env[release] = 0.5 - 0.5 * np.cos(np.pi * (1.0 - x[release]) / max(1e-6, alpha * 0.5))
+        return env
+
+    def pulsaret_wave(n, stream_index, local_form):
+        phase = np.linspace(0.0, 1.0, n, endpoint=False, dtype=np.float32)
+        if pulsaret == "overtone":
+            sig = np.sin(2 * np.pi * phase)
+            sig += 0.42 * np.sin(4 * np.pi * phase)
+            sig += 0.22 * np.sin(6 * np.pi * phase)
+            return (sig / 1.64).astype(np.float32)
+        if pulsaret == "impulse":
+            sig = np.zeros(n, dtype=np.float32)
+            sig[0:max(1, min(n, 3))] = 1.0
+            return sig
+        if pulsaret == "fold":
+            sig = np.sin(2 * np.pi * phase) + 0.35 * np.sin(2 * np.pi * phase * (2.0 + stream_index))
+            return np.tanh(sig * 2.2).astype(np.float32)
+        if pulsaret == "noise":
+            return rng.normal(0.0, 0.55, n).astype(np.float32)
+        return np.sin(2 * np.pi * phase).astype(np.float32)
+
+    total_events = 0
+    for stream in range(streams):
+        t = 0.0
+        phase_count = 0
+        stream_gain = amp / math.sqrt(streams)
+        stream_offset = (stream / max(1, streams - 1) - 0.5) * 2.0 if streams > 1 else 0.0
+        while t < duration:
+            u = t / duration
+            cu = curve_value(u)
+            fund = fund_start * (1.0 - cu) + fund_end * cu
+            fund *= 2.0 ** (drift * 0.08 * math.sin((stream + 1) * 2.0 * math.pi * u + stream))
+            period = 1.0 / max(0.05, fund)
+            do_emit = True
+            if mask_mode == "burst":
+                cycle = burst_on + burst_off
+                do_emit = cycle <= 0 or (phase_count % cycle) < burst_on
+            elif mask_mode == "channel":
+                do_emit = ((phase_count + stream) % max(2, streams)) == 0
+            elif mask_mode == "stochastic":
+                local_prob = pulse_probability * (0.65 + 0.35 * math.sin(math.pi * u))
+                do_emit = rng.random() < local_prob
+            if do_emit:
+                form = form_start * (1.0 - cu) + form_end * cu
+                form *= 2.0 ** (rng.normal(0.0, formant_scatter * 0.35))
+                pulse_frames = max(8, int(round(sample_rate / max(20.0, form))))
+                start = int(round(t * sample_rate))
+                if start < frames:
+                    count = min(pulse_frames, frames - start)
+                    wave = pulsaret_wave(count, stream, form)
+                    env = pulse_env(count)
+                    az = yaw_start + (yaw_end - yaw_start) * u + stream_offset * spatial_spread * 120.0
+                    el = elevation + math.sin(2.0 * math.pi * u + stream) * spatial_spread * 35.0
+                    basis = np.array(ambisonic_basis(order, az, np.clip(el, -89.0, 89.0)), dtype=np.float32)
+                    if channel_mask > 0.0:
+                        basis *= (1.0 - channel_mask) + channel_mask * rng.uniform(0.25, 1.0, basis.shape[0]).astype(np.float32)
+                    out[start:start + count] += (wave * env * stream_gain)[:, None] * basis[None, :]
+                    total_events += 1
+            t += period
+            phase_count += 1
+
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("soft_limit", True)):
+        out = np.tanh(out * 1.2).astype(np.float32) / 1.2
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out.astype(np.float32), sample_rate)
+    print("Process: 3OAFX Pulsar Field")
+    print(f"Ambisonic order: {order}OA")
+    print(f"Output channels: {ambi_channels}")
+    print(f"Streams: {streams}")
+    print(f"Fundamental: {fund_start:.2f} -> {fund_end:.2f} Hz")
+    print(f"Formant: {form_start:.2f} -> {form_end:.2f} Hz")
+    print(f"Mask mode: {mask_mode}")
+    print(f"Pulsars emitted: {total_events}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
+def render_foafx_particle_cloud(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    order = max(1, min(3, int(cfg.get("order", ambisonic_order_from_channels(audio.shape[1])))))
+    ambi_channels = (order + 1) * (order + 1)
+    if audio.shape[1] < ambi_channels:
+        raise RuntimeError(f"Selected source has {audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+    audio = audio[:, :ambi_channels].astype(np.float32, copy=False)
+    duration = max(0.05, float(cfg.get("duration", audio.shape[0] / sample_rate)))
+    out_frames = max(1, int(round(duration * sample_rate)))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+
+    density = max(0.1, float(cfg.get("density", 48.0)))
+    asynch = float(np.clip(cfg.get("asynchronicity", 0.65), 0.0, 1.0))
+    intermittency = float(np.clip(cfg.get("intermittency", 0.15), 0.0, 0.98))
+    streams = max(1, min(16, int(cfg.get("streams", 4))))
+    grain_ms = max(2.0, float(cfg.get("grain_ms", 90.0)))
+    grain_jitter = float(np.clip(cfg.get("grain_jitter", 0.35), 0.0, 1.0))
+    playback = float(cfg.get("playback_rate", 1.0))
+    playback_jitter = float(np.clip(cfg.get("playback_jitter", 0.15), 0.0, 2.0))
+    scan_begin = float(np.clip(cfg.get("scan_begin", 0.0), 0.0, 1.0))
+    scan_range = float(np.clip(cfg.get("scan_range", 1.0), -1.0, 1.0))
+    scan_speed = float(cfg.get("scan_speed", 1.0))
+    env_shape = float(np.clip(cfg.get("envelope_shape", 0.5), 0.0, 1.0))
+    yaw_start = float(cfg.get("yaw_start", 0.0))
+    yaw_end = float(cfg.get("yaw_end", 0.0))
+    yaw_scatter = float(np.clip(cfg.get("yaw_scatter", 35.0), 0.0, 180.0))
+    order_blur = float(np.clip(cfg.get("order_blur", 0.0), 0.0, 1.0))
+    gain = 10.0 ** (float(cfg.get("gain_db", -9.0)) / 20.0)
+
+    grain_base = max(8, int(round(grain_ms * sample_rate / 1000.0)))
+    out = np.zeros((out_frames + grain_base * 4 + 4, ambi_channels), dtype=np.float32)
+    norm = np.zeros(out.shape[0], dtype=np.float32)
+    source_frames = audio.shape[0]
+    event_slots = max(1, int(round(duration * density * streams)))
+    period = 1.0 / max(0.1, density * streams)
+    emitted = 0
+
+    def grain_window(n):
+        x = np.linspace(0.0, 1.0, n, dtype=np.float32)
+        if env_shape < 0.45:
+            return np.exp(-6.0 * x).astype(np.float32)
+        if env_shape > 0.55:
+            return np.exp(-6.0 * (1.0 - x)).astype(np.float32)
+        return np.hanning(n).astype(np.float32)
+
+    def scanner_position(u):
+        start = scan_begin
+        end = scan_begin + scan_range
+        if scan_range == 0:
+            pos = start
+        else:
+            pos = start + scan_range * ((u * abs(scan_speed)) % 1.0)
+        return float(pos % 1.0)
+
+    for event in range(event_slots):
+        if rng.random() < intermittency:
+            continue
+        base_time = event * period
+        jitter_time = rng.uniform(-period, period) * asynch
+        t = base_time + jitter_time
+        if t < 0.0 or t >= duration:
+            continue
+        u = t / duration
+        n = max(8, int(round(grain_base * (1.0 + rng.uniform(-grain_jitter, grain_jitter)))))
+        out_start = int(round(t * sample_rate))
+        src_u = scanner_position(u)
+        src_u = (src_u + rng.normal(0.0, 0.08 * asynch)) % 1.0
+        src_start = int(round(src_u * max(1, source_frames - n - 2)))
+        local_rate = playback * (2.0 ** rng.normal(0.0, playback_jitter))
+        read = src_start + np.arange(n, dtype=np.float64) * local_rate
+        read = np.clip(read, 0.0, source_frames - 1.0)
+        i0 = np.floor(read).astype(np.int64)
+        i1 = np.clip(i0 + 1, 0, source_frames - 1)
+        frac = (read - i0)[:, None].astype(np.float32)
+        grain = audio[i0] * (1.0 - frac) + audio[i1] * frac
+        yaw = yaw_start + (yaw_end - yaw_start) * u + rng.uniform(-yaw_scatter, yaw_scatter)
+        if abs(yaw) > 1e-9:
+            grain = apply_hoa_yaw(grain, order, yaw)
+        if order_blur > 0.0:
+            higher = max(0.0, 1.0 - order_blur)
+            grain = apply_hoa_order_weights(grain, order, 1.0, higher, higher * higher, 1.0)
+        end = min(out_start + n, out.shape[0])
+        count = end - out_start
+        if count <= 0:
+            continue
+        win = grain_window(count)
+        out[out_start:end] += grain[:count] * win[:, None] * gain / math.sqrt(max(1.0, streams))
+        norm[out_start:end] += win * win
+        emitted += 1
+
+    out = out[:out_frames]
+    out /= np.maximum(np.sqrt(norm[:out_frames, None]), 0.35)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("soft_limit", True)):
+        out = np.tanh(out * 1.1).astype(np.float32) / 1.1
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out.astype(np.float32), sample_rate)
+    print("Process: 3OAFX Particle Cloud")
+    print(f"Ambisonic order: {order}OA")
+    print(f"Output channels: {ambi_channels}")
+    print(f"Density: {density:.2f}")
+    print(f"Streams: {streams}")
+    print(f"Grains emitted: {emitted} of {event_slots}")
+    print(f"Asynchronicity: {asynch:.3f}")
+    print(f"Intermittency: {intermittency:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
 def spatial_weights(channels, center, width):
     idx = np.arange(channels, dtype=np.float64)
     dist = np.abs(((idx - center + channels / 2.0) % channels) - channels / 2.0)
@@ -4451,7 +4706,7 @@ def render_midi_form_learner(cfg):
 
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|stereo_expand_ambisonic_bed|foafx_offline|foafx_object_space|foafx_spatial_occupation_montage|foafx_scene_navigator|foafx_object_field_split|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|stereo_expand_ambisonic_bed|foafx_offline|foafx_object_space|foafx_spatial_occupation_montage|foafx_scene_navigator|foafx_object_field_split|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|foafx_pulsar_field|foafx_particle_cloud|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -4491,6 +4746,10 @@ def main():
         render_multichannel_spectral_profile_tool(cfg)
     elif mode == "foafx_spatial_grains":
         render_foafx_spatial_granulator(cfg)
+    elif mode == "foafx_pulsar_field":
+        render_foafx_pulsar_field(cfg)
+    elif mode == "foafx_particle_cloud":
+        render_foafx_particle_cloud(cfg)
     elif mode == "karplus_field":
         render_karplus_field(cfg)
     elif mode == "subharmonic_bank":

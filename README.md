@@ -7,13 +7,6 @@ It includes Lua actions, ReaImGui controllers, and JSFX for channel editing,
 automation, fold-down monitoring, dome panning, 3OA send/return routing, and
 render-based multichannel processes.
 
-Current package snapshot: the browser exposes 102 user-facing tools/controllers,
-plus the Package Browser. Of those, 42 are Python/NumPy-backed offline
-processes, 22 load, control, or render included JSFX, and 38 are native
-Lua/ReaImGui REAPER actions. The repository also ships 21 underlying JSFX
-engine/effect files. The Lua folder includes helper libraries and internal
-dialogs that are not shown as Package Browser entries.
-
 Documentation, workflow notes, and references: <a href="https://s3g.github.io/s3g-mc/" target="_blank" rel="noopener noreferrer">s3g-mc docs site</a>.
 
 Many of these tools are inspired by or extend existing computer music
@@ -21,6 +14,28 @@ practices, with references mentioned in the documentation where they are
 useful.
 
 ## Tools
+
+For step-by-step notes on selected processes, see the [Process Guides](docs/process-guides.md).
+
+Current package snapshot: the browser exposes 104 user-facing tools/controllers,
+plus the Package Browser. Of those, 44 are Python/NumPy-backed offline
+processes, 22 load, control, or render included JSFX, and 38 are native
+Lua/ReaImGui REAPER actions. The repository also ships 21 underlying JSFX
+engine/effect files. The Lua folder includes helper libraries and internal
+dialogs that are not shown as Package Browser entries.
+
+Package Browser group counts:
+
+- Channel Mixing / Automation: 4
+- MIDI Composition: 7
+- Procedural Synthesis: 6
+- Offline Synthesis / IR: 8
+- Spatial Panners: 10
+- 3OAFX: 20
+- Spectral / Convolution: 16
+- Multichannel Texture / Montage: 20
+- Item Channel Transforms: 10
+- Track Building / Routing: 3
 
 ### Channel Mixing / Automation
 
@@ -144,9 +159,6 @@ the RISD Studio for Research in Sound & Technology (SRST). They include a
 same array, giving composers room to compare and work with different spatial
 behaviors.
 
-See the <a href="https://s3g.github.io/s3g-mc/workflows.html#3oafx" target="_blank" rel="noopener noreferrer">3OAFX workflow docs</a>
-for the ambisonic send/return workflow.
-
 ### 3OAFX
 
 - `Ambisonic Stereo Decoder`: package-native JSFX stereo decoder for ACN/SN3D
@@ -169,6 +181,12 @@ for the ambisonic send/return workflow.
   motion counterpoint, and spatial allusion modes.
 - `3OAFX Object / Field Split`: automatic NumPy-backed split of an ambisonic
   source into object-like foreground and field-like spatial bed outputs.
+- `3OAFX Particle Cloud`: NumPy-backed ambisonic particle-cloud renderer for
+  selected ACN/SN3D media, with density, asynchronicity, intermittency, scan,
+  grain envelope, playback, and HOA yaw controls.
+- `3OAFX Pulsar Field`: NumPy-backed ambisonic pulsar-train synthesizer with
+  fundamental/formant curves, pulse masking, pulsaret shape, envelope shape,
+  and AED trajectory controls.
 - `3OAFX Scene Navigator`: multi-source ambisonic scene surface where selected
   soundfield files become nodes and an editable listener path renders a new
   perspective traversal.
@@ -204,13 +222,6 @@ for the ambisonic send/return workflow.
   channels and stacked 3OA is 128 channels.
 
 ### Spectral / Convolution
-
-These offline processes are informed by spectral tool families such as
-<a href="https://www.composersdesktop.com/" target="_blank" rel="noopener noreferrer">CDP</a>,
-<a href="https://www.soundhack.com/freeware/the-boneyard/" target="_blank" rel="noopener noreferrer">SoundHack</a>,
-<a href="https://github.com/ericlyon/FFTease3.0-MaxMSP" target="_blank" rel="noopener noreferrer">FFTease</a>, and
-<a href="https://www.michaelnorris.info/software/soundmagic-spectral" target="_blank" rel="noopener noreferrer">SoundMagic Spectral</a>,
-and run from the package's Python/NumPy backend.
 
 - `Convolve selected items`: convolution of two selected media items, including
   mono, stereo, multichannel pairing, and summed matrix modes.
@@ -251,10 +262,6 @@ and run from the package's Python/NumPy backend.
   suppress loudest partials, threshold, or thin randomly.
 
 ### Multichannel Texture / Montage
-
-Native REAPER variations inspired by
-<a href="https://www.composersdesktop.com/docs/html/cgromc.htm" target="_blank" rel="noopener noreferrer">CDP multichannel processes</a>.
-These scripts do not require CDP.
 
 - `Brownian Walk`: short fragments follow a bounded random walk through source
   time and output channels.

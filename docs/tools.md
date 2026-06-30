@@ -34,8 +34,8 @@ toc:
 
 For step-by-step notes on selected processes, see the [Process Guides](process-guides.md).
 
-Current package snapshot: the browser exposes 102 user-facing tools/controllers,
-plus the Package Browser. Of those, 42 are Python/NumPy-backed offline
+Current package snapshot: the browser exposes 104 user-facing tools/controllers,
+plus the Package Browser. Of those, 44 are Python/NumPy-backed offline
 processes, 22 load, control, or render included JSFX, and 38 are native
 Lua/ReaImGui REAPER actions. The repository also ships 21 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and internal
@@ -48,7 +48,7 @@ Package Browser group counts:
 - Procedural Synthesis: 6
 - Offline Synthesis / IR: 8
 - Spatial Panners: 10
-- 3OAFX: 18
+- 3OAFX: 20
 - Spectral / Convolution: 16
 - Multichannel Texture / Montage: 20
 - Item Channel Transforms: 10
@@ -198,6 +198,12 @@ behaviors.
   motion counterpoint, and spatial allusion modes.
 - `3OAFX Object / Field Split`: automatic NumPy-backed split of an ambisonic
   source into object-like foreground and field-like spatial bed outputs.
+- `3OAFX Particle Cloud`: NumPy-backed ambisonic particle-cloud renderer for
+  selected ACN/SN3D media, with density, asynchronicity, intermittency, scan,
+  grain envelope, playback, and HOA yaw controls.
+- `3OAFX Pulsar Field`: NumPy-backed ambisonic pulsar-train synthesizer with
+  fundamental/formant curves, pulse masking, pulsaret shape, envelope shape,
+  and AED trajectory controls.
 - `3OAFX Scene Navigator`: multi-source ambisonic scene surface where selected
   soundfield files become nodes and an editable listener path renders a new
   perspective traversal.

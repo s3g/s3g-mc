@@ -17,6 +17,10 @@ toc:
     href: "#3oafx-object-space"
   - title: 3OAFX Object / Field Split
     href: "#3oafx-object--field-split"
+  - title: 3OAFX Particle Cloud
+    href: "#3oafx-particle-cloud"
+  - title: 3OAFX Pulsar Field
+    href: "#3oafx-pulsar-field"
   - title: 3OAFX Scene Navigator
     href: "#3oafx-scene-navigator"
   - title: 3OAFX Spatial Occupation Montage
@@ -143,6 +147,55 @@ Raise `Transient weight` to place attacks in the object output. Raise
 `Directional coherence` to keep focused directional energy in the object stream.
 Raise `Field smoothing` to broaden the bed and reduce edge-like separation.
 `Object / field crossfade` blends the two outputs.
+
+## 3OAFX Particle Cloud
+
+Use this when you want an ambisonic source to be reassembled as a particle
+cloud while keeping grain decisions coherent across all encoded component
+channels. Select one WAV-backed `ACN/SN3D` ambisonic media item, choose the
+source order, and render a new ambisonic item.
+
+Method:
+
+The renderer emits grains from the selected source. Each grain uses the same
+source-time position, duration, envelope, playback rate, and yaw transform
+across every encoded channel. This keeps the source moving as one ambisonic
+field rather than treating HOA channels as unrelated mono files.
+
+Main controls:
+
+- `Grain rate`, `Streams`, `Asynchronicity`, and `Intermittency` define when
+  particles are emitted.
+- `Scan begin`, `Scan range`, and `Scan speed` define where grains read from
+  the source.
+- `Grain duration`, `Duration jitter`, and `Envelope shape` define the particle
+  profile.
+- `Playback rate` and `Playback jitter` alter grain reading speed.
+- `Yaw` controls rotate the ambisonic field over the render; `Higher-order blur`
+  softens upper-order spatial detail.
+
+## 3OAFX Pulsar Field
+
+Use this to synthesize a new `ACN/SN3D` ambisonic item from pulsar streams.
+The process does not need a source item. It creates sound from short pulsarets
+whose repetition rate can move between rhythm, flutter, and tone.
+
+Method:
+
+Each stream emits a train of pulsars. The fundamental curve controls the
+emission period, the formant curve controls pulsaret width, and the pulse mask
+decides which pulsars are heard or left silent. Each stream is encoded along an
+AED trajectory before the result is written as 1OA, 2OA, or 3OA.
+
+Main controls:
+
+- `Fundamental start/end` controls the pulsar-train rate.
+- `Formant start/end` controls the pulsaret duration and spectral region.
+- `Pulse mask` selects stochastic omission, burst/rest patterns, channel
+  dialogue, or no mask.
+- `Pulsaret` and `Pulsaret envelope` shape each particle.
+- `Azimuth`, `Elevation`, and `Stream spatial spread` place the streams in the
+  ambisonic field.
 
 ## 3OAFX Scene Navigator
 
