@@ -45,7 +45,7 @@ These guides match the Package Browser's 3OAFX group. They cover ambisonic offli
 
 ## Source Format Convention
 
-3OAFX processes use `ACN/SN3D` for ambisonic media and rendered ambisonic output. When a process accepts both ambisonic and non-ambisonic material, `Auto by channel count` reads `4ch` as 1OA, `10ch` as 2OA using the first 9 channels, and `16ch` as 3OA. A true `9ch` WAV may also be accepted as 2OA. Other channel counts are treated as non-ambisonic source material and encoded into the selected `ACN/SN3D` output order. Use the source-format override when the selected item needs to be interpreted differently.
+3OAFX processes use `ACN/SN3D` for ambisonic media and rendered ambisonic output. When a process accepts both ambisonic and non-ambisonic material, `Auto by channel count` reads `4ch` as 1OA, `10ch` as 2OA using the first 9 channels, and `16ch` as 3OA. A true `9ch` WAV may also be accepted as 2OA. Other channel counts are treated as non-ambisonic source objects. Each input channel is placed onto the selected 3OAFX directional layer, then encoded into the selected `ACN/SN3D` output order. This is a directional-layer interpretation rather than a decode of a standard speaker format such as 5.1 or hexagonal ring. Use the source-format override when the selected item needs to be interpreted differently.
 
 References and related writings are listed separately in the documentation. The guide pages focus on how to use each process.
 
@@ -101,7 +101,7 @@ Main controls:
 
 ## 3OAFX Object Space
 
-Use this when you want to transform a selected source into an ambisonic object/space relationship. The process accepts either `ACN/SN3D` ambisonic media or non-ambisonic media. In `Auto by channel count`, `4ch`, `10ch`, and `16ch` are interpreted as 1OA, 2OA, and 3OA respectively; true `9ch` WAVs are also accepted as 2OA. Other channel counts are treated as separate source objects and encoded into the selected ambisonic output order.
+Use this when you want to transform a selected source into an ambisonic object/space relationship. The process accepts either `ACN/SN3D` ambisonic media or non-ambisonic media. In `Auto by channel count`, `4ch`, `10ch`, and `16ch` are interpreted as 1OA, 2OA, and 3OA respectively; true `9ch` WAVs are also accepted as 2OA. Other channel counts are treated as separate source objects placed onto the selected 3OAFX directional layer before ambisonic encoding.
 
 Modes:
 
@@ -204,7 +204,7 @@ slows that part of the path.
 
 Use this to create an ambisonic montage from one or more selected WAV-backed media items. The process fragments the selected sources into overlapping events, distributes those events through a virtual direction layer, and re-encodes the result as `ACN/SN3D` ambisonic output.
 
-The source-format convention is the same as `3OAFX Object Space`: `4ch`, `10ch`, and `16ch` are treated as 1OA, 2OA, and 3OA in `Auto by channel count`, with true `9ch` WAVs also accepted as 2OA. Other channel counts are treated as non-ambisonic source objects.
+The source-format convention is the same as `3OAFX Object Space`: `4ch`, `10ch`, and `16ch` are treated as 1OA, 2OA, and 3OA in `Auto by channel count`, with true `9ch` WAVs also accepted as 2OA. Other channel counts are treated as non-ambisonic source objects placed onto the selected 3OAFX directional layer.
 
 The optional stereo expansion is a practical source-expansion step: stereo material contributes left/right object cues plus mid/side-derived front, rear, and side occupation cues before ambisonic encoding. It is not intended as a strict decoder for a historical matrix format.
 
