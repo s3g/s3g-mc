@@ -245,9 +245,8 @@ listener-specific inverse filter.
 
 Starting settings:
 
-- `Cancellation mode`: `Matrix inverse` is the more reference-aligned
-  transaural approximation. `Feedforward` keeps the earlier gentler subtraction
-  behavior and can be useful in reflective rooms or less exact speaker setups.
+- `Cancellation mode`: `Matrix inverse` uses inverse-style compensation.
+  `Feedforward` uses delayed opposite-channel subtraction.
 - `Cancellation amount`: start around `60-100%`; higher values are more
   dramatic and more position-dependent.
 - `Speaker half-angle`: half of the angle between the left and right speakers

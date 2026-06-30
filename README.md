@@ -7,9 +7,9 @@ It includes Lua actions, ReaImGui controllers, and JSFX for channel editing,
 automation, fold-down monitoring, dome panning, 3OA send/return routing, and
 render-based multichannel processes.
 
-Current package snapshot: the browser exposes 101 user-facing tools/controllers,
+Current package snapshot: the browser exposes 102 user-facing tools/controllers,
 plus the Package Browser. Of those, 42 are Python/NumPy-backed offline
-processes, 22 load, control, or render included JSFX, and 37 are native
+processes, 22 load, control, or render included JSFX, and 38 are native
 Lua/ReaImGui REAPER actions. The repository also ships 21 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and internal
 dialogs that are not shown as Package Browser entries.
@@ -39,29 +39,29 @@ useful.
 
 ### MIDI Composition
 
+- `Form Learner`: NumPy-backed composer that analyzes selected MIDI items
+  and expands their rhythm, pitch, velocity, duration, and channel traits into a
+  longer editable MIDI form.
 - `Lattice Drums`: creates an editable drum MIDI item from a layered
   table-scanning gesture, with each layer assigned to a drum voice and cells
   shaping velocity, duration, and density with Superior-style or GM note maps.
 - `Lattice Tables`: creates an editable MIDI item from a table-scanning
-  gesture model, translating visible lattice cells into pitch, velocity,
-  duration, and MIDI-channel focus.
+  gesture model, with scale selection, voicing, duration variation, table or
+  single-channel output, and visible translation layers.
 - `Musical Space`: creates an editable MIDI item from a path through melodic
-  and harmonic spaces, with selectable rhythm models, density, voicing,
-  velocity shaping, MIDI-channel focus, and geometric preview.
-- `Form Learner`: NumPy-backed composer that analyzes selected MIDI items
-  and expands their rhythm, pitch, velocity, duration, and channel traits into a
-  longer editable MIDI form.
-- `Terrain Form`: NumPy-backed song-duration MIDI generator with section
-  maps, terrain-shaped density/register/channel fields, and optional project
-  markers.
+  and harmonic spaces, with expanded scale choices, selectable rhythm models,
+  density, voicing, note-length variation, MIDI-channel focus, and geometric
+  preview.
 - `Polymetric Drum States`: creates an editable drum MIDI item from changing
   polymeter configurations, using Superior-style or GM drum maps, integer or
   fractional state lengths, beat-grid snapping, and jump or glide transitions
   between states.
 - `Polymetric Pitch Lanes`: creates multiple Euclidean lanes with
-  independent lengths, pulses, rotations, pitch degrees, and MIDI channels for
-  procedural synths or general algorithmic composition, shown as concentric
-  rhythm rings.
+  preset banks, independent lengths, pulses, rotations, pitch degrees,
+  note-length variation, and lane or single-channel MIDI output.
+- `Terrain Form`: NumPy-backed song-duration MIDI generator with section
+  maps, terrain-shaped density/register/channel fields, expanded scales, and
+  optional project markers.
 
 ### Procedural Synthesis
 
@@ -250,19 +250,6 @@ and run from the package's Python/NumPy backend.
 - `Spectral Trace`: partial tracing with modes to keep loudest partials,
   suppress loudest partials, threshold, or thin randomly.
 
-### Item Channel Transforms
-
-- `Explode multichannel item to mono tracks`
-- `Extract item channel to mono track`
-- `Mirror item channel order`
-- `Rotate item channels`
-- `Reorder item channels`
-- `Resize item channel count`
-- `Odd-even item channel order`
-- `Interleave item channel pairs`
-- `Deinterleave item channel pairs`
-- `Swap item channel halves`
-
 ### Multichannel Texture / Montage
 
 Native REAPER variations inspired by
@@ -309,6 +296,19 @@ These scripts do not require CDP.
   across an output field.
 - `Zigzag Channel Walker`: equal slices walk back and forth across output
   channels, with optional reverse source-slice order.
+
+### Item Channel Transforms
+
+- `Deinterleave item channel pairs`
+- `Explode multichannel item to mono tracks`
+- `Extract item channel to mono track`
+- `Interleave item channel pairs`
+- `Mirror item channel order`
+- `Odd-even item channel order`
+- `Reorder item channels`
+- `Resize item channel count`
+- `Rotate item channels`
+- `Swap item channel halves`
 
 ### Track Building / Routing
 

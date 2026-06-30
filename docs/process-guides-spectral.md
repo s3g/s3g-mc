@@ -11,10 +11,14 @@ next_page:
 toc:
   - title: Convolve Selected Items
     href: "#convolve-selected-items"
+  - title: Render MC Impulse Field
+    href: "#render-mc-impulse-field"
   - title: Spectral Shaper
     href: "#spectral-shaper"
   - title: Multichannel Spectral Profile Tools
     href: "#multichannel-spectral-profile-tools"
+  - title: Spectral Transform Tools
+    href: "#spectral-transform-tools"
 ---
 
 # Spectral / Convolution Guides
@@ -31,15 +35,32 @@ Selection:
 2. Select the impulse item second.
 3. Run `Convolve selected items`.
 
-Start with `Matched / wrap impulse` for mono, stereo, or same-channel experiments. Use matrix-sum behavior when you want multichannel source and impulse material to combine into one summed channel layout rather than creating every source/impulse channel pair.
+`Matched / wrap impulse` is for mono, stereo, or same-channel source/impulse pairs. Matrix-sum behavior combines multichannel source and impulse material into one summed channel layout rather than creating every source/impulse channel pair.
 
-Starting settings:
+Initial settings:
 
 - Tail: `Full convolution tail`
 - Normalize: on
 - Normalize peak: around `-6 dB`
 
 If the result is silent or unexpectedly long, check that both selected items are readable audio files and that the impulse has audible content. If the waveform takes a moment to appear, REAPER may still be building peaks for the rendered file.
+
+## Render MC Impulse Field
+
+Use this to generate multichannel impulse material for convolution, reverb
+design, or spatial excitation. It does not need an input item.
+
+Core decisions:
+
+- Duration sets the impulse-response length.
+- Channel count sets the output bed.
+- Distribution controls decide where impulses happen in time and channels.
+- Minimum spacing keeps impulses from collapsing into dense clicks.
+- Profile controls change impulse shape, decay, and brightness.
+
+For convolution use, short durations produce a compact spatial response.
+Longer durations emphasize tail behavior, echo fields, or unstable room-like
+motion.
 
 
 
@@ -55,9 +76,9 @@ Selection:
 
 In use, one sound keeps the contour of its performance while another sound changes what that performance seems to be made from.
 
-Try the standard spectral envelope mode first. Use the formant-vocode algorithm when you want broader vocal-like or resonant contour transfer instead of dense frame-by-frame spectral matching.
+The standard spectral envelope mode transfers the shaper's spectrum frame by frame. The formant-vocode algorithm gives broader vocal-like or resonant contour transfer instead of dense frame-by-frame spectral matching.
 
-Starting settings:
+Initial settings:
 
 - Amount: moderate rather than maximum
 - Contrast: increase after the source relationship is working
@@ -86,3 +107,33 @@ The `Channel mode` setting controls how the profile channels are assigned:
 - `Wrap profile channels`: profile channels repeat across the source channels.
 - `Summed profile to all`: the profile is analyzed as one composite spectrum and
   applied to every source channel.
+
+
+
+## Spectral Transform Tools
+
+These tools render new media items from one or two selected WAV-backed sources. They work directly on the selected channel layout and do not decode to an ambisonic direction layer.
+
+Single-source transforms:
+
+- `Chaotic Resonant EQ`: passes the selected item through a multichannel resonant filter field with feedback, detuning, drive, wet/dry mix, and peak normalization.
+- `Spectral Accumulate`: sustains spectral bands until stronger energy appears, with decay, floor, and expansion controls.
+- `Spectral Blur`: smooths spectral magnitudes across time while retaining the source timing.
+- `Spectral Freeze`: imposes one spectral frame over the item while retaining the source timing.
+- `Spectral Spatializer`: distributes frequency bins across even output channel counts from `2` to `64`.
+- `Spectral Step Drunk Freeze`: holds frames at regular steps or follows a random-walk frame path.
+- `Spectral Trace`: keeps, suppresses, thresholds, or thins detected spectral material.
+
+Two-source transforms:
+
+- `Cross Synthesis`: keeps the phase and timing of the first selected item while blending its spectral magnitudes toward the second selected item.
+- `Spectral Morph`: moves between the spectra of the first and second selected items, either frame-by-frame or through frozen frames.
+
+Main controls across the group:
+
+- Window and hop settings change the time/frequency detail of the analysis.
+- Amount, mix, or depth controls set how strongly the transform is applied.
+- Floor or protection controls leave a minimum amount of source material in place.
+- Expansion or duration controls can render a longer item when the process includes time stretching.
+
+For `Spectral Spatializer`, choose the output channel count before rendering. Lower channel counts create broader frequency regions per channel. Higher channel counts divide the spectrum into more locations.

@@ -21,6 +21,11 @@ toc:
 
 These pages provide practical notes for selected tools. The guide categories follow the Package Browser and [Tools](tools.md) page.
 
+Many processes use custom ImGui interfaces with diagrams, tables, breakpoint
+lanes, or spatial views. These visuals are meant to show how the process is
+mapping time, channels, pitch, space, or source material, so they can be read as
+part of the control surface while setting up a render.
+
 ## General Pattern
 
 Most render actions follow the same workflow:
@@ -48,12 +53,13 @@ Useful habits:
 
 ## Category Guides
 
-- [Channel Mixing / Automation](process-guides-channel-mixing.md): automation mixer, fold-down, transaural playback, and monitor decoders.
-- [MIDI Composition](process-guides-midi.md): MIDI rule generation, musical-space paths, and polymetric lanes.
-- [Procedural Synthesis](process-guides-procedural-synthesis.md): Carto, Lattice, and Spectra synth workflows.
-- [Offline Synthesis / IR](process-guides-offline-synthesis-ir.md): offline synth, resynthesis, grain-cloud, and impulse tools.
-- [Spatial Panners](process-guides-spatial-panners.md): panner workflows and spatial layout controls.
-- [3OAFX](process-guides-3oafx.md): ambisonic offline rendering, ambisonic convolution, spatial grains, and 3OAFX spectral tools.
-- [Spectral / Convolution](process-guides-spectral.md): non-ambisonic convolution, spectral shaping, and spectral profile tools.
-- [Multichannel Texture / Montage](process-guides-texture-montage.md): slice, loop, and montage-oriented multichannel processes.
-- [Track Building / Routing](process-guides-track-routing.md): project structure, routing, stems, and item helper actions.
+- [Channel Mixing / Automation](process-guides-channel-mixing.md)
+- [MIDI Composition](process-guides-midi.md)
+- [Procedural Synthesis](process-guides-procedural-synthesis.md)
+- [Offline Synthesis / IR](process-guides-offline-synthesis-ir.md)
+- [Spatial Panners](process-guides-spatial-panners.md)
+- [3OAFX](process-guides-3oafx.md)
+- [Spectral / Convolution](process-guides-spectral.md)
+- [Multichannel Texture / Montage](process-guides-texture-montage.md)
+- [Item Channel Transforms](process-guides-item-transforms.md)
+- [Track Building / Routing](process-guides-track-routing.md)

@@ -6,8 +6,8 @@ prev_page:
   title: Spectral / Convolution Guides
   url: /process-guides-spectral.html
 next_page:
-  title: Track Building / Routing Guides
-  url: /process-guides-track-routing.html
+  title: Item Channel Transforms Guides
+  url: /process-guides-item-transforms.html
 toc:
   - title: Scatter Slices
     href: "#scatter-slices"
@@ -15,6 +15,8 @@ toc:
     href: "#loop-drift"
   - title: Loop Rift
     href: "#loop-rift"
+  - title: Texture / Montage Utilities
+    href: "#texture--montage-utilities"
 ---
 
 # Multichannel Texture / Montage Guides
@@ -39,7 +41,7 @@ Core decisions:
 - Arrangement shape controls how events are distributed through time.
 - Density envelope controls where events are admitted over the render.
 
-For dense results, use more slices and moderate gain. For sparse results, reduce density and increase minimum spacing or use a thinner density envelope. If the source has obvious attacks, marker or transient-like manual slicing usually reads more clearly than very small even slices.
+For denser renders, use more slices and moderate gain. For more open renders, reduce density and increase minimum spacing or use a thinner density envelope. If the source has defined attacks, marker or transient-like manual slicing preserves those boundaries more directly than very small even slices.
 
 
 
@@ -61,7 +63,7 @@ Important controls:
 - `Rate quantize` can make rate relationships more stable or more stepped.
 - `Source mode` and `Source distribution` decide how multiple selected items are assigned.
 
-Start with moderate rate spread and a generous crossfade. Increase drift after the loop seam feels stable.
+Use moderate rate spread and a longer crossfade while setting the loop behavior. Increase drift after the loop seam is smooth.
 
 
 
@@ -69,7 +71,7 @@ Start with moderate rate spread and a generous crossfade. Increase drift after t
 
 Use this when you want Loop Drift behavior with openings, dropouts, and partial loop sections rather than continuous beds.
 
-It is designed to preserve source identity more than a glitch process: sections should feel like parts of the loop appearing and disappearing, not accidental clicks.
+It preserves source identity more than a glitch process: sections appear as parts of the loop entering and leaving, rather than tiny click-like fragments.
 
 Important controls:
 
@@ -80,3 +82,45 @@ Important controls:
 - `Gap fill` changes how silence and openings behave.
 
 If the result feels too choppy, increase minimum section length and fade time, then reduce rate instability.
+
+
+
+## Texture / Montage Utilities
+
+These actions create multichannel arrangements from selected items without opening a large editor. Most of them write a new media item and leave the source item in place. Use WAV-backed media when possible, especially when the action renders a new file.
+
+Slice and fragment tools:
+
+- `Fracture`: cuts the selected material into fragments and distributes them across the target channel layout.
+- `Frame Gate`: admits short time frames according to a gate pattern.
+- `Frame Shift`: offsets frames between channels to create staggered time relationships.
+- `Marker spatial montage`: uses project markers or take markers as montage boundaries.
+- `Shred / Slice`: slices the source and rearranges slices across channels and time.
+
+Repeat, echo, and motion tools:
+
+- `Cascade spatial echo`: sends repeated material through a channel cascade.
+- `Channel orbit delay`: delays repeated material around the channel layout.
+- `Spatial Repeater`: repeats selected material with channel movement and spacing controls.
+- `Spatial Stutter`: repeats short segments across channel positions.
+- `Stereo Spin`: rotates stereo material through a multichannel bed.
+- `Zigzag channel walker`: moves events back and forth across the channel order.
+
+Channel-density and grouping tools:
+
+- `Brownian Walk`: moves short fragments through channels using a bounded random walk.
+- `Channel Smear`: spreads source material across neighboring channels.
+- `Crumble spatial groups`: breaks material into grouped channel events.
+- `Flutter Gate`: switches active channel groups over time.
+- `Mono Fill`: spreads a mono source into the selected channel count.
+- `Texture Clouds`: creates overlapping channel events from selected material.
+
+Common settings:
+
+- `Output channels` sets the rendered channel count.
+- Segment or frame length controls determine the size of each event.
+- Density, probability, or gate controls decide how many events are admitted.
+- Fade controls shape event edges.
+- Gain or normalize controls set the rendered level.
+
+When a process uses markers, project markers and active-take markers can be used as boundaries where supported. Take markers travel with the media item; project markers stay fixed on the project timeline.

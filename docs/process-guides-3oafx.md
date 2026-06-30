@@ -11,6 +11,8 @@ next_page:
 toc:
   - title: Source Format Convention
     href: "#source-format-convention"
+  - title: 3OAFX Send Return Controller
+    href: "#3oafx-send-return-controller"
   - title: 3OAFX Object Space
     href: "#3oafx-object-space"
   - title: 3OAFX Object / Field Split
@@ -25,6 +27,8 @@ toc:
     href: "#3oafx-ambisonic-kernel-collage"
   - title: 3OAFX Offline Ambisonic Convolve
     href: "#3oafx-offline-ambisonic-convolve"
+  - title: 3OAFX Synthetic Ambisonic IR Bank
+    href: "#3oafx-synthetic-ambisonic-ir-bank"
   - title: 3OAFX Offline Renderer
     href: "#3oafx-offline-renderer"
   - title: 3OAFX Spectral Profile Subtract
@@ -41,15 +45,63 @@ These guides match the Package Browser's 3OAFX group. They cover ambisonic offli
 
 ## Source Format Convention
 
-3OAFX processes use `ACN/SN3D` for ambisonic media and rendered ambisonic output. When a process accepts both ambisonic and non-ambisonic material, it should infer the source type from the selected item channel count: `4ch` as 1OA, `10ch` as 2OA using the first 9 channels, and `16ch` as 3OA. A true `9ch` WAV may also be accepted as 2OA. Other channel counts are treated as non-ambisonic source material and encoded into the selected `ACN/SN3D` output order. Processes should also provide an explicit source-format override when ambiguity matters.
+3OAFX processes use `ACN/SN3D` for ambisonic media and rendered ambisonic output. When a process accepts both ambisonic and non-ambisonic material, `Auto by channel count` reads `4ch` as 1OA, `10ch` as 2OA using the first 9 channels, and `16ch` as 3OA. A true `9ch` WAV may also be accepted as 2OA. Other channel counts are treated as non-ambisonic source material and encoded into the selected `ACN/SN3D` output order. Use the source-format override when the selected item needs to be interpreted differently.
 
-When a process follows a specific published idea closely, the relevant guide should say so. Other processes may use published work as historical or conceptual context while extending those ideas into package-specific workflows.
+References and related writings are listed separately in the documentation. The guide pages focus on how to use each process.
+
+## 3OAFX Send Return Controller
+
+Use this controller for the live 3OAFX send/return workflow on a 72-channel track. The track holds a decoded 24-channel virtual speaker lane between an ambisonic decoder and encoder. The controller changes the included JSFX masks and mixer so an inserted 24-channel effect can be focused on a region of the virtual speaker layer.
+
+Track layout:
+
+1. Ambisonic decoder before the 3OAFX send stage.
+2. `JS: s3g 3OA Send`.
+3. One 24-channel effect insert.
+4. `JS: s3g 3OA Return Mask`.
+5. `JS: s3g 3OA Mixer`.
+6. Ambisonic encoder after the mixer.
+
+Recommended external plugins for this live workflow are SPARTA `AmbiDEC` before `s3g 3OA Send` and SPARTA `AmbiENC` after `s3g 3OA Mixer`. Set `AmbiDEC` to `MMD` and load the included 24-point coordinate JSON files for both the decoder and encoder. The JSON files are included in the package's `sparta_json` folder.
+
+SPARTA settings for this chain:
+
+- Ambisonic order: `3rd order`
+- Channel ordering: `ACN`
+- Normalization: `SN3D`
+- AmbiDEC decoder mode: `MMD` / multi-mode decoder
+- Number of virtual speaker/source points: `24`
+
+The 72-channel bus is divided into three 24-channel lanes:
+
+- `1-24`: wet/effect lane
+- `25-48`: clean dry copy
+- `49-72`: return mask for mixer ducking and monitoring
+
+The inserted effect processes only `1-24`. After adding or moving an insert
+effect, click `Pin inserts 1-24` in the controller so the dry copy and return
+mask lanes remain reserved for the included 3OAFX JSFX.
+
+Controller setup:
+
+1. Select the 3OA FX track.
+2. Run `3OAFX Send Return Controller`.
+3. Click `Load/repair JSFX` to add or repair the core chain.
+4. Add the desired 24-channel insert effect between `s3g 3OA Send` and
+   `s3g 3OA Return Mask`.
+5. Click `Pin inserts 1-24`.
+
+Main controls:
+
+- Focus azimuth and elevation set the center of the processed region.
+- Focus width and sharpness shape how many virtual speakers are included.
+- Return amount controls how much processed signal is returned.
+- Dry and mix controls decide how the masked effect and unprocessed signal combine.
+- The visual mask display shows which of the 24 virtual points are included in the focus area.
 
 ## 3OAFX Object Space
 
 Use this when you want to transform a selected source into an ambisonic object/space relationship. The process accepts either `ACN/SN3D` ambisonic media or non-ambisonic media. In `Auto by channel count`, `4ch`, `10ch`, and `16ch` are interpreted as 1OA, 2OA, and 3OA respectively; true `9ch` WAVs are also accepted as 2OA. Other channel counts are treated as separate source objects and encoded into the selected ambisonic output order.
-
-This process directly draws on Natasha Barrett's distinction between sound-object, sounding space, spatial illusion, spatial allusion, and object-to-resonance transformation. The modes are package-specific extensions of those ideas rather than recreations of a specific Barrett work. Bernhard Leitner's sound-space work is also useful context for hearing sound as architectural material, path, and spatial occupation.
 
 Modes:
 
@@ -58,12 +110,12 @@ Modes:
 - `Motion counterpoint` separates spectral regions into different spatial motion layers.
 - `Spatial allusion` emphasizes partial spatial cues, resonance, and ambiguity rather than a plausible room model.
 
-Start conservatively:
+Initial setup:
 
 1. Select one WAV-backed media item.
 2. Leave `Source format` on `Auto by channel count` unless the item is ambiguous.
 3. Choose the target `Output order`.
-4. Start with `Object clarity` around `0.5`, `Space amount` below `1.0`, and `Peak normalize` enabled.
+4. Use `Object clarity` around `0.5`, `Space amount` below `1.0`, and `Peak normalize` enabled while setting the relationship.
 
 For non-ambisonic sources, `Source object spread` controls how broadly each input channel is encoded into the virtual direction layer before the object-space process. For ambisonic sources, the selected order is decoded to the virtual direction layer, transformed, and re-encoded to `ACN/SN3D`.
 
@@ -76,23 +128,21 @@ estimates object-like material from transient energy, directional concentration,
 and local spectral contrast, then re-encodes the object and field outputs as new
 ambisonic WAVs.
 
-This first version is automatic. It does not need a reference file. A guided
-variant using object or field reference profiles would be a separate workflow,
-closer to the spectral profile tools.
+This version is automatic and does not need a reference file. The process
+estimates foreground and field behavior from the selected source itself.
 
-Starting approach:
+Initial setup:
 
 1. Select one ambisonic WAV-backed media item.
 2. Choose the source order: `1OA / 4ch`, `2OA / 9ch`, or `3OA / 16ch`.
 3. Leave `Output` on `Both object and field`.
-4. Start with `Object bias` around `0.55`, `Transient weight` and
+4. Use `Object bias` around `0.55`, `Transient weight` and
    `Directional coherence` around `0.45`, and `Peak normalize` enabled.
 
-Raise `Transient weight` when attacks should be captured as object material.
-Raise `Directional coherence` when focused directional energy should stay in the
-object stream. Raise `Field smoothing` when the bed should be broader and less
-edge-like. `Object / field crossfade` prevents the two outputs from becoming too
-binary.
+Raise `Transient weight` to place attacks in the object output. Raise
+`Directional coherence` to keep focused directional energy in the object stream.
+Raise `Field smoothing` to broaden the bed and reduce edge-like separation.
+`Object / field crossfade` blends the two outputs.
 
 ## 3OAFX Scene Navigator
 
@@ -103,19 +153,19 @@ is editable: larger nodes keep influence over a wider area, while smaller nodes
 make tighter zones. The listener path is drawn through those nodes with editable
 XYZ position and normalized time breakpoints. By default, the listener head
 faces the direction of travel. A manual AED orientation mode is available when
-yaw, pitch, and roll should be controlled independently from the trajectory. The
+yaw, pitch, and roll are controlled independently from the trajectory. The
 editor includes a visual preview transport so the trajectory and head direction
 can be checked before rendering. The renderer writes a new ambisonic WAV
 representing that traversal.
 
-This is a scene-interpolation and perspective-traversal process. It should not
-be read as literal physical six-degrees-of-freedom translation inside a single
+This is a scene-interpolation and perspective-traversal process. It is not
+literal physical six-degrees-of-freedom translation inside a single
 ambisonic recording. Instead, it composes a path through multiple encoded
 soundfields by decoding each selected file to the same 3OAFX direction layer,
 weighting nearby nodes, rotating the virtual field from the listener
 perspective, and re-encoding the result.
 
-Starting approach:
+Initial setup:
 
 1. Select two or more same-order ambisonic WAV-backed items.
 2. Leave `Source order` and `Output order` at `3OA / 16ch` for third-order
@@ -124,13 +174,13 @@ Starting approach:
 4. Drag the purple/red path points to define the listener trajectory. Leave
    `Head orientation` on `Face trajectory` unless independent head movement is
    needed.
-5. Start with `Blend field`, `Global node radius` around `1.25`,
+5. Use `Blend field`, `Global node radius` around `1.25`,
    `Perspective rotation` around `0.8`, and `Peak normalize` enabled.
 
 The scene viewer has `3/4`, `Top`, and `Side` camera presets plus camera
-azimuth/elevation controls. `Top` is best for placing nodes and path points
-across X/Y. `Side` is useful for height changes because dragging edits X/Z.
-`3/4` gives the clearest overview of the node field and listener trajectory.
+azimuth/elevation controls. `Top` places nodes and path points across X/Y.
+`Side` edits X/Z for height changes. `3/4` shows the node field and listener
+trajectory together.
 
 If the render duration is longer than one or more selected media items, those
 sources are looped under the hood with `Source loop crossfade ms`. This keeps
@@ -156,14 +206,14 @@ Use this to create an ambisonic montage from one or more selected WAV-backed med
 
 The source-format convention is the same as `3OAFX Object Space`: `4ch`, `10ch`, and `16ch` are treated as 1OA, 2OA, and 3OA in `Auto by channel count`, with true `9ch` WAVs also accepted as 2OA. Other channel counts are treated as non-ambisonic source objects.
 
-The optional stereo expansion is informed by Michael Gerzon's writing on deriving surround information from two-channel stereo. In this process it is used as a practical source-expansion step: stereo material contributes left/right object cues plus mid/side-derived front, rear, and side occupation cues before ambisonic encoding. It is not intended as a strict decoder for a historical matrix format.
+The optional stereo expansion is a practical source-expansion step: stereo material contributes left/right object cues plus mid/side-derived front, rear, and side occupation cues before ambisonic encoding. It is not intended as a strict decoder for a historical matrix format.
 
-Starting approach:
+Initial setup:
 
 1. Select one or more WAV-backed source items.
 2. Leave `Source format` on `Auto by channel count` unless the items need an override.
 3. Choose the target `Output order`.
-4. Start with `Events` around `180`, `Spatial occupation` around `0.7`, and `Peak normalize` enabled.
+4. Use `Events` around `180`, `Spatial occupation` around `0.7`, and `Peak normalize` enabled.
 
 `Event density` controls how many requested events are admitted. `Min segment ms` and `Max segment ms` set the fragment size range. `Spatial occupation` spreads each event through the virtual direction layer, while `Spatial motion` rotates or offsets event material over short blocks. Dense settings and long segments can build level quickly, so normalization is recommended while exploring.
 
@@ -175,49 +225,48 @@ for later 3OAFX processing. The renderer writes a new `ACN/SN3D` 1OA, 2OA, or
 into left/right plus mid/side cues, then distributed as front, side, rear, and
 optional height material before ambisonic encoding.
 
-This process is informed by Michael Gerzon's work on deriving surround
-information from two-channel stereo, but it is a package-specific expansion
-tool rather than a decoder for a named matrix format.
+This is a package-specific expansion tool rather than a decoder for a named
+matrix format.
 
-Starting approach:
+Initial setup:
 
 1. Select one WAV-backed mono or stereo media item.
 2. Choose the target `Output order`.
-3. Start with `Balanced bed`, `Stereo width` near `1.0`, and `Peak normalize`
+3. Use `Balanced bed`, `Stereo width` near `1.0`, and `Peak normalize`
    enabled.
 4. Raise `Rear amount`, `Side amount`, or `Height amount` to make a broader bed.
 
 `Decorrelation` adds diffuse support to the derived field. `Source spread`
 controls how tightly the derived components land on the virtual direction layer.
-`Bass mono below Hz` centers low frequencies before expansion, useful when the
-output will later be folded down or decoded to compact speaker layouts.
+`Bass mono below Hz` centers low frequencies before expansion when the output
+will later be folded down or decoded to compact speaker layouts.
 
 ## 3OAFX Ambisonic Kernel Collage
 
-Use this when the second set of files are not impulse responses, but ambisonic recordings you want to impose on another ambisonic source. The earliest selected WAV is the source. Every later selected WAV becomes a kernel recording. Any number of kernels can be selected. Files should use `ACN/SN3D`; kernels may be 1OA, 2OA, or 3OA when mixed-order adaptation is enabled.
+Use this when the second set of files are not impulse responses, but ambisonic recordings you want to impose on another ambisonic source. The earliest selected WAV is the source. Every later selected WAV becomes a kernel recording. Any number of kernels can be selected. Files use `ACN/SN3D`; kernels may be 1OA, 2OA, or 3OA when mixed-order adaptation is enabled.
 
 The process decodes the source to a small virtual direction layer, convolves those source feeds with the kernel recordings, and sums the result back to an encoded ambisonic WAV. It is closer to spatial cross-convolution than room simulation: transients in the source can excite the spectral and spatial body of the kernel recordings, while sustained sources can become smeared or clouded by them.
 
-Start conservatively:
+Initial setup:
 
 1. Select a 1OA, 2OA, or 3OA source item first on the timeline.
 2. Select one or more same-order ambisonic recordings to use as kernels.
 3. Run `3OAFX Ambisonic Kernel Collage`.
-4. Start with `Cycle kernels across directions`, `Max kernel window sec` around 2-4 seconds, and `Wet pre-gain dB` around `-18`.
+4. Use `Cycle kernels across directions`, `Max kernel window sec` around 2-4 seconds, and `Wet pre-gain dB` around `-18` for an initial render.
 
 `Direction layer` chooses the virtual directional structure. `Auto by order` uses four tetrahedral directions for 1OA and eight practical directions for 2OA/3OA. `Sparse 4-direction tetrahedral` can also be used with higher-order sources when you want a simpler four-region behavior. `Practical 8-direction` keeps the eight-region layout regardless of order.
 
 `Kernel assignment` controls how the kernel recordings are distributed across those directions. `Cycle` is predictable and can use any number of kernels. `Random one per direction` changes the mapping with the seed. `Kernel index equals direction` treats the selected kernels as explicit direction slots, leaving missing slots silent and ignoring extra kernels. `Region smear` gives every selected kernel an implied position and blends nearby kernels into each virtual direction. `Dense all kernels per direction` can produce large, saturated spatial masses because every direction is convolved with every kernel.
 
-`Adapt mixed-order kernels` lets 1OA, 2OA, and 3OA kernel recordings be used together. The selected output order is set by the source/order menu. Higher-order kernels are reduced to that order. Lower-order kernels keep their available channels, and missing higher-order channels are inferred from the lower-order directional energy. This is useful for collage work, but it is not the same as having native measured material at every order.
+`Adapt mixed-order kernels` lets 1OA, 2OA, and 3OA kernel recordings be used together. The selected output order is set by the source/order menu. Higher-order kernels are reduced to that order. Lower-order kernels keep their available channels, and missing higher-order channels are inferred from the lower-order directional energy. This makes mixed-order collage possible, but it is not the same as having native measured material at every order.
 
-The kernel window, fade, wet pre-gain, soft limit, and peak normalize controls are there because a whole recording used as a convolution kernel can build level quickly. Shorter kernel windows usually keep the source identity clearer; longer windows push toward suspended, imprint-like fields.
+The kernel window, fade, wet pre-gain, soft limit, and peak normalize controls shape level and duration when a whole recording is used as a convolution kernel. Shorter kernel windows keep more of the source articulation. Longer windows extend the kernel imprint over time.
 
 
 
 ## 3OAFX Offline Ambisonic Convolve
 
-Use this for offline convolution of ambisonic source material with ambisonic impulse responses. It belongs with the 3OAFX offline family because it can either convolve one same-order ambisonic file with one same-order ambisonic IR, or use an intermediate directional layer before returning to ambisonic format. The banked method is inspired by the measured-reverb workflow Bruce Wiggins described in *Sounds in Space 2017*: decode or transform the ambisonic source to directional feeds, convolve those feeds with corresponding ambisonic IRs, then sum the wet result back into ambisonic format.
+Use this for offline convolution of ambisonic source material with ambisonic impulse responses. It belongs with the 3OAFX offline family because it can either convolve one same-order ambisonic file with one same-order ambisonic IR, or use an intermediate directional layer before returning to ambisonic format. In directional-bank mode, the source is decoded or transformed to directional feeds, those feeds are convolved with corresponding ambisonic IRs, and the wet result is summed back into ambisonic format.
 
 Selection:
 
@@ -225,7 +274,7 @@ Selection:
 2. Select either one same-order ambisonic IR WAV, or a direction-accurate IR bank.
 3. Run `3OAFX Offline Ambisonic Convolve`.
 
-The source and IR items should use the same ambisonic convention: `ACN/SN3D`. Choose the source order to match the item: `1OA / 4ch`, `2OA / 9ch`, or `3OA / 16ch`.
+The source and IR items use the same ambisonic convention: `ACN/SN3D`. Choose the source order to match the item: `1OA / 4ch`, `2OA / 9ch`, or `3OA / 16ch`.
 
 Convolution methods:
 
@@ -236,15 +285,43 @@ In directional-bank mode, the IRs are encoded ambisonic WAVs, not P-format files
 
 Directional-bank mode does not reuse or wrap IRs. Select either one correctly stacked bank or the exact number of separate IR files required by the method: 4 files for first order, 8 files for 2OA or 3OA. A first-order four-direction bank is not an accurate substitute for an eight-direction 3OA bank. Render time increases with source duration, IR length, ambisonic order, and number of virtual directions.
 
-`Adapt lower-order IRs to output order` allows a lower-order directional bank to be used in a higher-order render, for example eight 1OA IRs or one 32-channel stacked 1OA bank in a 3OA render. The adaptation estimates direction and signed energy from the lower-order IR, then re-encodes that response to the selected output order. This preserves the lower-order directional information, but it should be understood as an inferred higher-order response rather than a measured 3OA IR.
+`Adapt lower-order IRs to output order` allows a lower-order directional bank to be used in a higher-order render, for example eight 1OA IRs or one 32-channel stacked 1OA bank in a 3OA render. The adaptation estimates direction and signed energy from the lower-order IR, then re-encodes that response to the selected output order. This preserves the lower-order directional information as an inferred higher-order response rather than a measured 3OA IR.
 
-`Allow sparse 4-direction FOA bank` lets four 1OA directional IRs, or one 16-channel stacked FOA bank, drive a 2OA or 3OA render. This uses the P-format / tetrahedral directions as the source-feed layer. It is useful when only four measured directions are available, but it is intentionally sparse: the additional 8-direction higher-order measurement positions are not filled or guessed.
+`Allow sparse 4-direction FOA bank` lets four 1OA directional IRs, or one 16-channel stacked FOA bank, drive a 2OA or 3OA render. This uses the P-format / tetrahedral directions as the source-feed layer. The additional 8-direction higher-order measurement positions are not filled or guessed.
 
 Use `Dry level` when the IRs were captured with little direct sound and you want to add the original source back separately. Use `Wet pre-gain dB` to lower the convolution bank before normalization if the wet result builds up.
 
-For testing and designed spaces, run `3OAFX Synthetic Ambisonic IR Bank` to create encoded ambisonic IRs for the same direction layer. It uses room dimensions, material absorption, scattering, source distance, early reflections, and late diffuse taps to sketch a synthetic acoustic response.
+For designed impulse responses, run `3OAFX Synthetic Ambisonic IR Bank` to create encoded ambisonic IRs for the same direction layer. It uses room dimensions, material absorption, scattering, source distance, early reflections, and late diffuse taps to define a synthetic acoustic response.
 
 The designer can write separate ambisonic WAVs, one per virtual direction, or one stacked multichannel bank where each direction occupies a block of ambisonic channels. The convolver detects either format. The practical 2OA and 3OA stacked banks are designed to fit REAPER's 128-channel track limit. The designer writes a direction-map CSV next to the generated IRs, and the convolver prints the same azimuth/elevation map in the console so measured banks can be checked against the expected order.
+
+
+
+## 3OAFX Synthetic Ambisonic IR Bank
+
+Use this to create encoded ambisonic impulse-response banks for `3OAFX Offline Ambisonic Convolve`. The generated files use `ACN/SN3D` and match the direction layers expected by the convolver.
+
+Output formats:
+
+- `Separate files` writes one ambisonic IR WAV per virtual direction.
+- `Stacked bank` writes one multichannel WAV with one ambisonic channel block per direction.
+
+Direction formats:
+
+- 1OA uses a four-direction tetrahedral / P-format-style layout.
+- 2OA uses eight directions, with each direction stored as a 9-channel ambisonic block.
+- 3OA uses eight directions, with each direction stored as a 16-channel ambisonic block.
+
+The stacked 2OA bank is `72ch`. The stacked 3OA bank is `128ch`, which fits REAPER's maximum track channel count. The script also writes a direction-map CSV next to the generated IRs so the direction order can be checked later.
+
+Main controls:
+
+- Room dimensions set the broad size relationship.
+- Material absorption changes how quickly energy decays.
+- Scattering changes how separated or diffuse the reflections become.
+- Source distance shapes the direct-to-reflected balance.
+- Early reflection and late-field controls define the response over time.
+- Output gain and peak normalize set the rendered level.
 
 
 
@@ -287,7 +364,7 @@ Selection:
    reduce or extract.
 3. Run `3OAFX Spectral Profile Subtract`.
 
-The source and profile should use the same ambisonic order and channel format.
+The source and profile use the same ambisonic order and channel format.
 The renderer decodes both to the same 3OAFX directional layer, builds a spectral
 profile per direction, applies subtraction, and re-encodes the result to
 ACN/SN3D.
@@ -297,8 +374,7 @@ Settings:
 - `Output`: `Cleaned source` writes the reduced source; `Residue only` writes
   the removed material.
 - `Reduction amount`: how strongly the profile is subtracted.
-- `Spectral floor`: the minimum gain left in a bin, useful for avoiding hollow
-  or watery artifacts.
+- `Spectral floor`: the minimum gain left in a bin.
 - `Profile sensitivity`: scales the profile before subtraction.
 - `Frequency smoothing bins` and `Temporal smoothing`: soften narrow-bin and
   frame-to-frame changes.
@@ -334,11 +410,10 @@ Useful first controls:
 
 ## 3OAFX Spatial Grains
 
-`3OAFX Spatial Grains` follows the spatial-grain principle described by E.
-Deleflie and Greg Schiemer: the same grain micro-control is applied to every
-encoded component channel. In practice, grain position, duration, envelope,
-playback rate, overlap, and navigation mode are shared across the 1OA, 2OA, or
-3OA channels, so the renderer can work directly on the encoded ambisonic file.
+`3OAFX Spatial Grains` applies the same grain micro-control to every encoded
+component channel. Grain position, duration, envelope, playback rate, overlap,
+and navigation mode are shared across the 1OA, 2OA, or 3OA channels, so the
+renderer can work directly on the encoded ambisonic file.
 
 Use `Navigation mode` to decide how source time is used as a spatial index:
 
