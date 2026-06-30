@@ -814,7 +814,6 @@ def render_mass_partial(cfg):
         weights /= np.sqrt(np.sum(weights * weights, axis=1, keepdims=True) + 1e-12)
         out[start:start + length, :] += tone[:, None] * weights.astype(np.float32, copy=False)
         accepted += 1
-    out = apply_output_envelope(out, cfg, "amplitude")
     if bool(cfg.get("normalize", True)):
         out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
     else:
@@ -2490,12 +2489,12 @@ def render_foafx_pulsar_field(cfg):
     for stream in range(streams):
         t = 0.0
         phase_count = 0
-        stream_gain = amp / math.sqrt(streams)
         stream_offset = (stream / max(1, streams - 1) - 0.5) * 2.0 if streams > 1 else 0.0
         while t < duration:
             u = t / duration
             cu = curve_value(u)
             fund = fund_start * (1.0 - cu) + fund_end * cu
+            fund = env_value(cfg, "fundamental", u, fund)
             fund *= 2.0 ** (drift * 0.08 * math.sin((stream + 1) * 2.0 * math.pi * u + stream))
             period = 1.0 / max(0.05, fund)
             do_emit = True
@@ -2505,10 +2504,11 @@ def render_foafx_pulsar_field(cfg):
             elif mask_mode == "channel":
                 do_emit = ((phase_count + stream) % max(2, streams)) == 0
             elif mask_mode == "stochastic":
-                local_prob = pulse_probability * (0.65 + 0.35 * math.sin(math.pi * u))
+                local_prob = env_value(cfg, "probability", u, pulse_probability) * (0.65 + 0.35 * math.sin(math.pi * u))
                 do_emit = rng.random() < local_prob
             if do_emit:
                 form = form_start * (1.0 - cu) + form_end * cu
+                form = env_value(cfg, "formant", u, form)
                 form *= 2.0 ** (rng.normal(0.0, formant_scatter * 0.35))
                 pulse_frames = max(8, int(round(sample_rate / max(20.0, form))))
                 start = int(round(t * sample_rate))
@@ -2516,12 +2516,15 @@ def render_foafx_pulsar_field(cfg):
                     count = min(pulse_frames, frames - start)
                     wave = pulsaret_wave(count, stream, form)
                     env = pulse_env(count)
-                    az = yaw_start + (yaw_end - yaw_start) * u + stream_offset * spatial_spread * 120.0
-                    el = elevation + math.sin(2.0 * math.pi * u + stream) * spatial_spread * 35.0
+                    local_spread = env_value(cfg, "spatial_spread", u, spatial_spread)
+                    local_amp = amp * env_value(cfg, "amplitude", u, 1.0)
+                    az = yaw_start + (yaw_end - yaw_start) * u
+                    az = env_value(cfg, "yaw", u, az) + stream_offset * local_spread * 120.0
+                    el = elevation + math.sin(2.0 * math.pi * u + stream) * local_spread * 35.0
                     basis = np.array(ambisonic_basis(order, az, np.clip(el, -89.0, 89.0)), dtype=np.float32)
                     if channel_mask > 0.0:
                         basis *= (1.0 - channel_mask) + channel_mask * rng.uniform(0.25, 1.0, basis.shape[0]).astype(np.float32)
-                    out[start:start + count] += (wave * env * stream_gain)[:, None] * basis[None, :]
+                    out[start:start + count] += (wave * env * local_amp / math.sqrt(streams))[:, None] * basis[None, :]
                     total_events += 1
             t += period
             phase_count += 1
@@ -2547,15 +2550,66 @@ def render_foafx_pulsar_field(cfg):
 
 
 def render_foafx_particle_cloud(cfg):
-    source, source_rate = read_wav(cfg["source_path"])
-    sample_rate = int(cfg.get("sample_rate", source_rate))
-    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
-    order = max(1, min(3, int(cfg.get("order", ambisonic_order_from_channels(audio.shape[1])))))
+    order = max(1, min(3, int(cfg.get("order", 3))))
     ambi_channels = (order + 1) * (order + 1)
-    if audio.shape[1] < ambi_channels:
-        raise RuntimeError(f"Selected source has {audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
-    audio = audio[:, :ambi_channels].astype(np.float32, copy=False)
-    duration = max(0.05, float(cfg.get("duration", audio.shape[0] / sample_rate)))
+    source_count = max(1, int(cfg.get("source_count", 1)))
+    first_path = cfg.get("source_path_1", cfg.get("source_path", ""))
+    if not first_path:
+        raise RuntimeError("No source media was provided.")
+    _, first_rate = read_wav(first_path)
+    sample_rate = int(cfg.get("sample_rate", first_rate))
+    layout = foafx_layout(order)
+    basis_out = np.array([ambisonic_basis(order, az, el) for az, el in layout], dtype=np.float64)
+    encode = np.linalg.pinv(basis_out).T
+    source_format = str(cfg.get("source_format", "auto")).lower()
+    source_pool = str(cfg.get("source_pool", "first")).lower()
+    source_spread = float(np.clip(cfg.get("source_spread", 0.2), 0.0, 1.0))
+    stereo_expand = bool(cfg.get("stereo_expand", True))
+    sources = []
+    source_labels = []
+
+    for index in range(source_count):
+        key = index + 1
+        path = cfg.get(f"source_path_{key}", cfg.get("source_path", "") if index == 0 else "")
+        if not path:
+            continue
+        source, source_rate = read_wav(path)
+        start = float(cfg.get(f"source_start_{key}", cfg.get("source_start", 0.0)))
+        default_duration = source.shape[0] / max(1, source_rate)
+        source_duration = float(cfg.get(f"source_duration_{key}", cfg.get("source_duration", default_duration)))
+        audio = segment(source, source_rate, start, source_duration, sample_rate)
+        exact_order = exact_ambisonic_order_from_channels(audio.shape[1])
+        if source_format == "ambisonic":
+            if exact_order <= 0:
+                raise RuntimeError(f"Source {key} has {audio.shape[1]} channels; forced ambisonic mode needs 4, 9, 10, or 16 channels.")
+            use_ambisonic = True
+        elif source_format == "non_ambisonic":
+            use_ambisonic = False
+        else:
+            use_ambisonic = exact_order > 0
+
+        if use_ambisonic:
+            source_order = exact_order
+            source_channels = (source_order + 1) * (source_order + 1)
+            hoa = audio[:, :source_channels].astype(np.float32, copy=False)
+            if source_order == order:
+                encoded = hoa[:, :ambi_channels]
+            elif source_order > order:
+                encoded = hoa[:, :ambi_channels]
+            else:
+                encoded = adapt_ambisonic_ir_order(hoa, source_order, order)[:, :ambi_channels]
+            source_labels.append(f"{key}:{source_order}OA")
+        else:
+            virtual = non_ambisonic_to_virtual(audio, layout, source_spread, stereo_expand)
+            encoded = (virtual.astype(np.float64) @ encode).astype(np.float32)
+            source_labels.append(f"{key}:non-ambisonic {audio.shape[1]}ch")
+        if encoded.shape[0] > 0:
+            sources.append(encoded.astype(np.float32, copy=False))
+
+    if not sources:
+        raise RuntimeError("No usable source media was found.")
+
+    duration = max(0.05, float(cfg.get("duration", sources[0].shape[0] / sample_rate)))
     out_frames = max(1, int(round(duration * sample_rate)))
     rng = np.random.default_rng(int(cfg.get("seed", 1)))
 
@@ -2580,10 +2634,18 @@ def render_foafx_particle_cloud(cfg):
     grain_base = max(8, int(round(grain_ms * sample_rate / 1000.0)))
     out = np.zeros((out_frames + grain_base * 4 + 4, ambi_channels), dtype=np.float32)
     norm = np.zeros(out.shape[0], dtype=np.float32)
-    source_frames = audio.shape[0]
     event_slots = max(1, int(round(duration * density * streams)))
     period = 1.0 / max(0.1, density * streams)
     emitted = 0
+
+    def pick_source(event):
+        if source_pool == "random":
+            return int(rng.integers(0, len(sources)))
+        if source_pool == "cycle":
+            return event % len(sources)
+        if source_pool == "stream_per_file":
+            return (event % max(1, streams)) % len(sources)
+        return 0
 
     def grain_window(n):
         x = np.linspace(0.0, 1.0, n, dtype=np.float32)
@@ -2603,6 +2665,10 @@ def render_foafx_particle_cloud(cfg):
         return float(pos % 1.0)
 
     for event in range(event_slots):
+        event_u = event / max(1, event_slots - 1)
+        local_density = env_value(cfg, "density", event_u, density)
+        if density > 0 and rng.random() > np.clip(local_density / density, 0.0, 1.0):
+            continue
         if rng.random() < intermittency:
             continue
         base_time = event * period
@@ -2611,30 +2677,41 @@ def render_foafx_particle_cloud(cfg):
         if t < 0.0 or t >= duration:
             continue
         u = t / duration
-        n = max(8, int(round(grain_base * (1.0 + rng.uniform(-grain_jitter, grain_jitter)))))
+        source_index = pick_source(event)
+        audio = sources[source_index]
+        source_frames = audio.shape[0]
+        local_grain_ms = env_value(cfg, "grain_ms", u, grain_ms)
+        local_grain_base = max(8, int(round(local_grain_ms * sample_rate / 1000.0)))
+        n = max(8, int(round(local_grain_base * (1.0 + rng.uniform(-grain_jitter, grain_jitter)))))
+        n = min(n, max(8, source_frames))
         out_start = int(round(t * sample_rate))
         src_u = scanner_position(u)
+        src_u = env_value(cfg, "scan", u, src_u) % 1.0
         src_u = (src_u + rng.normal(0.0, 0.08 * asynch)) % 1.0
         src_start = int(round(src_u * max(1, source_frames - n - 2)))
-        local_rate = playback * (2.0 ** rng.normal(0.0, playback_jitter))
+        local_playback = env_value(cfg, "playback_rate", u, playback)
+        local_rate = local_playback * (2.0 ** rng.normal(0.0, playback_jitter))
         read = src_start + np.arange(n, dtype=np.float64) * local_rate
         read = np.clip(read, 0.0, source_frames - 1.0)
         i0 = np.floor(read).astype(np.int64)
         i1 = np.clip(i0 + 1, 0, source_frames - 1)
         frac = (read - i0)[:, None].astype(np.float32)
         grain = audio[i0] * (1.0 - frac) + audio[i1] * frac
-        yaw = yaw_start + (yaw_end - yaw_start) * u + rng.uniform(-yaw_scatter, yaw_scatter)
+        yaw = yaw_start + (yaw_end - yaw_start) * u
+        yaw = env_value(cfg, "yaw", u, yaw) + rng.uniform(-yaw_scatter, yaw_scatter)
         if abs(yaw) > 1e-9:
             grain = apply_hoa_yaw(grain, order, yaw)
-        if order_blur > 0.0:
-            higher = max(0.0, 1.0 - order_blur)
+        local_order_blur = env_value(cfg, "order_blur", u, order_blur)
+        if local_order_blur > 0.0:
+            higher = max(0.0, 1.0 - local_order_blur)
             grain = apply_hoa_order_weights(grain, order, 1.0, higher, higher * higher, 1.0)
         end = min(out_start + n, out.shape[0])
         count = end - out_start
         if count <= 0:
             continue
         win = grain_window(count)
-        out[out_start:end] += grain[:count] * win[:, None] * gain / math.sqrt(max(1.0, streams))
+        local_amp = env_value(cfg, "amplitude", u, 1.0)
+        out[out_start:end] += grain[:count] * win[:, None] * gain * local_amp / math.sqrt(max(1.0, streams))
         norm[out_start:end] += win * win
         emitted += 1
 
@@ -2644,12 +2721,16 @@ def render_foafx_particle_cloud(cfg):
         out -= np.mean(out, axis=0, keepdims=True)
     if bool(cfg.get("soft_limit", True)):
         out = np.tanh(out * 1.1).astype(np.float32) / 1.1
+    out = apply_output_envelope(out, cfg, "amplitude")
     if bool(cfg.get("normalize", True)):
         out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
     else:
         pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
     write_pcm24_wav(cfg["output_path"], out.astype(np.float32), sample_rate)
     print("Process: 3OAFX Particle Cloud")
+    print(f"Sources: {len(sources)}")
+    print(f"Source mode: {source_format}; pool: {source_pool}")
+    print("Source labels: " + ", ".join(source_labels))
     print(f"Ambisonic order: {order}OA")
     print(f"Output channels: {ambi_channels}")
     print(f"Density: {density:.2f}")

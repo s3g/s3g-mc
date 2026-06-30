@@ -150,17 +150,23 @@ Raise `Field smoothing` to broaden the bed and reduce edge-like separation.
 
 ## 3OAFX Particle Cloud
 
-Use this when you want an ambisonic source to be reassembled as a particle
-cloud while keeping grain decisions coherent across all encoded component
-channels. Select one WAV-backed `ACN/SN3D` ambisonic media item, choose the
-source order, and render a new ambisonic item.
+Use this when you want one or more source files to be reassembled as an
+ambisonic particle cloud. Sources can be `ACN/SN3D` ambisonic media or ordinary
+mono, stereo, and multichannel WAV-backed media. Auto source format treats 4,
+9, 10, and 16 channel sources as ambisonic; other channel counts are interpreted
+as directional objects and encoded through the 3OAFX direction layer.
 
 Method:
 
-The renderer emits grains from the selected source. Each grain uses the same
-source-time position, duration, envelope, playback rate, and yaw transform
-across every encoded channel. This keeps the source moving as one ambisonic
-field rather than treating HOA channels as unrelated mono files.
+The renderer emits grains from the selected sources. Ambisonic sources keep the
+same source-time position, duration, envelope, playback rate, and yaw transform
+across every encoded channel. Non-ambisonic sources are first spread across the
+direction layer, then encoded to the selected ambisonic order before grain
+rendering.
+
+The diagram shows the selected media feeding a grain cloud and then an
+ambisonic output field. It updates with the selected order, source count, grain
+rate, grain duration, intermittency, asynchronicity, and yaw values.
 
 Main controls:
 
@@ -171,8 +177,16 @@ Main controls:
 - `Grain duration`, `Duration jitter`, and `Envelope shape` define the particle
   profile.
 - `Playback rate` and `Playback jitter` alter grain reading speed.
+- `Source format` can force ambisonic or non-ambisonic interpretation when the
+  automatic channel-count guess is not what you want.
+- `Source pool` chooses whether grains read from the first selected item, cycle
+  through selected items, choose randomly, or assign streams to files.
+- `Non-ambisonic source spread` and `Stereo sum/difference expansion` shape how
+  ordinary media is projected before encoding.
 - `Yaw` controls rotate the ambisonic field over the render; `Higher-order blur`
   softens upper-order spatial detail.
+- Breakpoint curves can vary amplitude, grain rate, grain duration, playback
+  rate, scan position, yaw, and higher-order blur over the rendered duration.
 
 ## 3OAFX Pulsar Field
 
@@ -187,6 +201,10 @@ emission period, the formant curve controls pulsaret width, and the pulse mask
 decides which pulsars are heard or left silent. Each stream is encoded along an
 AED trajectory before the result is written as 1OA, 2OA, or 3OA.
 
+The diagram shows pulse trains entering a pulsaret/mask stage and then a moving
+ambisonic field. It updates with stream count, selected order, and azimuth
+range.
+
 Main controls:
 
 - `Fundamental start/end` controls the pulsar-train rate.
@@ -196,6 +214,8 @@ Main controls:
 - `Pulsaret` and `Pulsaret envelope` shape each particle.
 - `Azimuth`, `Elevation`, and `Stream spatial spread` place the streams in the
   ambisonic field.
+- Breakpoint curves can vary amplitude, fundamental, formant, stochastic
+  probability, spatial spread, and azimuth over the rendered duration.
 
 ## 3OAFX Scene Navigator
 

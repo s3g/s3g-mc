@@ -5,8 +5,8 @@ type: software
 authors:
   - family-names: "Greenlee"
     given-names: "Shawn"
-version: "0.1.0"
-date-released: "2026-06-25"
+version: "0.9.0-beta.1"
+date-released: "2026-06-30"
 license: "0BSD"
 abstract: "A collection of REAPER Lua, ReaImGui, JSFX, and NumPy-backed tools for multichannel composition, spatial audio, offline sound transformation, procedural synthesis, and multichannel routing and channel-management workflows."
 keywords:

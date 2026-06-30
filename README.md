@@ -182,11 +182,12 @@ behaviors.
 - `3OAFX Object / Field Split`: automatic NumPy-backed split of an ambisonic
   source into object-like foreground and field-like spatial bed outputs.
 - `3OAFX Particle Cloud`: NumPy-backed ambisonic particle-cloud renderer for
-  selected ACN/SN3D media, with density, asynchronicity, intermittency, scan,
-  grain envelope, playback, and HOA yaw controls.
+  selected ambisonic or non-ambisonic WAV-backed media, with source-pool,
+  density, asynchronicity, intermittency, scan, grain envelope, playback, and
+  HOA yaw controls, plus a source-to-cloud diagram and time breakpoints.
 - `3OAFX Pulsar Field`: NumPy-backed ambisonic pulsar-train synthesizer with
   fundamental/formant curves, pulse masking, pulsaret shape, envelope shape,
-  and AED trajectory controls.
+  AED trajectory controls, a pulse-field diagram, and time breakpoints.
 - `3OAFX Scene Navigator`: multi-source ambisonic scene surface where selected
   soundfield files become nodes and an editable listener path renders a new
   perspective traversal.
