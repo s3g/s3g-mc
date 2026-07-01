@@ -30,6 +30,10 @@ body {
   line-height: 1.35;
 }
 
+:where(button, select, input[type="text"], input[type="number"], .custom-select-button, .custom-select-option) {
+  font-size: 11px;
+}
+
 button,
 input,
 select {
@@ -161,6 +165,7 @@ input[type="text"] {
 
 button {
   padding: 0 5px;
+  line-height: 1.15;
   cursor: pointer;
 }
 
@@ -364,6 +369,66 @@ select {
   min-height: 21px;
   margin-top: 3px;
   padding: 0 6px;
+}
+
+.native-select-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.custom-select {
+  position: relative;
+  width: 100%;
+  margin-top: 3px;
+}
+
+.custom-select-button {
+  position: relative;
+  width: 100%;
+  min-height: 21px;
+  padding: 0 20px 0 6px;
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.custom-select-button::after {
+  content: "v";
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-54%);
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.custom-select-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 120px;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--accent);
+  background: #101010;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.48);
+}
+
+.custom-select-option {
+  min-height: 21px;
+  padding: 4px 7px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.custom-select-option:hover,
+.custom-select-option.active {
+  background: #193035;
+  color: #ecffff;
 }
 
 .row {

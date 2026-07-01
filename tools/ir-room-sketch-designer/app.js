@@ -3120,5 +3120,84 @@ window.addEventListener("resize", () => {
   if ($("gltfModal").classList.contains("open")) drawGltfPreview();
 });
 
+function enhanceCustomSelects(root = document) {
+  let open = null;
+  const close = () => {
+    if (!open) return;
+    open.wrapper.classList.remove("open");
+    open.menu.remove();
+    open = null;
+  };
+  const refresh = (select) => {
+    if (!select._customButton) return;
+    select._customButton.textContent = select.selectedOptions[0]?.textContent || "Select";
+    select._customButton.disabled = select.disabled;
+  };
+  const positionMenu = (button, menu) => {
+    const rect = button.getBoundingClientRect();
+    menu.style.left = `${Math.round(rect.left)}px`;
+    menu.style.top = `${Math.round(rect.bottom + 2)}px`;
+    menu.style.width = `${Math.round(rect.width)}px`;
+  };
+  root.querySelectorAll("select").forEach((select) => {
+    if (select.dataset.customEnhanced === "1") return;
+    select.dataset.customEnhanced = "1";
+    const wrapper = document.createElement("span");
+    wrapper.className = "custom-select";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "custom-select-button";
+    select.classList.add("native-select-hidden");
+    select.parentNode.insertBefore(wrapper, select.nextSibling);
+    wrapper.appendChild(button);
+    select._customButton = button;
+    const openMenu = () => {
+      if (select.disabled) return;
+      if (open?.select === select) {
+        close();
+        return;
+      }
+      close();
+      const menu = document.createElement("div");
+      menu.className = "custom-select-menu";
+      Array.from(select.options).forEach((option) => {
+        const item = document.createElement("div");
+        item.className = `custom-select-option${option.selected ? " active" : ""}`;
+        item.textContent = option.textContent;
+        item.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          select.value = option.value;
+          refresh(select);
+          select.dispatchEvent(new Event("input", { bubbles: true }));
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+          close();
+        });
+        menu.appendChild(item);
+      });
+      document.body.appendChild(menu);
+      positionMenu(button, menu);
+      wrapper.classList.add("open");
+      open = { select, wrapper, menu, button };
+    };
+    button.addEventListener("click", openMenu);
+    button.addEventListener("keydown", (event) => {
+      if (!["Enter", " ", "ArrowDown"].includes(event.key)) return;
+      event.preventDefault();
+      openMenu();
+    });
+    select.addEventListener("input", () => refresh(select));
+    select.addEventListener("change", () => refresh(select));
+    refresh(select);
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (!open) return;
+    if (open.wrapper.contains(event.target) || open.menu.contains(event.target)) return;
+    close();
+  });
+  window.addEventListener("resize", close);
+  setInterval(() => root.querySelectorAll("select").forEach(refresh), 350);
+}
+
 updateAllRangeFills();
+enhanceCustomSelects();
 applyMaterial();

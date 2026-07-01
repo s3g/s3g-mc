@@ -6,7 +6,7 @@ prev_page:
   title: Image Score Generator
   url: /utilities-image-score-generator.html
 next_page:
-  title: s3g-mc Mover
+  title: Mover
   url: /utilities-mover.html
 toc:
   - title: Open Tool

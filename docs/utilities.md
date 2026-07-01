@@ -13,8 +13,8 @@ toc:
     href: "#image-score-generator"
   - title: IR Room Sketch Designer
     href: "#ir-room-sketch-designer"
-  - title: s3g-mc Mover
-    href: "#s3g-mc-mover"
+  - title: Mover
+    href: "#mover"
 ---
 
 # Utilities
@@ -46,11 +46,11 @@ room export. Load the exported JSON with `Load Room Sketch JSON` inside
 `3OAFX Synthetic Ambisonic IR Bank`; the generated IRs can then be used with
 `3OAFX Offline Ambisonic Convolve`.
 
-## s3g-mc Mover
+## Mover
 
-[Open s3g-mc Mover](tools/mover/){:target="_blank" rel="noopener noreferrer" .utility-link}
+[Open Mover](tools/mover/){:target="_blank" rel="noopener noreferrer" .utility-link}
 
-[Read s3g-mc Mover notes](utilities-mover.md)
+[Read Mover notes](utilities-mover.md)
 
 Designs banked third-order ambisonic source motion in the browser. Exported
 JSON can be loaded in REAPER with `Load Mover JSON`, which creates encoder

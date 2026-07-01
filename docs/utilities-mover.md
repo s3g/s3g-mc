@@ -1,6 +1,6 @@
 ---
 layout: default
-title: s3g-mc Mover
+title: Mover
 utility_nav: true
 prev_page:
   title: IR Room Sketch Designer
@@ -25,15 +25,15 @@ toc:
     href: "#browser-link"
 ---
 
-# s3g-mc Mover
+# Mover
 
 ## Open Tool
 
-[Open s3g-mc Mover](tools/mover/){:target="_blank" rel="noopener noreferrer" .utility-link}
+[Open Mover](tools/mover/){:target="_blank" rel="noopener noreferrer" .utility-link}
 
 ## Purpose
 
-s3g-mc Mover is a browser-based spatial motion designer for banked 8-source
+Mover is a browser-based spatial motion designer for banked 8-source
 third-order ambisonic motion. It is meant for composing motion first, then
 writing that motion into REAPER as editable automation.
 

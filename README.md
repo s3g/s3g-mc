@@ -151,7 +151,7 @@ modulation afterward.
   cube, 12ch ring, 16ch ring, 16ch double ring, 20ch double ring, and 24ch dome
   without overhead. Speaker numbering starts near the stereo-right position and
   proceeds clockwise.
-- `Load Mover JSON`: loads exported s3g-mc Mover JSON into REAPER, creates the
+- `Load Mover JSON`: loads exported Mover JSON into REAPER, creates the
   3OA encoder bus/child tracks, and writes source motion as editable automation.
 - `Mover Browser Link`: opens the browser-based Mover with the last loaded
   Mover JSON and follows REAPER transport from a local browser link.
