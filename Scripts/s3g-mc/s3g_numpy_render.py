@@ -5222,7 +5222,54 @@ def render_synthetic_ambisonic_ir_bank(cfg):
     seed = int(cfg.get("seed", 1))
     rng = np.random.default_rng(seed)
     speed_of_sound = 343.0
-    listener = np.array([room_x * 0.5, room_y * 0.5, room_z * 0.5], dtype=np.float64)
+    sketch = None
+    sketch_path = str(cfg.get("sketch_path", "") or "")
+    if sketch_path:
+        try:
+            with open(sketch_path, "r", encoding="utf-8") as handle:
+                sketch = json.load(handle)
+        except Exception as exc:
+            print(f"Room sketch ignored: {exc}")
+            sketch = None
+
+    def sketch_bounds():
+        points = []
+        if isinstance(sketch, dict):
+            for point in sketch.get("room_polygon", []) or []:
+                try:
+                    points.append((float(point.get("x", 0.0)), float(point.get("y", 0.0))))
+                except Exception:
+                    pass
+            chamber = sketch.get("chamber") or {}
+            for item in chamber.get("chambers", []) or []:
+                try:
+                    polygon = item.get("polygon") or []
+                    if polygon:
+                        for point in polygon:
+                            points.append((float(point.get("x", 0.0)), float(point.get("y", 0.0))))
+                    else:
+                        x = float(item.get("x", 0.0))
+                        y = float(item.get("y", 0.0))
+                        w = float(item.get("width", 0.0))
+                        d = float(item.get("depth", 0.0))
+                        points.extend([(x, y), (x + w, y), (x + w, y + d), (x, y + d)])
+                except Exception:
+                    pass
+        if not points:
+            points = [(0.0, 0.0), (room_x, room_y)]
+        xs = [p[0] for p in points]
+        ys = [p[1] for p in points]
+        return min(xs), max(xs), min(ys), max(ys)
+
+    min_x, max_x, min_y, max_y = sketch_bounds()
+    field = sketch.get("field_offset", {}) if isinstance(sketch, dict) else {}
+    field_x = float(np.clip(field.get("x", 0.0) if isinstance(field, dict) else 0.0, -1.0, 1.0))
+    field_y = float(np.clip(field.get("y", 0.0) if isinstance(field, dict) else 0.0, -1.0, 1.0))
+    listener = np.array([
+        min_x + (max_x - min_x) * (0.5 + field_x * 0.5),
+        min_y + (max_y - min_y) * (0.5 + field_y * 0.5),
+        room_z * 0.5,
+    ], dtype=np.float64)
 
     def perturbed_direction(az, el, amount_deg):
         return (
@@ -5239,6 +5286,53 @@ def render_synthetic_ambisonic_ir_bank(cfg):
 
     def unit_from_layout(az, el):
         return unit_from_aed(az, el)
+
+    def chamber_material_profile(chamber_item):
+        profile = chamber_item.get("material_profile", {}) if isinstance(chamber_item, dict) else {}
+        return {
+            "absorption": float(np.clip(profile.get("absorption", absorption), 0.03, 0.95)),
+            "scattering": float(np.clip(profile.get("scattering", scattering), 0.0, 1.0)),
+            "tail_soften": float(np.clip(profile.get("tail_soften", lowpass), 0.0, 1.0)),
+        }
+
+    def chamber_outward(side):
+        side = str(side or "back")
+        if side == "front":
+            return np.array([0.0, -1.0, 0.0], dtype=np.float64), 0.0
+        if side == "left":
+            return np.array([-1.0, 0.0, 0.0], dtype=np.float64), 90.0
+        if side == "right":
+            return np.array([1.0, 0.0, 0.0], dtype=np.float64), -90.0
+        return np.array([0.0, 1.0, 0.0], dtype=np.float64), 180.0
+
+    def chamber_items():
+        if not isinstance(sketch, dict):
+            return []
+        chamber = sketch.get("chamber") or {}
+        if not isinstance(chamber, dict):
+            return []
+        return [item for item in (chamber.get("chambers", []) or []) if isinstance(item, dict)]
+
+    def sketch_group_position(index):
+        if not isinstance(sketch, dict):
+            return None
+        groups = sketch.get("groups", []) or []
+        if index - 1 < 0 or index - 1 >= len(groups):
+            return None
+        group = groups[index - 1]
+        if not isinstance(group, dict):
+            return None
+        pos = group.get("source_position_m") or group.get("map_position_m")
+        if not isinstance(pos, dict):
+            return None
+        try:
+            return np.array([
+                float(pos.get("x", room_x * 0.5)),
+                float(pos.get("y", room_y * 0.5)),
+                float(pos.get("z", room_z * 0.5)),
+            ], dtype=np.float64)
+        except Exception:
+            return None
 
     def add_encoded_tap(ir, time_sec, az, el, amp):
         if time_sec < 0.0 or time_sec >= duration:
@@ -5265,10 +5359,13 @@ def render_synthetic_ambisonic_ir_bank(cfg):
         ir = np.zeros((frames, ambi_channels), dtype=np.float32)
         direct_basis = np.array(ambisonic_basis(order, base_az, base_el), dtype=np.float32)
         source_vec = unit_from_layout(base_az, base_el)
-        source_pos = listener + source_vec * min(source_distance, min(room_x, room_y, room_z) * 0.48)
-        source_pos = np.clip(source_pos, np.array([0.05, 0.05, 0.05]), np.array([room_x - 0.05, room_y - 0.05, room_z - 0.05]))
-        direct_time = pre_delay_ms / 1000.0 + source_distance / speed_of_sound
-        direct_amp = direct_gain / max(1.0, source_distance)
+        source_pos = sketch_group_position(direction_index)
+        if source_pos is None:
+            source_pos = listener + source_vec * min(source_distance, min(max_x - min_x, max_y - min_y, room_z) * 0.48)
+        source_pos = np.clip(source_pos, np.array([min_x + 0.05, min_y + 0.05, 0.05]), np.array([max_x - 0.05, max_y - 0.05, room_z - 0.05]))
+        local_source_distance = max(0.25, float(np.linalg.norm(source_pos - listener)))
+        direct_time = pre_delay_ms / 1000.0 + local_source_distance / speed_of_sound
+        direct_amp = direct_gain / max(1.0, local_source_distance)
         if direct_time < duration:
             direct_frame = min(frames - 1, max(0, int(round(direct_time * sample_rate))))
             ir[direct_frame] += direct_basis * direct_amp
@@ -5300,6 +5397,41 @@ def render_synthetic_ambisonic_ir_bank(cfg):
             amp = (0.22 + 0.55 * rng.random()) * reflectivity * math.exp(-t / max(0.05, decay))
             amp *= rng.choice([-1.0, 1.0])
             add_encoded_tap(ir, t, az, el, amp)
+
+        chambers = chamber_items()
+        if chambers:
+            chamber_taps = max(1, min(96, int(round(len(chambers) * (2.0 + scattering * 5.0)))))
+            for tap_index in range(chamber_taps):
+                chamber = chambers[int(rng.integers(0, len(chambers)))]
+                try:
+                    polygon = chamber.get("polygon") or []
+                    if polygon:
+                        xs = [float(point.get("x", 0.0)) for point in polygon]
+                        ys = [float(point.get("y", 0.0)) for point in polygon]
+                        cx = sum(xs) / max(1, len(xs))
+                        cy = sum(ys) / max(1, len(ys))
+                    else:
+                        cx = float(chamber.get("x", 0.0)) + float(chamber.get("width", 0.0)) * 0.5
+                        cy = float(chamber.get("y", 0.0)) + float(chamber.get("depth", 0.0)) * 0.5
+                    cdepth = max(0.1, float(chamber.get("depth", 0.0)))
+                    cwidth = max(0.1, float(chamber.get("width", 0.0)))
+                    level = max(0, int(chamber.get("level", 0)))
+                except Exception:
+                    continue
+                material = chamber_material_profile(chamber)
+                outward, outward_az = chamber_outward(chamber.get("side", "back"))
+                toward = max(0.0, float(np.dot(source_vec, outward)))
+                local_coupling = 0.28 + toward * 0.72
+                local_reflect = math.sqrt(max(0.0, 1.0 - material["absorption"]))
+                chamber_path = np.linalg.norm(np.array([cx, cy, room_z * 0.45], dtype=np.float64) - listener)
+                chamber_path += cdepth * (1.1 + 0.34 * level) + cwidth * (0.18 + 0.18 * rng.random())
+                t = pre_delay_ms / 1000.0 + chamber_path / speed_of_sound + tap_index * (0.001 + material["scattering"] * 0.0018)
+                az = float(wrap_degrees(np.array([outward_az + rng.normal(0.0, 18.0 + material["scattering"] * spread_deg * 0.65)], dtype=np.float64))[0])
+                el = float(np.clip(base_el * 0.28 + rng.normal(0.0, 10.0 + material["scattering"] * 22.0), -80.0, 80.0))
+                amp = (0.035 + 0.13 * rng.random()) * local_reflect * local_coupling
+                amp *= math.exp(-t / max(0.05, decay * (0.9 + material["tail_soften"] * 0.8)))
+                amp *= rng.choice([-1.0, 1.0])
+                add_encoded_tap(ir, t, az, el, amp)
 
         for _ in range(diffuse_count):
             u = rng.random()
@@ -5349,6 +5481,11 @@ def render_synthetic_ambisonic_ir_bank(cfg):
     if output_mode == "stacked":
         print(f"Stacked bank channels: {ambi_channels * len(layout)}")
     print(f"Room: {room_x:.2f} x {room_y:.2f} x {room_z:.2f} m")
+    if sketch:
+        chamber_count = len(chamber_items())
+        print(f"Room sketch: {sketch_path}")
+        print(f"Sketch chambers: {chamber_count}")
+        print(f"Sketch field bounds: {min_x:.2f}, {min_y:.2f} to {max_x:.2f}, {max_y:.2f} m")
     print(f"Absorption: {absorption:.3f}")
     print(f"Scattering: {scattering:.3f}")
     print(f"Duration: {duration:.3f} sec")

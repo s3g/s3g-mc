@@ -15,8 +15,11 @@
         </div>
         <div class="top-actions">
           <button id="reset" type="button">Reset</button>
+          <label class="generate-bias">Strangeness <input id="topologyBias" type="range" min="0" max="1" value="0.35" step="0.01" /></label>
           <button id="randomize" type="button">Generate</button>
           <button id="exportJson" type="button">Export JSON</button>
+          <button id="viewGltf" type="button">View glTF</button>
+          <button id="exportGltf" type="button">Export glTF</button>
         </div>
       </header>
 
@@ -30,11 +33,15 @@
             <label>Material preset
               <select id="materialPreset">
                 <option value="concrete">Concrete room</option>
+                <option value="brick">Brick hall</option>
                 <option value="stone">Stone room</option>
                 <option value="wood">Wood room</option>
+                <option value="metal">Metal tank</option>
                 <option value="studio">Studio room</option>
                 <option value="damped">Damped room</option>
                 <option value="glass">Glass / tile</option>
+                <option value="fabric">Fabric / curtain</option>
+                <option value="water">Water / ceramic</option>
               </select>
             </label>
             <label>Absorption <input id="absorption" type="range" min="0.03" max="0.95" value="0.12" step="0.01" /></label>
@@ -43,11 +50,85 @@
           </section>
 
           <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Room Shape</span></h2>
+            <label>Plan
+              <select id="spaceShape">
+                <option value="shoebox">Shoebox</option>
+                <option value="side_chamber" selected>Main room + chambers</option>
+              </select>
+            </label>
+            <label>Main room shape
+              <select id="roomShape">
+                <option value="rect" selected>Rectangular</option>
+                <option value="trapezoid">Trapezoid</option>
+                <option value="wedge">Wedge</option>
+                <option value="skew">Skewed polygon</option>
+                <option value="diamond">Diamond / lens</option>
+                <option value="impossible">Impossible fold</option>
+              </select>
+            </label>
+            <label>Chamber shape
+              <select id="chamberShape">
+                <option value="rect">Rectangular</option>
+                <option value="trapezoid">Trapezoid</option>
+                <option value="wedge">Wedge</option>
+                <option value="skew">Skewed polygon</option>
+                <option value="impossible">Impossible fold</option>
+              </select>
+            </label>
+            <label>Chamber side
+              <select id="chamberSide">
+                <option value="back" selected>Back wall</option>
+                <option value="front">Front wall</option>
+                <option value="left">Left wall</option>
+                <option value="right">Right wall</option>
+                <option value="all">All sides</option>
+              </select>
+            </label>
+            <label>Chamber material
+              <select id="chamberMaterial">
+                <option value="inherit">Follow room</option>
+                <option value="concrete">Concrete room</option>
+                <option value="brick">Brick hall</option>
+                <option value="stone">Stone room</option>
+                <option value="wood">Wood room</option>
+                <option value="metal">Metal tank</option>
+                <option value="studio">Studio room</option>
+                <option value="damped">Damped room</option>
+                <option value="glass">Glass / tile</option>
+                <option value="fabric">Fabric / curtain</option>
+                <option value="water">Water / ceramic</option>
+              </select>
+            </label>
+            <label>Material pattern
+              <select id="chamberMaterialMode">
+                <option value="uniform">Uniform chamber material</option>
+                <option value="alternating">Alternating room / chamber</option>
+                <option value="nested">Nested chambers shift material</option>
+                <option value="palette">Varied material palette</option>
+              </select>
+            </label>
+            <label>Chamber width m <input id="chamberWidth" type="range" min="1" max="20" value="4.5" step="0.1" /></label>
+            <label>Chamber depth m <input id="chamberDepth" type="range" min="1" max="20" value="3.8" step="0.1" /></label>
+            <label>Chamber count <input id="chamberCount" type="range" min="1" max="4" value="2" step="1" /></label>
+            <label>Chamber position <input id="chamberPosition" type="range" min="0" max="1" value="0.5" step="0.01" /></label>
+            <label>Nested chambers <input id="nestedChambers" type="range" min="0" max="2" value="1" step="1" /></label>
+            <label>Opening width <input id="openingWidth" type="range" min="0.1" max="1" value="0.42" step="0.01" /></label>
+            <label>Chamber coupling <input id="chamberCoupling" type="range" min="0" max="1" value="0.48" step="0.01" /></label>
+            <label>Chamber material contrast <input id="chamberMaterialMix" type="range" min="0" max="1" value="0.65" step="0.01" /></label>
+          </section>
+
+          <section class="collapsible">
             <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Source / Group</span></h2>
-            <label>Single azimuth <input id="sourceAz" type="range" min="-180" max="180" value="35" step="1" /></label>
-            <label>Single elevation <input id="sourceEl" type="range" min="-80" max="80" value="10" step="1" /></label>
+            <label>Field X offset <input id="fieldX" type="range" min="-1" max="1" value="0" step="0.01" /></label>
+            <label>Field Y offset <input id="fieldY" type="range" min="-1" max="1" value="0" step="0.01" /></label>
             <label>Distance m <input id="sourceDistance" type="range" min="0.25" max="20" value="3.2" step="0.05" /></label>
             <label>Direction spread <input id="spreadDeg" type="range" min="0" max="120" value="45" step="1" /></label>
+            <label>Group variation <input id="groupVariation" type="range" min="0" max="1" value="0.35" step="0.01" /></label>
+            <label>Surface contrast <input id="surfaceContrast" type="range" min="0" max="1" value="0.45" step="0.01" /></label>
+            <label>Distance variation <input id="distanceVariation" type="range" min="0" max="1" value="0.18" step="0.01" /></label>
+            <input id="sourceAz" type="hidden" value="0" />
+            <input id="sourceEl" type="hidden" value="0" />
           </section>
 
           <section class="collapsible">
@@ -61,16 +142,30 @@
             </label>
             <label>Direction set
               <select id="directionSet">
-                <option value="single">Single direction</option>
-                <option value="tetra">4 direction tetra</option>
-                <option value="cube" selected>8 direction cube</option>
-                <option value="ring8">8 direction ring</option>
-                <option value="virtual24">24 point virtual layer</option>
+                <option value="auto" selected>Auto by order</option>
+                <option value="tetra">P-format tetra</option>
+                <option value="cube">Practical 8-direction</option>
               </select>
             </label>
             <label>Duration s <input id="duration" type="range" min="0.1" max="12" value="3" step="0.05" /></label>
             <label>Pre-delay ms <input id="preDelay" type="range" min="0" max="120" value="12" step="1" /></label>
             <label>Early reflections <input id="earlyReflections" type="range" min="0" max="80" value="18" step="1" /></label>
+          </section>
+
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Auralization View</span></h2>
+            <label>Camera azimuth <input id="cameraAz" type="range" min="-180" max="180" value="-38" step="1" /></label>
+            <label>Camera elevation <input id="cameraEl" type="range" min="-80" max="80" value="32" step="1" /></label>
+            <label>Zoom <input id="cameraZoom" type="range" min="0.55" max="2.4" value="1" step="0.01" /></label>
+            <div class="button-row">
+              <button type="button" data-camera="top">Top</button>
+              <button type="button" data-camera="side">Side</button>
+              <button type="button" data-camera="iso">3/4</button>
+              <button type="button" data-camera="wide">Wide</button>
+            </div>
+            <label class="check-row"><input id="showDirect" type="checkbox" checked /> Direct path</label>
+            <label class="check-row"><input id="showEarly" type="checkbox" checked /> Early reflections</label>
+            <label class="check-row"><input id="showDiffuse" type="checkbox" checked /> Late field</label>
           </section>
         </aside>
 
@@ -78,7 +173,15 @@
           <div class="view-tabs">
             <button type="button" data-view="top" class="active">Top</button>
             <button type="button" data-view="side">Side</button>
+            <button type="button" data-view="view3d">3D</button>
             <button type="button" data-view="sphere">Bank Map</button>
+            <button type="button" data-view="matrix">Bank Matrix</button>
+            <button type="button" data-view="layers">Reflection Layers</button>
+          </div>
+          <div class="group-nav">
+            <button id="prevGroup" type="button">Prev Group</button>
+            <div id="groupStrip" class="group-strip" aria-label="IR bank groups"></div>
+            <button id="nextGroup" type="button">Next Group</button>
           </div>
           <div class="canvas-frame">
             <canvas id="roomCanvas" width="900" height="560"></canvas>
@@ -108,6 +211,32 @@
         </aside>
       </section>
     </main>
+    <div id="gltfModal" class="gltf-modal" aria-hidden="true">
+      <div class="gltf-panel" role="dialog" aria-label="glTF room preview">
+        <div class="gltf-head">
+          <div>
+            <h2>glTF Room Preview</h2>
+            <p>Generated 3D model of the main room, chambers, field center, and IR group positions.</p>
+          </div>
+          <div class="gltf-camera">
+            <label>Az <input id="gltfCameraAz" type="range" min="-180" max="180" value="-38" step="1" /></label>
+            <label>El <input id="gltfCameraEl" type="range" min="-80" max="80" value="32" step="1" /></label>
+            <label>Zoom <input id="gltfCameraZoom" type="range" min="0.45" max="3.2" value="1" step="0.01" /></label>
+            <div class="gltf-presets">
+              <button type="button" data-gltf-camera="top">Top</button>
+              <button type="button" data-gltf-camera="side">Side</button>
+              <button type="button" data-gltf-camera="iso">3/4</button>
+              <button type="button" data-gltf-camera="wide">Wide</button>
+            </div>
+          </div>
+          <div class="gltf-actions">
+            <button id="modalExportGltf" type="button">Export glTF</button>
+            <button id="closeGltf" type="button">Close</button>
+          </div>
+        </div>
+        <canvas id="gltfCanvas" width="1100" height="720"></canvas>
+      </div>
+    </div>
     <script src="./app.js"></script>
   </body>
 </html>

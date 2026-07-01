@@ -160,6 +160,21 @@ h2 {
   gap: 8px;
 }
 
+.generate-bias {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 210px;
+  margin: 0 4px;
+  color: #aeb7bd;
+  font-size: 11px;
+}
+
+.generate-bias input {
+  width: 118px;
+  margin: 0;
+}
+
 .workspace {
   flex: 1;
   display: grid;
@@ -222,6 +237,17 @@ label select {
   margin-top: 5px;
 }
 
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+}
+
+.check-row input {
+  margin: 0;
+}
+
 .stage {
   min-width: 0;
   display: flex;
@@ -237,9 +263,66 @@ label select {
 
 .view-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 4px;
   width: min(100%, 900px);
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin: 6px 0 10px;
+}
+
+.group-nav {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px;
+  width: min(100%, 900px);
+  align-items: stretch;
+}
+
+.group-strip {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+
+.group-chip {
+  min-height: 38px;
+  padding: 3px 4px;
+  color: #aeb6bb;
+  text-align: left;
+}
+
+.group-chip span,
+.group-chip small {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.group-chip span {
+  color: #e0e0e0;
+  font-size: 11px;
+}
+
+.group-chip small {
+  color: #8f9aa0;
+  font-size: 9px;
+  line-height: 1.15;
+}
+
+.group-chip.active {
+  border-color: var(--amber);
+  background: #2a2418;
+}
+
+.group-chip.active span {
+  color: #f0d39a;
 }
 
 .canvas-frame {
@@ -254,6 +337,7 @@ label select {
   width: 100%;
   height: auto;
   aspect-ratio: 900 / 560;
+  cursor: crosshair;
 }
 
 .readout-grid {
@@ -281,6 +365,30 @@ label select {
   font-size: 13px;
 }
 
+.group-readout {
+  display: grid;
+  gap: 6px;
+}
+
+.group-readout div {
+  padding: 6px;
+  border: 1px solid var(--line-soft);
+  background: #0f0f0f;
+}
+
+.group-readout span {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.group-readout strong {
+  display: block;
+  margin-top: 2px;
+  color: #e5e5e5;
+  font-size: 11px;
+}
+
 #timelineCanvas {
   display: block;
   width: 100%;
@@ -302,7 +410,99 @@ label select {
   white-space: pre-wrap;
 }
 
+.gltf-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: none;
+  padding: 24px;
+  background: rgba(8, 8, 8, 0.82);
+}
+
+.gltf-modal.open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gltf-panel {
+  width: min(1180px, 96vw);
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  background: #121212;
+  box-shadow: 0 18px 70px rgba(0, 0, 0, 0.54);
+}
+
+.gltf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+  background: #181818;
+}
+
+.gltf-head h2 {
+  margin: 0 0 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.gltf-head p {
+  color: var(--muted);
+}
+
+.gltf-camera {
+  min-width: min(440px, 42vw);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(92px, 1fr));
+  gap: 6px 8px;
+  align-items: end;
+}
+
+.gltf-camera label {
+  margin: 0;
+  font-size: 10px;
+}
+
+.gltf-camera input {
+  margin-top: 3px;
+}
+
+.gltf-presets {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.gltf-actions {
+  display: flex;
+  gap: 8px;
+}
+
+#gltfCanvas {
+  display: block;
+  width: 100%;
+  height: min(72vh, 720px);
+  background: #050607;
+}
+
 @media (max-width: 1080px) {
+  .gltf-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .gltf-camera {
+    width: 100%;
+    min-width: 0;
+  }
+
   .workspace {
     grid-template-columns: 250px minmax(360px, 1fr);
   }

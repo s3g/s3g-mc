@@ -1,10 +1,10 @@
 -- @description 3OAFX Synthetic Ambisonic IR Bank
 -- @author s3g
--- @version 0.1
+-- @version 0.2
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category 3OAFX
 -- @render Yes; NumPy-backed synthetic ambisonic IR bank generator.
--- @method Designs encoded ACN/SN3D ambisonic impulse-response WAVs for the direction layer used by 3OAFX Offline Ambisonic Convolve. Room size, material absorption, scattering, source distance, early reflections, and late diffuse taps shape the synthetic space.
+-- @method Designs encoded ACN/SN3D ambisonic impulse-response WAVs for the direction layer used by 3OAFX Offline Ambisonic Convolve. Room size, material absorption, scattering, source distance, early reflections, late diffuse taps, and optional IR Room Sketch Designer JSON files shape the synthetic space.
 -- @about
 --   Creates either one encoded ambisonic IR file per virtual direction or one
 --   stacked multichannel bank with one ambisonic channel block per direction.
@@ -102,6 +102,56 @@ local function apply_material(settings)
   settings.absorption = material.absorption
   settings.scattering = material.scattering
   settings.tail_soften = material.tail_soften
+end
+
+local function basename(path)
+  return tostring(path or ""):match("([^/\\]+)$") or tostring(path or "")
+end
+
+local function json_number(text, key)
+  local pattern = '"' .. key .. '"%s*:%s*([-+]?%d+%.?%d*)'
+  local value = tostring(text or ""):match(pattern)
+  return value and tonumber(value) or nil
+end
+
+local function json_string(text, key)
+  local pattern = '"' .. key .. '"%s*:%s*"([^"]*)"'
+  return tostring(text or ""):match(pattern)
+end
+
+local function apply_room_sketch(settings, path)
+  local text = nr.read_file(path)
+  if text == "" then return false, "Could not read JSON file." end
+  if not text:find('"target_process"%s*:%s*"3OAFX Synthetic Ambisonic IR Bank"', 1) then
+    return false, "This does not look like an IR Room Sketch Designer export."
+  end
+  settings.sketch_path = path
+  settings.room_x = json_number(text, "room_x") or settings.room_x
+  settings.room_y = json_number(text, "room_y") or settings.room_y
+  settings.room_z = json_number(text, "room_z") or settings.room_z
+  settings.absorption = json_number(text, "absorption") or settings.absorption
+  settings.scattering = json_number(text, "scattering") or settings.scattering
+  settings.tail_soften = json_number(text, "tail_soften") or settings.tail_soften
+  settings.source_distance = json_number(text, "source_distance") or settings.source_distance
+  settings.spread_deg = json_number(text, "direction_spread_deg") or settings.spread_deg
+  settings.duration = json_number(text, "duration") or settings.duration
+  settings.pre_delay_ms = json_number(text, "pre_delay_ms") or settings.pre_delay_ms
+  settings.early_reflections = json_number(text, "early_reflections") or settings.early_reflections
+  local order = json_number(text, "order")
+  if order then settings.order_index = clamp(math.floor(order + 0.5), 1, 3) end
+  settings.material_index = 1
+  return true, "Loaded " .. basename(path)
+end
+
+local function choose_room_sketch(settings)
+  local ok, path = reaper.GetUserFileNameForRead(settings.sketch_path or "", "Load IR Room Sketch JSON", "json")
+  if not ok or path == "" then return end
+  local loaded, message = apply_room_sketch(settings, path)
+  if not loaded then
+    mc.show_error(message or "Could not load room sketch JSON.")
+  else
+    reaper.ShowConsoleMsg("[3OAFX Synthetic Ambisonic IR Bank]\n" .. message .. "\n")
+  end
 end
 
 local function order_channels(order_index)
@@ -272,6 +322,7 @@ local function run_render(settings)
     air_damping = settings.tail_soften,
     normalize_db = settings.normalize_db,
     seed = math.floor(settings.seed + 0.5),
+    sketch_path = settings.sketch_path or "",
   }
   local log, elapsed = nr.run_backend(script_dir, "synthetic_ambisonic_ir_bank", manifest, TITLE)
   if not log then return end
@@ -313,6 +364,7 @@ local function run_render(settings)
     "Direction layout: " .. (order == 1 and "P-format / tetrahedral" or "Practical 8-direction bank"),
     "Output mode: " .. (OUTPUT_MODE_NAMES[settings.output_mode_index] or "?"),
     "IR files: " .. tostring(#paths),
+    settings.sketch_path and settings.sketch_path ~= "" and ("Room sketch: " .. settings.sketch_path) or "Room sketch: none",
     string.format("NumPy time: %.2f sec", elapsed),
     "Output folder: " .. output_dir,
     "",
@@ -348,6 +400,7 @@ local function main()
     normalize_db = get_number("normalize_db", -6.0),
     seed = get_number("seed", 1),
     insert_items = get_bool("insert_items", true),
+    sketch_path = reaper.GetExtState(EXT, "sketch_path"),
   }
 
   local function persist()
@@ -371,6 +424,17 @@ local function main()
       end
       ImGui.Spacing(ctx)
       draw_ir_preview(ctx, settings)
+      ImGui.Spacing(ctx)
+      if ImGui.Button(ctx, "Load Room Sketch JSON", 180, 26) then choose_room_sketch(settings) end
+      ImGui.SameLine(ctx)
+      if settings.sketch_path and settings.sketch_path ~= "" then
+        ImGui.Text(ctx, basename(settings.sketch_path))
+      else
+        ImGui.TextColored(ctx, COLOR_MUTED, "optional browser sketch")
+      end
+      if settings.sketch_path and settings.sketch_path ~= "" then
+        ImGui.TextColored(ctx, COLOR_MUTED, "Imported sketches can add polygon room metadata and chamber-return timing.")
+      end
       ImGui.Spacing(ctx)
       local old_material = settings.material_index
       settings.material_index = combo(ctx, "Material preset", settings.material_index, MATERIAL_NAMES)

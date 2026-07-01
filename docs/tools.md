@@ -263,9 +263,10 @@ behaviors.
   its own ambisonic item for creative or diagnostic use.
 - `3OAFX Synthetic Ambisonic IR Bank`: designs encoded ambisonic IR banks for
   `3OAFX Offline Ambisonic Convolve`, with room size, material absorption,
-  scattering, early reflections, late-field controls, and separate or stacked
-  output formats. Higher-order banks use 8 directions: stacked 2OA is 72
-  channels and stacked 3OA is 128 channels.
+  scattering, early reflections, late-field controls, optional IR Room Sketch
+  Designer JSON import, and separate or stacked output formats. Higher-order
+  banks use 8 directions: stacked 2OA is 72 channels and stacked 3OA is 128
+  channels.
 
 ## Spectral / Convolution
 
