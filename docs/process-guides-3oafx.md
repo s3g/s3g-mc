@@ -386,16 +386,30 @@ image so the X/time and Y/frequency interpretation is visible before rendering.
 Use the read-orientation button to transpose the interpretation so vertical
 image position becomes time and horizontal image position becomes frequency.
 
-Amplitude is separate from lightness so elevation and loudness are not tied to
-the same visual feature. Choose one of three amplitude sources:
+Amplitude is separate from lightness so elevation and loudness do not have to
+be tied to the same visual feature. Choose an amplitude source:
 
 - `Edge contrast`: local image structure drives amplitude.
 - `Alpha`: the PNG alpha channel drives amplitude.
+- `Luminance`: lighter areas drive amplitude.
+- `Inverse luminance`: darker areas drive amplitude.
+- `Local contrast`: textured areas that differ from their surrounding
+  neighborhood drive amplitude.
+- `Ridge`: thin lines and bright contours drive amplitude.
+- `Blob fill`: filled masses drive amplitude more than their outlines.
+- `Center emphasis`: areas away from strong edges drive amplitude.
+- `Temporal activity`: changes from one image column to the next drive
+  amplitude.
 - `Separate image`: a second PNG supplies the amplitude mask.
 
-The edge and alpha preview panels use the same grayscale convention: white
-means higher amplitude and black means little or no amplitude after threshold
-and amplitude-curve shaping.
+The amplitude preview panel uses the same grayscale convention for each mask:
+white means higher amplitude and black means little or no amplitude after
+threshold and amplitude-curve shaping.
+
+When `Luminance` or `Inverse luminance` is used as the amplitude source, the
+elevation source can be changed from image lightness to a uniform elevation or
+a frequency-spread elevation. This keeps brightness available as amplitude
+without requiring the same brightness values to determine height.
 
 Composing images for this process:
 

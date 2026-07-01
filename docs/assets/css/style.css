@@ -241,6 +241,25 @@ a:focus-visible {
   font-size: 12px;
 }
 
+.content .utility-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  margin: 6px 0 16px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  background: var(--panel-alt);
+  color: var(--ink);
+  font-family: "Menlo", "Monaco", "Courier New", monospace;
+  font-size: 12px;
+}
+
+.content .utility-link:hover {
+  border-color: var(--accent);
+  color: var(--accent-dark);
+  text-decoration: none;
+}
+
 .content .bibliography {
   margin-top: 14px;
 }

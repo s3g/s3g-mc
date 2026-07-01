@@ -24,10 +24,11 @@ local SELECTED_SOURCES = nr.selected_entries()
 local SELECTED_SOURCE = SELECTED_SOURCES[1]
 
 local SYNTH_MODES = { "Hybrid", "Additive partials", "Spectral additive", "Spectral noise", "Granular" }
-local AMP_SOURCES = { "Edge contrast", "Alpha", "Separate image" }
+local AMP_SOURCES = { "Edge contrast", "Alpha", "Luminance", "Inverse luminance", "Local contrast", "Ridge", "Blob fill", "Center emphasis", "Temporal activity", "Separate image" }
 local COLOR_MODELS = { "OKLCH", "HSL", "HSV", "YCbCr" }
 local OUTPUT_MODES = { "3OA ACN/SN3D", "Multichannel ring" }
 local ELEVATION_MODES = { "Sphere", "Hemisphere" }
+local ELEVATION_SOURCES = { "Image lightness", "Uniform elevation", "Frequency spread" }
 local FREQ_MODES = { "Log", "Linear" }
 local GRAIN_SOURCE_MODES = { "Image time", "Image frequency", "Image color", "Random", "Cycle" }
 local GRAIN_SCAN_MODES = { "Image time", "Image frequency", "Diagonal", "Random", "Fixed" }
@@ -61,6 +62,7 @@ local settings = {
   color_model = getn("color_model", 1),
   output_mode = getn("output_mode", 1),
   elevation_mode = getn("elevation_mode", 1),
+  elevation_source = getn("elevation_source", 1),
   freq_mode = getn("freq_mode", 1),
   transpose_read = getb("transpose_read", false),
   duration = getn("duration", 8),
@@ -71,6 +73,8 @@ local settings = {
   max_bins = getn("max_bins", 18),
   min_freq = getn("min_freq", 80),
   max_freq = getn("max_freq", 6000),
+  uniform_elevation = getn("uniform_elevation", 0),
+  elevation_spread = getn("elevation_spread", 90),
   threshold = getn("threshold", 0.08),
   amp_gamma = getn("amp_gamma", 0.75),
   noise_blend = getn("noise_blend", 0.45),
@@ -149,7 +153,7 @@ local function render()
     mc.show_error("Granular mode needs one or more selected WAV-backed media items to use as grain sources.")
     return
   end
-  if settings.amp_source == 3 and settings.amp_image_path == "" then
+  if settings.amp_source == #AMP_SOURCES and settings.amp_image_path == "" then
     mc.show_error("Separate image amplitude mode needs an amplitude PNG.")
     return
   end
@@ -165,12 +169,13 @@ local function render()
     source_count = settings.synth_mode == 5 and #SELECTED_SOURCES or 0,
     duration = settings.duration,
     synth_mode = value_key(SYNTH_MODES, settings.synth_mode):gsub("additive_partials", "additive"):gsub("spectral_noise", "noise"),
-    amp_source = settings.amp_source == 1 and "edge" or (settings.amp_source == 2 and "alpha" or "separate"),
+    amp_source = value_key(AMP_SOURCES, settings.amp_source):gsub("edge_contrast", "edge"):gsub("blob_fill", "blob"),
     color_model = value_key(COLOR_MODELS, settings.color_model),
     output_mode = settings.output_mode == 1 and "3oa" or "ring",
     channels = channels,
     order = math.max(1, math.min(3, math.floor(settings.order + 0.5))),
     elevation_mode = value_key(ELEVATION_MODES, settings.elevation_mode),
+    elevation_source = value_key(ELEVATION_SOURCES, settings.elevation_source):gsub("image_lightness", "image_lightness"):gsub("uniform_elevation", "uniform"):gsub("frequency_spread", "spread"),
     freq_mode = value_key(FREQ_MODES, settings.freq_mode),
     transpose_read = settings.transpose_read,
     columns = math.floor(settings.columns + 0.5),
@@ -178,6 +183,8 @@ local function render()
     max_bins_per_column = math.floor(settings.max_bins + 0.5),
     min_freq = settings.min_freq,
     max_freq = settings.max_freq,
+    uniform_elevation = settings.uniform_elevation,
+    elevation_spread = settings.elevation_spread,
     threshold = settings.threshold,
     amp_gamma = settings.amp_gamma,
     noise_blend = settings.noise_blend,
@@ -447,25 +454,17 @@ local function loop()
       else
         draw_diagram()
       end
-      if settings.amp_source == 1 and settings.image_path ~= "" then
-        local edge_path, edge_err = ensure_amplitude_preview("edge")
+      if settings.amp_source < #AMP_SOURCES and settings.image_path ~= "" then
+        local preview_key = value_key(AMP_SOURCES, settings.amp_source):gsub("edge_contrast", "edge"):gsub("blob_fill", "blob")
+        local preview_path, preview_err = ensure_amplitude_preview(preview_key)
         ImGui.Spacing(ctx)
-        if edge_path then
-          draw_image_preview("edge", "Edge contrast amplitude preview", edge_path, 150)
+        if preview_path then
+          draw_image_preview("ampmask", AMP_SOURCES[settings.amp_source] .. " amplitude preview", preview_path, 150)
         else
-          ImGui.TextColored(ctx, COLORS.muted, edge_err or "Edge preview unavailable.")
+          ImGui.TextColored(ctx, COLORS.muted, preview_err or "Amplitude preview unavailable.")
         end
       end
-      if settings.amp_source == 2 and settings.image_path ~= "" then
-        local alpha_path, alpha_err = ensure_amplitude_preview("alpha")
-        ImGui.Spacing(ctx)
-        if alpha_path then
-          draw_image_preview("alpha", "Alpha amplitude preview", alpha_path, 150)
-        else
-          ImGui.TextColored(ctx, COLORS.muted, alpha_err or "Alpha preview unavailable.")
-        end
-      end
-      if settings.amp_source == 3 and settings.amp_image_path ~= "" then
+      if settings.amp_source == #AMP_SOURCES and settings.amp_image_path ~= "" then
         ImGui.Spacing(ctx)
         draw_image_preview("amp", "Amplitude image preview", settings.amp_image_path, 150)
       end
@@ -478,7 +477,7 @@ local function loop()
       ImGui.SameLine(ctx)
       if ImGui.Button(ctx, "Choose##image", 96, 24) then settings.image_path = choose_png("Choose color PNG", settings.image_path) end
       settings.amp_source = combo("Amplitude source", settings.amp_source, AMP_SOURCES)
-      if settings.amp_source == 3 then
+      if settings.amp_source == #AMP_SOURCES then
         ImGui.PushItemWidth(ctx, -120)
         changed, settings.amp_image_path = ImGui.InputText(ctx, "##amp_image_path", settings.amp_image_path)
         ImGui.PopItemWidth(ctx)
@@ -499,6 +498,15 @@ local function loop()
       end
       settings.color_model = combo("Color model", settings.color_model, COLOR_MODELS)
       settings.elevation_mode = combo("Elevation", settings.elevation_mode, ELEVATION_MODES)
+      if settings.amp_source == 3 or settings.amp_source == 4 then
+        settings.elevation_source = combo("Elevation source", settings.elevation_source, ELEVATION_SOURCES)
+        if settings.elevation_source == 2 then
+          changed, settings.uniform_elevation = ImGui.SliderDouble(ctx, "Uniform elevation", settings.uniform_elevation, -90, 90, "%.0f deg")
+        elseif settings.elevation_source == 3 then
+          changed, settings.uniform_elevation = ImGui.SliderDouble(ctx, "Elevation center", settings.uniform_elevation, -90, 90, "%.0f deg")
+          changed, settings.elevation_spread = ImGui.SliderDouble(ctx, "Elevation spread", settings.elevation_spread, 0, 180, "%.0f deg")
+        end
+      end
       settings.freq_mode = combo("Frequency scale", settings.freq_mode, FREQ_MODES)
       local read_label = settings.transpose_read and "Read: vertical time / horizontal frequency" or "Read: horizontal time / vertical frequency"
       if ImGui.Button(ctx, read_label, -1, 26) then

@@ -6148,6 +6148,119 @@ def edge_contrast_amplitude(rgb):
     return amp.astype(np.float32)
 
 
+def normalize_mask(mask):
+    mask = np.nan_to_num(mask.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+    mask = np.maximum(mask, 0.0)
+    peak = float(np.max(mask)) if mask.size else 0.0
+    if peak > 1e-9:
+        mask /= peak
+    return np.clip(mask, 0.0, 1.0).astype(np.float32)
+
+
+def gaussian_kernel(radius, amount):
+    radius = max(1, int(radius))
+    x = np.arange(-radius, radius + 1, dtype=np.float32)
+    sigma = max(0.5, radius * (0.24 + float(amount) * 0.36))
+    kernel = np.exp(-(x * x) / (2.0 * sigma * sigma)).astype(np.float32)
+    kernel /= np.sum(kernel)
+    return kernel
+
+
+def blur_mask(mask, radius=3, amount=0.5):
+    kernel = gaussian_kernel(radius, amount)
+    out = mask.astype(np.float32).copy()
+    for y in range(out.shape[0]):
+        row = np.convolve(out[y, :], kernel, mode="same")
+        if row.shape[0] != out.shape[1]:
+            extra = row.shape[0] - out.shape[1]
+            row = row[max(0, extra // 2):max(0, extra // 2) + out.shape[1]]
+        out[y, :] = row
+    for x in range(out.shape[1]):
+        col = np.convolve(out[:, x], kernel, mode="same")
+        if col.shape[0] != out.shape[0]:
+            extra = col.shape[0] - out.shape[0]
+            col = col[max(0, extra // 2):max(0, extra // 2) + out.shape[0]]
+        out[:, x] = col
+    return out.astype(np.float32)
+
+
+def image_luminance(rgb):
+    return np.clip(0.2126 * rgb[:, :, 0] + 0.7152 * rgb[:, :, 1] + 0.0722 * rgb[:, :, 2], 0.0, 1.0).astype(np.float32)
+
+
+def local_contrast_amplitude(rgb):
+    gray = image_luminance(rgb)
+    local = blur_mask(gray, radius=5, amount=0.65)
+    return normalize_mask(np.abs(gray - local))
+
+
+def ridge_amplitude(rgb):
+    gray = image_luminance(rgb)
+    blur = blur_mask(gray, radius=2, amount=0.4)
+    lap = np.zeros_like(blur)
+    lap[1:-1, 1:-1] = (
+        4.0 * blur[1:-1, 1:-1]
+        - blur[:-2, 1:-1]
+        - blur[2:, 1:-1]
+        - blur[1:-1, :-2]
+        - blur[1:-1, 2:]
+    )
+    thin = np.maximum(lap, 0.0)
+    return normalize_mask(thin * (0.35 + 0.65 * edge_contrast_amplitude(rgb)))
+
+
+def blob_amplitude(rgb):
+    gray = image_luminance(rgb)
+    fill = blur_mask(gray, radius=7, amount=0.85)
+    edge = edge_contrast_amplitude(rgb)
+    return normalize_mask(fill * (1.0 - 0.55 * edge))
+
+
+def center_emphasis_amplitude(rgb):
+    gray = image_luminance(rgb)
+    edge = blur_mask(edge_contrast_amplitude(rgb), radius=3, amount=0.5)
+    fill = blur_mask(gray, radius=5, amount=0.75)
+    return normalize_mask(fill * np.maximum(0.0, 1.0 - edge) ** 1.75)
+
+
+def temporal_activity_amplitude(rgb):
+    gray = image_luminance(rgb)
+    diff = np.zeros_like(gray)
+    if gray.shape[1] > 1:
+        diff[:, 1:] = np.abs(gray[:, 1:] - gray[:, :-1])
+        diff[:, 0] = diff[:, 1]
+    return normalize_mask(blur_mask(diff, radius=2, amount=0.4))
+
+
+def image_amplitude_mask(rgb, alpha, amp_source, separate_rgb=None, separate_alpha=None):
+    amp_source = str(amp_source or "edge").lower()
+    if amp_source == "alpha":
+        amp = alpha.astype(np.float32)
+        if float(np.max(amp)) <= 1e-6:
+            amp = np.zeros(alpha.shape, dtype=np.float32)
+    elif amp_source == "luminance":
+        amp = image_luminance(rgb)
+    elif amp_source in ("inverse_luminance", "inverse-luminance"):
+        amp = 1.0 - image_luminance(rgb)
+    elif amp_source == "local_contrast":
+        amp = local_contrast_amplitude(rgb)
+    elif amp_source == "ridge":
+        amp = ridge_amplitude(rgb)
+    elif amp_source in ("blob", "blob_fill"):
+        amp = blob_amplitude(rgb)
+    elif amp_source == "center_emphasis":
+        amp = center_emphasis_amplitude(rgb)
+    elif amp_source == "temporal_activity":
+        amp = temporal_activity_amplitude(rgb)
+    elif amp_source == "separate":
+        if separate_rgb is None or separate_alpha is None:
+            raise RuntimeError("Separate image amplitude mode needs an amplitude PNG.")
+        amp = image_luminance(separate_rgb) * separate_alpha.astype(np.float32)
+    else:
+        amp = edge_contrast_amplitude(rgb)
+    return normalize_mask(amp)
+
+
 def ring_spatial_weights(az, el, dist, channels, width):
     idx = np.arange(int(channels), dtype=np.float64)
     ch_az = -45.0 - idx * 360.0 / max(1, int(channels))
@@ -6177,27 +6290,32 @@ def render_image_aed_sonogram(cfg):
         alpha = resize_image_nearest(alpha[:, :, None], width, height)[:, :, 0]
 
     amp_source = str(cfg.get("amp_source", "edge")).lower()
-    if amp_source == "alpha":
-        amp = alpha.astype(np.float32)
-        if float(np.max(amp)) <= 1e-6:
-            amp = edge_contrast_amplitude(rgb)
-    elif amp_source == "separate":
+    separate_rgb = None
+    separate_alpha = None
+    if amp_source == "separate":
         amp_path = cfg.get("amp_image_path", "")
         if not amp_path:
             raise RuntimeError("Separate image amplitude mode needs an amplitude PNG.")
         amp_rgb, amp_alpha = read_png_rgba(amp_path)
         if transpose_read:
-            amp_rgb = np.transpose(resize_image_nearest(amp_rgb, height, width), (1, 0, 2))
-            amp_alpha = np.transpose(resize_image_nearest(amp_alpha[:, :, None], height, width), (1, 0, 2))[:, :, 0]
+            separate_rgb = np.transpose(resize_image_nearest(amp_rgb, height, width), (1, 0, 2))
+            separate_alpha = np.transpose(resize_image_nearest(amp_alpha[:, :, None], height, width), (1, 0, 2))[:, :, 0]
         else:
-            amp_rgb = resize_image_nearest(amp_rgb, width, height)
-            amp_alpha = resize_image_nearest(amp_alpha[:, :, None], width, height)[:, :, 0]
-        amp = np.mean(amp_rgb, axis=2).astype(np.float32) * amp_alpha.astype(np.float32)
-    else:
-        amp = edge_contrast_amplitude(rgb)
+            separate_rgb = resize_image_nearest(amp_rgb, width, height)
+            separate_alpha = resize_image_nearest(amp_alpha[:, :, None], width, height)[:, :, 0]
+    amp = image_amplitude_mask(rgb, alpha, amp_source, separate_rgb, separate_alpha)
 
     model = cfg.get("color_model", "oklch")
     hue, chroma, light = image_color_model(rgb, model)
+    elevation_source = str(cfg.get("elevation_source", "image_lightness")).lower()
+    if elevation_source == "uniform":
+        light = np.full_like(light, np.clip((float(cfg.get("uniform_elevation", 0.0)) + 90.0) / 180.0, 0.0, 1.0))
+    elif elevation_source == "spread":
+        center = float(cfg.get("uniform_elevation", 0.0))
+        spread = float(cfg.get("elevation_spread", 90.0))
+        row_curve = np.linspace(1.0, 0.0, height, dtype=np.float32)[:, None]
+        elev = center + (row_curve - 0.5) * spread
+        light = np.repeat(np.clip((elev + 90.0) / 180.0, 0.0, 1.0), width, axis=1).astype(np.float32)
     threshold = float(cfg.get("threshold", 0.08))
     amp = np.clip((amp - threshold) / max(1e-6, 1.0 - threshold), 0, 1) ** float(cfg.get("amp_gamma", 0.75))
 
@@ -6562,12 +6680,7 @@ def render_image_amp_preview(cfg):
         rgb = resize_image_nearest(rgb, width, height)
         alpha = resize_image_nearest(alpha[:, :, None], width, height)[:, :, 0]
     preview_type = str(cfg.get("preview_type", "edge")).lower()
-    if preview_type == "alpha":
-        amp = alpha.astype(np.float32)
-        if float(np.max(amp)) <= 1e-6:
-            amp = np.zeros((height, width), dtype=np.float32)
-    else:
-        amp = edge_contrast_amplitude(rgb)
+    amp = image_amplitude_mask(rgb, alpha, preview_type)
     threshold = float(cfg.get("threshold", 0.08))
     amp = np.clip((amp - threshold) / max(1e-6, 1.0 - threshold), 0, 1) ** float(cfg.get("amp_gamma", 0.75))
     output_path = cfg["output_path"]

@@ -33,6 +33,8 @@ toc:
 # Tools
 
 For step-by-step notes on selected processes, see the [Process Guides](process-guides.md).
+The [Utilities](utilities.md) page includes the standalone Image Score
+Generator for preparing PNG scores used by `3OAFX Image Sonogram Field`.
 
 Current package snapshot: the browser exposes 109 user-facing tools/controllers,
 plus the Package Browser. Of those, 48 are Python/NumPy-backed offline

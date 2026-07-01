@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>s3g-mc IR Room Sketch Designer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <h1>s3g-mc IR Room Sketch Designer</h1>
+          <p>Room sketches for 3OAFX Synthetic Ambisonic IR Bank</p>
+        </div>
+        <div class="top-actions">
+          <button id="reset" type="button">Reset</button>
+          <button id="randomize" type="button">Generate</button>
+          <button id="exportJson" type="button">Export JSON</button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <aside class="panel tools">
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Room</span></h2>
+            <label>Length m <input id="roomX" type="range" min="1" max="80" value="12" step="0.1" /></label>
+            <label>Width m <input id="roomY" type="range" min="1" max="80" value="9" step="0.1" /></label>
+            <label>Height m <input id="roomZ" type="range" min="1" max="30" value="5" step="0.1" /></label>
+            <label>Material preset
+              <select id="materialPreset">
+                <option value="concrete">Concrete room</option>
+                <option value="stone">Stone room</option>
+                <option value="wood">Wood room</option>
+                <option value="studio">Studio room</option>
+                <option value="damped">Damped room</option>
+                <option value="glass">Glass / tile</option>
+              </select>
+            </label>
+            <label>Absorption <input id="absorption" type="range" min="0.03" max="0.95" value="0.12" step="0.01" /></label>
+            <label>Scattering <input id="scattering" type="range" min="0" max="1" value="0.32" step="0.01" /></label>
+            <label>Tail soften <input id="tailSoften" type="range" min="0" max="1" value="0.16" step="0.01" /></label>
+          </section>
+
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Source / Group</span></h2>
+            <label>Single azimuth <input id="sourceAz" type="range" min="-180" max="180" value="35" step="1" /></label>
+            <label>Single elevation <input id="sourceEl" type="range" min="-80" max="80" value="10" step="1" /></label>
+            <label>Distance m <input id="sourceDistance" type="range" min="0.25" max="20" value="3.2" step="0.05" /></label>
+            <label>Direction spread <input id="spreadDeg" type="range" min="0" max="120" value="45" step="1" /></label>
+          </section>
+
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>IR Bank</span></h2>
+            <label>Output order
+              <select id="order">
+                <option value="1">1OA / 4ch</option>
+                <option value="2">2OA / 9ch</option>
+                <option value="3" selected>3OA / 16ch</option>
+              </select>
+            </label>
+            <label>Direction set
+              <select id="directionSet">
+                <option value="single">Single direction</option>
+                <option value="tetra">4 direction tetra</option>
+                <option value="cube" selected>8 direction cube</option>
+                <option value="ring8">8 direction ring</option>
+                <option value="virtual24">24 point virtual layer</option>
+              </select>
+            </label>
+            <label>Duration s <input id="duration" type="range" min="0.1" max="12" value="3" step="0.05" /></label>
+            <label>Pre-delay ms <input id="preDelay" type="range" min="0" max="120" value="12" step="1" /></label>
+            <label>Early reflections <input id="earlyReflections" type="range" min="0" max="80" value="18" step="1" /></label>
+          </section>
+        </aside>
+
+        <section class="stage">
+          <div class="view-tabs">
+            <button type="button" data-view="top" class="active">Top</button>
+            <button type="button" data-view="side">Side</button>
+            <button type="button" data-view="sphere">Bank Map</button>
+          </div>
+          <div class="canvas-frame">
+            <canvas id="roomCanvas" width="900" height="560"></canvas>
+          </div>
+          <div class="readout-grid">
+            <div><span>RT60</span><strong id="rt60Readout">0.00 s</strong></div>
+            <div><span>Volume</span><strong id="volumeReadout">0 m3</strong></div>
+            <div><span>Channels</span><strong id="channelReadout">128</strong></div>
+            <div><span>Late start</span><strong id="lateReadout">0 ms</strong></div>
+          </div>
+        </section>
+
+        <aside class="panel preview">
+          <section>
+            <h2>Selected IR Group</h2>
+            <div id="groupReadout" class="group-readout"></div>
+          </section>
+          <section>
+            <h2>Reflection Sketch</h2>
+            <canvas id="timelineCanvas" width="512" height="180"></canvas>
+            <p class="hint">Early marks show image-source timing. The tail preview uses absorption, scattering, and duration.</p>
+          </section>
+          <section>
+            <h2>Export Preview</h2>
+            <pre id="jsonPreview"></pre>
+          </section>
+        </aside>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>
