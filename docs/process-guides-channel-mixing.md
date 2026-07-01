@@ -15,6 +15,8 @@ toc:
     href: "#6ch-ambisonic-decoder-router"
   - title: MC Channel Automation Mixer
     href: "#mc-channel-automation-mixer"
+  - title: 128ch Ambisonic Node Track Mixer
+    href: "#128ch-ambisonic-node-track-mixer"
   - title: 128ch Node Track Mixer
     href: "#128ch-node-track-mixer"
   - title: MC to Stereo Autogain
@@ -123,6 +125,46 @@ Workflow:
 The visible mixer adapts to the track channel count, up to REAPER's 128-channel limit. Faders use a dB-style response, double-click returns to unity, and direct dB entry can make relative changes across selected faders.
 
 Use shift-click to select or release channels. Quick channel groups highlight related faders and let a group move together. The pin matrix is for channel remapping and should be treated as routing, not gain.
+
+
+## 128ch Ambisonic Node Track Mixer
+
+Use this when selected source tracks are already ambisonic encoded and should
+be mixed as complete spatial streams. The action creates a bus, routes each
+selected source track into its own input block, loads `s3g 128ch Ambisonic Node
+Track Mixer`, and opens a node controller with a separate color identity from
+the general node mixer.
+
+This mixer does not decode, encode, or reinterpret the channels as speakers.
+Each node receives one ACN/SN3D stream, applies a single node weight, and sums
+matching channels to the output: channel 1 to channel 1, channel 2 to channel
+2, and so on. This keeps the ambisonic image inside each source track intact
+while still allowing node-based level movement between tracks.
+
+Selected source tracks should use ambisonic container widths: `4ch` for 1OA,
+`10ch` for 2OA in REAPER's even-channel container, or `16ch` for 3OA. The
+created bus uses the highest order among the selected tracks. Lower-order
+tracks can be routed into that bus; their missing higher-order channels remain
+silent.
+
+`Spatial field` places each encoded stream as a node in a visual field. Move
+the cursor or automate `Cursor X`, `Cursor Y`, and `Cursor Z` to weight nearby
+nodes. `Stack scan` treats the nodes as an ordered stack and uses `Stack
+position` as the main automation lane. `Global radius`, `Global focus`, and
+`Cursor gate` control how sharply the cursor moves between complete streams.
+
+Starting approach:
+
+1. Select one or more ambisonic source tracks.
+2. Run `128ch Ambisonic Node Track Mixer`.
+3. Confirm the detected ambisonic order.
+4. Place nodes in `Spatial field`, or switch to `Stack scan` for ordered
+   interpolation.
+5. Use the automation helpers to show cursor, curve, or stack lanes when the
+   mix should be written as editable REAPER automation.
+
+The script turns off the selected source tracks' master sends when it creates
+the node bus, so the bus becomes the monitored/output path.
 
 
 ## 128ch Node Track Mixer

@@ -31,6 +31,8 @@ toc:
     href: "#stereo-expand-to-ambisonic-bed"
   - title: 3OAFX Ambisonic Kernel Collage
     href: "#3oafx-ambisonic-kernel-collage"
+  - title: 3OAFX Image Sonogram Field
+    href: "#3oafx-image-sonogram-field"
   - title: 3OAFX Offline Ambisonic Convolve
     href: "#3oafx-offline-ambisonic-convolve"
   - title: 3OAFX Synthetic Ambisonic IR Bank
@@ -373,6 +375,82 @@ Initial setup:
 
 The kernel window, fade, wet pre-gain, soft limit, and peak normalize controls shape level and duration when a whole recording is used as a convolution kernel. Shorter kernel windows keep more of the source articulation. Longer windows extend the kernel imprint over time.
 
+
+## 3OAFX Image Sonogram Field
+
+Use this to render a PNG image as a spectral-spatial score. The horizontal
+axis becomes time, the vertical axis becomes frequency, and color data
+determines AED positioning: hue to azimuth, lightness to elevation, and
+chroma/saturation to distance. The preview draws a reading graph over the
+image so the X/time and Y/frequency interpretation is visible before rendering.
+Use the read-orientation button to transpose the interpretation so vertical
+image position becomes time and horizontal image position becomes frequency.
+
+Amplitude is separate from lightness so elevation and loudness are not tied to
+the same visual feature. Choose one of three amplitude sources:
+
+- `Edge contrast`: local image structure drives amplitude.
+- `Alpha`: the PNG alpha channel drives amplitude.
+- `Separate image`: a second PNG supplies the amplitude mask.
+
+The edge and alpha preview panels use the same grayscale convention: white
+means higher amplitude and black means little or no amplitude after threshold
+and amplitude-curve shaping.
+
+Composing images for this process:
+
+- The working image grid is at most `512 x 256`: 512 time columns by 256
+  frequency rows. Larger PNGs are resampled into that grid.
+- Use `Time columns` and `Frequency rows` to choose how much of that grid is
+  read. Lower values make a coarser score.
+- An alpha channel is useful because `Alpha` can act directly as the amplitude
+  mask. A separate grayscale or color PNG can also be used as the amplitude
+  image when color and loudness need independent composition.
+- At lower `Max active rows per column` settings, each time column is reduced
+  to the strongest rows after thresholding. This keeps the most prominent
+  amplitude-mask features and omits weaker rows. Raising the value toward 256
+  allows denser vertical detail and can increase render time.
+
+Synthesis modes:
+
+- `Hybrid`: bright/colored features lean toward oscillator partials while
+  diffuse or low-chroma areas add noise energy. `Hybrid noise blend` applies
+  only to this mode.
+- `Additive partials`: active pixels become phase-continuous sine partials.
+  Higher smoothing and sustain values make the image behave more like a
+  continuous oscillator bank; lower values keep more of the column-by-column
+  articulation.
+- `Spectral additive`: image columns are treated as evolving spectral frames.
+  Spectral blur smooths the mask through time, spectral band width spreads
+  active rows into neighboring frequency bands, and spectral inertia lets bands
+  persist as the image changes.
+- `Spectral noise`: active pixels become noise-weighted frequency bands.
+- `Granular`: active pixels emit short windowed grains from one or more
+  selected WAV-backed media items. The image controls when grains occur, source
+  selection, pitch region, density, and AED position.
+
+Granular controls:
+
+- `Source item` chooses how grains select among multiple selected WAV items:
+  image time, image frequency, image color, random, or cycling through the
+  source pool.
+- `Source scan` chooses how image position reads through the selected WAV:
+  image time, image frequency, diagonal, random, or fixed source position.
+- `Source jitter` moves grain read points around the selected scan position.
+- `Source channel` chooses whether grain material follows image row, image
+  color, random channel selection, cycling channels, or a source mixdown.
+- `Image pitch depth` controls how strongly vertical/frequency position changes
+  grain playback rate.
+- `Reverse chance` and `Grain taper` shape grain direction and envelope.
+
+Output can be 3OA ACN/SN3D or a multichannel ring. `Sphere` elevation maps
+lightness across `-90..90`; `Hemisphere` maps lightness across `0..90`.
+`Invert distance` changes whether chroma moves material nearer or farther
+away.
+
+Use smaller `Time columns`, `Frequency rows`, and `Max active rows per column`
+while testing. Higher values admit more image detail and can increase render
+time.
 
 
 ## 3OAFX Offline Ambisonic Convolve

@@ -137,6 +137,9 @@ Live page available as of access date.</p>
 <p class="bib-entry">Deleflie, E., and Schiemer, Greg. 2009. "Spatial Grains: Imbuing Granular Particles With Spatial-Domain Information."
 <a href="https://ro.uow.edu.au/creartspapers/35" target="_blank" rel="noopener noreferrer">https://ro.uow.edu.au/creartspapers/35</a>.</p>
 
+<p class="bib-entry">Greenlee, Shawn, RISD Color Lab, Department of Digital + Media, and Division of Experimental and Foundation Studies. 2025. "Faculty Fellow Shawn Greenlee | HSL Grains: Graphical Sound Field Displacement." <em>Event Recordings</em> 10.
+<a href="https://digitalcommons.risd.edu/colorlab_events_recordings/10" target="_blank" rel="noopener noreferrer">https://digitalcommons.risd.edu/colorlab_events_recordings/10</a>.</p>
+
 <p class="bib-entry">Mariette, Nicholas. 2009. "AmbiGrainer: A Higher Order Ambisonic Granulator in Pd." Paper presented at Ambisonics Symposium 2009, Graz, June 25-27.</p>
 
 </div>

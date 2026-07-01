@@ -9,6 +9,7 @@ import subprocess
 import sys
 import csv
 import tempfile
+import zlib
 
 import numpy as np
 
@@ -5931,9 +5932,658 @@ def render_midi_spectral_trace(cfg):
     print(f"Output: {output_path}")
 
 
+def png_paeth(a, b, c):
+    p = a + b - c
+    pa = abs(p - a)
+    pb = abs(p - b)
+    pc = abs(p - c)
+    if pa <= pb and pa <= pc:
+        return a
+    if pb <= pc:
+        return b
+    return c
+
+
+def read_png_rgba(path):
+    with open(path, "rb") as handle:
+        raw = handle.read()
+    if raw[:8] != b"\x89PNG\r\n\x1a\n":
+        raise RuntimeError("Image reader currently supports PNG files.")
+    pos = 8
+    width = height = bit_depth = color_type = None
+    idat = bytearray()
+    while pos + 8 <= len(raw):
+        size = struct.unpack(">I", raw[pos:pos + 4])[0]
+        chunk = raw[pos + 4:pos + 8]
+        data = raw[pos + 8:pos + 8 + size]
+        pos += 12 + size
+        if chunk == b"IHDR":
+            width, height, bit_depth, color_type, compression, filter_method, interlace = struct.unpack(">IIBBBBB", data)
+            if bit_depth != 8 or compression != 0 or filter_method != 0 or interlace != 0:
+                raise RuntimeError("PNG must be non-interlaced 8-bit RGB/RGBA/grayscale.")
+            if color_type not in (0, 2, 4, 6):
+                raise RuntimeError("PNG color type must be grayscale, RGB, grayscale+alpha, or RGBA.")
+        elif chunk == b"IDAT":
+            idat.extend(data)
+        elif chunk == b"IEND":
+            break
+    if not width or not height or not idat:
+        raise RuntimeError("PNG is missing image data.")
+    channels = {0: 1, 2: 3, 4: 2, 6: 4}[color_type]
+    scanline = width * channels
+    inflated = zlib.decompress(bytes(idat))
+    recon = np.zeros((height, scanline), dtype=np.uint8)
+    p = 0
+    for y in range(height):
+        filt = inflated[p]
+        p += 1
+        src = np.frombuffer(inflated[p:p + scanline], dtype=np.uint8)
+        p += scanline
+        up = recon[y - 1].astype(np.int16) if y > 0 else np.zeros(scanline, dtype=np.int16)
+        row = np.zeros(scanline, dtype=np.uint8)
+        for i in range(scanline):
+            raw_byte = int(src[i])
+            left = int(row[i - channels]) if i >= channels else 0
+            above = int(up[i])
+            upper_left = int(up[i - channels]) if i >= channels else 0
+            if filt == 0:
+                value = raw_byte
+            elif filt == 1:
+                value = raw_byte + left
+            elif filt == 2:
+                value = raw_byte + above
+            elif filt == 3:
+                value = raw_byte + ((left + above) // 2)
+            elif filt == 4:
+                value = raw_byte + png_paeth(left, above, upper_left)
+            else:
+                raise RuntimeError(f"Unsupported PNG filter: {filt}")
+            row[i] = value & 255
+        recon[y] = row
+    data = recon.reshape(height, width, channels).astype(np.float32) / 255.0
+    if color_type == 0:
+        rgb = np.repeat(data[:, :, :1], 3, axis=2)
+        alpha = np.ones((height, width), dtype=np.float32)
+    elif color_type == 4:
+        rgb = np.repeat(data[:, :, :1], 3, axis=2)
+        alpha = data[:, :, 1]
+    elif color_type == 2:
+        rgb = data[:, :, :3]
+        alpha = np.ones((height, width), dtype=np.float32)
+    else:
+        rgb = data[:, :, :3]
+        alpha = data[:, :, 3]
+    return rgb.astype(np.float32), alpha.astype(np.float32)
+
+
+def write_png_gray(path, image):
+    gray = np.clip(image, 0.0, 1.0)
+    data = (gray * 255.0 + 0.5).astype(np.uint8)
+    height, width = data.shape
+    raw = bytearray()
+    for y in range(height):
+        raw.append(0)
+        raw.extend(data[y].tobytes())
+
+    def chunk(kind, payload):
+        return (
+            struct.pack(">I", len(payload))
+            + kind
+            + payload
+            + struct.pack(">I", zlib.crc32(kind + payload) & 0xFFFFFFFF)
+        )
+
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(bytes(raw)))
+        + chunk(b"IEND", b"")
+    )
+    with open(path, "wb") as handle:
+        handle.write(png)
+
+
+def resize_image_nearest(image, width, height):
+    src_h, src_w = image.shape[:2]
+    if src_w == width and src_h == height:
+        return image.astype(np.float32)
+    xs = np.linspace(0, src_w - 1, width).astype(np.int32)
+    ys = np.linspace(0, src_h - 1, height).astype(np.int32)
+    return image[ys][:, xs].astype(np.float32)
+
+
+def srgb_to_linear_array(v):
+    v = np.clip(v, 0.0, 1.0)
+    return np.where(v <= 0.04045, v / 12.92, ((v + 0.055) / 1.055) ** 2.4)
+
+
+def rgb_to_hsl_arrays(rgb):
+    r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
+    maxv = np.max(rgb, axis=2)
+    minv = np.min(rgb, axis=2)
+    d = maxv - minv
+    light = (maxv + minv) * 0.5
+    sat = np.zeros_like(light)
+    nz = d > 1e-7
+    sat[nz] = np.where(light[nz] > 0.5, d[nz] / np.maximum(1e-7, 2 - maxv[nz] - minv[nz]), d[nz] / np.maximum(1e-7, maxv[nz] + minv[nz]))
+    hue = np.zeros_like(light)
+    mask = nz & (maxv == r)
+    hue[mask] = ((g[mask] - b[mask]) / d[mask] + np.where(g[mask] < b[mask], 6, 0)) / 6
+    mask = nz & (maxv == g)
+    hue[mask] = ((b[mask] - r[mask]) / d[mask] + 2) / 6
+    mask = nz & (maxv == b)
+    hue[mask] = ((r[mask] - g[mask]) / d[mask] + 4) / 6
+    return np.mod(hue, 1.0), np.clip(sat, 0, 1), np.clip(light, 0, 1)
+
+
+def rgb_to_hsv_arrays(rgb):
+    r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
+    maxv = np.max(rgb, axis=2)
+    minv = np.min(rgb, axis=2)
+    d = maxv - minv
+    hue = np.zeros_like(maxv)
+    nz = d > 1e-7
+    mask = nz & (maxv == r)
+    hue[mask] = ((g[mask] - b[mask]) / d[mask] + np.where(g[mask] < b[mask], 6, 0)) / 6
+    mask = nz & (maxv == g)
+    hue[mask] = ((b[mask] - r[mask]) / d[mask] + 2) / 6
+    mask = nz & (maxv == b)
+    hue[mask] = ((r[mask] - g[mask]) / d[mask] + 4) / 6
+    sat = np.where(maxv <= 1e-7, 0, d / np.maximum(1e-7, maxv))
+    return np.mod(hue, 1.0), np.clip(sat, 0, 1), np.clip(maxv, 0, 1)
+
+
+def rgb_to_ycbcr_arrays(rgb):
+    r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
+    y = 0.299 * r + 0.587 * g + 0.114 * b
+    cb = (b - y) * 0.564
+    cr = (r - y) * 0.713
+    hue = np.mod((np.arctan2(cb, cr) / (math.pi * 2)) + 0.25, 1.0)
+    chroma = np.clip(np.sqrt(cb * cb + cr * cr) * 2.2, 0, 1)
+    return hue, chroma, np.clip(y, 0, 1)
+
+
+def rgb_to_oklch_arrays(rgb):
+    lin = srgb_to_linear_array(rgb)
+    r, g, b = lin[:, :, 0], lin[:, :, 1], lin[:, :, 2]
+    l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b
+    m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b
+    s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b
+    l3 = np.cbrt(np.maximum(0, l))
+    m3 = np.cbrt(np.maximum(0, m))
+    s3 = np.cbrt(np.maximum(0, s))
+    L = 0.2104542553 * l3 + 0.7936177850 * m3 - 0.0040720468 * s3
+    a = 1.9779984951 * l3 - 2.4285922050 * m3 + 0.4505937099 * s3
+    bb = 0.0259040371 * l3 + 0.7827717662 * m3 - 0.8086757660 * s3
+    C = np.sqrt(a * a + bb * bb)
+    H = np.mod(np.arctan2(bb, a) / (math.pi * 2), 1.0)
+    return H, np.clip(C / 0.37, 0, 1), np.clip(L, 0, 1)
+
+
+def image_color_model(rgb, model):
+    model = str(model or "oklch").lower()
+    if model == "hsl":
+        return rgb_to_hsl_arrays(rgb)
+    if model == "hsv":
+        return rgb_to_hsv_arrays(rgb)
+    if model in ("ycbcr", "yuv"):
+        return rgb_to_ycbcr_arrays(rgb)
+    return rgb_to_oklch_arrays(rgb)
+
+
+def edge_contrast_amplitude(rgb):
+    gray = np.mean(rgb, axis=2)
+    gx = np.zeros_like(gray)
+    gy = np.zeros_like(gray)
+    gx[:, 1:-1] = np.abs(gray[:, 2:] - gray[:, :-2]) * 0.5
+    gx[:, 0] = np.abs(gray[:, 1] - gray[:, 0]) if gray.shape[1] > 1 else 0
+    gx[:, -1] = np.abs(gray[:, -1] - gray[:, -2]) if gray.shape[1] > 1 else 0
+    gy[1:-1, :] = np.abs(gray[2:, :] - gray[:-2, :]) * 0.5
+    gy[0, :] = np.abs(gray[1, :] - gray[0, :]) if gray.shape[0] > 1 else 0
+    gy[-1, :] = np.abs(gray[-1, :] - gray[-2, :]) if gray.shape[0] > 1 else 0
+    amp = np.sqrt(gx * gx + gy * gy)
+    peak = float(np.max(amp)) if amp.size else 0.0
+    if peak > 1e-9:
+        amp /= peak
+    return amp.astype(np.float32)
+
+
+def ring_spatial_weights(az, el, dist, channels, width):
+    idx = np.arange(int(channels), dtype=np.float64)
+    ch_az = -45.0 - idx * 360.0 / max(1, int(channels))
+    delta = ((az - ch_az + 180.0) % 360.0) - 180.0
+    spread = max(8.0, float(width) * 60.0 + (1.0 - min(1.0, max(0.0, dist))) * 45.0 + abs(float(el)) * 0.18)
+    weights = np.exp(-(delta * delta) / (2.0 * spread * spread))
+    weights *= 1.0 / max(0.35, 1.0 + max(0.0, dist - 1.0) * 0.35)
+    weights /= math.sqrt(float(np.sum(weights * weights)) + 1e-12)
+    return weights.astype(np.float32)
+
+
+def render_image_aed_sonogram(cfg):
+    image_path = cfg.get("image_path", "")
+    if not image_path:
+        raise RuntimeError("No image selected.")
+    rgb, alpha = read_png_rgba(image_path)
+    max_columns = int(cfg.get("columns", 192))
+    max_rows = int(cfg.get("rows", 96))
+    width = max(8, min(512, max_columns))
+    height = max(8, min(256, max_rows))
+    transpose_read = bool(cfg.get("transpose_read", False))
+    if transpose_read:
+        rgb = np.transpose(resize_image_nearest(rgb, height, width), (1, 0, 2))
+        alpha = np.transpose(resize_image_nearest(alpha[:, :, None], height, width), (1, 0, 2))[:, :, 0]
+    else:
+        rgb = resize_image_nearest(rgb, width, height)
+        alpha = resize_image_nearest(alpha[:, :, None], width, height)[:, :, 0]
+
+    amp_source = str(cfg.get("amp_source", "edge")).lower()
+    if amp_source == "alpha":
+        amp = alpha.astype(np.float32)
+        if float(np.max(amp)) <= 1e-6:
+            amp = edge_contrast_amplitude(rgb)
+    elif amp_source == "separate":
+        amp_path = cfg.get("amp_image_path", "")
+        if not amp_path:
+            raise RuntimeError("Separate image amplitude mode needs an amplitude PNG.")
+        amp_rgb, amp_alpha = read_png_rgba(amp_path)
+        if transpose_read:
+            amp_rgb = np.transpose(resize_image_nearest(amp_rgb, height, width), (1, 0, 2))
+            amp_alpha = np.transpose(resize_image_nearest(amp_alpha[:, :, None], height, width), (1, 0, 2))[:, :, 0]
+        else:
+            amp_rgb = resize_image_nearest(amp_rgb, width, height)
+            amp_alpha = resize_image_nearest(amp_alpha[:, :, None], width, height)[:, :, 0]
+        amp = np.mean(amp_rgb, axis=2).astype(np.float32) * amp_alpha.astype(np.float32)
+    else:
+        amp = edge_contrast_amplitude(rgb)
+
+    model = cfg.get("color_model", "oklch")
+    hue, chroma, light = image_color_model(rgb, model)
+    threshold = float(cfg.get("threshold", 0.08))
+    amp = np.clip((amp - threshold) / max(1e-6, 1.0 - threshold), 0, 1) ** float(cfg.get("amp_gamma", 0.75))
+
+    duration = max(0.1, float(cfg.get("duration", 8.0)))
+    sr = int(cfg.get("sample_rate", 48000))
+    frames = int(round(duration * sr))
+    output_mode = str(cfg.get("output_mode", "3oa")).lower()
+    if output_mode == "3oa":
+        order = int(cfg.get("order", 3))
+        channels = (order + 1) * (order + 1)
+    else:
+        channels = max(1, min(128, int(cfg.get("channels", 8))))
+    out = np.zeros((frames, channels), dtype=np.float32)
+
+    min_freq = max(10.0, float(cfg.get("min_freq", 80.0)))
+    max_freq = max(min_freq + 1.0, float(cfg.get("max_freq", 6000.0)))
+    freq_mode = str(cfg.get("freq_mode", "log")).lower()
+    row_pos = np.linspace(0.0, 1.0, height, dtype=np.float64)
+    if freq_mode == "linear":
+        freqs = min_freq + (1.0 - row_pos) * (max_freq - min_freq)
+    else:
+        freqs = min_freq * ((max_freq / min_freq) ** (1.0 - row_pos))
+
+    synth_mode = str(cfg.get("synth_mode", "hybrid")).lower()
+    display_synth_mode = synth_mode
+    source_pool = []
+    if synth_mode == "granular":
+        source_count = max(0, int(cfg.get("source_count", 0)))
+        legacy_path = str(cfg.get("source_path", ""))
+        if source_count <= 0 and legacy_path:
+            source_count = 1
+            cfg["source_path_1"] = legacy_path
+            cfg["source_start_1"] = cfg.get("source_start", 0.0)
+            cfg["source_duration_1"] = cfg.get("source_duration", 1.0)
+        for index in range(source_count):
+            key = index + 1
+            source_path = str(cfg.get(f"source_path_{key}", ""))
+            if not source_path:
+                continue
+            source_data, source_rate = read_wav(source_path)
+            source_audio = segment(
+                source_data,
+                source_rate,
+                cfg.get(f"source_start_{key}", 0.0),
+                cfg.get(f"source_duration_{key}", 1.0),
+                sr,
+            )
+            if source_audio.shape[0] < 8:
+                continue
+            source_audio = (source_audio - np.mean(source_audio, axis=0, keepdims=True)).astype(np.float32)
+            source_pool.append({
+                "path": source_path,
+                "audio": source_audio,
+                "mono": np.mean(source_audio, axis=1).astype(np.float32),
+                "frames": int(source_audio.shape[0]),
+                "channels": int(source_audio.shape[1]),
+            })
+        if not source_pool:
+            raise RuntimeError("Granular mode needs one or more selected WAV-backed media items.")
+    max_bins = max(1, min(height, int(cfg.get("max_bins_per_column", 18))))
+    slice_frames = max(8, int(math.ceil(frames / width)))
+    overlap = float(cfg.get("overlap", 0.25))
+    event_frames = max(16, int(round(slice_frames * (1.0 + overlap))))
+    t_event = np.arange(event_frames, dtype=np.float32) / sr
+    env = np.hanning(event_frames).astype(np.float32)
+    if np.max(env) > 0:
+        env /= np.max(env)
+    az_offset = float(cfg.get("azimuth_offset", 0.0))
+    elevation_mode = str(cfg.get("elevation_mode", "sphere")).lower()
+    min_distance = float(cfg.get("min_distance", 0.0))
+    max_distance = float(cfg.get("max_distance", 1.0))
+    invert_distance = bool(cfg.get("invert_distance", False))
+    spatial_width = float(cfg.get("spatial_width", 0.65))
+    noise_blend = float(cfg.get("noise_blend", 0.45))
+    additive_smoothing = float(np.clip(float(cfg.get("additive_smoothing", 0.85)), 0.0, 1.0))
+    additive_sustain = float(np.clip(float(cfg.get("additive_sustain", 0.85)), 0.0, 1.0))
+    additive_attack = float(np.clip(float(cfg.get("additive_attack", 0.12)), 0.0, 1.0))
+    spectral_blur = float(np.clip(float(cfg.get("spectral_blur", 0.55)), 0.0, 1.0))
+    spectral_band_width = float(np.clip(float(cfg.get("spectral_band_width", 0.18)), 0.0, 1.0))
+    spectral_inertia = float(np.clip(float(cfg.get("spectral_inertia", 0.8)), 0.0, 1.0))
+    grain_ms = max(1.0, float(cfg.get("grain_ms", 45.0)))
+    grain_density = max(0.0, float(cfg.get("grain_density", 0.55)))
+    grain_pitch_spread = max(0.0, float(cfg.get("grain_pitch_spread", 0.12)))
+    grain_source_mode = str(cfg.get("grain_source_mode", "image_time")).lower()
+    grain_scan_mode = str(cfg.get("grain_scan_mode", "image_time")).lower()
+    grain_channel_mode = str(cfg.get("grain_channel_mode", "image_row")).lower()
+    grain_source_position = float(np.clip(float(cfg.get("grain_source_position", 0.0)), 0.0, 1.0))
+    grain_source_jitter = max(0.0, float(cfg.get("grain_source_jitter", 0.12)))
+    grain_rate_depth = max(0.0, float(cfg.get("grain_rate_depth", 1.0)))
+    grain_reverse = float(np.clip(float(cfg.get("grain_reverse", 0.0)), 0.0, 1.0))
+    grain_taper = float(np.clip(float(cfg.get("grain_taper", 0.45)), 0.0, 1.0))
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+
+    event_count = 0
+    grain_actual_count = 0
+    if synth_mode in ("additive", "spectral_additive") and (synth_mode == "spectral_additive" or additive_smoothing > 0.001):
+        target_cols = np.zeros((height, width), dtype=np.float32)
+        for x in range(width):
+            column_amp = amp[:, x]
+            active = np.flatnonzero(column_amp > 0.001)
+            if active.size == 0:
+                continue
+            if active.size > max_bins:
+                active = active[np.argsort(column_amp[active])[-max_bins:]]
+            for y in active:
+                target_cols[y, x] = float(column_amp[y])
+                event_count += 1
+        if synth_mode == "spectral_additive" and spectral_band_width > 0.001:
+            radius = int(round(1 + spectral_band_width * 18))
+            kernel_y = np.arange(-radius, radius + 1, dtype=np.float32)
+            sigma = max(0.5, radius * (0.22 + spectral_band_width * 0.32))
+            kernel = np.exp(-(kernel_y * kernel_y) / (2.0 * sigma * sigma)).astype(np.float32)
+            kernel /= np.sum(kernel)
+            for x in range(width):
+                blurred_col = np.convolve(target_cols[:, x], kernel, mode="same")
+                if blurred_col.shape[0] != height:
+                    extra = blurred_col.shape[0] - height
+                    start_idx = max(0, extra // 2)
+                    blurred_col = blurred_col[start_idx:start_idx + height]
+                target_cols[:, x] = blurred_col
+        sustain_mix = spectral_inertia if synth_mode == "spectral_additive" else additive_sustain
+        if sustain_mix > 0.001:
+            sustain_cols = target_cols.copy()
+            decay = 0.55 + 0.44 * sustain_mix
+            for x in range(1, width):
+                sustain_cols[:, x] = np.maximum(sustain_cols[:, x], sustain_cols[:, x - 1] * decay)
+            target_cols = target_cols * (1.0 - sustain_mix) + sustain_cols * sustain_mix
+        time_smoothing = spectral_blur if synth_mode == "spectral_additive" else additive_smoothing
+        if time_smoothing > 0.001:
+            radius = int(round(1 + time_smoothing * 24))
+            kernel_x = np.arange(-radius, radius + 1, dtype=np.float32)
+            sigma = max(0.5, radius * (0.22 + time_smoothing * 0.30))
+            kernel = np.exp(-(kernel_x * kernel_x) / (2.0 * sigma * sigma)).astype(np.float32)
+            kernel /= np.sum(kernel)
+            for y in range(height):
+                smoothed_row = np.convolve(target_cols[y, :], kernel, mode="same")
+                if smoothed_row.shape[0] != width:
+                    extra = smoothed_row.shape[0] - width
+                    start_idx = max(0, extra // 2)
+                    smoothed_row = smoothed_row[start_idx:start_idx + width]
+                target_cols[y, :] = smoothed_row
+        frame_pos = np.linspace(0, width - 1, frames, dtype=np.float64)
+        xp = np.arange(width, dtype=np.float64)
+        time = np.arange(frames, dtype=np.float32) / sr
+        denom = math.sqrt(max(1, max_bins))
+        if synth_mode == "spectral_additive":
+            active_rows = np.flatnonzero(np.max(target_cols, axis=1) > 1e-5)
+        else:
+            active_rows = range(height)
+        for y in active_rows:
+            row_env = np.interp(frame_pos, xp, target_cols[y, :]).astype(np.float32)
+            if float(np.max(row_env)) <= 1e-6:
+                continue
+            if additive_attack > 0.001:
+                slew = max(0.0001, additive_attack * sr * 0.06)
+                smoothed = np.zeros_like(row_env)
+                prev = 0.0
+                for i, val in enumerate(row_env):
+                    coeff = 1.0 / slew if val > prev else 1.0 / (slew * (1.8 + additive_sustain * 3.0))
+                    coeff = min(1.0, coeff)
+                    prev += (float(val) - prev) * coeff
+                    smoothed[i] = prev
+                row_env = smoothed
+            freq = float(freqs[y])
+            phase = ((int(y) * 0.61803398875) % 1.0) * math.tau
+            carrier = np.sin(math.tau * freq * time + phase).astype(np.float32)
+            source_cols = np.linspace(0, width - 1, frames, dtype=np.float64)
+            h_row = np.interp(source_cols, xp, hue[y, :]).astype(np.float32)
+            c_row = np.interp(source_cols, xp, chroma[y, :]).astype(np.float32)
+            l_row = np.interp(source_cols, xp, light[y, :]).astype(np.float32)
+            block = max(64, min(frames, int(sr * 0.02)))
+            for start_frame in range(0, frames, block):
+                end_frame = min(frames, start_frame + block)
+                mid = (start_frame + end_frame - 1) // 2
+                h_mid = float(h_row[mid])
+                c_mid = float(c_row[mid])
+                l_mid = float(l_row[mid])
+                dist_t = 1.0 - c_mid if invert_distance else c_mid
+                dist = min_distance + (max_distance - min_distance) * dist_t
+                el = l_mid * 90.0 if elevation_mode == "hemisphere" else l_mid * 180.0 - 90.0
+                az = ((h_mid * 360.0 + az_offset + 180.0) % 360.0) - 180.0
+                sig = carrier[start_frame:end_frame] * row_env[start_frame:end_frame] * (0.35 + 0.65 * c_row[start_frame:end_frame])
+                if output_mode == "3oa":
+                    basis = np.array(ambisonic_basis(order, az, el), dtype=np.float32)
+                    out[start_frame:end_frame] += sig[:, None] * basis[None, :] / denom
+                else:
+                    weights = ring_spatial_weights(az, el, dist, channels, spatial_width)
+                    out[start_frame:end_frame] += sig[:, None] * weights[None, :] / denom
+        synth_mode = "__done_spectral_additive" if synth_mode == "spectral_additive" else "__done_additive"
+    event_amp = np.zeros_like(amp) if synth_mode in ("__done_additive", "__done_spectral_additive") else amp
+    for x in range(width):
+        column_amp = event_amp[:, x]
+        active = np.flatnonzero(column_amp > 0.001)
+        if active.size == 0:
+            continue
+        if active.size > max_bins:
+            active = active[np.argsort(column_amp[active])[-max_bins:]]
+        start = int(round(x / max(1, width) * frames))
+        end = min(frames, start + event_frames)
+        count = end - start
+        if count <= 0:
+            continue
+        for y in active:
+            a = float(column_amp[y])
+            if a <= 0:
+                continue
+            h = float(hue[y, x])
+            c = float(chroma[y, x])
+            l = float(light[y, x])
+            dist_t = c
+            if invert_distance:
+                dist_t = 1.0 - dist_t
+            dist = min_distance + (max_distance - min_distance) * dist_t
+            el = l * 90.0 if elevation_mode == "hemisphere" else l * 180.0 - 90.0
+            az = ((h * 360.0 + az_offset + 180.0) % 360.0) - 180.0
+            freq = float(freqs[y])
+            if synth_mode == "granular":
+                carrier = np.zeros(count, dtype=np.float32)
+                grain_len = max(8, min(count, int(round(grain_ms * sr / 1000.0))))
+                grain_env = np.hanning(grain_len).astype(np.float32)
+                if np.max(grain_env) > 0:
+                    grain_env /= np.max(grain_env)
+                if grain_taper < 0.5:
+                    grain_env = np.power(np.maximum(grain_env, 0.0), 0.35 + grain_taper * 1.3).astype(np.float32)
+                else:
+                    grain_env = np.power(np.maximum(grain_env, 0.0), 1.0 + (grain_taper - 0.5) * 5.0).astype(np.float32)
+                grain_count = max(1, int(round(1.0 + 9.0 * grain_density * a)))
+                base_u = x / max(1, width - 1)
+                row_u = 1.0 - (y / max(1, height - 1))
+                for _ in range(grain_count):
+                    if count <= grain_len:
+                        g0 = 0
+                    else:
+                        g0 = int(rng.integers(0, count - grain_len + 1))
+                    if len(source_pool) > 1:
+                        if grain_source_mode == "image_frequency":
+                            source_index = int(np.clip(round(row_u * (len(source_pool) - 1)), 0, len(source_pool) - 1))
+                        elif grain_source_mode == "image_color":
+                            source_index = int(np.clip(round(h * (len(source_pool) - 1)), 0, len(source_pool) - 1))
+                        elif grain_source_mode == "random":
+                            source_index = int(rng.integers(0, len(source_pool)))
+                        elif grain_source_mode == "cycle":
+                            source_index = grain_actual_count % len(source_pool)
+                        else:
+                            source_index = int(np.clip(round(base_u * (len(source_pool) - 1)), 0, len(source_pool) - 1))
+                    else:
+                        source_index = 0
+                    source = source_pool[source_index]
+                    source_audio = source["audio"]
+                    source_mono = source["mono"]
+                    source_frames = source["frames"]
+                    source_channels = source["channels"]
+                    rate = 2.0 ** float(((row_u - 0.5) * 2.0 * grain_pitch_spread * grain_rate_depth) + rng.normal(0.0, grain_pitch_spread * 0.18))
+                    src_len = max(2, min(source_frames - 1, int(math.ceil(grain_len * rate)) + 2))
+                    if grain_scan_mode == "image_frequency":
+                        scan_u = row_u
+                    elif grain_scan_mode == "diagonal":
+                        scan_u = (base_u + row_u) * 0.5
+                    elif grain_scan_mode == "random":
+                        scan_u = rng.random()
+                    elif grain_scan_mode == "fixed":
+                        scan_u = grain_source_position
+                    else:
+                        scan_u = base_u
+                    jitter = (rng.random() - 0.5) * grain_source_jitter
+                    src_u = (scan_u + jitter) % 1.0
+                    src_start = int(src_u * max(1, source_frames - src_len - 1))
+                    if grain_channel_mode == "mixdown":
+                        src = source_mono[src_start:src_start + src_len]
+                    else:
+                        if grain_channel_mode == "image_color":
+                            src_channel = int(np.clip(round(h * max(0, source_channels - 1)), 0, max(0, source_channels - 1)))
+                        elif grain_channel_mode == "random":
+                            src_channel = int(rng.integers(0, max(1, source_channels)))
+                        elif grain_channel_mode == "cycle":
+                            src_channel = grain_actual_count % max(1, source_channels)
+                        else:
+                            src_channel = int(y) % max(1, source_channels)
+                        src = source_audio[src_start:src_start + src_len, src_channel]
+                    if src.size < 2:
+                        continue
+                    if rng.random() < grain_reverse:
+                        src = src[::-1]
+                    xp = np.linspace(0, src.size - 1, grain_len, dtype=np.float64)
+                    partial = np.interp(xp, np.arange(src.size), src).astype(np.float32)
+                    carrier[g0:g0 + grain_len] += partial * grain_env
+                    grain_actual_count += 1
+                peak = float(np.max(np.abs(carrier))) if carrier.size else 0.0
+                if peak > 1e-6:
+                    carrier /= peak
+            elif synth_mode in ("noise", "filtered_noise"):
+                phase = rng.random() * math.tau
+                tone = np.sin(math.tau * freq * t_event[:count] + phase).astype(np.float32)
+                carrier = rng.standard_normal(count).astype(np.float32)
+                carrier = 0.65 * carrier + 0.35 * tone
+            elif synth_mode == "hybrid":
+                phase = rng.random() * math.tau
+                tone = np.sin(math.tau * freq * t_event[:count] + phase).astype(np.float32)
+                local_noise = rng.standard_normal(count).astype(np.float32)
+                mix = noise_blend * (1.0 - c)
+                carrier = tone * (1.0 - mix) + local_noise * mix
+            else:
+                phase = ((int(y) * 0.61803398875) % 1.0) * math.tau
+                absolute_t = np.arange(start, start + count, dtype=np.float32) / sr
+                carrier = np.sin(math.tau * freq * absolute_t + phase).astype(np.float32)
+            sig = carrier * env[:count] * a * (0.35 + 0.65 * c)
+            if output_mode == "3oa":
+                basis = np.array(ambisonic_basis(order, az, el), dtype=np.float32)
+                out[start:end] += sig[:, None] * basis[None, :] / math.sqrt(max(1, max_bins))
+            else:
+                weights = ring_spatial_weights(az, el, dist, channels, spatial_width)
+                out[start:end] += sig[:, None] * weights[None, :] / math.sqrt(max(1, max_bins))
+            event_count += 1
+
+    out = np.tanh(out * float(cfg.get("drive", 0.9))).astype(np.float32)
+    out = apply_output_envelope(out, cfg)
+    pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    if cfg.get("normalize", True):
+        out, _ = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    output_path = cfg["output_path"]
+    write_pcm24_wav(output_path, out, sr)
+    print("Process: 3OAFX Image Sonogram Field")
+    print(f"Image: {image_path}")
+    if amp_source == "separate":
+        print(f"Amplitude image: {cfg.get('amp_image_path', '')}")
+    print(f"Image render size: {width}x{height}")
+    print(f"Read orientation: {'vertical time / horizontal frequency' if transpose_read else 'horizontal time / vertical frequency'}")
+    print(f"Synthesis mode: {display_synth_mode}")
+    if display_synth_mode == "spectral_additive":
+        print(f"Spectral blur: {spectral_blur:.3f}")
+        print(f"Spectral band width: {spectral_band_width:.3f}")
+        print(f"Spectral inertia: {spectral_inertia:.3f}")
+    if synth_mode == "granular":
+        print(f"Grain sources: {len(source_pool)}")
+        for index, source in enumerate(source_pool, 1):
+            print(f"Grain source {index}: {source['path']} ({source['channels']}ch)")
+        print(f"Source item mode: {grain_source_mode}")
+        print(f"Source scan: {grain_scan_mode}")
+        print(f"Source channel mode: {grain_channel_mode}")
+        print(f"Actual grains: {grain_actual_count}")
+    print(f"Amplitude source: {amp_source}")
+    print(f"Color model: {model}")
+    print(f"Output mode: {output_mode}")
+    print(f"Output channels: {channels}")
+    print(f"Events: {event_count}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+    print(f"Output: {output_path}")
+
+
+def render_image_amp_preview(cfg):
+    image_path = cfg.get("image_path", "")
+    if not image_path:
+        raise RuntimeError("No image selected.")
+    rgb, alpha = read_png_rgba(image_path)
+    width = max(8, min(512, int(cfg.get("columns", 192))))
+    height = max(8, min(256, int(cfg.get("rows", 96))))
+    transpose_read = bool(cfg.get("transpose_read", False))
+    if transpose_read:
+        rgb = np.transpose(resize_image_nearest(rgb, height, width), (1, 0, 2))
+        alpha = np.transpose(resize_image_nearest(alpha[:, :, None], height, width), (1, 0, 2))[:, :, 0]
+    else:
+        rgb = resize_image_nearest(rgb, width, height)
+        alpha = resize_image_nearest(alpha[:, :, None], width, height)[:, :, 0]
+    preview_type = str(cfg.get("preview_type", "edge")).lower()
+    if preview_type == "alpha":
+        amp = alpha.astype(np.float32)
+        if float(np.max(amp)) <= 1e-6:
+            amp = np.zeros((height, width), dtype=np.float32)
+    else:
+        amp = edge_contrast_amplitude(rgb)
+    threshold = float(cfg.get("threshold", 0.08))
+    amp = np.clip((amp - threshold) / max(1e-6, 1.0 - threshold), 0, 1) ** float(cfg.get("amp_gamma", 0.75))
+    output_path = cfg["output_path"]
+    write_png_gray(output_path, amp)
+    print("Process: Image amplitude preview")
+    print(f"Image: {image_path}")
+    print(f"Preview type: {preview_type}")
+    print(f"Preview size: {width}x{height}")
+    print("Preview scale: white = higher amplitude, black = lower amplitude")
+    print(f"Read orientation: {'vertical time / horizontal frequency' if transpose_read else 'horizontal time / vertical frequency'}")
+    print(f"Output: {output_path}")
+
+
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|stereo_expand_ambisonic_bed|foafx_offline|foafx_object_space|foafx_spatial_occupation_montage|foafx_scene_navigator|foafx_object_field_split|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|foafx_aed_granulator|foafx_pulsar_field|foafx_particle_cloud|evp_field|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner|midi_spectral_trace> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|image_aed_sonogram|image_edge_preview|stereo_expand_ambisonic_bed|foafx_offline|foafx_object_space|foafx_spatial_occupation_montage|foafx_scene_navigator|foafx_object_field_split|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|foafx_aed_granulator|foafx_pulsar_field|foafx_particle_cloud|evp_field|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner|midi_spectral_trace> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -5953,6 +6603,10 @@ def main():
         render_partial_trace_resynth(cfg)
     elif mode == "fata_morgana":
         render_fata_morgana(cfg)
+    elif mode == "image_aed_sonogram":
+        render_image_aed_sonogram(cfg)
+    elif mode == "image_edge_preview":
+        render_image_amp_preview(cfg)
     elif mode == "stereo_expand_ambisonic_bed":
         render_stereo_expand_ambisonic_bed(cfg)
     elif mode == "foafx_offline":

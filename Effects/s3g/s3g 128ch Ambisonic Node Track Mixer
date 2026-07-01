@@ -1,0 +1,161 @@
+desc:s3g 128ch Ambisonic Node Track Mixer
+tags: ambisonic hoa node track mixer utility
+
+<? loop(x=1; 128, printf("in_pin:ambi bus ch %03d\n", x); x += 1); ?>
+<? loop(x=1; 128, printf("out_pin:ambi mix ch %03d\n", x); x += 1); ?>
+
+slider1:2<0,2,1{1OA / 4ch,2OA / 10ch,3OA / 16ch}>Ambisonic order
+slider2:4<1,16,1>Node count
+slider3:0<0,1,1{Spatial field,Stack scan}>Mix mode
+<? loop(n=1; 16,
+  base = 4 + (n - 1) * 8;
+  printf("slider%d:1<0,1,1{off,on}>Node %02d active\n", base, n);
+  printf("slider%d:0<-60,12,0.1>Node %02d level (dB)\n", base + 1, n);
+  printf("slider%d:1<1,128,1>Node %02d input start\n", base + 2, n);
+  printf("slider%d:0<-2,2,0.001>Node %02d X\n", base + 3, n);
+  printf("slider%d:0<-2,2,0.001>Node %02d Y\n", base + 4, n);
+  printf("slider%d:0<-2,2,0.001>Node %02d Z\n", base + 5, n);
+  printf("slider%d:0.9<0.05,8,0.001>Node %02d radius\n", base + 6, n);
+  printf("slider%d:2<0.2,12,0.001>Node %02d focus\n", base + 7, n);
+  n += 1;
+); ?>
+slider132:1<0,1,0.001>Cursor influence
+slider133:0<-2,2,0.001>Cursor X
+slider134:0<-2,2,0.001>Cursor Y
+slider135:0<-2,2,0.001>Cursor Z
+slider136:1<1,16,0.001>Stack position
+slider137:1.1<0.05,8,0.001>Cursor radius
+slider138:2<0.2,12,0.001>Cursor focus
+slider139:0.02<0,0.95,0.001>Cursor gate
+
+@init
+ext_tail_size = -2;
+ext_noinit = 1;
+max_nodes = 16;
+max_ch = 128;
+fader_min_db = -60;
+sig_base = 10000;
+weight_base = 12000;
+
+function db_to_gain(db)
+(
+  db <= fader_min_db ? 0 : exp(log(10) * db / 20);
+);
+
+function clamp(v lo hi)
+(
+  v < lo ? lo : v > hi ? hi : v;
+);
+
+function safe_sample(v)
+(
+  v != v ? 0 : v > 8 ? 8 : v < -8 ? -8 : abs(v) < 0.0000000000000001 ? 0 : v;
+);
+
+function order_channels(order)
+(
+  order < 0.5 ? 4 : order < 1.5 ? 10 : 16;
+);
+
+function apply_cursor_gate(v gate)
+(
+  gate <= 0 ? v : v <= gate ? 0 : (v - gate) / max(0.0001, 1 - gate);
+);
+
+@slider
+ambi_order = floor(slider1 + 0.5);
+ambi_ch = order_channels(ambi_order);
+node_count = floor(clamp(slider2, 1, max_nodes) + 0.5);
+mix_mode = floor(slider3 + 0.5);
+cursor_influence = clamp(slider132, 0, 1);
+cursor_x = slider133;
+cursor_y = slider134;
+cursor_z = slider135;
+stack_pos = clamp(slider136, 1, max_nodes);
+cursor_radius = max(0.001, slider137);
+cursor_focus = max(0.1, slider138);
+cursor_gate = clamp(slider139, 0, 0.95);
+
+@block
+ambi_order = floor(slider1 + 0.5);
+ambi_ch = order_channels(ambi_order);
+node_count = floor(clamp(slider2, 1, max_nodes) + 0.5);
+mix_mode = floor(slider3 + 0.5);
+cursor_influence = clamp(slider132, 0, 1);
+cursor_x = slider133;
+cursor_y = slider134;
+cursor_z = slider135;
+stack_pos = clamp(slider136, 1, max_nodes);
+cursor_radius = max(0.001, slider137);
+cursor_focus = max(0.1, slider138);
+cursor_gate = clamp(slider139, 0, 0.95);
+
+n = 0;
+loop(node_count,
+  base = 4 + n * 8;
+  n_active = slider(base);
+  n_gain = db_to_gain(slider(base + 1));
+  input_start = floor(clamp(slider(base + 2), 1, max_ch) + 0.5) - 1;
+  n_x = slider(base + 3);
+  n_y = slider(base + 4);
+  n_z = slider(base + 5);
+  n_radius = max(0.001, slider(base + 6));
+  n_focus = max(0.1, slider(base + 7));
+  cursor_w = 1;
+  n < node_count && n_active >= 0.5 && cursor_influence > 0 ? (
+    mix_mode >= 0.5 ? (
+      cdist = abs((n + 1) - stack_pos);
+      local_radius = cursor_radius;
+      local_focus = cursor_focus;
+    ) : (
+      cdx = n_x - cursor_x;
+      cdy = n_y - cursor_y;
+      cdz = n_z - cursor_z;
+      cdist = sqrt(cdx * cdx + cdy * cdy + cdz * cdz);
+      local_radius = n_radius * cursor_radius;
+      local_focus = n_focus * cursor_focus * 0.5;
+    );
+    cursor_raw = apply_cursor_gate(exp(-pow(cdist / max(0.001, local_radius), max(0.1, local_focus))), cursor_gate);
+    cursor_w = (1 - cursor_influence) + cursor_influence * cursor_raw;
+  );
+  weight_base[n] = n_active >= 0.5 ? n_gain * cursor_w : 0;
+  n += 1;
+);
+
+@sample
+n = 0;
+loop(node_count,
+  base = 4 + n * 8;
+  input_start = floor(clamp(slider(base + 2), 1, max_ch) + 0.5) - 1;
+  ch = 0;
+  loop(ambi_ch,
+    sig_base[n * 16 + ch] = input_start + ch < max_ch ? safe_sample(spl(input_start + ch)) : 0;
+    ch += 1;
+  );
+  n += 1;
+);
+
+ch = 0;
+loop(max_ch,
+  spl(ch) = 0;
+  ch += 1;
+);
+
+n = 0;
+loop(node_count,
+  w = weight_base[n];
+  w != 0 ? (
+    ch = 0;
+    loop(ambi_ch,
+      spl(ch) += sig_base[n * 16 + ch] * w;
+      ch += 1;
+    );
+  );
+  n += 1;
+);
+
+ch = 0;
+loop(ambi_ch,
+  spl(ch) = safe_sample(spl(ch));
+  ch += 1;
+);

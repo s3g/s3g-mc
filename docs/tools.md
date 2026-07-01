@@ -34,21 +34,21 @@ toc:
 
 For step-by-step notes on selected processes, see the [Process Guides](process-guides.md).
 
-Current package snapshot: the browser exposes 107 user-facing tools/controllers,
-plus the Package Browser. Of those, 47 are Python/NumPy-backed offline
-processes, 22 load, control, or render included JSFX, and 38 are native
-Lua/ReaImGui REAPER actions. The repository also ships 21 underlying JSFX
+Current package snapshot: the browser exposes 109 user-facing tools/controllers,
+plus the Package Browser. Of those, 48 are Python/NumPy-backed offline
+processes, 23 load, control, or render included JSFX, and 38 are native
+Lua/ReaImGui REAPER actions. The repository also ships 22 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and internal
 dialogs that are not shown as Package Browser entries.
 
 Package Browser group counts:
 
-- Channel Mixing / Automation: 4
+- Channel Mixing / Automation: 5
 - MIDI Composition: 8
 - Procedural Synthesis: 6
 - Offline Synthesis / IR: 9
 - Spatial Panners: 10
-- 3OAFX: 21
+- 3OAFX: 22
 - Spectral / Convolution: 16
 - Multichannel Texture / Montage: 20
 - Item Channel Transforms: 10
@@ -58,6 +58,9 @@ Package Browser group counts:
 
 - `128ch Automation Mixer`: faders, mute/solo, channel groups, meters, and
   plugin pin remapping for high-channel-count tracks.
+- `128ch Ambisonic Node Track Mixer`: selected ambisonic source tracks become
+  movable nodes, with whole ACN/SN3D streams weighted and summed
+  channel-for-channel without decode, encode, or speaker remapping.
 - `128ch Node Track Mixer`: selected source tracks become movable
   channel-shape nodes, so stereo, ring, cube, double-ring, or dome source
   layouts can be mixed as spatial objects or aligned stacked shapes. The
@@ -206,6 +209,11 @@ behaviors.
 - `3OAFX Ambisonic Kernel Collage`: creative ambisonic cross-convolution that
   treats selected ambisonic recordings as spatial/spectral kernels for another
   ambisonic source, with mixed-order kernel adaptation.
+- `3OAFX Image Sonogram Field`: PNG image-score synthesis where X is time, Y is
+  frequency, color data determines AED positioning, and amplitude comes from
+  alpha, edge contrast, or a separate image. Includes additive, filtered-noise,
+  hybrid, and selected-source granular engines, plus transposed image reading,
+  for 3OA ACN/SN3D or multichannel ring output.
 - `3OAFX Offline Renderer`: NumPy-backed ambisonic decode/process/re-encode
   action for 1OA, 2OA, and 3OA media, with moving AED focus, dry attenuation,
   and included regional effects such as gain, filtering, delay, diffusion,
