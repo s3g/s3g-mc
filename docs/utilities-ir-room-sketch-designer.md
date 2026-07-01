@@ -84,11 +84,17 @@ view so the model reads as a single cutout.
 
 ## REAPER Use
 
-The JSON export is intended for `3OAFX Synthetic Ambisonic IR Bank`, not
-`3OAFX Offline Renderer`. In REAPER, open `3OAFX Synthetic Ambisonic IR Bank`
-and use `Load Room Sketch JSON` to import the sketch. That renderer uses the
-room polygon, chamber network, exterior openings, Bank Map group positions, and
-material settings when creating encoded ambisonic IR banks.
+The JSON export is intended for `3OAFX Synthetic Ambisonic IR Bank`. In
+REAPER, open `3OAFX Synthetic Ambisonic IR Bank` and use `Load Room Sketch
+JSON` to import the sketch. The available script controls update from the JSON
+where matching controls exist; leave those values in place to render the
+intended room sketch, or adjust them after loading when you want to reinterpret
+the design.
+
+The JSON also carries room data that is not editable on the renderer panel
+itself. During render, the NumPy backend reads the sketch file for the room
+polygon, chamber network, exterior openings, Bank Map group positions, field
+offset, and material details when creating encoded ambisonic IR banks.
 
 Those generated IR banks can then be used with `3OAFX Offline Ambisonic
 Convolve` for ambisonic convolution.
