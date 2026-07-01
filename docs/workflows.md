@@ -222,12 +222,11 @@ automatable in REAPER, but the controller gives direct access to the spatial
 map, source positions, and panner-specific controls.
 
 Use `Spatial Automation Composer` to compose spatial movement offline as
-editable REAPER automation. It detects supported 8-source AED and XYZ s3g
-panners on the selected track, previews the intended motion with transport and
-camera controls, and writes automation points across the time selection or
-selected item range. Path methods include orbit, arc, graph walk, hole field,
-attractor, and boundary trace; source relationship modes include unison, phase
-offset, canon, counter-rotation, and scatter.
+editable REAPER automation for supported 8-source AED and XYZ s3g panners. For
+larger 3OA motion designs, s3g-mc Mover provides a browser-based scene/bank
+editor; export Mover JSON, then use `Load Mover JSON` to create encoder tracks
+and write automation in REAPER. `Mover Browser Link` can reopen the last loaded
+Mover JSON and follow REAPER transport as a visual monitor.
 
 The package includes these spatial panners:
 

@@ -2,6 +2,9 @@ const $ = (id) => document.getElementById(id);
 
 const canvas = $("roomCanvas");
 const ctx = canvas.getContext("2d");
+const ROOM_CANVAS_W = 900;
+const ROOM_CANVAS_H = 560;
+const roomSvg = $("roomSvg");
 const timelineCanvas = $("timelineCanvas");
 const timelineCtx = timelineCanvas.getContext("2d");
 const gltfCanvas = $("gltfCanvas");
@@ -30,6 +33,13 @@ const controls = {
   openingWidth: $("openingWidth"),
   chamberCoupling: $("chamberCoupling"),
   chamberMaterialMix: $("chamberMaterialMix"),
+  outsideOpening: $("outsideOpening"),
+  outsideOpeningSide: $("outsideOpeningSide"),
+  outsideOpeningCount: $("outsideOpeningCount"),
+  outsideOpeningPosition: $("outsideOpeningPosition"),
+  outsideOpeningSpread: $("outsideOpeningSpread"),
+  outsideOpeningWidth: $("outsideOpeningWidth"),
+  outsideLeak: $("outsideLeak"),
   fieldX: $("fieldX"),
   fieldY: $("fieldY"),
   sourceAz: $("sourceAz"),
@@ -89,6 +99,18 @@ const materials = {
   water: { absorption: 0.10, scattering: 0.70, tailSoften: 0.10 }
 };
 
+function configureRoomCanvas() {
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  const pixelW = Math.round(ROOM_CANVAS_W * dpr);
+  const pixelH = Math.round(ROOM_CANVAS_H * dpr);
+  if (canvas.width !== pixelW || canvas.height !== pixelH) {
+    canvas.width = pixelW;
+    canvas.height = pixelH;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+}
+
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
@@ -119,14 +141,20 @@ function settings() {
   const roomX = Number(controls.roomX.value);
   const roomY = Number(controls.roomY.value);
   const roomZ = Number(controls.roomZ.value);
-  const absorption = Number(controls.absorption.value);
+  const baseAbsorption = Number(controls.absorption.value);
   const scattering = Number(controls.scattering.value);
   const duration = Number(controls.duration.value);
   const preDelay = Number(controls.preDelay.value);
   const volume = roomX * roomY * roomZ;
   const surface = 2 * (roomX * roomY + roomX * roomZ + roomY * roomZ);
+  const outsideOpening = controls.outsideOpening.checked;
+  const outsideOpeningCount = Math.max(1, Math.round(Number(controls.outsideOpeningCount.value)));
+  const outsideOpeningWidth = Number(controls.outsideOpeningWidth.value);
+  const outsideLeak = Number(controls.outsideLeak.value);
+  const leakFactor = outsideOpening ? clamp(outsideOpeningWidth * outsideLeak * outsideOpeningCount, 0, 1) : 0;
+  const absorption = clamp(baseAbsorption + leakFactor * 0.32, 0.03, 0.95);
   const rt60 = clamp(0.161 * volume / Math.max(0.01, surface * absorption), 0.08, 8.0);
-  const lateStart = Math.min(duration * 0.92, preDelay / 1000 + 0.035 + (1 - scattering) * 0.080);
+  const lateStart = clamp(Math.min(duration * 0.92, preDelay / 1000 + 0.035 + (1 - scattering) * 0.080 - leakFactor * 0.030), 0.008, duration * 0.92);
   const order = Number(controls.order.value);
   const directionSet = controls.directionSet.value;
   const effectiveDirectionLayout = directionSet === "auto" ? (order === 1 ? "tetra" : "practical_8") : directionSet;
@@ -154,6 +182,14 @@ function settings() {
     opening_width: Number(controls.openingWidth.value),
     chamber_coupling: Number(controls.chamberCoupling.value),
     chamber_material_mix: Number(controls.chamberMaterialMix.value),
+    outside_opening: outsideOpening,
+    outside_opening_side: controls.outsideOpeningSide.value,
+    outside_opening_count: outsideOpeningCount,
+    outside_opening_position: Number(controls.outsideOpeningPosition.value),
+    outside_opening_spread: Number(controls.outsideOpeningSpread.value),
+    outside_opening_width: outsideOpeningWidth,
+    outside_leak: outsideLeak,
+    outside_leak_factor: leakFactor,
     field_x: Number(controls.fieldX.value),
     field_y: Number(controls.fieldY.value),
     source_azimuth: Number(controls.sourceAz.value),
@@ -223,7 +259,8 @@ function activeDirections(directionSetOrSettings = settings()) {
 function localRt60(s, absorption) {
   const volume = s.room_x * s.room_y * s.room_z;
   const surface = 2 * (s.room_x * s.room_y + s.room_x * s.room_z + s.room_y * s.room_z);
-  return clamp(0.161 * volume / Math.max(0.01, surface * absorption), 0.08, 8.0);
+  const leakAbsorption = (s.outside_opening ? s.outside_leak_factor || 0 : 0) * 0.20;
+  return clamp(0.161 * volume / Math.max(0.01, surface * clamp(absorption + leakAbsorption, 0.03, 0.95)), 0.08, 8.0);
 }
 
 function roomMaterialProfile(s) {
@@ -516,6 +553,42 @@ function chamberOpeningSegment(chamber) {
     x2: chamber.openingX + chamber.opening,
     y2: chamber.openingY
   };
+}
+
+function roomOpeningSegment(s) {
+  return roomOpeningSegments(s)[0] || null;
+}
+
+function roomOpeningSegments(s) {
+  if (!s.outside_opening) return [];
+  const roomPoly = roomPolygon(s);
+  const count = Math.max(1, Math.round(s.outside_opening_count || 1));
+  const requestedSides = s.outside_opening_side === "all"
+    ? ["front", "right", "back", "left"]
+    : [s.outside_opening_side || "back"];
+  const segments = [];
+  for (let index = 0; index < count; index += 1) {
+    const side = requestedSides[index % requestedSides.length];
+    const edge = edgeForSide(roomPoly, side);
+    const opening = clamp(s.outside_opening_width, 0.03, 1) * edge.length;
+    const spreadOffset = count <= 1 ? 0 : (index - (count - 1) * 0.5) * clamp(s.outside_opening_spread || 0, 0, 1) / Math.max(1, count - 1);
+    const center = clamp((s.outside_opening_position || 0.5) + spreadOffset, 0, 1);
+    const start = clamp(edge.length * center - opening * 0.5, 0, Math.max(0, edge.length - opening));
+    const openA = mapLocal(edge, start, 0);
+    const openB = mapLocal(edge, start + opening, 0);
+    segments.push({
+      x1: openA.x,
+      y1: openA.y,
+      x2: openB.x,
+      y2: openB.y,
+      opening,
+      index,
+      side,
+      outward: edge.outward,
+      center: mapLocal(edge, start + opening * 0.5, 0)
+    });
+  }
+  return segments;
 }
 
 function chamberOutwardVector(side) {
@@ -819,17 +892,215 @@ function reflectionEvents(s, dir = selectedDirection(s)) {
 }
 
 function drawRoom() {
+  configureRoomCanvas();
   const s = settings();
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, ROOM_CANVAS_W, ROOM_CANVAS_H);
   ctx.fillStyle = "#050607";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, ROOM_CANVAS_W, ROOM_CANVAS_H);
   if (state.view === "sphere") drawDirections(s);
   else if (state.view === "matrix") drawBankMatrix(s);
   else if (state.view === "layers") drawReflectionLayers(s);
   else drawRoomView(s);
+  renderVectorRoom(s);
   drawTimeline(s);
   updateGroupStrip(s);
   updateReadouts(s);
+}
+
+function svgEscape(value) {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[char]);
+}
+
+function svgPoints(points) {
+  return points.map((point) => `${round(point.x, 2)},${round(point.y, 2)}`).join(" ");
+}
+
+function renderVectorRoom(s) {
+  const vectorView = state.view === "top" || state.view === "sphere";
+  roomSvg.parentElement.classList.toggle("svg-active", vectorView);
+  if (!vectorView) {
+    roomSvg.innerHTML = "";
+    return;
+  }
+  if (state.view === "sphere") renderVectorBankMap(s);
+  else renderVectorTopView(s);
+}
+
+function vectorProjection(s) {
+  const pad = 48;
+  const bounds = floorplanBounds(s);
+  const roomW = bounds.maxX - bounds.minX;
+  const roomH = bounds.height;
+  const scale = Math.min((ROOM_CANVAS_W - pad * 2) / roomW, (ROOM_CANVAS_H - pad * 2) / roomH);
+  const ox = (ROOM_CANVAS_W - roomW * scale) / 2;
+  const oy = (ROOM_CANVAS_H - roomH * scale) / 2;
+  return {
+    bounds,
+    scale,
+    px: (p) => ox + (p.x - bounds.minX) * scale,
+    py: (p) => oy + (p.y - bounds.minY) * scale,
+    point: (p) => ({ x: ox + (p.x - bounds.minX) * scale, y: oy + (p.y - bounds.minY) * scale })
+  };
+}
+
+function renderVectorFloorplan(s, projection) {
+  const room = roomPolygon(s).map(projection.point);
+  const chambers = chamberGeometries(s) || [];
+  const outsideSvg = roomOpeningSegments(s).map((outside) => {
+    const p1 = projection.point({ x: outside.x1, y: outside.y1 });
+    const p2 = projection.point({ x: outside.x2, y: outside.y2 });
+    const label = projection.point(outside.center);
+    return `
+      <line x1="${round(p1.x, 2)}" y1="${round(p1.y, 2)}" x2="${round(p2.x, 2)}" y2="${round(p2.y, 2)}" stroke="#050607" stroke-width="5.6" vector-effect="non-scaling-stroke" />
+      <line x1="${round(p1.x, 2)}" y1="${round(p1.y, 2)}" x2="${round(p2.x, 2)}" y2="${round(p2.y, 2)}" stroke="rgba(200,245,235,0.82)" stroke-width="1.7" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />
+      <text x="${round(label.x + 8, 2)}" y="${round(label.y - 8, 2)}" class="svg-tiny svg-outside">${svgEscape(`outside ${outside.index + 1}`)}</text>
+    `;
+  }).join("");
+  const chamberSvg = chambers.map((chamber) => {
+    const material = chamberMaterialProfile(s, chamber);
+    const alpha = Math.max(0.04, 0.06 + s.chamber_coupling * 0.08 + (1 - material.absorption) * 0.03 - chamber.level * 0.01);
+    const poly = chamberPolygon(chamber).map(projection.point);
+    const opening = chamberOpeningSegment(chamber);
+    const p1 = projection.point({ x: opening.x1, y: opening.y1 });
+    const p2 = projection.point({ x: opening.x2, y: opening.y2 });
+    const label = chamber.level === 0 ? `chamber ${chamber.index + 1}` : `nested ${chamber.level}`;
+    const text = projection.point({ x: chamber.x, y: chamber.y });
+    return `
+      <polygon points="${svgPoints(poly)}" fill="rgba(120,190,150,${alpha.toFixed(3)})" stroke="rgba(120,190,150,${chamber.level === 0 ? 0.78 : 0.5})" stroke-width="1.3" vector-effect="non-scaling-stroke" />
+      <line x1="${round(p1.x, 2)}" y1="${round(p1.y, 2)}" x2="${round(p2.x, 2)}" y2="${round(p2.y, 2)}" stroke="#050607" stroke-width="4" vector-effect="non-scaling-stroke" />
+      <text x="${round(text.x + 8, 2)}" y="${round(text.y + 16, 2)}" class="svg-small svg-chamber">${svgEscape(label)}</text>
+      <text x="${round(text.x + 8, 2)}" y="${round(text.y + 29, 2)}" class="svg-tiny svg-muted">${svgEscape(material.material_key)} a${round(material.absorption, 2)} s${round(material.scattering, 2)}</text>
+    `;
+  }).join("");
+  const grid = Array.from({ length: 7 }, (_, i) => {
+    const n = i + 1;
+    const x = projection.px({ x: s.room_x * n / 8, y: 0 });
+    const y = projection.py({ x: 0, y: s.room_y * n / 8 });
+    const left = projection.px({ x: 0, y: 0 });
+    const right = projection.px({ x: s.room_x, y: 0 });
+    const top = projection.py({ x: 0, y: 0 });
+    const bottom = projection.py({ x: 0, y: s.room_y });
+    return `
+      <line x1="${round(x, 2)}" y1="${round(top, 2)}" x2="${round(x, 2)}" y2="${round(bottom, 2)}" class="svg-grid" />
+      <line x1="${round(left, 2)}" y1="${round(y, 2)}" x2="${round(right, 2)}" y2="${round(y, 2)}" class="svg-grid" />
+    `;
+  }).join("");
+  return `
+    <defs>
+      <style>
+        text { font-family: Menlo, Monaco, "Courier New", monospace; }
+        .svg-label { fill: #d7d7d7; font-size: 10px; dominant-baseline: middle; text-anchor: middle; }
+        .svg-small { fill: #d7d7d7; font-size: 10px; }
+        .svg-tiny { font-size: 9px; }
+        .svg-muted { fill: #8f9aa0; }
+        .svg-chamber { fill: #78be96; }
+        .svg-outside { fill: #c8f5eb; }
+        .svg-grid { stroke: rgba(255,255,255,0.09); stroke-width: 1; vector-effect: non-scaling-stroke; }
+      </style>
+    </defs>
+    <rect x="0" y="0" width="${ROOM_CANVAS_W}" height="${ROOM_CANVAS_H}" fill="#050607" />
+    ${grid}
+    <polygon points="${svgPoints(room)}" fill="rgba(90,168,199,0.045)" stroke="rgba(90,168,199,0.78)" stroke-width="1.4" vector-effect="non-scaling-stroke" />
+    ${outsideSvg}
+    ${chamberSvg}
+  `;
+}
+
+function renderVectorTopView(s) {
+  const projection = vectorProjection(s);
+  const selected = selectedDirection(s);
+  const { listener } = roomPoints(s, selected);
+  const selectedProfile = groupProfile(s, selected.index);
+  const sourcePoint = groupMapPosition(s, selected, selectedProfile);
+  const listenerPoint = { x: listener.x, y: listener.y, z: listener.z };
+  const events = reflectionEvents(s, selected).slice(0, Math.min(s.early_reflections, 26));
+  const points = activeDirections(s).map((dir, index) => {
+    const profile = groupProfile(s, index);
+    const info = {
+      index,
+      azimuth: dir[0],
+      elevation: dir[1],
+      channels_start: index * s.channels_per_ir + 1,
+      channels_end: (index + 1) * s.channels_per_ir
+    };
+    return { index, active: index === selected.index, p: projection.point(groupMapPosition(s, info, profile)) };
+  });
+  const pathLines = points.slice(1).map((point, i) => {
+    const prev = points[i].p;
+    return `<line x1="${round(prev.x, 2)}" y1="${round(prev.y, 2)}" x2="${round(point.p.x, 2)}" y2="${round(point.p.y, 2)}" stroke="rgba(90,168,199,0.22)" stroke-width="1.5" vector-effect="non-scaling-stroke" />`;
+  }).join("");
+  const lp = projection.point(listenerPoint);
+  const sp = projection.point(sourcePoint);
+  const diffuseRadius = Math.min(projection.bounds.maxX - projection.bounds.minX, projection.bounds.height) * projection.scale * (0.12 + selectedProfile.scattering * 0.22);
+  const eventLines = s.show_early ? events.map((event) => {
+    const dir = unitFromAed(event.az, event.el);
+    const endpoint = {
+      x: clamp(listener.x + dir.x * selectedProfile.source_distance * 0.65, 0, s.room_x),
+      y: clamp(listener.y + dir.z * selectedProfile.source_distance * 0.65, 0, s.room_y)
+    };
+    const ep = projection.point(endpoint);
+    const color = event.type === "chamber" ? "120,190,150" : "216,162,74";
+    return `<line x1="${round(lp.x, 2)}" y1="${round(lp.y, 2)}" x2="${round(ep.x, 2)}" y2="${round(ep.y, 2)}" stroke="rgba(${color},${clamp(event.amp * 3.6, 0.18, 0.72).toFixed(3)})" stroke-width="${round(clamp(event.amp * 12, 1.8, 4.8), 2)}" vector-effect="non-scaling-stroke" />`;
+  }).join("") : "";
+  const pointSvg = points.map((point) => `
+    <g>
+      <circle cx="${round(point.p.x, 2)}" cy="${round(point.p.y, 2)}" r="${point.active ? 7 : 4}" fill="${point.active ? "#5aa8c7" : "rgba(90,168,199,0.48)"}" />
+      <text x="${round(point.p.x, 2)}" y="${round(point.p.y + 0.5, 2)}" class="svg-label" fill="${point.active ? "#050607" : "#d7d7d7"}">${point.index + 1}</text>
+    </g>
+  `).join("");
+  roomSvg.innerHTML = `
+    ${renderVectorFloorplan(s, projection)}
+    ${pathLines}
+    ${s.show_diffuse ? `<circle cx="${round(lp.x, 2)}" cy="${round(lp.y, 2)}" r="${round(diffuseRadius, 2)}" fill="rgba(90,168,199,${(0.06 + (1 - selectedProfile.absorption) * 0.08).toFixed(3)})" />` : ""}
+    ${eventLines}
+    ${s.show_direct ? `<line x1="${round(lp.x, 2)}" y1="${round(lp.y, 2)}" x2="${round(sp.x, 2)}" y2="${round(sp.y, 2)}" stroke="rgba(90,190,220,0.92)" stroke-width="3" vector-effect="non-scaling-stroke" />` : ""}
+    ${pointSvg}
+    <circle cx="${round(lp.x, 2)}" cy="${round(lp.y, 2)}" r="7" fill="#d7d7d7" />
+    <text x="${round(lp.x, 2)}" y="${round(lp.y + 0.5, 2)}" class="svg-label" fill="#050607">L</text>
+    <circle cx="${round(sp.x, 2)}" cy="${round(sp.y, 2)}" r="8" fill="#5aa8c7" />
+    <text x="${round(sp.x, 2)}" y="${round(sp.y + 0.5, 2)}" class="svg-label" fill="#050607">${selected.index + 1}</text>
+    <text x="12" y="20" class="svg-small svg-muted">TOP group ${selected.index + 1}/${selected.count}  ${selected.azimuth} az / ${selected.elevation} el</text>
+    <text x="12" y="${ROOM_CANVAS_H - 16}" class="svg-small svg-muted">drag in Top view to move the field; use Bank Map to move mic positions</text>
+  `;
+}
+
+function renderVectorBankMap(s) {
+  const projection = vectorProjection(s);
+  const dirs = activeDirections(s);
+  const selected = selectedDirection(s);
+  const listener = roomPoints(s, selected).listener;
+  const lp = projection.point(listener);
+  const groupSvg = dirs.map((dir, index) => {
+    const metrics = groupMetrics(s, index);
+    const position = groupMapPosition(s, metrics, metrics.profile);
+    const p = projection.point(position);
+    const active = index === selected.index;
+    const radius = active ? 11 : clamp(5 + Math.sqrt(metrics.early_energy) * 14, 5, 15);
+    const dirUnit = unitFromAed(dir[0], dir[1]);
+    const lobeX = p.x + dirUnit.x * 46;
+    const lobeY = p.y + dirUnit.z * 46;
+    return `
+      ${active ? `<path d="M ${round(p.x, 2)} ${round(p.y, 2)} Q ${round(p.x + dirUnit.x * 26 - dirUnit.z * 14, 2)} ${round(p.y + dirUnit.z * 26 + dirUnit.x * 14, 2)} ${round(lobeX, 2)} ${round(lobeY, 2)} Q ${round(p.x + dirUnit.x * 26 + dirUnit.z * 14, 2)} ${round(p.y + dirUnit.z * 26 - dirUnit.x * 14, 2)} ${round(p.x, 2)} ${round(p.y, 2)} Z" fill="rgba(216,162,74,0.12)" />
+      <line x1="${round(p.x, 2)}" y1="${round(p.y, 2)}" x2="${round(lobeX, 2)}" y2="${round(lobeY, 2)}" stroke="rgba(216,162,74,0.72)" stroke-width="1.2" vector-effect="non-scaling-stroke" />` : ""}
+      <circle cx="${round(p.x, 2)}" cy="${round(p.y, 2)}" r="${round(radius, 2)}" fill="${active ? "#d8a24a" : "rgba(90,168,199,0.72)"}" />
+      <text x="${round(p.x + 11, 2)}" y="${round(p.y + 3, 2)}" class="svg-small">${svgEscape(`G${index + 1}`)}</text>
+    `;
+  }).join("");
+  roomSvg.innerHTML = `
+    ${renderVectorFloorplan(s, projection)}
+    <circle cx="${round(lp.x, 2)}" cy="${round(lp.y, 2)}" r="7" fill="#d7d7d7" />
+    <text x="${round(lp.x, 2)}" y="${round(lp.y + 0.5, 2)}" class="svg-label" fill="#050607">L</text>
+    ${groupSvg}
+    <text x="12" y="20" class="svg-small svg-muted">Bank Map: ${dirs.length} IR groups placed in floorplan / ${s.channels_per_ir}ch per group / ${s.stacked_channels}ch stacked</text>
+    <text x="12" y="38" class="svg-small svg-muted">selected G${selected.index + 1}: ${selected.channels_start}-${selected.channels_end}</text>
+    <text x="12" y="${ROOM_CANVAS_H - 16}" class="svg-small svg-muted">drag IR group points inside the room/chamber geometry</text>
+  `;
 }
 
 function project3DFactory(s) {
@@ -846,7 +1117,7 @@ function project3DFactory(s) {
   const cosE = Math.cos(el);
   const sinE = Math.sin(el);
   const diagonal = Math.sqrt((bounds.maxX - bounds.minX) ** 2 + bounds.height ** 2 + s.room_z ** 2);
-  const scale = Math.min(canvas.width, canvas.height) * 0.82 * s.camera_zoom / Math.max(1, diagonal);
+  const scale = Math.min(ROOM_CANVAS_W, ROOM_CANVAS_H) * 0.82 * s.camera_zoom / Math.max(1, diagonal);
   return (p) => {
     const x = p.x - center.x;
     const y = p.y - center.y;
@@ -855,8 +1126,8 @@ function project3DFactory(s) {
     const ry = x * sinA + y * cosA;
     const sy = ry * sinE - z * cosE;
     return {
-      x: canvas.width * 0.5 + rx * scale,
-      y: canvas.height * 0.54 + sy * scale,
+      x: ROOM_CANVAS_W * 0.5 + rx * scale,
+      y: ROOM_CANVAS_H * 0.54 + sy * scale,
       depth: ry * cosE + z * sinE
     };
   };
@@ -911,6 +1182,29 @@ function drawRoom3D(s) {
   drawPolyline3D(project, roomFloor, true);
   drawPolyline3D(project, roomTop, true);
   roomFloor.forEach((point, index) => drawPolyline3D(project, [point, roomTop[index]]));
+
+  openingSegmentsForModel(s).forEach((opening) => {
+    const height = opening.height || s.room_z * 0.82;
+    const a = { x: opening.x1, y: opening.y1, z: 0.03 };
+    const b = { x: opening.x2, y: opening.y2, z: 0.03 };
+    const c = { x: opening.x2, y: opening.y2, z: height };
+    const d = { x: opening.x1, y: opening.y1, z: height };
+    const pa = project(a);
+    const pb = project(b);
+    const pc = project(c);
+    const pd = project(d);
+    ctx.fillStyle = "rgba(5,6,7,0.74)";
+    ctx.strokeStyle = "rgba(200,245,235,0.88)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.lineTo(pc.x, pc.y);
+    ctx.lineTo(pd.x, pd.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  });
 
   const chambers = chamberGeometries(s) || [];
   chambers.forEach((chamber) => {
@@ -996,7 +1290,7 @@ function drawRoom3D(s) {
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
   ctx.fillText(`3D group ${selected.index + 1}/${selected.count}  camera ${s.camera_azimuth} az / ${s.camera_elevation} el / ${round(s.camera_zoom, 2)}x`, 12, 20);
-  ctx.fillText("use camera controls for 3D; Bank Map edits mic positions, Top edits field offset", 12, canvas.height - 16);
+  ctx.fillText("use camera controls for 3D; Bank Map edits mic positions, Top edits field offset", 12, ROOM_CANVAS_H - 16);
 }
 
 function drawRoomView(s) {
@@ -1006,14 +1300,14 @@ function drawRoomView(s) {
   }
   const pad = 48;
   const bounds = floorplanBounds(s);
-  const viewMinX = state.view === "side" ? 0 : bounds.minX;
+  const viewMinX = bounds.minX;
   const viewMinY = state.view === "side" ? 0 : bounds.minY;
-  const roomW = state.view === "side" ? s.room_x : bounds.maxX - bounds.minX;
+  const roomW = bounds.maxX - bounds.minX;
   const roomH = state.view === "side" ? s.room_z : bounds.height;
   const mainRoomH = state.view === "side" ? s.room_z : s.room_y;
-  const scale = Math.min((canvas.width - pad * 2) / roomW, (canvas.height - pad * 2) / roomH);
-  const ox = (canvas.width - roomW * scale) / 2;
-  const oy = (canvas.height - roomH * scale) / 2;
+  const scale = Math.min((ROOM_CANVAS_W - pad * 2) / roomW, (ROOM_CANVAS_H - pad * 2) / roomH);
+  const ox = (ROOM_CANVAS_W - roomW * scale) / 2;
+  const oy = (ROOM_CANVAS_H - roomH * scale) / 2;
   const selected = selectedDirection(s);
   const { listener, source } = roomPoints(s, selected);
   const selectedProfile = groupProfile(s, selected.index);
@@ -1030,8 +1324,10 @@ function drawRoomView(s) {
   if (state.view === "top") {
     drawPlanPolygon(roomPolygon(s), ox, oy, scale, bounds, "rgba(90,168,199,0.045)", "rgba(90,168,199,0.72)", 1.2);
     drawChamberPlan(s, ox, oy, scale);
+    drawOutsideOpeningPlan(s, ox, oy, scale);
   } else {
     ctx.strokeRect(ox + (0 - viewMinX) * scale, oy + (0 - viewMinY) * scale, s.room_x * scale, mainRoomH * scale);
+    drawChamberSide(s, ox, oy, scale, bounds);
   }
 
   const grid = state.view === "side" ? s.room_z : s.room_y;
@@ -1044,8 +1340,8 @@ function drawRoomView(s) {
     ctx.stroke();
     const y = oy + (grid * i / 8 - viewMinY) * scale;
     ctx.beginPath();
-    ctx.moveTo(ox + (0 - viewMinX) * scale, y);
-    ctx.lineTo(ox + (s.room_x - viewMinX) * scale, y);
+    ctx.moveTo(ox, y);
+    ctx.lineTo(ox + roomW * scale, y);
     ctx.stroke();
   }
 
@@ -1132,7 +1428,7 @@ function drawRoomView(s) {
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
   ctx.fillText(`${state.view.toUpperCase()} group ${selected.index + 1}/${selected.count}  ${selected.azimuth} az / ${selected.elevation} el`, 12, 20);
-  ctx.fillText("drag in Top view to move the field; use Bank Map to move mic positions", 12, canvas.height - 16);
+  ctx.fillText("drag in Top view to move the field; use Bank Map to move mic positions", 12, ROOM_CANVAS_H - 16);
 }
 
 function drawChamberRay(s, event, listenerPoint, px, py) {
@@ -1181,6 +1477,37 @@ function drawChamberRay(s, event, listenerPoint, px, py) {
   ctx.fillRect(px(bounce) - 3, py(bounce) - 3, 6, 6);
 }
 
+function drawChamberSide(s, ox, oy, scale, bounds) {
+  const chambers = chamberGeometries(s);
+  if (!chambers) return;
+  chambers.forEach((chamber) => {
+    const chamberBoundsLocal = chamberBounds(chamber);
+    const material = chamberMaterialProfile(s, chamber);
+    const x = ox + (chamberBoundsLocal.minX - bounds.minX) * scale;
+    const yTop = oy + s.room_z * (1 - (0.72 + chamber.level * 0.06)) * scale;
+    const w = Math.max(3, (chamberBoundsLocal.maxX - chamberBoundsLocal.minX) * scale);
+    const h = s.room_z * (0.72 + chamber.level * 0.06) * scale;
+    const alpha = Math.max(0.045, 0.07 + s.chamber_coupling * 0.08 + (1 - material.absorption) * 0.035 - chamber.level * 0.012);
+    ctx.fillStyle = `rgba(120, 190, 150, ${alpha})`;
+    ctx.fillRect(x, yTop, w, h);
+    ctx.strokeStyle = chamber.level === 0 ? "rgba(120, 190, 150, 0.72)" : "rgba(120, 190, 150, 0.48)";
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(x, yTop, w, h);
+
+    const opening = chamberOpeningSegment(chamber);
+    const openCenterX = (opening.x1 + opening.x2) * 0.5;
+    const openWidth = Math.max(Math.abs(opening.x2 - opening.x1), chamber.opening * 0.16);
+    const openX = ox + (openCenterX - bounds.minX) * scale - openWidth * scale * 0.5;
+    ctx.fillStyle = "rgba(5, 6, 7, 0.92)";
+    ctx.fillRect(openX, oy + s.room_z * 0.24 * scale, Math.max(3, openWidth * scale), s.room_z * 0.56 * scale);
+
+    ctx.fillStyle = "#78be96";
+    ctx.font = "9px Menlo, monospace";
+    ctx.fillText(chamber.level === 0 ? `chamber ${chamber.index + 1}` : `nested ${chamber.level}`, x + 6, yTop + 14);
+  });
+  ctx.lineWidth = 1;
+}
+
 function drawChamberPlan(s, ox, oy, scale) {
   const chambers = chamberGeometries(s);
   if (!chambers) return;
@@ -1221,6 +1548,37 @@ function drawChamberPlan(s, ox, oy, scale) {
   });
 }
 
+function drawOutsideOpeningPlan(s, ox, oy, scale) {
+  const bounds = floorplanBounds(s);
+  roomOpeningSegments(s).forEach((opening) => {
+    const openX1 = ox + (opening.x1 - bounds.minX) * scale;
+    const openY1 = oy + (opening.y1 - bounds.minY) * scale;
+    const openX2 = ox + (opening.x2 - bounds.minX) * scale;
+    const openY2 = oy + (opening.y2 - bounds.minY) * scale;
+    const centerX = ox + (opening.center.x - bounds.minX) * scale;
+    const centerY = oy + (opening.center.y - bounds.minY) * scale;
+    const outward = opening.outward || chamberOutwardVector(opening.side);
+    ctx.strokeStyle = "rgba(5, 6, 7, 0.98)";
+    ctx.lineWidth = 4.8;
+    ctx.beginPath();
+    ctx.moveTo(openX1, openY1);
+    ctx.lineTo(openX2, openY2);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(200, 245, 235, 0.88)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(openX1, openY1);
+    ctx.lineTo(openX2, openY2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(200, 245, 235, 0.88)";
+    ctx.font = "9px Menlo, monospace";
+    ctx.fillText(`outside ${opening.index + 1}`, centerX + outward.x * 16 + 5, centerY + outward.y * 16 + 3);
+  });
+  ctx.lineWidth = 1;
+}
+
 function drawPoint(x, y, r, color, label, labelInside = false) {
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -1248,9 +1606,9 @@ function drawDirections(s) {
   const bounds = floorplanBounds(s);
   const roomW = Math.max(0.5, bounds.maxX - bounds.minX);
   const roomH = Math.max(0.5, bounds.maxY - bounds.minY);
-  const scale = Math.min((canvas.width - pad * 2) / roomW, (canvas.height - pad * 2) / roomH);
-  const ox = (canvas.width - roomW * scale) / 2;
-  const oy = (canvas.height - roomH * scale) / 2;
+  const scale = Math.min((ROOM_CANVAS_W - pad * 2) / roomW, (ROOM_CANVAS_H - pad * 2) / roomH);
+  const ox = (ROOM_CANVAS_W - roomW * scale) / 2;
+  const oy = (ROOM_CANVAS_H - roomH * scale) / 2;
   const px = (p) => ox + (p.x - bounds.minX) * scale;
   const py = (p) => oy + (p.y - bounds.minY) * scale;
   state.directionHitPoints = [];
@@ -1324,7 +1682,7 @@ function drawDirections(s) {
   ctx.font = "11px Menlo, monospace";
   ctx.fillText(`Bank Map: ${dirs.length} IR groups placed in floorplan / ${s.channels_per_ir}ch per group / ${s.stacked_channels}ch stacked`, 12, 20);
   ctx.fillText(`selected G${selected.index + 1}: ${selected.channels_start}-${selected.channels_end}`, 12, 38);
-  ctx.fillText("drag IR group points inside the room/chamber geometry", 12, canvas.height - 16);
+  ctx.fillText("drag IR group points inside the room/chamber geometry", 12, ROOM_CANVAS_H - 16);
 }
 
 function drawDirectivityLobe(cx, cy, x, y, radius, spreadDeg) {
@@ -1349,7 +1707,7 @@ function drawBankMatrix(s) {
   const maxEnergy = Math.max(...metrics.map((item) => item.early_energy), 0.0001);
   const maxTime = Math.max(s.duration, ...metrics.map((item) => item.first_reflection_time), 0.1);
   const pad = 34;
-  const rowH = Math.min(48, (canvas.height - pad * 2 - 42) / Math.max(1, dirs.length));
+  const rowH = Math.min(48, (ROOM_CANVAS_H - pad * 2 - 42) / Math.max(1, dirs.length));
   const x0 = pad;
   const y0 = pad + 36;
   const columns = {
@@ -1377,16 +1735,16 @@ function drawBankMatrix(s) {
     const y = y0 + row * rowH;
     const active = row === selected.index;
     ctx.fillStyle = active ? "rgba(216, 162, 74, 0.12)" : row % 2 === 0 ? "rgba(255,255,255,0.035)" : "rgba(255,255,255,0.015)";
-    ctx.fillRect(x0 - 10, y - 18, canvas.width - pad * 2 + 20, rowH - 5);
+    ctx.fillRect(x0 - 10, y - 18, ROOM_CANVAS_W - pad * 2 + 20, rowH - 5);
     state.matrixHitRows.push({
       index: row,
       x: x0 - 10,
       y: y - 18,
-      w: canvas.width - pad * 2 + 20,
+      w: ROOM_CANVAS_W - pad * 2 + 20,
       h: rowH - 5
     });
     ctx.strokeStyle = active ? "rgba(216, 162, 74, 0.82)" : "rgba(255,255,255,0.08)";
-    ctx.strokeRect(x0 - 10.5, y - 18.5, canvas.width - pad * 2 + 20, rowH - 5);
+    ctx.strokeRect(x0 - 10.5, y - 18.5, ROOM_CANVAS_W - pad * 2 + 20, rowH - 5);
 
     ctx.fillStyle = active ? "#f0d39a" : "#d7d7d7";
     ctx.fillText(`G${row + 1}`, columns.group, y);
@@ -1401,7 +1759,7 @@ function drawBankMatrix(s) {
   });
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "10px Menlo, monospace";
-  ctx.fillText("click a row to select the IR group", x0, canvas.height - 16);
+  ctx.fillText("click a row to select the IR group", x0, ROOM_CANVAS_H - 16);
 }
 
 function drawReflectionLayers(s) {
@@ -1409,9 +1767,9 @@ function drawReflectionLayers(s) {
   const selected = selectedDirection(s);
   const pad = 36;
   const top = 66;
-  const bottom = canvas.height - 50;
+  const bottom = ROOM_CANVAS_H - 50;
   const left = 116;
-  const right = canvas.width - 34;
+  const right = ROOM_CANVAS_W - 34;
   const width = right - left;
   const rowH = Math.min(64, (bottom - top) / Math.max(1, dirs.length));
   const duration = Math.max(0.1, s.duration);
@@ -1489,12 +1847,12 @@ function drawReflectionLayers(s) {
     const groupColor = `hsl(${hue}, 58%, ${active ? 66 : 48}%)`;
 
     ctx.fillStyle = active ? "rgba(216, 162, 74, 0.10)" : index % 2 === 0 ? "rgba(255,255,255,0.028)" : "rgba(255,255,255,0.014)";
-    ctx.fillRect(pad, rowTop, canvas.width - pad * 2, rowH - 4);
+    ctx.fillRect(pad, rowTop, ROOM_CANVAS_W - pad * 2, rowH - 4);
     ctx.strokeStyle = active ? "rgba(216,162,74,0.76)" : "rgba(255,255,255,0.07)";
-    ctx.strokeRect(pad + 0.5, rowTop + 0.5, canvas.width - pad * 2, rowH - 4);
+    ctx.strokeRect(pad + 0.5, rowTop + 0.5, ROOM_CANVAS_W - pad * 2, rowH - 4);
     ctx.fillStyle = groupColor;
     ctx.fillRect(pad + 1, rowTop + 1, 4, rowH - 6);
-    state.matrixHitRows.push({ index, x: pad, y: rowTop, w: canvas.width - pad * 2, h: rowH - 4 });
+    state.matrixHitRows.push({ index, x: pad, y: rowTop, w: ROOM_CANVAS_W - pad * 2, h: rowH - 4 });
 
     ctx.fillStyle = active ? "#f0d39a" : groupColor;
     ctx.fillText(`G${index + 1}`, pad + 8, rowMid + 4);
@@ -1578,7 +1936,7 @@ function drawReflectionLayers(s) {
   ctx.lineWidth = 1;
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "10px Menlo, monospace";
-  ctx.fillText("click a row to select; upper/lower lanes separate image-source and chamber timing", pad, canvas.height - 16);
+  ctx.fillText("click a row to select; upper/lower lanes separate image-source and chamber timing", pad, ROOM_CANVAS_H - 16);
 }
 
 function drawMetricBar(x, y, width, fillWidth, color, label) {
@@ -1693,6 +2051,7 @@ function updateReadouts(s) {
     <div><span>First reflection</span><strong>${metrics.first_reflection_wall} / ${Math.round(metrics.first_reflection_time * 1000)} ms</strong></div>
     <div><span>Early energy</span><strong>${round(metrics.early_energy, 3)}</strong></div>
     <div><span>Chamber energy</span><strong>${round(metrics.chamber_energy, 3)}</strong></div>
+    <div><span>Exterior leak</span><strong>${s.outside_opening ? round(s.outside_leak_factor, 3) : "off"}</strong></div>
     <div><span>Local material</span><strong>a ${round(profile.absorption, 2)} / s ${round(profile.scattering, 2)} / tail ${round(profile.tail_soften, 2)}</strong></div>
     <div><span>Local distance</span><strong>${round(profile.source_distance, 2)} m</strong></div>
   `;
@@ -1700,6 +2059,7 @@ function updateReadouts(s) {
 }
 
 function exportObject(s = settings()) {
+  const outsideOpenings = roomOpeningSegments(s);
   const groups = activeDirections(s).map((d, i) => {
     const info = {
       index: i,
@@ -1757,6 +2117,38 @@ function exportObject(s = settings()) {
     })),
     chamber_shape: s.chamber_shape,
     chamber_side: s.chamber_side,
+    exterior_opening: outsideOpenings.length ? {
+      enabled: true,
+      side: s.outside_opening_side,
+      count: outsideOpenings.length,
+      position: round(s.outside_opening_position, 3),
+      spread: round(s.outside_opening_spread, 3),
+      width: round(s.outside_opening_width, 3),
+      opening_m: round(outsideOpenings.reduce((sum, item) => sum + item.opening, 0), 3),
+      leak: round(s.outside_leak, 3),
+      leak_factor: round(s.outside_leak_factor, 3),
+      interpretation: "energy escape boundary for late-tail thinning and reduced reflection density",
+      openings: outsideOpenings.map((opening) => ({
+        index: opening.index + 1,
+        side: opening.side,
+        opening_m: round(opening.opening, 3),
+        opening_segment: {
+          x1: round(opening.x1, 3),
+          y1: round(opening.y1, 3),
+          x2: round(opening.x2, 3),
+          y2: round(opening.y2, 3)
+        }
+      })),
+      opening_segment: {
+        x1: round(outsideOpenings[0].x1, 3),
+        y1: round(outsideOpenings[0].y1, 3),
+        x2: round(outsideOpenings[0].x2, 3),
+        y2: round(outsideOpenings[0].y2, 3)
+      }
+    } : {
+      enabled: false,
+      leak: 0
+    },
     chamber: s.space_shape === "side_chamber" ? {
       material: s.chamber_material,
       material_mode: s.chamber_material_mode,
@@ -1897,11 +2289,121 @@ function addPointMarkerMesh(meshes, name, point, radius, height, materialIndex) 
   addExtrudedPolygonMesh(meshes, name, poly, height, materialIndex);
 }
 
+function addOpeningPortalMesh(meshes, name, chamber, height, materialIndex) {
+  const segment = chamberOpeningSegment(chamber);
+  const outward = chamber.edgeOutward || chamberOutwardVector(chamber.side);
+  addSegmentPortalMesh(meshes, name, segment, outward, height, materialIndex);
+}
+
+function addRoomOpeningPortalMesh(meshes, name, s, height, materialIndex) {
+  mergedOpeningSegments(roomOpeningSegments(s)).forEach((segment) => {
+    addSegmentPortalMesh(meshes, `${name} ${segment.index + 1}`, segment, segment.outward, height, materialIndex);
+  });
+}
+
+function mergedOpeningSegments(segments) {
+  const groups = new Map();
+  segments.forEach((segment) => {
+    const dx = segment.x2 - segment.x1;
+    const dy = segment.y2 - segment.y1;
+    const length = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
+    const tx = dx / length;
+    const ty = dy / length;
+    const key = [
+      segment.side || "wall",
+      Math.round(Math.abs(tx) * 1000),
+      Math.round(Math.abs(ty) * 1000),
+      Math.round((segment.outward?.x || 0) * 1000),
+      Math.round((segment.outward?.y || 0) * 1000)
+    ].join(":");
+    const start = segment.x1 * tx + segment.y1 * ty;
+    const end = segment.x2 * tx + segment.y2 * ty;
+    const normal = segment.x1 * -(ty) + segment.y1 * tx;
+    if (!groups.has(key)) groups.set(key, { tx, ty, normal, side: segment.side, outward: segment.outward, items: [] });
+    groups.get(key).items.push({ start: Math.min(start, end), end: Math.max(start, end), height: segment.height || 0, original: segment });
+  });
+  const merged = [];
+  groups.forEach((group) => {
+    group.items.sort((a, b) => a.start - b.start);
+    const spans = [];
+    group.items.forEach((item) => {
+      const last = spans[spans.length - 1];
+      if (last && item.start <= last.end + 0.04) {
+        last.end = Math.max(last.end, item.end);
+        last.height = Math.max(last.height || 0, item.height || 0);
+      } else {
+        spans.push({ start: item.start, end: item.end, height: item.height || 0 });
+      }
+    });
+    spans.forEach((span) => {
+      const nx = -group.ty;
+      const ny = group.tx;
+      const x1 = group.tx * span.start + nx * group.normal;
+      const y1 = group.ty * span.start + ny * group.normal;
+      const x2 = group.tx * span.end + nx * group.normal;
+      const y2 = group.ty * span.end + ny * group.normal;
+      merged.push({
+        x1,
+        y1,
+        x2,
+        y2,
+        opening: Math.max(0.001, span.end - span.start),
+        side: group.side,
+        outward: group.outward,
+        index: merged.length,
+        height: span.height || 0,
+        center: { x: (x1 + x2) * 0.5, y: (y1 + y2) * 0.5 }
+      });
+    });
+  });
+  return merged;
+}
+
+function openingSegmentsForModel(s) {
+  const openings = roomOpeningSegments(s).map((segment) => ({
+    ...segment,
+    height: s.room_z * 0.86
+  }));
+  (chamberGeometries(s) || []).forEach((chamber) => {
+    const chamberHeight = s.room_z * (0.72 + chamber.level * 0.06);
+    openings.push({
+      ...chamberOpeningSegment(chamber),
+      index: openings.length,
+      side: chamber.side,
+      outward: chamber.edgeOutward || chamberOutwardVector(chamber.side),
+      height: Math.min(s.room_z, chamberHeight) * 0.92
+    });
+  });
+  return mergedOpeningSegments(openings);
+}
+
+function addSegmentPortalMesh(meshes, name, segment, outward, height, materialIndex) {
+  if (!segment) return;
+  outward = outward || { x: 0, y: 1 };
+  const offset = 0.035;
+  const ox = (outward.x || 0) * offset;
+  const oy = (outward.y || 0) * offset;
+  const x1 = segment.x1 + ox;
+  const y1 = segment.y1 + oy;
+  const x2 = segment.x2 + ox;
+  const y2 = segment.y2 + oy;
+  const positions = [];
+  pushVec3(positions, x1, 0.01, -y1);
+  pushVec3(positions, x2, 0.01, -y2);
+  pushVec3(positions, x2, height, -y2);
+  pushVec3(positions, x1, height, -y1);
+  meshes.push({ name, positions, indices: [0, 1, 2, 0, 2, 3], materialIndex });
+}
+
 function buildGltfMeshes(s = settings()) {
   const meshes = [];
   addExtrudedPolygonMesh(meshes, "Main room", roomPolygon(s), s.room_z, 0);
   (chamberGeometries(s) || []).forEach((chamber) => {
-    addExtrudedPolygonMesh(meshes, `Chamber ${chamber.index + 1}`, chamberPolygon(chamber), s.room_z * (0.72 + chamber.level * 0.06), 1);
+    const chamberHeight = s.room_z * (0.72 + chamber.level * 0.06);
+    addExtrudedPolygonMesh(meshes, `Chamber ${chamber.index + 1}`, chamberPolygon(chamber), chamberHeight, 1);
+  });
+  openingSegmentsForModel(s).forEach((segment) => {
+    addSegmentPortalMesh(meshes, `Opening ${segment.index + 1}`, segment, segment.outward, segment.height || s.room_z * 0.72, 4);
   });
   const listener = roomPoints(s).listener;
   addPointMarkerMesh(meshes, "Field center", listener, Math.max(0.12, Math.min(s.room_x, s.room_y) * 0.018), s.room_z * 0.08, 2);
@@ -1988,7 +2490,8 @@ function buildGltf(s = settings()) {
       { name: "Main room cyan", pbrMetallicRoughness: { baseColorFactor: [0.2, 0.75, 0.85, 0.42], metallicFactor: 0, roughnessFactor: 0.92 }, alphaMode: "BLEND", doubleSided: true },
       { name: "Chambers green", pbrMetallicRoughness: { baseColorFactor: [0.32, 0.78, 0.52, 0.48], metallicFactor: 0, roughnessFactor: 0.86 }, alphaMode: "BLEND", doubleSided: true },
       { name: "Field center", pbrMetallicRoughness: { baseColorFactor: [0.9, 0.9, 0.9, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
-      { name: "IR groups", pbrMetallicRoughness: { baseColorFactor: [0.93, 0.62, 0.22, 1], metallicFactor: 0, roughnessFactor: 0.5 } }
+      { name: "IR groups", pbrMetallicRoughness: { baseColorFactor: [0.93, 0.62, 0.22, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
+      { name: "Openings / cutouts", pbrMetallicRoughness: { baseColorFactor: [0.015, 0.018, 0.02, 0.92], metallicFactor: 0, roughnessFactor: 0.96 }, alphaMode: "BLEND", doubleSided: true }
     ],
     accessors,
     bufferViews,
@@ -2045,7 +2548,8 @@ function drawGltfPreview() {
   const center = {
     x: (min.x + max.x) * 0.5,
     y: (min.y + max.y) * 0.5,
-    z: (min.z + max.z) * 0.5
+    z: (min.z + max.z) * 0.5,
+    planY: -(min.z + max.z) * 0.5
   };
   const az = state.gltfCamera.azimuth * Math.PI / 180;
   const el = state.gltfCamera.elevation * Math.PI / 180;
@@ -2057,28 +2561,30 @@ function drawGltfPreview() {
   const scale = Math.min(w, h) * 0.72 * state.gltfCamera.zoom / Math.max(1, diag);
   const project = (point) => {
     const x = point.x - center.x;
-    const y = point.y - center.y;
-    const z = point.z - center.z;
-    const rx = x * cosA - z * sinA;
-    const rz = x * sinA + z * cosA;
-    const ry = y * cosE - rz * sinE;
+    const y = -point.z - center.planY;
+    const z = point.y - center.y;
+    const rx = x * cosA - y * sinA;
+    const ry = x * sinA + y * cosA;
+    const sy = ry * sinE - z * cosE;
     return {
       x: w * 0.5 + rx * scale,
-      y: h * 0.56 - ry * scale,
-      depth: rz * cosE + y * sinE
+      y: h * 0.54 + sy * scale,
+      depth: ry * cosE + z * sinE
     };
   };
   const fills = [
     "rgba(90,168,199,0.20)",
     "rgba(120,190,150,0.24)",
     "rgba(230,230,230,0.88)",
-    "rgba(216,162,74,0.92)"
+    "rgba(216,162,74,0.92)",
+    "rgba(5,6,7,0.90)"
   ];
   const strokes = [
-    "rgba(90,168,199,0.82)",
-    "rgba(120,190,150,0.72)",
+    "rgba(90,168,199,0)",
+    "rgba(120,190,150,0)",
     "rgba(245,245,245,0.95)",
-    "rgba(216,162,74,0.95)"
+    "rgba(216,162,74,0.95)",
+    "rgba(200,245,235,0.92)"
   ];
   const triangles = [];
   meshes.forEach((mesh) => {
@@ -2107,8 +2613,57 @@ function drawGltfPreview() {
     gltfCtx.closePath();
     gltfCtx.fillStyle = fills[tri.materialIndex] || fills[0];
     gltfCtx.strokeStyle = strokes[tri.materialIndex] || strokes[0];
-    gltfCtx.lineWidth = tri.materialIndex >= 2 ? 1.4 : 0.6;
+    gltfCtx.lineWidth = tri.materialIndex === 2 || tri.materialIndex === 3 ? 1.4 : 0;
     gltfCtx.fill();
+    if (tri.materialIndex === 2 || tri.materialIndex === 3) gltfCtx.stroke();
+  });
+  const outlineStyles = [
+    { stroke: "rgba(90,168,199,0.92)", width: 1.45 },
+    { stroke: "rgba(120,190,150,0.78)", width: 1.2 },
+    null,
+    null,
+    { stroke: "rgba(200,245,235,0.92)", width: 1.2 }
+  ];
+  meshes.forEach((mesh) => {
+    const style = outlineStyles[mesh.materialIndex];
+    if (!style) return;
+    if (mesh.materialIndex === 4 && mesh.positions.length === 12) {
+      const points = [];
+      for (let i = 0; i < 4; i += 1) {
+        const pi = i * 3;
+        points.push(project({ x: mesh.positions[pi], y: mesh.positions[pi + 1], z: mesh.positions[pi + 2] }));
+      }
+      gltfCtx.strokeStyle = style.stroke;
+      gltfCtx.lineWidth = style.width;
+      gltfCtx.beginPath();
+      points.forEach((p, index) => index === 0 ? gltfCtx.moveTo(p.x, p.y) : gltfCtx.lineTo(p.x, p.y));
+      gltfCtx.closePath();
+      gltfCtx.stroke();
+      return;
+    }
+    if (mesh.positions.length < 18) return;
+    const vertexCount = mesh.positions.length / 3;
+    const half = vertexCount / 2;
+    if (Math.floor(half) !== half || half < 3) return;
+    const bottom = [];
+    const top = [];
+    for (let i = 0; i < half; i += 1) {
+      const bi = i * 3;
+      const ti = (i + half) * 3;
+      bottom.push(project({ x: mesh.positions[bi], y: mesh.positions[bi + 1], z: mesh.positions[bi + 2] }));
+      top.push(project({ x: mesh.positions[ti], y: mesh.positions[ti + 1], z: mesh.positions[ti + 2] }));
+    }
+    gltfCtx.strokeStyle = style.stroke;
+    gltfCtx.lineWidth = style.width;
+    gltfCtx.beginPath();
+    top.forEach((p, index) => index === 0 ? gltfCtx.moveTo(p.x, p.y) : gltfCtx.lineTo(p.x, p.y));
+    gltfCtx.closePath();
+    bottom.forEach((p, index) => index === 0 ? gltfCtx.moveTo(p.x, p.y) : gltfCtx.lineTo(p.x, p.y));
+    gltfCtx.closePath();
+    for (let i = 0; i < half; i += 1) {
+      gltfCtx.moveTo(bottom[i].x, bottom[i].y);
+      gltfCtx.lineTo(top[i].x, top[i].y);
+    }
     gltfCtx.stroke();
   });
   gltfCtx.fillStyle = "#aeb7bd";
@@ -2180,6 +2735,13 @@ function resetDefaults() {
   controls.openingWidth.value = 0.42;
   controls.chamberCoupling.value = 0.48;
   controls.chamberMaterialMix.value = 0.65;
+  controls.outsideOpening.checked = true;
+  controls.outsideOpeningSide.value = "back";
+  controls.outsideOpeningCount.value = 2;
+  controls.outsideOpeningPosition.value = 0.76;
+  controls.outsideOpeningSpread.value = 0.42;
+  controls.outsideOpeningWidth.value = 0.22;
+  controls.outsideLeak.value = 0.28;
   controls.fieldX.value = 0;
   controls.fieldY.value = 0;
   controls.sourceAz.value = 0;
@@ -2246,6 +2808,18 @@ function randomize() {
   controls.openingWidth.value = round(range(0.48 - bias * 0.32, 0.86 - bias * 0.22), 2);
   controls.chamberCoupling.value = round(rangeBiased(0.12, 0.92), 2);
   controls.chamberMaterialMix.value = round(rangeBiased(0.18, 0.98), 2);
+  controls.outsideOpening.checked = Math.random() < 0.35 + bias * 0.45;
+  controls.outsideOpeningSide.value = chooseByBias(
+    ["front", "back", "left", "right"],
+    ["front", "back", "left", "right", "all"],
+    ["front", "back", "left", "right", "all", "all"],
+    bias
+  );
+  controls.outsideOpeningCount.value = Math.round(clamp(1 + Math.random() * (1.4 + bias * 4.2), 1, 6));
+  controls.outsideOpeningPosition.value = round(Math.random(), 2);
+  controls.outsideOpeningSpread.value = round(range(0.12, 0.35 + bias * 0.65), 2);
+  controls.outsideOpeningWidth.value = round(range(0.10, 0.24 + bias * 0.42), 2);
+  controls.outsideLeak.value = round(rangeBiased(0.12, 0.88), 2);
   controls.fieldX.value = round(range(-0.22 - bias * 0.62, 0.22 + bias * 0.62), 2);
   controls.fieldY.value = round(range(-0.22 - bias * 0.62, 0.22 + bias * 0.62), 2);
   controls.sourceAz.value = 0;
@@ -2280,12 +2854,23 @@ Object.values(controls).forEach((control) => {
 
 controls.materialPreset.addEventListener("change", applyMaterial);
 
-document.querySelectorAll(".section-toggle").forEach((button) => {
-  button.addEventListener("click", () => {
-    const section = button.closest(".collapsible");
-    const collapsed = section.classList.toggle("collapsed");
-    button.textContent = collapsed ? "+" : "-";
-    button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+document.querySelectorAll(".collapsible > h2").forEach((heading) => {
+  const section = heading.parentElement;
+  heading.tabIndex = 0;
+  heading.setAttribute("role", "button");
+  heading.setAttribute("aria-expanded", "true");
+  const toggle = () => {
+    section.classList.toggle("collapsed");
+    heading.setAttribute("aria-expanded", section.classList.contains("collapsed") ? "false" : "true");
+  };
+  heading.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    toggle();
+  });
+  heading.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    toggle();
   });
 });
 
@@ -2333,8 +2918,8 @@ $("nextGroup").addEventListener("click", () => stepGroup(1));
 
 function canvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
+  const scaleX = ROOM_CANVAS_W / rect.width;
+  const scaleY = ROOM_CANVAS_H / rect.height;
   return {
     x: (event.clientX - rect.left) * scaleX,
     y: (event.clientY - rect.top) * scaleY

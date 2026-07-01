@@ -116,6 +116,21 @@
             <label>Opening width <input id="openingWidth" type="range" min="0.1" max="1" value="0.42" step="0.01" /></label>
             <label>Chamber coupling <input id="chamberCoupling" type="range" min="0" max="1" value="0.48" step="0.01" /></label>
             <label>Chamber material contrast <input id="chamberMaterialMix" type="range" min="0" max="1" value="0.65" step="0.01" /></label>
+            <label class="check-row"><input id="outsideOpening" type="checkbox" checked /> Exterior opening</label>
+            <label>Exterior side
+              <select id="outsideOpeningSide">
+                <option value="front">Front wall</option>
+                <option value="back" selected>Back wall</option>
+                <option value="left">Left wall</option>
+                <option value="right">Right wall</option>
+                <option value="all">All sides</option>
+              </select>
+            </label>
+            <label>Exterior count <input id="outsideOpeningCount" type="range" min="1" max="6" value="2" step="1" /></label>
+            <label>Exterior position <input id="outsideOpeningPosition" type="range" min="0" max="1" value="0.76" step="0.01" /></label>
+            <label>Exterior spread <input id="outsideOpeningSpread" type="range" min="0" max="1" value="0.42" step="0.01" /></label>
+            <label>Exterior width <input id="outsideOpeningWidth" type="range" min="0.03" max="1" value="0.22" step="0.01" /></label>
+            <label>Exterior leak <input id="outsideLeak" type="range" min="0" max="1" value="0.28" step="0.01" /></label>
           </section>
 
           <section class="collapsible">
@@ -184,6 +199,7 @@
             <button id="nextGroup" type="button">Next Group</button>
           </div>
           <div class="canvas-frame">
+            <svg id="roomSvg" viewBox="0 0 900 560" role="img" aria-label="IR room vector drawing"></svg>
             <canvas id="roomCanvas" width="900" height="560"></canvas>
           </div>
           <div class="readout-grid">

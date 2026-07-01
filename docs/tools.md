@@ -33,13 +33,13 @@ toc:
 # Tools
 
 For step-by-step notes on selected processes, see the [Process Guides](process-guides.md).
-The [Utilities](utilities.md) page includes the standalone Image Score
-Generator for preparing PNG scores used by `3OAFX Image Sonogram Field`.
+The [Utilities](utilities.md) pages cover the browser-based companion tools for
+image scores, IR room sketches, and Mover automation JSON.
 
-Current package snapshot: the browser exposes 109 user-facing tools/controllers,
+Current package snapshot: the browser exposes 111 user-facing tools/controllers,
 plus the Package Browser. Of those, 48 are Python/NumPy-backed offline
-processes, 23 load, control, or render included JSFX, and 38 are native
-Lua/ReaImGui REAPER actions. The repository also ships 22 underlying JSFX
+processes, 25 load, control, or render included JSFX, and 38 are native
+Lua/ReaImGui REAPER actions. The repository also ships 23 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and internal
 dialogs that are not shown as Package Browser entries.
 
@@ -49,7 +49,7 @@ Package Browser group counts:
 - MIDI Composition: 8
 - Procedural Synthesis: 6
 - Offline Synthesis / IR: 9
-- Spatial Panners: 10
+- Spatial Panners: 12
 - 3OAFX: 22
 - Spectral / Convolution: 16
 - Multichannel Texture / Montage: 20
@@ -170,6 +170,10 @@ modulation afterward.
   cube, 12ch ring, 16ch ring, 16ch double ring, 20ch double ring, and 24ch dome
   without overhead. Speaker numbering starts near the stereo-right position and
   proceeds clockwise.
+- `Load Mover JSON`: loads exported s3g-mc Mover JSON into REAPER, creates the
+  3OA encoder bus/child tracks, and writes source motion as editable automation.
+- `Mover Browser Link`: opens the browser-based Mover with the last loaded
+  Mover JSON and follows REAPER transport from a local browser link.
 - `25ch Cosine Dome Panner`: soft angular-focus panning for up to 8 mono
   sources across the 25-speaker dome.
 - `25ch DBAP Dome Panner`: distance-weighted amplitude panning for up to 8 mono
@@ -312,11 +316,11 @@ behaviors.
 
 - `Brownian Walk`: short fragments follow a bounded random walk through source
   time and output channels.
-- `Cascade Spatial Echo`: equal segments print decaying echoes through space.
-- `Channel Orbit Delay`: whole-item delay repeats orbit around output channels.
+- `Cascade spatial echo`: equal segments print decaying echoes through space.
+- `Channel orbit delay`: whole-item delay repeats orbit around output channels.
 - `Channel Smear`: slices duplicate to neighboring channels with gain
   compensation.
-- `Crumble Spatial Groups`: slices move through progressively smaller channel
+- `Crumble spatial groups`: slices move through progressively smaller channel
   groups.
 - `Flutter Gate`: moving active-channel groups create flutter patterns.
 - `Fracture`: ordered slices from one source channel disperse across a channel
@@ -331,7 +335,7 @@ behaviors.
 - `Loop Rift`: NumPy-backed loop sections with graceful dropouts,
   overlap-add fades, source-pool routing, grouped channel openings, and
   unstable playback rates.
-- `Marker Spatial Montage`: project markers or active-take markers inside the
+- `Marker spatial montage`: project markers or active-take markers inside the
   selected item define chunks for ordered or shuffled montage.
 - `Mono Fill`: one source channel fills every output channel with optional gain
   compensation and slice rotation.
@@ -348,7 +352,7 @@ behaviors.
 - `Stereo Spin`: sliced stereo images rotate around a multichannel output field.
 - `Texture Clouds`: dense short fragments from one source channel scattered
   across an output field.
-- `Zigzag Channel Walker`: equal slices walk back and forth across output
+- `Zigzag channel walker`: equal slices walk back and forth across output
   channels, with optional reverse source-slice order.
 
 ## Item Channel Transforms

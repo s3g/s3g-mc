@@ -38,11 +38,11 @@ input[type="number"] {
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 0;
+  min-height: 21px;
 }
 
 button {
-  min-height: 24px;
-  padding: 0 8px;
+  padding: 0 5px;
   cursor: pointer;
 }
 
@@ -55,14 +55,13 @@ button.active {
 
 select {
   width: 100%;
-  min-height: 24px;
-  padding: 0 8px;
+  padding: 0 6px;
 }
 
 input[type="range"] {
   width: 100%;
-  height: 19px;
-  margin: 4px 0 0;
+  height: 15px;
+  margin: 3px 0 0;
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid #4b4b4b;
@@ -72,14 +71,14 @@ input[type="range"] {
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
-  height: 17px;
+  height: 13px;
   background: transparent;
   border: 0;
 }
 
 input[type="range"]::-webkit-slider-thumb {
   width: 0;
-  height: 17px;
+  height: 13px;
   appearance: none;
   -webkit-appearance: none;
   background: transparent;
@@ -87,14 +86,14 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 input[type="range"]::-moz-range-track {
-  height: 17px;
+  height: 13px;
   background: transparent;
   border: 0;
 }
 
 input[type="range"]::-moz-range-thumb {
   width: 0;
-  height: 17px;
+  height: 13px;
   border: 0;
   background: transparent;
 }
@@ -116,10 +115,11 @@ input[type="range"]:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-  background: #151515;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-width: 0 0 1px;
+  background: var(--panel);
 }
 
 h1,
@@ -136,13 +136,14 @@ h1 {
 h2 {
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 21px;
-  margin: -8px -8px 10px;
-  padding: 0 8px;
+  justify-content: space-between;
+  min-height: 28px;
+  margin: -7px -7px 7px;
+  padding: 0 6px 0 8px;
   background: var(--panel-2);
   border-bottom: 1px solid var(--line-soft);
   font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   color: #cfcfcf;
 }
@@ -157,15 +158,15 @@ h2 {
   flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .generate-bias {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 210px;
-  margin: 0 4px;
+  gap: 6px;
+  min-width: 190px;
+  margin: 0 2px;
   color: #aeb7bd;
   font-size: 11px;
 }
@@ -194,24 +195,43 @@ h2 {
 }
 
 .panel section {
-  margin: 8px;
-  padding: 8px;
+  margin: 6px;
+  padding: 7px;
   background: #141414;
   border: 1px solid var(--line-soft);
 }
 
 .panel section + section {
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
 .section-toggle {
-  width: 16px;
-  min-height: 16px;
-  padding: 0;
-  border-color: #555;
-  color: #d2d2d2;
-  line-height: 14px;
-  text-align: center;
+  display: none;
+}
+
+.collapsible > h2 {
+  cursor: pointer;
+  user-select: none;
+}
+
+.collapsible > h2::after {
+  content: "-";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  border: 1px solid var(--line-soft);
+  background: var(--field);
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.collapsible > h2:hover::after,
+.collapsible > h2:focus-visible::after {
+  border-color: var(--cyan);
+  color: var(--text);
 }
 
 .collapsible.collapsed {
@@ -219,7 +239,12 @@ h2 {
 }
 
 .collapsible.collapsed h2 {
-  margin-bottom: -1px;
+  margin-bottom: 0;
+  border-bottom: 0;
+}
+
+.collapsible.collapsed > h2::after {
+  content: "+";
 }
 
 .collapsible.collapsed > :not(h2) {
@@ -228,13 +253,13 @@ h2 {
 
 label {
   display: block;
-  margin: 8px 0;
+  margin: 5px 0;
   color: var(--muted);
 }
 
 label input,
 label select {
-  margin-top: 5px;
+  margin-top: 3px;
 }
 
 .check-row {
@@ -326,18 +351,40 @@ label select {
 }
 
 .canvas-frame {
+  position: relative;
   width: min(100%, 900px);
+  aspect-ratio: 900 / 560;
   border: 1px solid #4a5259;
   background: #050607;
   box-shadow: 0 0 0 1px #000 inset, 0 0 0 2px #171717;
 }
 
+#roomSvg,
 #roomCanvas {
   display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
-  aspect-ratio: 900 / 560;
+  height: 100%;
+}
+
+#roomSvg {
+  z-index: 1;
+  background: #050607;
+  pointer-events: none;
+}
+
+#roomCanvas {
+  z-index: 2;
   cursor: crosshair;
+}
+
+.canvas-frame.svg-active #roomCanvas {
+  opacity: 0;
+}
+
+.canvas-frame:not(.svg-active) #roomSvg {
+  display: none;
 }
 
 .readout-grid {
@@ -450,6 +497,12 @@ label select {
   padding: 0;
   border: 0;
   background: transparent;
+  min-height: 0;
+  cursor: default;
+}
+
+.gltf-head h2::after {
+  display: none;
 }
 
 .gltf-head p {

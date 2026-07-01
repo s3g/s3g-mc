@@ -433,7 +433,7 @@ local function main()
         ImGui.TextColored(ctx, COLOR_MUTED, "optional browser sketch")
       end
       if settings.sketch_path and settings.sketch_path ~= "" then
-        ImGui.TextColored(ctx, COLOR_MUTED, "Imported sketches can add polygon room metadata and chamber-return timing.")
+        ImGui.TextColored(ctx, COLOR_MUTED, "Imported sketches can add polygon room metadata, chamber timing, and exterior leak.")
       end
       ImGui.Spacing(ctx)
       local old_material = settings.material_index

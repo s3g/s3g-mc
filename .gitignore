@@ -1,3 +1,7 @@
 .DS_Store
 *.bak
 *.tmp
+tools/mover/reaper-link.json
+tools/mover/reaper-playhead.json
+docs/tools/mover/reaper-link.json
+docs/tools/mover/reaper-playhead.json

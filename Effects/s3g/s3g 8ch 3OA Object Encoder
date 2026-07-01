@@ -1,0 +1,177 @@
+desc:s3g 8ch 3OA Object Encoder
+tags: multichannel ambisonics HOA encoder mover
+
+in_pin:source 01
+in_pin:source 02
+in_pin:source 03
+in_pin:source 04
+in_pin:source 05
+in_pin:source 06
+in_pin:source 07
+in_pin:source 08
+
+out_pin:ACN 01 W
+out_pin:ACN 02 Y
+out_pin:ACN 03 Z
+out_pin:ACN 04 X
+out_pin:ACN 05 V
+out_pin:ACN 06 T
+out_pin:ACN 07 R
+out_pin:ACN 08 S
+out_pin:ACN 09 U
+out_pin:ACN 10 Q
+out_pin:ACN 11 O
+out_pin:ACN 12 M
+out_pin:ACN 13 K
+out_pin:ACN 14 L
+out_pin:ACN 15 N
+out_pin:ACN 16 P
+
+slider1:1<1,64,1>Bank ID
+slider2:0<-48,24,0.1>Output gain (dB)
+
+slider3:1<0,1,1{Off,On}>S1 enable
+slider4:0<-360,360,0.1>S1 azimuth (deg)
+slider5:0<-90,90,0.1>S1 elevation (deg)
+slider6:1<0.1,3,0.01>S1 distance
+slider7:0<-60,24,0.1>S1 gain (dB)
+
+slider8:1<0,1,1{Off,On}>S2 enable
+slider9:45<-360,360,0.1>S2 azimuth (deg)
+slider10:0<-90,90,0.1>S2 elevation (deg)
+slider11:1<0.1,3,0.01>S2 distance
+slider12:0<-60,24,0.1>S2 gain (dB)
+
+slider13:1<0,1,1{Off,On}>S3 enable
+slider14:90<-360,360,0.1>S3 azimuth (deg)
+slider15:0<-90,90,0.1>S3 elevation (deg)
+slider16:1<0.1,3,0.01>S3 distance
+slider17:0<-60,24,0.1>S3 gain (dB)
+
+slider18:1<0,1,1{Off,On}>S4 enable
+slider19:135<-360,360,0.1>S4 azimuth (deg)
+slider20:0<-90,90,0.1>S4 elevation (deg)
+slider21:1<0.1,3,0.01>S4 distance
+slider22:0<-60,24,0.1>S4 gain (dB)
+
+slider23:1<0,1,1{Off,On}>S5 enable
+slider24:180<-360,360,0.1>S5 azimuth (deg)
+slider25:0<-90,90,0.1>S5 elevation (deg)
+slider26:1<0.1,3,0.01>S5 distance
+slider27:0<-60,24,0.1>S5 gain (dB)
+
+slider28:1<0,1,1{Off,On}>S6 enable
+slider29:-135<-360,360,0.1>S6 azimuth (deg)
+slider30:0<-90,90,0.1>S6 elevation (deg)
+slider31:1<0.1,3,0.01>S6 distance
+slider32:0<-60,24,0.1>S6 gain (dB)
+
+slider33:1<0,1,1{Off,On}>S7 enable
+slider34:-90<-360,360,0.1>S7 azimuth (deg)
+slider35:0<-90,90,0.1>S7 elevation (deg)
+slider36:1<0.1,3,0.01>S7 distance
+slider37:0<-60,24,0.1>S7 gain (dB)
+
+slider38:1<0,1,1{Off,On}>S8 enable
+slider39:-45<-360,360,0.1>S8 azimuth (deg)
+slider40:0<-90,90,0.1>S8 elevation (deg)
+slider41:1<0.1,3,0.01>S8 distance
+slider42:0<-60,24,0.1>S8 gain (dB)
+
+@init
+deg2rad = $pi / 180;
+EPS = 0.000001;
+
+function db2lin(db)
+(
+  10 ^ (db / 20);
+);
+
+function add_src(sig en az el dist gain_db)
+local(azr elr ce x y z r g w)
+(
+  en > 0.5 ? (
+    azr = az * deg2rad;
+    elr = el * deg2rad;
+    ce = cos(elr);
+    x = sin(azr) * ce;
+    y = cos(azr) * ce;
+    z = sin(elr);
+    r = dist < 0.1 ? 0.1 : dist;
+    g = sig * db2lin(gain_db) / r;
+    w = 0.70710678118 * g;
+
+    o0 += w;
+    o1 += y * g;
+    o2 += z * g;
+    o3 += x * g;
+
+    o4 += x * y * 1.224744871 * g;
+    o5 += y * z * 1.224744871 * g;
+    o6 += (1.5 * z * z - 0.5) * g;
+    o7 += x * z * 1.224744871 * g;
+    o8 += 0.612372435 * (x * x - y * y) * g;
+
+    o9  += 0.790569415 * y * (3 * x * x - y * y) * g;
+    o10 += 2.371708245 * x * y * z * g;
+    o11 += 0.790569415 * y * (5 * z * z - 1) * g;
+    o12 += 0.5 * z * (5 * z * z - 3) * g;
+    o13 += 0.790569415 * x * (5 * z * z - 1) * g;
+    o14 += 1.185854122 * z * (x * x - y * y) * g;
+    o15 += 0.790569415 * x * (x * x - 3 * y * y) * g;
+  );
+);
+
+@sample
+in0 = spl0;
+in1 = spl1;
+in2 = spl2;
+in3 = spl3;
+in4 = spl4;
+in5 = spl5;
+in6 = spl6;
+in7 = spl7;
+
+o0 = 0;
+o1 = 0;
+o2 = 0;
+o3 = 0;
+o4 = 0;
+o5 = 0;
+o6 = 0;
+o7 = 0;
+o8 = 0;
+o9 = 0;
+o10 = 0;
+o11 = 0;
+o12 = 0;
+o13 = 0;
+o14 = 0;
+o15 = 0;
+
+add_src(in0, slider3,  slider4,  slider5,  slider6,  slider7);
+add_src(in1, slider8,  slider9,  slider10, slider11, slider12);
+add_src(in2, slider13, slider14, slider15, slider16, slider17);
+add_src(in3, slider18, slider19, slider20, slider21, slider22);
+add_src(in4, slider23, slider24, slider25, slider26, slider27);
+add_src(in5, slider28, slider29, slider30, slider31, slider32);
+add_src(in6, slider33, slider34, slider35, slider36, slider37);
+add_src(in7, slider38, slider39, slider40, slider41, slider42);
+
+out_gain = db2lin(slider2) * 0.25;
+spl0 = o0 * out_gain;
+spl1 = o1 * out_gain;
+spl2 = o2 * out_gain;
+spl3 = o3 * out_gain;
+spl4 = o4 * out_gain;
+spl5 = o5 * out_gain;
+spl6 = o6 * out_gain;
+spl7 = o7 * out_gain;
+spl8 = o8 * out_gain;
+spl9 = o9 * out_gain;
+spl10 = o10 * out_gain;
+spl11 = o11 * out_gain;
+spl12 = o12 * out_gain;
+spl13 = o13 * out_gain;
+spl14 = o14 * out_gain;
+spl15 = o15 * out_gain;

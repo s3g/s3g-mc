@@ -5232,6 +5232,26 @@ def render_synthetic_ambisonic_ir_bank(cfg):
             print(f"Room sketch ignored: {exc}")
             sketch = None
 
+    exterior_opening = sketch.get("exterior_opening", {}) if isinstance(sketch, dict) else {}
+    if not isinstance(exterior_opening, dict):
+        exterior_opening = {}
+    exterior_enabled = bool(exterior_opening.get("enabled", False))
+    exterior_openings = exterior_opening.get("openings", []) if exterior_enabled else []
+    if not isinstance(exterior_openings, list):
+        exterior_openings = []
+    exterior_count = len([item for item in exterior_openings if isinstance(item, dict)])
+    if exterior_enabled and exterior_count <= 0:
+        exterior_count = max(1, int(exterior_opening.get("count", 1) or 1))
+    exterior_leak = float(np.clip(exterior_opening.get("leak", cfg.get("outside_leak", 0.0)), 0.0, 1.0)) if exterior_enabled else 0.0
+    exterior_width = float(np.clip(exterior_opening.get("width", cfg.get("outside_opening_width", 0.0)), 0.0, 1.0)) if exterior_enabled else 0.0
+    exterior_leak_factor = float(np.clip(exterior_opening.get("leak_factor", exterior_leak * exterior_width * exterior_count), 0.0, 1.0)) if exterior_enabled else 0.0
+    if exterior_leak_factor > 0.0:
+        absorption = float(np.clip(absorption + exterior_leak_factor * 0.20, 0.03, 0.95))
+        if bool(cfg.get("auto_decay", True)):
+            area_absorption = max(0.01, surface * absorption)
+            decay = float(np.clip(0.161 * volume / area_absorption, 0.08, 8.0))
+        diffuse_count = max(0, int(round(diffuse_count * (1.0 - 0.52 * exterior_leak_factor))))
+
     def sketch_bounds():
         points = []
         if isinstance(sketch, dict):
@@ -5435,7 +5455,8 @@ def render_synthetic_ambisonic_ir_bank(cfg):
 
         for _ in range(diffuse_count):
             u = rng.random()
-            late_start = min(duration * 0.92, pre_delay_ms / 1000.0 + 0.035 + (1.0 - scattering) * 0.080)
+            late_start = min(duration * 0.92, pre_delay_ms / 1000.0 + 0.035 + (1.0 - scattering) * 0.080 - exterior_leak_factor * 0.030)
+            late_start = max(0.008, late_start)
             t = late_start + max(0.0, duration - late_start) * (u ** (1.35 + scattering * 0.9))
             if rng.random() < 0.35 + scattering * 0.45:
                 az, el = perturbed_direction(base_az, base_el, spread_deg * (1.4 + scattering * 2.0))
@@ -5485,6 +5506,9 @@ def render_synthetic_ambisonic_ir_bank(cfg):
         chamber_count = len(chamber_items())
         print(f"Room sketch: {sketch_path}")
         print(f"Sketch chambers: {chamber_count}")
+        if exterior_enabled:
+            side = str(exterior_opening.get("side", "?"))
+            print(f"Exterior openings: {exterior_count} on {side}, leak {exterior_leak:.3f}, factor {exterior_leak_factor:.3f}")
         print(f"Sketch field bounds: {min_x:.2f}, {min_y:.2f} to {max_x:.2f}, {max_y:.2f} m")
     print(f"Absorption: {absorption:.3f}")
     print(f"Scattering: {scattering:.3f}")

@@ -47,7 +47,7 @@
         {% endif %}
       </main>
 
-      {% if page.toc or page.guide_nav %}
+      {% if page.toc or page.guide_nav or page.utility_nav %}
       <aside class="toc" aria-label="Page navigation">
         {% if page.toc %}
         <div class="toc-section">
@@ -71,6 +71,15 @@
           <a href="{{ '/process-guides-texture-montage.html' | relative_url }}">Multichannel Texture / Montage</a>
           <a href="{{ '/process-guides-item-transforms.html' | relative_url }}">Item Channel Transforms</a>
           <a href="{{ '/process-guides-track-routing.html' | relative_url }}">Track Building / Routing</a>
+        </div>
+        {% endif %}
+        {% if page.utility_nav %}
+        <div class="toc-section guide-nav">
+          <h2>Utilities</h2>
+          <a href="{{ '/utilities.html' | relative_url }}">Utilities</a>
+          <a href="{{ '/utilities-image-score-generator.html' | relative_url }}">Image Score Generator</a>
+          <a href="{{ '/utilities-ir-room-sketch-designer.html' | relative_url }}">IR Room Sketch Designer</a>
+          <a href="{{ '/utilities-mover.html' | relative_url }}">s3g-mc Mover</a>
         </div>
         {% endif %}
       </aside>

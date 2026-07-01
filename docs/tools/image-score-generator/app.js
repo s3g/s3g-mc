@@ -1403,12 +1403,23 @@ document.querySelectorAll("#layerButtons button").forEach((button) => {
   button.addEventListener("click", () => setLayer(button.dataset.layer));
 });
 
-document.querySelectorAll(".section-toggle").forEach((button) => {
-  button.addEventListener("click", () => {
-    const section = button.closest(".collapsible");
-    const collapsed = section.classList.toggle("collapsed");
-    button.textContent = collapsed ? "+" : "-";
-    button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+document.querySelectorAll(".collapsible > h2").forEach((heading) => {
+  const section = heading.parentElement;
+  heading.tabIndex = 0;
+  heading.setAttribute("role", "button");
+  heading.setAttribute("aria-expanded", "true");
+  const toggle = () => {
+    section.classList.toggle("collapsed");
+    heading.setAttribute("aria-expanded", section.classList.contains("collapsed") ? "false" : "true");
+  };
+  heading.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    toggle();
+  });
+  heading.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    toggle();
   });
 });
 
