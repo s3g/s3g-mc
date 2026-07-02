@@ -36,7 +36,9 @@ When the package is installed with `Scripts/s3g-mc/utilities` in place, the Pack
 Composes generic breakpoint lanes and section markers for REAPER automation.
 Export JSON from the browser, then run `Load Automation Score JSON` to write
 those lanes to selected track volume envelopes or sequential FX parameter
-envelopes, with optional project markers.
+envelopes, with optional project markers. An optional Max bridge in
+`Scripts/s3g-mc/utilities/automation-score-max-bridge` can read the same JSON
+for control-rate playback in Max.
 
 ## Image Score
 
@@ -67,12 +69,12 @@ The same utility can be launched from REAPER with `IR Sketch`.
 
 ## Spatial Score
 
-[Open Spatial Score](utilities/mover/){:target="_blank" rel="noopener noreferrer" .utility-link}
+[Open Spatial Score](utilities/spatial-score/){:target="_blank" rel="noopener noreferrer" .utility-link}
 
-[Read Spatial Score notes](utilities-mover.md)
+[Read Spatial Score notes](utilities-spatial-score.md)
 
 Designs banked third-order ambisonic source motion in the browser. Exported
 JSON can be loaded in REAPER with `Load Spatial Score JSON`, which creates encoder
 tracks and writes automation for `s3g 8ch 3OA Object Encoder`. An optional Max
-bridge in `Scripts/s3g-mc/utilities/mover-max-bridge` can read the same JSON
+bridge in `Scripts/s3g-mc/utilities/spatial-score-max-bridge` can read the same JSON
 for ICST AmbiMonitor-style playback and monitoring patches.

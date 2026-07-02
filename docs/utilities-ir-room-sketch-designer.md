@@ -2,12 +2,13 @@
 layout: default
 title: IR Sketch
 utility_nav: true
+lightbox: true
 prev_page:
   title: Image Score
   url: /utilities-image-score-generator.html
 next_page:
   title: Spatial Score
-  url: /utilities-mover.html
+  url: /utilities-spatial-score.html
 toc:
   - title: Open Tool
     href: "#open-tool"
@@ -26,6 +27,12 @@ toc:
 ---
 
 # IR Sketch
+
+<div class="utility-screenshot">
+  <button class="utility-screenshot-button" type="button" data-lightbox-image="assets/images/utilities/IRSketch.png" aria-label="Open IR Sketch screenshot">
+    <img src="assets/images/utilities/IRSketch.png" alt="IR Sketch browser utility">
+  </button>
+</div>
 
 ## Open Tool
 

@@ -61,7 +61,9 @@ Package Browser group counts:
 
 - `Automation Score`: opens the browser utility for composing generic
   breakpoint lanes and section markers that can later be assigned to track or
-  FX automation.
+  FX automation. An optional Max bridge in
+  `Scripts/s3g-mc/utilities/automation-score-max-bridge` can play the same JSON
+  at control rate in Max.
 - `Image Score`: opens the browser utility for composing PNG scores
   used by `3OAFX Image Sonogram Field`.
 - `IR Sketch`: opens the browser utility for preparing room

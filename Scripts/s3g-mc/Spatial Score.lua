@@ -27,9 +27,9 @@ local function find_utility_dir(name)
   return nil
 end
 
-local utility_dir = find_utility_dir("mover")
+local utility_dir = find_utility_dir("spatial-score") or find_utility_dir("mover")
 if not utility_dir then
-  reaper.MB("Could not find mover/index.html in Scripts/s3g-mc/utilities or docs/utilities.", script_name, 0)
+  reaper.MB("Could not find spatial-score/index.html in Scripts/s3g-mc/utilities or docs/utilities.", script_name, 0)
   return
 end
 

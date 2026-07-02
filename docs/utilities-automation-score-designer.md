@@ -2,6 +2,7 @@
 layout: default
 title: Automation Score
 utility_nav: true
+lightbox: true
 prev_page:
   title: Utilities
   url: /utilities.html
@@ -15,9 +16,17 @@ toc:
     href: "#export"
   - title: Loading In REAPER
     href: "#loading-in-reaper"
+  - title: Max Bridge
+    href: "#max-bridge"
 ---
 
 # Automation Score
+
+<div class="utility-screenshot">
+  <button class="utility-screenshot-button" type="button" data-lightbox-image="assets/images/utilities/AutomationScore.png" aria-label="Open Automation Score screenshot">
+    <img src="assets/images/utilities/AutomationScore.png" alt="Automation Score browser utility">
+  </button>
+</div>
 
 [Open Automation Score](utilities/automation-score-designer/){:target="_blank" rel="noopener noreferrer" .utility-link}
 
@@ -66,3 +75,14 @@ writing.
 
 If the JSON contains section markers, the loader can also write them as REAPER
 project markers at the corresponding positions within the imported score range.
+
+## Max Bridge
+
+The optional Max bridge in `Scripts/s3g-mc/utilities/automation-score-max-bridge`
+reads the same Automation Score JSON. Open `Automation Score Player.maxpat`,
+drop a JSON export onto the patch, then use the playback controls to output
+interpolated lane values, section changes, and timing metadata at control rate.
+
+The V8 player can output generic lane messages, normalized value messages, or
+MIDI-CC-style `0..127` values. Print gates are closed by default so the patch can
+run without filling the Max console.

@@ -704,3 +704,89 @@ label select {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Compact toolbox controls; keep the room and reflection drawings at full scale. */
+.panel {
+  font-size: 10px;
+}
+
+.panel section {
+  margin: 5px;
+  padding: 6px;
+}
+
+.panel section + section {
+  margin-top: 5px;
+}
+
+.panel h2 {
+  min-height: 23px;
+  margin: -6px -6px 6px;
+  padding: 0 5px 0 6px;
+  font-size: 10px;
+}
+
+.panel .collapsible > h2::after {
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+}
+
+.panel label {
+  margin: 4px 0;
+  font-size: 10px;
+}
+
+.panel label input,
+.panel label select {
+  margin-top: 2px;
+}
+
+.panel button,
+.panel select,
+.panel input[type="number"],
+.panel .custom-select-button,
+.panel .custom-select-option {
+  min-height: 18px;
+  padding-left: 5px;
+  padding-right: 5px;
+  font-size: 10px;
+}
+
+.panel .custom-select,
+.panel .custom-select-button,
+.panel input[type="range"] {
+  margin-top: 2px;
+}
+
+.panel .custom-select-button {
+  padding-right: 18px;
+}
+
+.panel .custom-select-option {
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+.panel input[type="range"] {
+  height: 13px;
+}
+
+.panel .check-row {
+  gap: 6px;
+  min-height: 19px;
+}
+
+.panel .button-row {
+  gap: 3px;
+  margin: 5px 0 8px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .panel input[type="range"]::-webkit-slider-runnable-track,
+  .panel input[type="range"]::-webkit-slider-thumb,
+  .panel input[type="range"]::-moz-range-track,
+  .panel input[type="range"]::-moz-range-thumb {
+    height: 11px;
+  }
+}

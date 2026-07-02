@@ -80,11 +80,50 @@
           <a href="{{ '/utilities-automation-score-designer.html' | relative_url }}">Automation Score</a>
           <a href="{{ '/utilities-image-score-generator.html' | relative_url }}">Image Score</a>
           <a href="{{ '/utilities-ir-room-sketch-designer.html' | relative_url }}">IR Sketch</a>
-          <a href="{{ '/utilities-mover.html' | relative_url }}">Spatial Score</a>
+          <a href="{{ '/utilities-spatial-score.html' | relative_url }}">Spatial Score</a>
         </div>
         {% endif %}
       </aside>
       {% endif %}
     </div>
+    {% if page.lightbox %}
+    <div class="gallery-lightbox" data-page-lightbox aria-hidden="true">
+      <button class="gallery-close" type="button" data-page-lightbox-close aria-label="Close image">×</button>
+      <img data-page-lightbox-image src="" alt="">
+    </div>
+    <script>
+    (() => {
+      const triggers = Array.from(document.querySelectorAll("[data-lightbox-image]"));
+      const lightbox = document.querySelector("[data-page-lightbox]");
+      if (!triggers.length || !lightbox) return;
+      const image = document.querySelector("[data-page-lightbox-image]");
+      const close = document.querySelector("[data-page-lightbox-close]");
+
+      function show(trigger) {
+        const img = trigger.querySelector("img");
+        image.src = trigger.dataset.lightboxImage;
+        image.alt = img ? img.alt : "";
+        lightbox.setAttribute("aria-hidden", "false");
+        document.body.classList.add("gallery-open");
+      }
+
+      function hide() {
+        lightbox.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("gallery-open");
+        image.src = "";
+      }
+
+      triggers.forEach(trigger => trigger.addEventListener("click", () => show(trigger)));
+      close.addEventListener("click", hide);
+      lightbox.addEventListener("click", event => {
+        if (event.target === lightbox) hide();
+      });
+      document.addEventListener("keydown", event => {
+        if (lightbox.getAttribute("aria-hidden") === "true") return;
+        if (event.key === "Escape") hide();
+      });
+    })();
+    </script>
+    {% endif %}
   </body>
 </html>

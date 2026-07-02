@@ -2,6 +2,7 @@
 layout: default
 title: Image Score
 utility_nav: true
+lightbox: true
 prev_page:
   title: Utilities
   url: /utilities.html
@@ -22,6 +23,12 @@ toc:
 ---
 
 # Image Score
+
+<div class="utility-screenshot">
+  <button class="utility-screenshot-button" type="button" data-lightbox-image="assets/images/utilities/ImageScore.png" aria-label="Open Image Score screenshot">
+    <img src="assets/images/utilities/ImageScore.png" alt="Image Score browser utility">
+  </button>
+</div>
 
 ## Open Tool
 

@@ -315,6 +315,44 @@ a:focus-visible {
   filter: brightness(1.12);
 }
 
+.utility-screenshot {
+  display: flex;
+  justify-content: center;
+  margin: 18px auto 30px;
+}
+
+.utility-screenshot-button {
+  display: block;
+  width: min(100%, 760px);
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.utility-screenshot-button:hover,
+.utility-screenshot-button:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 5px;
+}
+
+.utility-screenshot-button img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #3f4744;
+  background: #050606;
+  box-shadow: 0 12px 42px rgba(0, 0, 0, 0.34);
+  transition: filter 160ms ease;
+}
+
+.utility-screenshot-button:hover img,
+.utility-screenshot-button:focus-visible img {
+  filter: brightness(1.08);
+}
+
 .gallery-lightbox {
   position: fixed;
   inset: 0;

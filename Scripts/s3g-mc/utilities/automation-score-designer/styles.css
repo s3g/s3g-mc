@@ -515,3 +515,87 @@ input[type="color"] {
   background: var(--panel);
   padding: 8px 10px;
 }
+
+/* Compact toolbox controls; keep the composition canvases at full scale. */
+.panel {
+  padding: 8px 8px 8px 0;
+  font-size: 10px;
+}
+
+.panel section {
+  padding: 6px;
+  margin-bottom: 6px;
+}
+
+.panel h2 {
+  min-height: 23px;
+  margin: -6px -6px 6px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+
+.panel h2::after {
+  width: 15px;
+  height: 15px;
+}
+
+.panel label {
+  gap: 3px;
+  margin: 5px 0;
+  font-size: 10px;
+}
+
+.panel button,
+.panel select,
+.panel input[type="text"],
+.panel input[type="number"],
+.panel input[type="color"],
+.panel .custom-select-button,
+.panel .custom-select-option {
+  min-height: 18px;
+  padding-left: 5px;
+  padding-right: 5px;
+  font-size: 10px;
+}
+
+.panel .custom-select-button {
+  padding-right: 18px;
+}
+
+.panel .custom-select-option {
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+.panel input[type="range"] {
+  height: 13px;
+  margin-top: 2px;
+}
+
+.panel .row,
+.panel .lane-list,
+.panel .section-list {
+  gap: 3px;
+}
+
+.panel .lane-button,
+.panel .section-button {
+  min-height: 20px;
+  padding: 0 5px;
+  gap: 5px;
+  font-size: 10px;
+}
+
+.panel .lane-swatch {
+  width: 8px;
+  height: 8px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .panel input[type="range"]::-webkit-slider-runnable-track,
+  .panel input[type="range"]::-webkit-slider-thumb,
+  .panel input[type="range"]::-moz-range-track,
+  .panel input[type="range"]::-moz-range-thumb {
+    height: 11px;
+  }
+}

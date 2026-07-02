@@ -48,7 +48,7 @@ local function find_utility_dir(name)
   return nil
 end
 
-local mover_dir = find_utility_dir("mover") or (script_dir .. "/utilities/mover")
+local spatial_score_dir = find_utility_dir("spatial-score") or find_utility_dir("mover") or (script_dir .. "/utilities/spatial-score")
 
 local function read_file(path)
   local file = io.open(path, "rb")
@@ -89,17 +89,17 @@ end
 
 local function start_server()
   if server_started then return true end
-  if not file_exists(mover_dir .. "/index.html") then
-    status = "Could not find utilities/mover/index.html."
+  if not file_exists(spatial_score_dir .. "/index.html") then
+    status = "Could not find utilities/spatial-score/index.html."
     return false
   end
   local sep = package.config:sub(1, 1)
   if sep == "\\" then
     os.execute('start "" /min python -m http.server ' .. tostring(PORT) ..
-      ' --bind 127.0.0.1 --directory "' .. mover_dir .. '"')
+      ' --bind 127.0.0.1 --directory "' .. spatial_score_dir .. '"')
   else
     os.execute("python3 -m http.server " .. tostring(PORT) ..
-      " --bind 127.0.0.1 --directory " .. shell_quote(mover_dir) ..
+      " --bind 127.0.0.1 --directory " .. shell_quote(spatial_score_dir) ..
       " >/dev/null 2>&1 &")
   end
   server_started = true
@@ -133,7 +133,7 @@ local function publish_json(prompt_if_missing)
     status = "Could not read JSON."
     return false
   end
-  if not write_file(mover_dir .. "/reaper-link.json", text) then
+  if not write_file(spatial_score_dir .. "/reaper-link.json", text) then
     status = "Could not write reaper-link.json."
     return false
   end
@@ -162,7 +162,7 @@ local function publish_playhead(force)
   local now = reaper.time_precise()
   if not force and now - last_write < WRITE_INTERVAL then return end
   last_write = now
-  write_file(mover_dir .. "/reaper-playhead.json", playhead_json())
+  write_file(spatial_score_dir .. "/reaper-playhead.json", playhead_json())
 end
 
 local function launch_browser()
