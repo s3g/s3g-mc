@@ -12,6 +12,7 @@ var playSeconds = 0;
 var sourceNorm = 0;
 var mode = "lanes";
 var showMarkers = true;
+var UI_FONT = "Menlo";
 
 var C = {
   bg: [0.055, 0.055, 0.055, 1],
@@ -88,9 +89,7 @@ function drawLanes(w, h) {
   mgraphics.rectangle(area.x + 0.5, area.y + 0.5, area.w - 1, area.h - 1);
   mgraphics.stroke();
 
-  var labelW = Math.min(84, Math.max(52, area.w * 0.18));
-  var plotX = area.x + labelW;
-  var plotW = area.w - labelW;
+  var timeline = timelineArea(area);
   var gap = 4;
   var laneH = (area.h - gap * Math.max(0, lanes.length - 1)) / Math.max(1, lanes.length);
 
@@ -108,7 +107,7 @@ function drawLanes(w, h) {
     rgba(lane.enabled === false ? C.muted : C.text);
     mgraphics.move_to(area.x + 15, y + Math.min(16, laneH - 4));
     mgraphics.show_text(shortName(lane.name || ("Lane " + (i + 1)), 12));
-    drawLaneCurve(lane, plotX + 4, y + 4, plotW - 8, Math.max(6, laneH - 8), col, lane.enabled !== false);
+    drawLaneCurve(lane, timeline.x, y + 4, timeline.w, Math.max(6, laneH - 8), col, lane.enabled !== false);
   }
 }
 
@@ -122,7 +121,8 @@ function drawOverlap(w, h) {
   for (var i = 0; i < lanes.length; i += 1) {
     var lane = lanes[i];
     var col = parseColor(lane.color, i);
-    drawLaneCurve(lane, area.x + 8, area.y + 8, area.w - 16, area.h - 16, col, lane.enabled !== false);
+    var timeline = timelineArea(area);
+    drawLaneCurve(lane, timeline.x, area.y + 8, timeline.w, area.h - 16, col, lane.enabled !== false);
   }
   rgba(C.line);
   mgraphics.rectangle(area.x + 0.5, area.y + 0.5, area.w - 1, area.h - 1);
@@ -165,9 +165,10 @@ function drawMarkers(w, h) {
   if (!showMarkers || !score) return;
   var sections = score.sections || [];
   var area = graphArea(w, h);
+  var timeline = timelineArea(area);
   setFont(8);
   for (var i = 0; i < sections.length; i += 1) {
-    var x = area.x + clamp(sections[i].t, 0, 1) * area.w;
+    var x = timeline.x + clamp(sections[i].t, 0, 1) * timeline.w;
     rgba(C.amber);
     mgraphics.set_line_width(1);
     mgraphics.move_to(x, area.y);
@@ -184,17 +185,18 @@ function drawMarkers(w, h) {
 
 function drawCursor(w, h) {
   var area = graphArea(w, h);
-  var x = area.x + clamp(sourceNorm, 0, 1) * area.w;
+  var timeline = timelineArea(area);
+  var x = timeline.x + clamp(sourceNorm, 0, 1) * timeline.w;
   rgba([C.play[0], C.play[1], C.play[2], 0.95]);
   mgraphics.set_line_width(2);
   mgraphics.move_to(x, area.y);
   mgraphics.line_to(x, area.y + area.h);
   mgraphics.stroke();
   rgba([C.cyan[0], C.cyan[1], C.cyan[2], 0.32]);
-  mgraphics.rectangle(area.x, area.y + area.h + 7, clamp(playNorm, 0, 1) * area.w, 5);
+  mgraphics.rectangle(timeline.x, area.y + area.h + 7, clamp(playNorm, 0, 1) * timeline.w, 5);
   mgraphics.fill();
   rgba(C.line);
-  mgraphics.rectangle(area.x, area.y + area.h + 7, area.w, 5);
+  mgraphics.rectangle(timeline.x, area.y + area.h + 7, timeline.w, 5);
   mgraphics.stroke();
 }
 
@@ -203,14 +205,18 @@ function drawStatus(w, h) {
   var sections = score ? (score.sections || []).length : 0;
   setFont(9);
   rgba(C.muted);
-  mgraphics.move_to(10, h - 12);
+  mgraphics.move_to(10, h - 10);
   mgraphics.show_text(playSeconds.toFixed(2) + "s / " + ((score && score.duration) ? score.duration.toFixed(2) : "0.00") + "s");
-  mgraphics.move_to(w - 145, h - 12);
+  mgraphics.move_to(w - 145, h - 10);
   mgraphics.show_text(lanes + " lanes  " + sections + " markers");
 }
 
 function graphArea(w, h) {
-  return { x: 10.5, y: 29.5, w: w - 21, h: Math.max(40, h - 58) };
+  return { x: 10.5, y: 29.5, w: w - 21, h: Math.max(40, h - 72) };
+}
+
+function timelineArea(area) {
+  return { x: area.x + 8, w: Math.max(1, area.w - 16) };
 }
 
 function scorejson() {
@@ -283,6 +289,12 @@ function bang() {
   mgraphics.redraw();
 }
 
+function anything() {
+  if (String(messagename || "") === "/automation") {
+    mgraphics.redraw();
+  }
+}
+
 function onclick(x, y) {
   var w = box.rect[2] - box.rect[0];
   if (y < 25 && x > w - 124) {
@@ -292,7 +304,7 @@ function onclick(x, y) {
 }
 
 function setFont(size) {
-  mgraphics.select_font_face("Arial");
+  mgraphics.select_font_face(UI_FONT);
   mgraphics.set_font_size(size);
 }
 

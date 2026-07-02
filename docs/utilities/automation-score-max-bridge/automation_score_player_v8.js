@@ -1,6 +1,6 @@
 autowatch = 1;
 inlets = 1;
-outlets = 4;
+outlets = 5;
 
 var automationScore = null;
 var duration = 1;
@@ -11,7 +11,7 @@ var loop = true;
 var palindromeEnabled = false;
 var direction = 1;
 var selectedLane = "all";
-var outputMode = "generic";
+var outputMode = "osc";
 var lastSectionIndex = -1;
 
 function read(path) {
@@ -223,7 +223,9 @@ function outputLane(index, laneData, t) {
   var enabled = laneData.enabled !== false;
   var value = enabled ? laneValue(laneData, t) : 0;
   var name = laneData.name || ("Lane " + index);
-  if (outputMode === "cc") {
+  if (outputMode === "osc") {
+    outlet(0, ["/automation/lane", index, Number(value.toFixed(6))]);
+  } else if (outputMode === "cc") {
     outlet(0, ["cc", index, Math.round(clamp(value, 0, 1) * 127)]);
   } else if (outputMode === "value") {
     outlet(0, ["value", index, Number(value.toFixed(6))]);
@@ -243,7 +245,14 @@ function outputSection(t) {
   if (current !== lastSectionIndex) {
     lastSectionIndex = current;
     var section = sections[current];
-    outlet(2, ["section", Number(section.index || current + 1), section.name || ("Section " + (current + 1)), Number((section.time || section.t * duration || 0).toFixed(6))]);
+    var index = Number(section.index || current + 1);
+    var name = section.name || ("Section " + (current + 1));
+    var time = Number((section.time || section.t * duration || 0).toFixed(6));
+    if (outputMode === "osc") {
+      outlet(3, ["/automation/marker", index, name, time, "bang"]);
+    } else {
+      outlet(3, ["section", index, name, time]);
+    }
   }
 }
 
@@ -385,5 +394,5 @@ function lerp(a, b, t) {
 }
 
 function status(message) {
-  outlet(3, String(message));
+  outlet(4, String(message));
 }

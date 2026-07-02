@@ -83,6 +83,10 @@ reads the same Automation Score JSON. Open `Automation Score Player.maxpat`,
 drop a JSON export onto the patch, then use the playback controls to output
 interpolated lane values, section changes, and timing metadata at control rate.
 
-The V8 player can output generic lane messages, normalized value messages, or
-MIDI-CC-style `0..127` values. Print gates are closed by default so the patch can
-run without filling the Max console.
+The default output is OSC-style token data:
+`/automation/lane lane-index normalized-value`. The address is a single
+Max symbol followed by payload atoms, so Max `route` objects can parse the lane
+stream directly. Other modes are available for compact normalized values,
+MIDI-CC-style `0..127` values, and more descriptive generic lane messages that
+include the lane name and enabled state. Print gates are closed by default so
+the patch can run without filling the Max console.
