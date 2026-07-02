@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.1
 -- @requires ReaImGui
--- @category Package / Utilities
+-- @category Utils
 -- @about
 --   Browser and launcher for the s3g-mc REAPER script collection. Scans this
 --   folder for Lua scripts, groups them by practical workflow category, and
@@ -47,7 +47,7 @@ local CATEGORY_ORDER = {
   "Multichannel Texture / Montage",
   "Item Channel Transforms",
   "Track Building / Routing",
-  "Package / Utilities",
+  "Utils",
 }
 
 local CATEGORY_LABELS = {
@@ -62,7 +62,7 @@ local CATEGORY_LABELS = {
   ["Multichannel Texture / Montage"] = "Texture",
   ["Item Channel Transforms"] = "Items",
   ["Track Building / Routing"] = "Routing",
-  ["Package / Utilities"] = "Package",
+  ["Utils"] = "Utils",
 }
 
 local function path_join(left, right)
@@ -159,7 +159,7 @@ local function classify(name, description)
   if hay:find("automation") or hay:find("mixer") or hay:find("fader") then return "Channel Mixing / Automation" end
   if hay:find("selected item") or hay:find("multichannel item") or hay:find("item channel") or hay:find("shred") then return "Item Channel Transforms" end
   if hay:find("selected tracks") or hay:find("selected mono tracks") or hay:find("track from") or hay:find("routing") then return "Track Building / Routing" end
-  return "Package / Utilities"
+  return "Utils"
 end
 
 local function scan_scripts()
@@ -260,7 +260,7 @@ local function draw_category_buttons()
   local rows = {
     { "All", "Channel Mixing / Automation", "MIDI Composition", "Procedural Synthesis", "Offline Synthesis / IR" },
     { "Spatial Panners", "3OAFX", "Spectral / Convolution", "Multichannel Texture / Montage" },
-    { "Item Channel Transforms", "Track Building / Routing", "Package / Utilities" },
+    { "Item Channel Transforms", "Track Building / Routing", "Utils" },
   }
   for _, row in ipairs(rows) do
     for index, category in ipairs(row) do

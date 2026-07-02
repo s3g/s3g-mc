@@ -1,7 +1,7 @@
 -- @description IR Sketch
 -- @author s3g
 -- @version 0.1
--- @category Package / Utilities
+-- @category Utils
 -- @method Opens the browser-based IR Sketch for preparing JSON room sketches used by 3OAFX Synthetic Ambisonic IR Bank.
 
 local script_name = "IR Sketch"

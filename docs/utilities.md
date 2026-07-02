@@ -33,9 +33,10 @@ When the package is installed with `Scripts/s3g-mc/utilities` in place, the Pack
 
 [Read Automation Score notes](utilities-automation-score-designer.md)
 
-Composes generic breakpoint lanes for REAPER automation. Export JSON from the
-browser, then run `Load Automation Score JSON` to write those lanes to selected
-track volume envelopes or sequential FX parameter envelopes.
+Composes generic breakpoint lanes and section markers for REAPER automation.
+Export JSON from the browser, then run `Load Automation Score JSON` to write
+those lanes to selected track volume envelopes or sequential FX parameter
+envelopes, with optional project markers.
 
 ## Image Score
 

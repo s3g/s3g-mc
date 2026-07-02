@@ -1,7 +1,7 @@
 -- @description Automation Score
 -- @author s3g
 -- @version 0.1
--- @category Channel Mixing / Automation
+-- @category Utils
 -- @method Opens the browser-based Automation Score for composing generic breakpoint automation JSON.
 
 local script_name = "Automation Score"

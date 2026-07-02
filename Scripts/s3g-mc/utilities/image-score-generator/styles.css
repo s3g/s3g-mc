@@ -212,7 +212,11 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .app {
-  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100vh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .topbar {
@@ -220,8 +224,7 @@ input[type="range"]::-moz-range-thumb {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  align-self: stretch;
-  width: 100%;
+  margin: 10px 10px 0;
   padding: 8px 10px;
   border: 1px solid var(--line);
   background: var(--panel);
@@ -339,14 +342,16 @@ h2 {
 .workspace {
   display: grid;
   grid-template-columns: minmax(520px, 1fr) 318px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .panel {
   background: var(--panel);
   border-left: 1px solid var(--line);
-  overflow: visible;
-  min-height: calc(100vh - 48px);
+  overflow: auto;
+  min-height: 0;
 }
 
 .panel.tools {
@@ -412,18 +417,27 @@ label select {
 
 .stage {
   min-width: 0;
-  overflow: visible;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   gap: 9px;
-  padding: 18px 14px 36px;
+  padding: 14px 14px 44px;
+  scroll-padding-bottom: 72px;
   background:
     linear-gradient(#171717 1px, transparent 1px),
     linear-gradient(90deg, #171717 1px, transparent 1px),
     #0d0d0d;
   background-size: 20px 20px;
+}
+
+.stage::after {
+  content: "";
+  flex: 0 0 28px;
+  width: 100%;
 }
 
 .canvas-frame {
@@ -488,17 +502,19 @@ label select {
 }
 
 .scan-windows {
+  --preview-h: 150px;
   display: grid;
-  grid-template-columns: 250px minmax(220px, 1fr) repeat(2, 88px);
-  gap: 10px;
+  grid-template-columns: 160px 76px 76px minmax(300px, 1fr);
+  gap: 8px;
   width: min(100%, 1024px);
   justify-content: start;
-  align-items: start;
+  align-items: stretch;
+  margin-bottom: 0;
 }
 
 .scan-windows figure {
   margin: 0;
-  padding: 7px;
+  padding: 5px;
   border: 1px solid var(--line);
   background: #141414;
 }
@@ -514,19 +530,19 @@ label select {
 
 .scan-windows canvas {
   display: block;
-  width: 48px;
-  height: 236px;
+  width: 60px;
+  height: var(--preview-h);
   margin: 0 auto;
-  border: 1px solid #5a5a5a;
+  border: 1px solid #343434;
   background: #000;
   image-rendering: pixelated;
 }
 
 .score-overview canvas {
   display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 2 / 1;
+  width: min(100%, calc(var(--preview-h) * 2));
+  height: var(--preview-h);
+  margin: 0 auto;
   border: 1px solid #4a5259;
   background: #050607;
   border-color: #4a5259;
@@ -535,6 +551,7 @@ label select {
 
 .score-overview {
   min-width: 0;
+  grid-column: 4;
 }
 
 .score-overview figcaption {
@@ -545,8 +562,8 @@ label select {
 }
 
 .aed-sphere-view canvas {
-  width: 236px;
-  height: 236px;
+  width: var(--preview-h);
+  height: var(--preview-h);
   border-color: #4a5259;
   cursor: grab;
   image-rendering: auto;
@@ -558,14 +575,14 @@ label select {
 
 .camera-buttons {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
-  margin-top: 6px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+  margin-top: 5px;
 }
 
 .camera-buttons button {
-  min-height: 22px;
-  padding: 0 4px;
+  min-height: 20px;
+  padding: 0 3px;
   font-size: 10px;
 }
 

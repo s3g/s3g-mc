@@ -42,6 +42,17 @@
           <div id="laneList" class="lane-list"></div>
         </section>
         <section>
+          <h2>Sections / Markers</h2>
+          <div class="row two">
+            <button id="addSection" type="button">Add Marker</button>
+            <button id="deleteSection" type="button">Delete Marker</button>
+          </div>
+          <div id="sectionList" class="section-list"></div>
+          <label>Name <input id="sectionName" type="text" /></label>
+          <label>Time s <input id="sectionTime" type="number" min="0" value="0" step="0.25" /></label>
+          <button id="sectionToPlayhead" type="button">Set To Playhead</button>
+        </section>
+        <section>
           <h2>Selected Lane</h2>
           <label>Name <input id="laneName" type="text" /></label>
           <label class="check"><input id="laneEnabled" type="checkbox" checked /> Enabled</label>

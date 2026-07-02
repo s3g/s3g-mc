@@ -13,8 +13,10 @@ const state = {
   duration: 16,
   pointRate: 16,
   lanes: [],
+  sections: [],
   selectedLane: 0,
   selectedPoint: -1,
+  selectedSection: 0,
   viewMode: "overlay",
   aggregateMode: "mean",
   projectionMode: "line",
@@ -44,6 +46,12 @@ const el = {
   addLane: document.getElementById("addLane"),
   deleteLane: document.getElementById("deleteLane"),
   laneList: document.getElementById("laneList"),
+  addSection: document.getElementById("addSection"),
+  deleteSection: document.getElementById("deleteSection"),
+  sectionList: document.getElementById("sectionList"),
+  sectionName: document.getElementById("sectionName"),
+  sectionTime: document.getElementById("sectionTime"),
+  sectionToPlayhead: document.getElementById("sectionToPlayhead"),
   laneName: document.getElementById("laneName"),
   laneEnabled: document.getElementById("laneEnabled"),
   laneColor: document.getElementById("laneColor"),
@@ -221,8 +229,13 @@ function newLane(index) {
 function resetField() {
   state.lanes = [];
   for (let i = 0; i < 8; i++) state.lanes.push(newLane(i));
+  state.sections = [
+    { name: "A", t: 0 },
+    { name: "B", t: 0.5 },
+  ];
   state.selectedLane = 0;
   state.selectedPoint = -1;
+  state.selectedSection = 0;
   syncControls();
 }
 
@@ -235,6 +248,77 @@ function sortPoints(lane) {
   if (!lane.points.length) lane.points.push({ t: 0, v: 0.5 }, { t: 1, v: 0.5 });
   lane.points[0].t = 0;
   lane.points[lane.points.length - 1].t = 1;
+}
+
+function sortSections() {
+  state.sections = state.sections
+    .map((section, index) => ({
+      name: section.name || `Section ${index + 1}`,
+      t: clamp(Number(section.t) || 0),
+    }))
+    .sort((a, b) => a.t - b.t);
+  state.selectedSection = Math.max(0, Math.min(state.selectedSection, Math.max(0, state.sections.length - 1)));
+}
+
+function selectedSection() {
+  if (!state.sections.length) {
+    state.sections.push({ name: "A", t: state.playT });
+    state.selectedSection = 0;
+  }
+  return state.sections[state.selectedSection] || state.sections[0];
+}
+
+function drawSectionMarkers(g, x0, y0, width, height, options = {}) {
+  if (!state.sections.length) return;
+  g.save();
+  g.font = "10px Menlo, Monaco, monospace";
+  state.sections.forEach((section, index) => {
+    const x = x0 + clamp(section.t) * width;
+    const active = index === state.selectedSection;
+    g.strokeStyle = active ? "rgba(240, 192, 103, 0.95)" : "rgba(216, 162, 74, 0.62)";
+    g.lineWidth = active ? 1.8 : 1;
+    g.beginPath();
+    g.moveTo(x, y0);
+    g.lineTo(x, y0 + height);
+    g.stroke();
+    if (!options.noLabel) {
+      const label = section.name || `S${index + 1}`;
+      g.fillStyle = active ? "#f0c067" : "#b98c46";
+      g.fillText(label, Math.min(x + 4, x0 + width - 48), y0 + 12);
+    }
+  });
+  g.restore();
+}
+
+function drawSectionRail() {
+  const r = markerRailRect();
+  ctx.save();
+  ctx.fillStyle = "#10100d";
+  ctx.strokeStyle = "#3d3320";
+  ctx.lineWidth = 1;
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.strokeRect(r.x, r.y, r.w, r.h);
+  ctx.fillStyle = "#8d7a50";
+  ctx.font = "10px Menlo, Monaco, monospace";
+  ctx.fillText("markers", r.x + 6, r.y + 14);
+  state.sections.forEach((section, index) => {
+    const x = r.x + clamp(section.t) * r.w;
+    const active = index === state.selectedSection;
+    ctx.fillStyle = active ? "#f0c067" : "#b98c46";
+    ctx.strokeStyle = "#050505";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, r.y + 3);
+    ctx.lineTo(x + 5, r.y + 11);
+    ctx.lineTo(x, r.y + 19);
+    ctx.lineTo(x - 5, r.y + 11);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = active ? "#f0c067" : "#9f8046";
+    ctx.fillText(section.name || `S${index + 1}`, Math.min(x + 7, r.x + r.w - 42), r.y + 14);
+  });
+  ctx.restore();
 }
 
 function laneValue(lane, t) {
@@ -354,7 +438,12 @@ function aggregateLabel() {
 function fieldRect() {
   const w = canvas.clientWidth;
   const h = canvas.clientHeight;
-  return { x: 52, y: 36, w: Math.max(120, w - 84), h: Math.max(120, h - 72) };
+  return { x: 52, y: 58, w: Math.max(120, w - 84), h: Math.max(120, h - 94) };
+}
+
+function markerRailRect() {
+  const r = fieldRect();
+  return { x: r.x, y: 28, w: r.w, h: 22 };
 }
 
 function timelineGeometry(width) {
@@ -459,9 +548,11 @@ function draw() {
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = "#050707";
   ctx.fillRect(0, 0, w, h);
+  drawSectionRail();
   if (state.viewMode === "overlay") drawGrid(fieldRect(), "");
   state.lanes.forEach((lane, index) => drawLane(lane, index));
   const r = fieldRect();
+  drawSectionMarkers(ctx, r.x, r.y, r.w, r.h, { noLabel: state.viewMode === "stacked" });
   const playX = r.x + state.playT * r.w;
   ctx.strokeStyle = "#d8a24a";
   ctx.lineWidth = 1.5;
@@ -516,6 +607,7 @@ function drawPlaybar() {
   } else {
     drawAggregateLine(pad, top, graphW, graphH, steps);
   }
+  drawSectionMarkers(barCtx, pad, top, graphW, graphH, { noLabel: false });
 
   const playX = pad + state.playT * graphW;
   barCtx.strokeStyle = "#f0c067";
@@ -549,6 +641,7 @@ function drawHeatmapWindow() {
   const graphW = Math.max(100, Math.min(geo.w, w - pad - 10));
   const steps = Math.max(96, Math.floor(graphW / 3));
   drawLaneHeatmap(heatCtx, pad, 10, graphW, h - 22, steps, { compact: false, labelOutside: true });
+  drawSectionMarkers(heatCtx, pad, 10, graphW, h - 22, { noLabel: true });
   heatCtx.fillStyle = "#888";
   heatCtx.font = "10px Menlo, Monaco, monospace";
   heatCtx.fillText("lane heatmap", pad, h - 5);
@@ -933,8 +1026,25 @@ function renderLaneList() {
   });
 }
 
+function renderSectionList() {
+  el.sectionList.innerHTML = "";
+  state.sections.forEach((section, index) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = `section-button${index === state.selectedSection ? " active" : ""}`;
+    b.innerHTML = `<span>${section.name || `S${index + 1}`}</span><span>${(section.t * state.duration).toFixed(2)}s</span>`;
+    b.addEventListener("click", () => {
+      state.selectedSection = index;
+      state.playT = clamp(section.t);
+      syncControls();
+    });
+    el.sectionList.appendChild(b);
+  });
+}
+
 function syncControls() {
   const lane = selectedLane();
+  const section = selectedSection();
   el.laneName.value = lane.name;
   el.laneEnabled.checked = lane.enabled;
   el.laneColor.value = lane.color;
@@ -960,8 +1070,17 @@ function syncControls() {
   el.relationshipCenterValue.textContent = Number(el.relationshipCenter.value).toFixed(2);
   el.deriveAmountValue.textContent = Number(el.deriveAmount.value).toFixed(2);
   el.deriveCenterValue.textContent = Number(el.deriveCenter.value).toFixed(2);
+  el.sectionName.value = section.name || "";
+  el.sectionTime.value = (clamp(section.t) * state.duration).toFixed(3);
   updateAllRangeFills();
   renderLaneList();
+  renderSectionList();
+}
+
+function syncSectionFields() {
+  const section = selectedSection();
+  el.sectionName.value = section.name || "";
+  el.sectionTime.value = (clamp(section.t) * state.duration).toFixed(3);
 }
 
 function generateShape(laneIndex) {
@@ -1129,6 +1248,12 @@ function exportData() {
     version: 1,
     duration: state.duration,
     point_rate: state.pointRate,
+    sections: state.sections.map((section, index) => ({
+      index: index + 1,
+      name: section.name || `Section ${index + 1}`,
+      t: +clamp(section.t).toFixed(6),
+      time: +(clamp(section.t) * state.duration).toFixed(6),
+    })),
     lanes,
   };
 }
@@ -1148,6 +1273,13 @@ function loadData(data) {
   if (!validFormat) throw new Error("not an Automation Score JSON file");
   state.duration = Number(data.duration) || 16;
   state.pointRate = Number(data.point_rate) || 16;
+  state.sections = (data.sections || data.markers || []).map((section, index) => {
+    const hasT = section.t !== undefined;
+    const t = hasT ? Number(section.t) : (Number(section.time) || 0) / Math.max(0.001, state.duration);
+    return { name: section.name || `Section ${index + 1}`, t: clamp(t) };
+  });
+  if (!state.sections.length) state.sections = [{ name: "A", t: 0 }, { name: "B", t: 0.5 }];
+  sortSections();
   state.lanes = (data.lanes || []).map((lane, index) => ({
     name: lane.name || `Lane ${index + 1}`,
     enabled: lane.enabled !== false,
@@ -1159,6 +1291,7 @@ function loadData(data) {
   state.lanes.forEach(sortPoints);
   state.selectedLane = 0;
   state.selectedPoint = -1;
+  state.selectedSection = 0;
   syncControls();
 }
 
@@ -1180,13 +1313,42 @@ function hitTest(x, y) {
   return best;
 }
 
+function hitTestSection(x, y, allowFullHeight) {
+  const r = fieldRect();
+  const rail = markerRailRect();
+  const inRail = y >= rail.y - 4 && y <= rail.y + rail.h + 4;
+  if (!inRail && (!allowFullHeight || y < r.y - 8 || y > r.y + r.h + 8)) return null;
+  let best = null;
+  const width = inRail ? rail.w : r.w;
+  const x0 = inRail ? rail.x : r.x;
+  state.sections.forEach((section, index) => {
+    const sx = x0 + clamp(section.t) * width;
+    const d = Math.abs(x - sx);
+    const threshold = inRail ? 16 : 9;
+    if (d < threshold && (!best || d < best.d)) best = { section: index, d };
+  });
+  return best;
+}
+
 canvas.addEventListener("pointerdown", event => {
   const { x, y } = pointerPos(event);
+  const sectionHit = hitTestSection(x, y, event.shiftKey);
+  if (sectionHit) {
+    state.selectedSection = sectionHit.section;
+    state.selectedPoint = -1;
+    const rail = markerRailRect();
+    const inRail = y >= rail.y - 4 && y <= rail.y + rail.h + 4;
+    state.drag = { type: "section", sectionRef: state.sections[sectionHit.section], rail: inRail };
+    canvas.setPointerCapture(event.pointerId);
+    syncControls();
+    return;
+  }
+
   const hit = hitTest(x, y);
   if (hit) {
     state.selectedLane = hit.lane;
     state.selectedPoint = hit.point;
-    state.drag = hit;
+    state.drag = { type: "point", lane: hit.lane, point: hit.point };
   } else {
     const laneIndex = state.viewMode === "stacked"
       ? Math.max(0, Math.min(state.lanes.length - 1, state.lanes.findIndex((_, i) => {
@@ -1199,7 +1361,7 @@ canvas.addEventListener("pointerdown", event => {
     selectedLane().points.push(p);
     sortPoints(selectedLane());
     state.selectedPoint = selectedLane().points.findIndex(q => q === p);
-    state.drag = { lane: state.selectedLane, point: state.selectedPoint };
+    state.drag = { type: "point", lane: state.selectedLane, point: state.selectedPoint };
   }
   canvas.setPointerCapture(event.pointerId);
   syncControls();
@@ -1208,6 +1370,15 @@ canvas.addEventListener("pointerdown", event => {
 canvas.addEventListener("pointermove", event => {
   if (!state.drag) return;
   const { x, y } = pointerPos(event);
+  if (state.drag.type === "section") {
+    const r = state.drag.rail ? markerRailRect() : fieldRect();
+    const section = state.drag.sectionRef;
+    section.t = clamp((x - r.x) / Math.max(1, r.w));
+    state.selectedSection = state.sections.findIndex(item => item === section);
+    if (state.selectedSection < 0) state.selectedSection = 0;
+    syncSectionFields();
+    return;
+  }
   const lane = state.lanes[state.drag.lane];
   const p = screenToPoint(x, y, state.drag.lane);
   const idx = state.drag.point;
@@ -1217,6 +1388,13 @@ canvas.addEventListener("pointermove", event => {
 });
 
 canvas.addEventListener("pointerup", event => {
+  if (state.drag && state.drag.type === "section") {
+    const section = state.drag.sectionRef;
+    sortSections();
+    state.selectedSection = state.sections.findIndex(item => item === section);
+    if (state.selectedSection < 0) state.selectedSection = 0;
+    syncControls();
+  }
   state.drag = null;
   canvas.releasePointerCapture(event.pointerId);
 });
@@ -1256,6 +1434,33 @@ el.deleteLane.addEventListener("click", () => {
   if (state.lanes.length <= 1) return;
   state.lanes.splice(state.selectedLane, 1);
   state.selectedLane = Math.max(0, state.selectedLane - 1);
+  syncControls();
+});
+el.addSection.addEventListener("click", () => {
+  state.sections.push({ name: `Section ${state.sections.length + 1}`, t: state.playT });
+  sortSections();
+  state.selectedSection = state.sections.findIndex(section => Math.abs(section.t - state.playT) < 0.000001);
+  if (state.selectedSection < 0) state.selectedSection = state.sections.length - 1;
+  syncControls();
+});
+el.deleteSection.addEventListener("click", () => {
+  if (!state.sections.length) return;
+  state.sections.splice(state.selectedSection, 1);
+  state.selectedSection = Math.max(0, state.selectedSection - 1);
+  syncControls();
+});
+el.sectionName.addEventListener("input", () => {
+  selectedSection().name = el.sectionName.value;
+  renderSectionList();
+});
+el.sectionTime.addEventListener("input", () => {
+  selectedSection().t = clamp((Number(el.sectionTime.value) || 0) / Math.max(0.001, state.duration));
+  sortSections();
+  syncControls();
+});
+el.sectionToPlayhead.addEventListener("click", () => {
+  selectedSection().t = state.playT;
+  sortSections();
   syncControls();
 });
 el.laneName.addEventListener("input", () => { selectedLane().name = el.laneName.value; renderLaneList(); });

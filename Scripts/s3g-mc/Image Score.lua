@@ -1,7 +1,7 @@
 -- @description Image Score
 -- @author s3g
 -- @version 0.1
--- @category Package / Utilities
+-- @category Utils
 -- @method Opens the browser-based Image Score for composing PNG scores used by 3OAFX Image Sonogram Field.
 
 local script_name = "Image Score"

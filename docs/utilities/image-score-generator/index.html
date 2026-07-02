@@ -8,28 +8,28 @@
   </head>
   <body>
     <main class="app">
+      <header class="topbar">
+        <div>
+          <h1>s3g-mc Image Score</h1>
+          <p>512 x 256 PNG scores for 3OAFX Image Sonogram Field</p>
+        </div>
+        <div class="top-actions">
+          <button id="newScore" type="button">New</button>
+          <button id="importImageButton" type="button">Import PNG</button>
+          <input id="importImage" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+          <label class="export-select">Export as
+            <select id="exportMode">
+              <option value="rgba">RGBA Score PNG</option>
+              <option value="mask">Mask PNG</option>
+              <option value="alpha">Alpha PNG</option>
+              <option value="color">Color PNG</option>
+            </select>
+          </label>
+          <button id="exportScore" type="button">Export</button>
+        </div>
+      </header>
       <section class="workspace">
         <section class="stage">
-          <header class="topbar">
-            <div>
-              <h1>s3g-mc Image Score</h1>
-              <p>512 x 256 PNG scores for 3OAFX Image Sonogram Field</p>
-            </div>
-            <div class="top-actions">
-              <button id="newScore" type="button">New</button>
-              <button id="importImageButton" type="button">Import PNG</button>
-              <input id="importImage" type="file" accept="image/png,image/jpeg,image/webp" hidden />
-              <label class="export-select">Export as
-                <select id="exportMode">
-                  <option value="rgba">RGBA Score PNG</option>
-                  <option value="mask">Mask PNG</option>
-                  <option value="alpha">Alpha PNG</option>
-                  <option value="color">Color PNG</option>
-                </select>
-              </label>
-              <button id="exportScore" type="button">Export</button>
-            </div>
-          </header>
           <div class="canvas-frame">
             <canvas id="scoreCanvas" width="512" height="256"></canvas>
             <canvas id="overlayCanvas" width="512" height="256"></canvas>

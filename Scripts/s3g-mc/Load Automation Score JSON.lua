@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.2
 -- @requires ReaImGui
--- @category Channel Mixing / Automation
+-- @category Utils
 -- @method Loads Automation Score JSON and maps generic score lanes to selected track volume envelopes or FX parameter envelopes.
 
 local script_name = "Load Automation Score JSON"
@@ -14,11 +14,15 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ctx
 
 local TARGET_TYPES = { "Track volume dB", "FX parameter", "Skip" }
 local TARGET_VOLUME = 1
 local TARGET_FX = 2
 local TARGET_SKIP = 3
+local WRITE_MODES = { "Replace range", "Append at start/cursor" }
+local WRITE_REPLACE = 1
+local WRITE_APPEND = 2
 
 local function message(text)
   reaper.MB(text, script_name, 0)
@@ -212,9 +216,11 @@ local function volume_envelope_value(env, db)
   return amp
 end
 
-local function write_lane(env, lane, start_pos, duration, use_samples, transform)
+local function write_lane(env, lane, start_pos, duration, use_samples, transform, replace_range)
   if not env then return 0 end
-  reaper.DeleteEnvelopePointRange(env, start_pos - 0.0001, start_pos + duration + 0.0001)
+  if replace_range then
+    reaper.DeleteEnvelopePointRange(env, start_pos - 0.0001, start_pos + duration + 0.0001)
+  end
   local points = use_samples and lane.samples or lane.points
   if not points or #points == 0 then points = lane.points end
   local inserted = 0
@@ -297,6 +303,20 @@ for _, lane in ipairs(data.lanes or {}) do
 end
 if #lanes == 0 then message("No enabled lanes found in the JSON file.") return end
 
+local sections = {}
+for index, section in ipairs(data.sections or data.markers or {}) do
+  local t = tonumber(section.t)
+  if not t then
+    t = (tonumber(section.time) or 0) / math.max(0.001, tonumber(data.duration) or 16)
+  end
+  t = clamp(t or 0, 0, 1)
+  sections[#sections + 1] = {
+    name = tostring(section.name or ("Section " .. tostring(index))),
+    t = t,
+  }
+end
+table.sort(sections, function(a, b) return a.t < b.t end)
+
 local tracks = selected_tracks()
 if #tracks == 0 then message("Select one or more target tracks before loading the JSON.") return end
 
@@ -306,10 +326,12 @@ for i, info in ipairs(tracks) do track_names[i] = tostring(i) .. ": " .. info.na
 local start_pos = reaper.GetCursorPosition()
 local duration = tonumber(data.duration) or 16
 local use_samples = true
+local write_markers = true
+local write_mode = WRITE_APPEND
 local write_requested = false
 local status = "Ready. Assign each score lane to a track volume envelope, FX parameter, or Skip."
 local open = true
-local ctx = ImGui.CreateContext(script_name)
+ctx = ImGui.CreateContext(script_name)
 
 local assignments = {}
 for i, lane in ipairs(lanes) do
@@ -361,11 +383,26 @@ local function assign_fx_sequential()
   end
 end
 
+local function write_project_markers()
+  if not write_markers or #sections == 0 then return 0 end
+  local count = 0
+  for _, section in ipairs(sections) do
+    local pos = start_pos + clamp(section.t or 0, 0, 1) * duration
+    local name = section.name ~= "" and section.name or "Automation Score"
+    if reaper.AddProjectMarker2(0, false, pos, 0, name, -1, 0) >= 0 then
+      count = count + 1
+    end
+  end
+  return count
+end
+
 local function write_automation()
   if #tracks == 0 then return false, "No selected target tracks." end
+  local replace_range = write_mode == WRITE_REPLACE
   local total = 0
   local skipped = 0
   reaper.Undo_BeginBlock()
+  local marker_count = write_project_markers()
   for i, lane in ipairs(lanes) do
     local a = assignments[i]
     if not a or a.target == TARGET_SKIP then
@@ -381,7 +418,7 @@ local function write_automation()
         total = total + write_lane(env, lane, start_pos, duration, use_samples, function(v)
           local db = min_db + v * (max_db - min_db)
           return volume_envelope_value(env, db)
-        end)
+        end, replace_range)
       elseif a.target == TARGET_FX then
         local fx_names, fx_count = track_fx_names(track_info.track)
         local fx_index = math.max(0, math.min(fx_count - 1, (tonumber(a.fx_index) or 1) - 1))
@@ -395,14 +432,14 @@ local function write_automation()
         local max_value = tonumber(a.max_value) or 1
         total = total + write_lane(env, lane, start_pos, duration, use_samples, function(v)
           return min_value + v * (max_value - min_value)
-        end)
+        end, replace_range)
         end
       end
     end
   end
   reaper.UpdateArrange()
   reaper.Undo_EndBlock(script_name, -1)
-  return true, string.format("Wrote %d automation points from %.2f to %.2f seconds. Skipped %d lane(s).", total, start_pos, start_pos + duration, skipped)
+  return true, string.format("%s %d automation points and %d project marker(s) from %.2f to %.2f seconds. Skipped %d lane(s).", replace_range and "Replaced with" or "Appended", total, marker_count, start_pos, start_pos + duration, skipped)
 end
 
 local function draw_assignment_row(i, lane, a)
@@ -472,7 +509,14 @@ local function loop()
     changed, start_pos = ImGui.InputDouble(ctx, "Start time", start_pos, 0.1, 1.0, "%.3f")
     changed, duration = ImGui.InputDouble(ctx, "Duration", duration, 1.0, 10.0, "%.3f")
     duration = math.max(0.001, duration)
+    ImGui.SetNextItemWidth(ctx, 180)
+    write_mode = combo(ctx, "Write mode", write_mode, WRITE_MODES)
     changed, use_samples = ImGui.Checkbox(ctx, "Use sampled points from JSON", use_samples)
+    changed, write_markers = ImGui.Checkbox(ctx, "Write section markers to project", write_markers)
+    if #sections > 0 then
+      ImGui.SameLine(ctx)
+      disabled_text(tostring(#sections) .. " marker(s)")
+    end
 
     if ImGui.Button(ctx, "Refresh Tracks", 118, 24) then refresh_tracks() end
     ImGui.SameLine(ctx)

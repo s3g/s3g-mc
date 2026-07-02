@@ -401,14 +401,21 @@ input[type="color"] {
   color: var(--text);
 }
 
-.lane-list {
+.lane-list,
+.section-list {
   display: grid;
   gap: 4px;
   max-height: 250px;
   overflow: auto;
 }
 
-.lane-button {
+.section-list {
+  max-height: 120px;
+  margin-top: 6px;
+}
+
+.lane-button,
+.section-button {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr) auto;
   gap: 6px;
@@ -421,9 +428,19 @@ input[type="color"] {
   text-align: left;
 }
 
+.section-button {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .lane-button.active {
   border-color: var(--accent);
   color: var(--text);
+}
+
+.section-button.active {
+  border-color: var(--accent-2);
+  color: var(--text);
+  background: #241e14;
 }
 
 .lane-swatch {

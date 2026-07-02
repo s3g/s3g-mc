@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.1
 -- @requires JSFX: s3g 8ch 3OA Object Encoder
--- @category Spatial Panners
+-- @category Utils
 -- @method Loads a s3g-mc Spatial Score JSON file, creates bank encoder tracks and a 16-channel 3OA bus, and writes source motion automation from the exported browser composition.
 
 local script_name = "Load Spatial Score JSON"

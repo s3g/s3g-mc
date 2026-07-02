@@ -2,7 +2,7 @@
 -- @author s3g
 -- @version 0.1
 -- @requires ReaImGui; Python 3
--- @category Spatial Panners
+-- @category Utils
 -- @method Opens the browser-based s3g-mc Spatial Score with the last loaded Spatial Score JSON and writes a small playhead file so the browser can follow REAPER transport.
 
 local SCRIPT_NAME = "Spatial Score Browser Link"
@@ -29,6 +29,7 @@ local duration = tonumber(reaper.GetExtState(EXT_SECTION, "duration")) or 16
 local status = "Ready"
 local last_write = 0
 local server_started = false
+local tried_auto_launch = false
 
 local function file_exists(path)
   local file = io.open(path, "rb")
@@ -116,8 +117,12 @@ local function choose_json()
   return false
 end
 
-local function publish_json()
+local function publish_json(prompt_if_missing)
   if json_path == "" or not file_exists(json_path) then
+    if not prompt_if_missing then
+      status = "No Spatial Score JSON is selected. Use Choose JSON, or run Load Spatial Score JSON first."
+      return false
+    end
     if not choose_json() then
       status = "No Spatial Score JSON selected."
       return false
@@ -161,7 +166,7 @@ local function publish_playhead(force)
 end
 
 local function launch_browser()
-  if not publish_json() then return end
+  if not publish_json(true) then return end
   publish_playhead(true)
   if not start_server() then return end
   local url = "http://127.0.0.1:" .. tostring(PORT) ..
@@ -192,7 +197,23 @@ local function draw()
   end
 end
 
-launch_browser()
+local function auto_launch_if_ready()
+  if tried_auto_launch then return end
+  tried_auto_launch = true
+  if json_path ~= "" and file_exists(json_path) then
+    if not publish_json(false) then return end
+    publish_playhead(true)
+    if not start_server() then return end
+    local url = "http://127.0.0.1:" .. tostring(PORT) ..
+      "/?reaper_link=1&cache=" .. url_quote(tostring(math.floor(reaper.time_precise() * 1000)))
+    open_url(url)
+    status = "Browser link active on port " .. tostring(PORT)
+  else
+    status = "Ready. Choose a Spatial Score JSON, or run Load Spatial Score JSON first."
+  end
+end
+
+auto_launch_if_ready()
 
 local function loop()
   publish_playhead(false)
