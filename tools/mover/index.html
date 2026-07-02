@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Mover</title>
+    <title>s3g-mc Mover</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -11,7 +11,7 @@
       <section class="stage">
         <header class="topbar">
           <div>
-            <h1>Mover</h1>
+            <h1>s3g-mc Mover</h1>
             <p>Spatial motion designer for 8-source 3OA encoder banks</p>
           </div>
           <div class="transport">
@@ -19,6 +19,7 @@
             <button id="stop" type="button" title="Stop">■</button>
             <button id="importJson" type="button" title="Import JSON">Import</button>
             <button id="exportJson" type="button" title="Export JSON">Export</button>
+            <button id="recordClip" type="button" title="Record canvas clip">Record</button>
             <button id="fullscreenView" type="button" title="Fullscreen View">View</button>
             <input id="jsonFile" type="file" accept="application/json,.json" hidden />
           </div>
@@ -71,8 +72,10 @@
             <button id="generateScenes" type="button">Generate A-H</button>
           </div>
           <label class="check"><input id="varySceneBanks" type="checkbox" /> Vary motion banks</label>
+          <label class="check"><input id="randomMorphTime" type="checkbox" checked /> Random morph time</label>
           <label>Motion bank
             <select id="bankMode">
+              <option value="manual">Manual</option>
               <option value="orbit">Orbit</option>
               <option value="weave">Weave</option>
               <option value="lattice">Lattice</option>
@@ -94,6 +97,7 @@
               <option value="cardew">Cardew</option>
               <option value="path">Path</option>
               <option value="scatter">Scatter</option>
+              <option value="physics">Physics</option>
             </select>
           </label>
           <label>Variant
@@ -116,14 +120,38 @@
               <option value="still">Still</option>
             </select>
           </label>
-          <label>Duration s <input id="duration" type="range" min="1" max="180" value="16" step="0.25" /></label>
-          <label>Point rate / s <input id="pointRate" type="range" min="4" max="96" value="32" step="1" /></label>
+          <label>Preview duration s <span id="durationValue" class="value-readout">16.00s</span><input id="duration" type="range" min="1" max="180" value="16" step="0.25" /></label>
+          <label>Point rate / s <span id="pointRateValue" class="value-readout">32/s</span><input id="pointRate" type="range" min="4" max="96" value="32" step="1" /></label>
+          <div id="pointCountValue" class="value-readout">512 points per source</div>
           <label>Motion <input id="motion" type="range" min="0" max="1" value="0.42" step="0.01" /></label>
           <label>Width <input id="width" type="range" min="0" max="1" value="0.58" step="0.01" /></label>
           <label>Disorder <input id="disorder" type="range" min="0" max="1" value="0.18" step="0.01" /></label>
           <label>Gravity <input id="gravity" type="range" min="0" max="1" value="0.46" step="0.01" /></label>
           <label>Development <input id="development" type="range" min="0" max="1" value="0.35" step="0.01" /></label>
           <label>Topo warp <input id="topoWarp" type="range" min="0" max="1" value="0.18" step="0.01" /></label>
+          <label class="physics-only">Attract <input id="physAttract" type="range" min="0" max="1" value="0.32" step="0.01" /></label>
+          <label class="physics-only">Repel <input id="physRepel" type="range" min="0" max="1" value="0.42" step="0.01" /></label>
+          <label class="physics-only">Bounce <input id="physBounce" type="range" min="0" max="1" value="0.52" step="0.01" /></label>
+          <label class="physics-only">Collision <input id="physCollision" type="range" min="0" max="1" value="0.34" step="0.01" /></label>
+          <label class="physics-only">Damping <input id="physDamping" type="range" min="0" max="1" value="0.38" step="0.01" /></label>
+          <label class="physics-only">Turbulence <input id="physTurbulence" type="range" min="0" max="1" value="0.28" step="0.01" /></label>
+          <label class="check"><input id="arcSluiceOn" type="checkbox" /> Arc sluice</label>
+          <label class="arc-sluice-only">Arc mode
+            <select id="arcSluiceMode">
+              <option value="quarter" selected>Quarter Sphere</option>
+              <option value="vertical">Vertical Hemisphere</option>
+              <option value="diameter">Diameter</option>
+              <option value="full">Full Sphere</option>
+            </select>
+          </label>
+          <label class="arc-sluice-only">Arc walls <input id="arcWallCount" type="range" min="1" max="6" value="1" step="1" /></label>
+          <label class="arc-sluice-only">Sluice holes <input id="arcSluiceHoles" type="range" min="0" max="4" value="1" step="1" /></label>
+          <label class="arc-sluice-only">Sluice size <input id="arcSluiceSize" type="range" min="0" max="1" value="0.55" step="0.01" /></label>
+          <label class="arc-sluice-only">Arc azimuth <input id="arcSluiceAzimuth" type="range" min="-180" max="180" value="0" step="1" /></label>
+          <label class="arc-sluice-only">Arc dispersion <input id="arcWallSpread" type="range" min="0" max="1" value="0.36" step="0.01" /></label>
+          <label class="arc-sluice-only">Arc width <input id="arcWallWidth" type="range" min="0" max="1" value="0.42" step="0.01" /></label>
+          <label class="arc-sluice-only">Sluice pull <input id="arcSluicePull" type="range" min="0" max="1" value="0.45" step="0.01" /></label>
+          <label class="arc-sluice-only">Spit force <input id="arcSluiceSpit" type="range" min="0" max="1" value="0.34" step="0.01" /></label>
         </section>
         <section>
           <h2>Source</h2>
@@ -131,7 +159,9 @@
             <select id="sourceSelect"></select>
           </label>
           <label>Gain <input id="sourceGain" type="range" min="0" max="1.5" value="1" step="0.01" /></label>
-          <label>Distance <input id="sourceDistance" type="range" min="0.1" max="3" value="1" step="0.01" /></label>
+          <label>Azimuth <span id="sourceAzimuthValue" class="value-readout">0 deg</span><input id="sourceAzimuth" type="range" min="-180" max="180" value="0" step="1" /></label>
+          <label>Elevation <span id="sourceElevationValue" class="value-readout">0 deg</span><input id="sourceElevation" type="range" min="-85" max="85" value="0" step="1" /></label>
+          <label>Distance <span id="sourceDistanceValue" class="value-readout">1.00 m</span><input id="sourceDistance" type="range" min="0.1" max="3" value="1" step="0.01" /></label>
           <div class="row two">
             <button id="toggleSource" type="button">Mute Source</button>
             <button id="resetSources" type="button">Reset Sources</button>
@@ -148,6 +178,12 @@
           <label>Camera az <input id="cameraAz" type="range" min="-180" max="180" value="-35" step="1" /></label>
           <label>Camera el <input id="cameraEl" type="range" min="-85" max="85" value="36" step="1" /></label>
           <label>Zoom <input id="zoom" type="range" min="0.45" max="2.8" value="1" step="0.01" /></label>
+          <label>Spatial constraint
+            <select id="spatialConstraint">
+              <option value="sphere" selected>Full Sphere</option>
+              <option value="hemisphere">Upper Hemisphere</option>
+            </select>
+          </label>
           <label>Analysis scope
             <select id="analysisScope">
               <option value="global" selected>All Groups</option>

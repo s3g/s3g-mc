@@ -54,4 +54,6 @@ room export. Load the exported JSON with `Load Room Sketch JSON` inside
 
 Designs banked third-order ambisonic source motion in the browser. Exported
 JSON can be loaded in REAPER with `Load Mover JSON`, which creates encoder
-tracks and writes automation for `s3g 8ch 3OA Object Encoder`.
+tracks and writes automation for `s3g 8ch 3OA Object Encoder`. An optional Max
+bridge in `tools/mover-max-bridge` can read the same JSON for ICST
+AmbiMonitor-style playback and monitoring patches.

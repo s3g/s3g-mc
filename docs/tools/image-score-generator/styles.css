@@ -375,6 +375,12 @@ label select {
   margin-top: 8px;
 }
 
+.generator-action {
+  grid-template-columns: 1fr;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
 #toolButtons {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

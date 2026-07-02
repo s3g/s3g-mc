@@ -15,7 +15,6 @@
         </div>
         <div class="top-actions">
           <button id="newScore" type="button">New</button>
-          <button id="randomize" type="button">Generate</button>
           <button id="importImageButton" type="button">Import PNG</button>
           <input id="importImage" type="file" accept="image/png,image/jpeg,image/webp" hidden />
           <label class="export-select">Export as
@@ -84,6 +83,9 @@
 
           <section class="collapsible">
             <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Generator</span></h2>
+            <div class="button-row generator-action">
+              <button id="randomize" type="button">Generate</button>
+            </div>
             <label>Rule
               <select id="rule">
                 <option value="contours">Contour Lines</option>

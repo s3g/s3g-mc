@@ -23,6 +23,8 @@ toc:
     href: "#reaper-export"
   - title: Browser Link
     href: "#browser-link"
+  - title: Max Bridge
+    href: "#max-bridge"
 ---
 
 # Mover
@@ -51,8 +53,23 @@ scene name. `Auto Next` advances through the scenes in order during preview.
 
 Motion banks provide families of movement such as orbit, weave, lattice, frame,
 trace, pulse, suspend, leap, field, molec, fluid, forsy, flock, eco, contact,
-march, procession, xenak, cardew, path, and scatter. Variants change the local
-behavior within a bank.
+march, procession, xenak, cardew, path, scatter, and physics. The physics bank
+adapts the older Max physics macro idea into deterministic scene behaviors such
+as calm, swarm, bounce, orbit, tether, drift, vortex, and well. Variants change
+the local behavior within a bank.
+
+Variant names change with the selected motion bank. They keep the same stored
+keys for JSON compatibility, but the visible names and internal profile nudges
+are bank aware, so variants steer each bank toward a more specific movement
+style.
+
+For the physics bank, `Attract`, `Repel`, `Bounce`, `Collision`, `Damping`, and
+`Turbulence` act inside the motion generator. Physics variants also shape these
+forces. `Arc sluice` adds a multi-arc boundary with moving gaps, using the same
+collision and bounce controls. `Analysis influence` is a separate global layer,
+so it is usually clearest to audition physics motion with analysis influence low
+or off, then add analysis only when a scene needs additional centroid or spread
+control.
 
 `Generate Motion` creates a new seeded variant for the active scene. Captured
 motion can then be held, morphed into the next scene, and exported as part of a
@@ -84,3 +101,15 @@ same JSON in the browser and follow REAPER transport. The link starts a local
 browser view, writes a small playhead file while the ReaScript window is open,
 and lets the Mover visual act as a large monitor for the automation already
 written into REAPER.
+
+## Max Bridge
+
+The optional Max bridge in `tools/mover-max-bridge` reads exported Mover JSON
+directly with a V8 script. It plays back the exported automation arrays at
+control rate. In ICST mode it outputs AmbiMonitor point messages in the format
+`aed index azimuth elevation distance`.
+
+This keeps Mover JSON as the source format and avoids converting continuous
+motion into ICST snapshot XML. The bridge is a translation layer: adapt its
+generic source-message outlet if another Max-based monitoring patch needs
+group, source, or gain data.

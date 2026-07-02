@@ -8,6 +8,7 @@ const ui = {
   app: document.querySelector(".app"),
   importJson: el("importJson"),
   exportJson: el("exportJson"),
+  recordClip: el("recordClip"),
   fullscreenView: el("fullscreenView"),
   closeFullscreen: el("closeFullscreen"),
   jsonFile: el("jsonFile"),
@@ -28,27 +29,53 @@ const ui = {
   randomScene: el("randomScene"),
   generateScenes: el("generateScenes"),
   varySceneBanks: el("varySceneBanks"),
+  randomMorphTime: el("randomMorphTime"),
   morphScene: el("morphScene"),
   autoNext: el("autoNext"),
   sceneLoop: el("sceneLoop"),
   bankMode: el("bankMode"),
   sceneMode: el("sceneMode"),
   duration: el("duration"),
+  durationValue: el("durationValue"),
   pointRate: el("pointRate"),
+  pointRateValue: el("pointRateValue"),
+  pointCountValue: el("pointCountValue"),
   motion: el("motion"),
   width: el("width"),
   disorder: el("disorder"),
   gravity: el("gravity"),
   development: el("development"),
   topoWarp: el("topoWarp"),
+  physAttract: el("physAttract"),
+  physRepel: el("physRepel"),
+  physBounce: el("physBounce"),
+  physCollision: el("physCollision"),
+  physDamping: el("physDamping"),
+  physTurbulence: el("physTurbulence"),
+  arcSluiceOn: el("arcSluiceOn"),
+  arcSluiceMode: el("arcSluiceMode"),
+  arcWallCount: el("arcWallCount"),
+  arcSluiceHoles: el("arcSluiceHoles"),
+  arcSluiceSize: el("arcSluiceSize"),
+  arcSluiceAzimuth: el("arcSluiceAzimuth"),
+  arcWallSpread: el("arcWallSpread"),
+  arcWallWidth: el("arcWallWidth"),
+  arcSluicePull: el("arcSluicePull"),
+  arcSluiceSpit: el("arcSluiceSpit"),
   sourceSelect: el("sourceSelect"),
   sourceGain: el("sourceGain"),
+  sourceAzimuth: el("sourceAzimuth"),
+  sourceAzimuthValue: el("sourceAzimuthValue"),
+  sourceElevation: el("sourceElevation"),
+  sourceElevationValue: el("sourceElevationValue"),
   sourceDistance: el("sourceDistance"),
+  sourceDistanceValue: el("sourceDistanceValue"),
   toggleSource: el("toggleSource"),
   resetSources: el("resetSources"),
   cameraAz: el("cameraAz"),
   cameraEl: el("cameraEl"),
   zoom: el("zoom"),
+  spatialConstraint: el("spatialConstraint"),
   analysisScope: el("analysisScope"),
   neighborLinks: el("neighborLinks"),
   analysisInfluence: el("analysisInfluence"),
@@ -65,14 +92,40 @@ const COLORS = ["#6ee7f2", "#f2c56e", "#ff7f6e", "#9de67f", "#b998ff", "#f06eca"
 const SCENE_COLORS = ["#5aa8c7", "#d8a24a", "#cf695f", "#7ea65a", "#9b83d8", "#cf6bb0", "#7f9bd8", "#d7d7d7"];
 const SCENES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const MOTION_BANKS = [
+  "manual",
   "orbit", "weave", "lattice", "frame", "trace", "pulse", "suspend", "leap",
   "field", "molec", "fluid", "forsy", "flock", "eco", "contact", "march",
-  "procession", "xenak", "cardew", "path", "scatter",
+  "procession", "xenak", "cardew", "path", "scatter", "physics",
 ];
 const VARIANTS = [
   "primary", "alternate", "wide", "fold", "canon", "suspend", "burst", "drift",
   "ribbon", "gate", "mirror", "surge", "tether", "vortex", "yield", "still",
 ];
+const VARIANT_LABELS = {
+  manual: ["Placed points", "Placed points", "Placed points", "Placed points", "Placed points", "Placed points", "Placed points", "Placed points", "Placed points", "Placed points", "Placed points", "Placed points", "Placed points", "Placed points", "Placed points", "Placed points"],
+  orbit: ["Single orbit", "Counter orbit", "Wide ellipse", "Folded orbit", "Phase canon", "High suspend", "Comet burst", "Slow drift", "Ribbon orbit", "Window gate", "Mirror pair", "Solar surge", "Gravity tether", "Vortex ring", "Yielding orbit", "Held orbit"],
+  weave: ["Plain weave", "Cross weave", "Wide bands", "Folded braid", "Stagger canon", "Lifted weave", "Thread burst", "Loose drift", "Ribbon braid", "Gate loom", "Mirror braid", "Surge weave", "Tether weave", "Twist vortex", "Yielding cloth", "Held weave"],
+  lattice: ["Cell lattice", "Rotated lattice", "Wide grid", "Folded grid", "Delayed cells", "Floating lattice", "Cell burst", "Drift grid", "Ribbon grid", "Gate cells", "Mirror lattice", "Surge grid", "Tether grid", "Spin lattice", "Soft collapse", "Held lattice"],
+  frame: ["Frame trace", "Alt frame", "Wide frame", "Folded edge", "Edge canon", "High frame", "Frame burst", "Drift frame", "Ribbon edge", "Gate frame", "Mirror frame", "Surge frame", "Pinned edge", "Rotating frame", "Yielding frame", "Held frame"],
+  trace: ["Follow trace", "Branch trace", "Wide trace", "Folded line", "Echo canon", "Suspended trace", "Trace burst", "Wander trace", "Ribbon trace", "Gate trace", "Mirror trace", "Surge trace", "Tether trace", "Spiral trace", "Yield trace", "Held trace"],
+  pulse: ["Pulse field", "Alt pulse", "Wide pulse", "Folded pulse", "Pulse canon", "High pulse", "Impulse burst", "Pulse drift", "Ribbon pulse", "Gate pulse", "Mirror pulse", "Surge pulse", "Tether pulse", "Vortex pulse", "Yield pulse", "Held pulse"],
+  suspend: ["Suspended cloud", "Alt suspend", "Wide halo", "Folded halo", "Hanging canon", "High float", "Lift burst", "Slow hover", "Ribbon halo", "Gate hover", "Mirror hover", "Lift surge", "Anchor tether", "Halo vortex", "Yield hover", "Still cloud"],
+  leap: ["Soft leaps", "Alt leaps", "Wide jumps", "Folded jumps", "Jump canon", "High jumps", "Hard burst", "Drift jumps", "Ribbon jumps", "Gate jumps", "Mirror jumps", "Surge jumps", "Tether jumps", "Vortex jumps", "Yield jumps", "Held jumps"],
+  field: ["Charge field", "Alt field", "Wide field", "Folded field", "Field canon", "Suspended field", "Field burst", "Flux drift", "Ribbon field", "Gate field", "Mirror poles", "Surge field", "Tether field", "Vortex field", "Yield field", "Held field"],
+  molec: ["Bond pairs", "Alt bonds", "Wide molecule", "Folded molecule", "Bond canon", "Suspended molecule", "Bond burst", "Molecular drift", "Chain ribbon", "Gate bonds", "Mirror bonds", "Bond surge", "Tether bonds", "Helix vortex", "Yield bonds", "Locked bonds"],
+  fluid: ["Laminar flow", "Eddy flow", "Wide current", "Folded current", "Flow canon", "Suspended flow", "Jet burst", "Drift current", "Ribbon stream", "Gate current", "Mirror flow", "Surge current", "Tether current", "Vortex eddy", "Yielding flow", "Still pool"],
+  forsy: ["Point figure", "Line figure", "Wide plane", "Folded figure", "Figure canon", "Suspended figure", "Figure burst", "Drift figure", "Ribbon figure", "Gate figure", "Mirror figure", "Surge figure", "Tether figure", "Axis vortex", "Yield figure", "Held figure"],
+  flock: ["Cohesive flock", "Split flock", "Wide flock", "Folded flock", "Flock canon", "High flock", "Panic burst", "Roost drift", "Ribbon flock", "Gate flock", "Mirror flock", "Surge flock", "Tether flock", "Vortex flock", "Yield flock", "Roost hold"],
+  eco: ["Migration", "Grazing", "Wide range", "Folded range", "Herd canon", "High migration", "Scatter burst", "Forage drift", "Ribbon herd", "Gate herd", "Mirror herd", "Surge herd", "Tether herd", "Vortex herd", "Yield herd", "Nest hold"],
+  contact: ["Weighted contact", "Rolling contact", "Wide lean", "Folded lean", "Contact canon", "Lifted contact", "Impact burst", "Contact drift", "Ribbon contact", "Gate contact", "Mirror contact", "Surge contact", "Tether contact", "Vortex contact", "Yield contact", "Held contact"],
+  march: ["Block march", "Line march", "Wide wedge", "Folded ranks", "Rank canon", "High march", "Step burst", "Drift march", "Ribbon march", "Gate march", "Mirror march", "Surge march", "Tether march", "Pinwheel march", "Yield march", "Held ranks"],
+  procession: ["Station walk", "Relay walk", "Wide circle", "Folded path", "Process canon", "High procession", "Process burst", "Return drift", "Ribbon process", "Gate process", "Mirror process", "Surge process", "Tether process", "Circle vortex", "Yield process", "Vigil hold"],
+  xenak: ["Ruled score", "Graphic score", "Wide score", "Folded score", "Score canon", "High score", "Score burst", "Drift score", "Ribbon score", "Gate score", "Mirror score", "Surge score", "Tether score", "Helix score", "Yield score", "Held score"],
+  cardew: ["Open line", "Symbol field", "Wide page", "Folded page", "Page canon", "High symbols", "Symbol burst", "Free drift", "Ribbon symbols", "Gate symbols", "Mirror page", "Surge page", "Tether page", "Spiral symbols", "Yield page", "Still page"],
+  path: ["Path follow", "Reverse path", "Wide path", "Folded path", "Path canon", "High path", "Path burst", "Path drift", "Ribbon path", "Gate path", "Mirror path", "Surge path", "Tether path", "Vortex path", "Yield path", "Held path"],
+  scatter: ["Dust cloud", "Spark cloud", "Wide scatter", "Folded scatter", "Scatter canon", "High scatter", "Burst scatter", "Brownian drift", "Ribbon scatter", "Gate scatter", "Mirror scatter", "Surge scatter", "Tether scatter", "Vortex scatter", "Yield scatter", "Settled scatter"],
+  physics: ["Soft bodies", "Magnetic well", "Elastic chamber", "Brownian cloud", "Pinball shell", "Tethered masses", "Pressure release", "Viscous drift", "Ribbon bodies", "Impact gate", "Mirror masses", "Shock surge", "Spring tethers", "Vortex well", "Yielding field", "Frozen bodies"],
+};
 const SCENE_NAME_A = ["RUST", "VOLT", "FROST", "GHOST", "DUSK", "CIRCUIT", "PULSE", "CINDER", "ECHO", "GLASS", "IRON", "STATIC", "NOVA", "BLOOM", "SILT", "VECTOR"];
 const SCENE_NAME_B = ["DRIFT", "LOCK", "TRACE", "WAVE", "SPIN", "FIELD", "FOLD", "GATE", "ORBIT", "VAULT", "MIRROR", "SWARM", "BEND", "RIFT", "PHASE", "GRID"];
 const SCENE_NAMES_BY_BANK = {
@@ -97,22 +150,44 @@ const SCENE_NAMES_BY_BANK = {
   cardew: ["LINE", "SYMBL", "PAGE", "STAFF", "RULE", "FREE", "CHOICE", "GROUP"],
   path: ["FOLLOW", "RIBBON", "ORBIT", "PULSE", "REV", "BRAID", "GATE", "SCAT"],
   scatter: ["CLOUD", "DUST", "SPARK", "DRIFT", "BURST", "GRAIN", "SWARM", "FIELD"],
+  physics: ["CALM", "SWARM", "BOUNCE", "ORBIT", "TETHER", "DRIFT", "VORTX", "WELL"],
 };
+const ARC_SLUICE_PARAM_KEYS = new Set([
+  "arcSluiceOn",
+  "arcSluiceMode",
+  "arcWallCount",
+  "arcSluiceHoles",
+  "arcSluiceSize",
+  "arcSluiceAzimuth",
+  "arcWallSpread",
+  "arcWallWidth",
+  "arcSluicePull",
+  "arcSluiceSpit",
+]);
 const MAX_BANKS = 8;
 const TWO_PI = Math.PI * 2;
+const DOME_RADIUS = 2.0;
 
 let state = {
   playing: false,
   playStart: performance.now(),
   playT: 0,
   activeBank: 0,
+  groupFocus: true,
   activeScene: "a",
   selectedSource: 0,
   banks: [makeBank(0, "Group 1")],
+  arcSluice: defaultArcSluiceParams(),
   dragging: null,
   viewDrag: null,
   nextSceneAt: 0,
   generateSeed: 0,
+  simCache: new Map(),
+  recorder: null,
+  recordingStart: 0,
+  recordingDuration: 0,
+  recordingSceneCycle: false,
+  recordingScale: 1,
 };
 
 let reaperLink = {
@@ -140,6 +215,21 @@ function makeSource(index) {
   };
 }
 
+function defaultArcSluiceParams() {
+  return {
+    arcSluiceOn: 0,
+    arcSluiceMode: "quarter",
+    arcWallCount: 1,
+    arcSluiceHoles: 1,
+    arcSluiceSize: 0.55,
+    arcSluiceAzimuth: 0,
+    arcWallSpread: 0.36,
+    arcWallWidth: 0.42,
+    arcSluicePull: 0.45,
+    arcSluiceSpit: 0.34,
+  };
+}
+
 function makeBank(index, name) {
   return {
     id: index + 1,
@@ -158,6 +248,13 @@ function makeBank(index, name) {
       gravity: 0.46,
       development: 0.35,
       topoWarp: 0.18,
+      physAttract: 0.32,
+      physRepel: 0.42,
+      physBounce: 0.52,
+      physCollision: 0.34,
+      physDamping: 0.38,
+      physTurbulence: 0.28,
+      ...defaultArcSluiceParams(),
     },
   };
 }
@@ -192,6 +289,19 @@ function updateAllRangeFills() {
 function updateTimeReadouts() {
   ui.morphDurationValue.textContent = `${Number(ui.morphDuration.value).toFixed(1)}s`;
   ui.sceneHoldValue.textContent = `${Number(ui.sceneHold.value).toFixed(1)}s`;
+  const duration = Number(ui.duration.value || 0);
+  const pointRate = Number(ui.pointRate.value || 0);
+  const exportDuration = Math.max(1, sceneCycleDuration(activeBank()));
+  const pointCount = Math.max(2, Math.round(exportDuration * pointRate));
+  ui.durationValue.textContent = `${duration.toFixed(duration % 1 ? 2 : 0)}s`;
+  ui.pointRateValue.textContent = `${Math.round(pointRate)}/s`;
+  ui.pointCountValue.textContent = `A-H export ${exportDuration.toFixed(1)}s | ${pointCount.toLocaleString()} points per source`;
+}
+
+function updateSourcePositionReadouts() {
+  ui.sourceAzimuthValue.textContent = `${Number(ui.sourceAzimuth.value).toFixed(0)} deg`;
+  ui.sourceElevationValue.textContent = `${Number(ui.sourceElevation.value).toFixed(0)} deg`;
+  ui.sourceDistanceValue.textContent = `${Number(ui.sourceDistance.value).toFixed(2)} m`;
 }
 
 function lerp(a, b, t) {
@@ -211,12 +321,59 @@ function wrapDeg(v) {
   return x === -180 ? 180 : x;
 }
 
+function signedAngleRad(a, b) {
+  return Math.atan2(Math.sin(a - b), Math.cos(a - b));
+}
+
+function internalAzimuthRad(azimuthDeg) {
+  return degToRad(-wrapDeg(azimuthDeg));
+}
+
+function azimuthFromVector(x, y) {
+  return wrapDeg(-radToDeg(Math.atan2(x, y)));
+}
+
+function vectorFromAed(azimuthDeg, elevationDeg, distance = 1) {
+  const az = internalAzimuthRad(azimuthDeg);
+  const el = degToRad(clamp(elevationDeg, -89, 89));
+  return {
+    x: Math.sin(az) * Math.cos(el) * distance,
+    y: Math.cos(az) * Math.cos(el) * distance,
+    z: Math.sin(el) * distance,
+  };
+}
+
 function fract(v) {
   return v - Math.floor(v);
 }
 
 function activeBank() {
   return state.banks[state.activeBank];
+}
+
+function preserveArcSluiceParams(targetParams = {}, sourceParams = {}) {
+  ARC_SLUICE_PARAM_KEYS.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(sourceParams, key)) {
+      targetParams[key] = sourceParams[key];
+    }
+  });
+  return targetParams;
+}
+
+function syncGlobalArcSluiceFromParams(params = {}) {
+  ARC_SLUICE_PARAM_KEYS.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(params, key)) {
+      state.arcSluice[key] = params[key];
+    }
+  });
+}
+
+function globalArcSluiceBank() {
+  return {
+    id: 1,
+    motionOffset: { phase: 0, azimuth: 0, elevation: 0, distance: 1 },
+    params: state.arcSluice,
+  };
 }
 
 function nextSceneKey(key, loop = true) {
@@ -232,7 +389,7 @@ function propagateMotionFrom(sourceBank) {
     bank.mode = sourceBank.mode;
     bank.scene = sourceBank.scene;
     bank.variant = sourceBank.variant;
-    bank.params = { ...sourceBank.params };
+    bank.params = preserveArcSluiceParams({ ...sourceBank.params }, bank.params);
     bank.morph = null;
   });
 }
@@ -260,6 +417,7 @@ function snapshotFromScene(scene, key) {
     scene: key,
     variant: scene.variant || "primary",
     params: { ...scene.params },
+    sources: (scene.sources || []).map(cloneSource),
     hold: Number(scene.hold ?? ui.sceneHold.value ?? 1),
     morph: Number(scene.morph ?? ui.morphDuration.value ?? 4),
   };
@@ -274,6 +432,7 @@ function serializeScenes(scenes) {
       mode: scene.mode || "orbit",
       variant: scene.variant || "primary",
       params: { ...(scene.params || {}) },
+      sources: (scene.sources || []).map(cloneSource),
       hold: Number(scene.hold ?? 1),
       morph: Number(scene.morph ?? 4),
     };
@@ -289,7 +448,83 @@ function normalizeParams(params = {}) {
     gravity: Number(params.gravity ?? 0.46),
     development: Number(params.development ?? 0.35),
     topoWarp: Number(params.topoWarp ?? 0.18),
+    physAttract: Number(params.physAttract ?? 0.32),
+    physRepel: Number(params.physRepel ?? 0.42),
+    physBounce: Number(params.physBounce ?? 0.52),
+    physCollision: Number(params.physCollision ?? 0.34),
+    physDamping: Number(params.physDamping ?? 0.38),
+    physTurbulence: Number(params.physTurbulence ?? 0.28),
+    arcSluiceOn: Number(params.arcSluiceOn ?? 0),
+    arcSluiceMode: ["quarter", "vertical", "diameter", "full"].includes(params.arcSluiceMode) ? params.arcSluiceMode : "quarter",
+    arcWallCount: Number(params.arcWallCount ?? 1),
+    arcSluiceHoles: Number(params.arcSluiceHoles ?? 1),
+    arcSluiceSize: Number(params.arcSluiceSize ?? 0.55),
+    arcSluiceAzimuth: Number(params.arcSluiceAzimuth ?? 0),
+    arcWallSpread: Number(params.arcWallSpread ?? 0.36),
+    arcWallWidth: Number(params.arcWallWidth ?? 0.42),
+    arcSluicePull: Number(params.arcSluicePull ?? 0.45),
+    arcSluiceSpit: Number(params.arcSluiceSpit ?? 0.34),
   };
+}
+
+function normalizeArcSluiceParams(params = {}) {
+  const normalized = normalizeParams({ ...defaultArcSluiceParams(), ...params });
+  const arc = {};
+  ARC_SLUICE_PARAM_KEYS.forEach((key) => {
+    arc[key] = normalized[key];
+  });
+  return arc;
+}
+
+function setParamControlValue(key, value) {
+  const control = ui[key];
+  if (!control) return;
+  if (control.type === "checkbox") control.checked = Number(value) > 0;
+  else control.value = value;
+  if (control._customButton) {
+    control._customButton.textContent = control.selectedOptions[0]?.textContent || String(control.value);
+  }
+}
+
+function readParamControlValue(key) {
+  const control = ui[key];
+  if (!control) return 0;
+  if (control.tagName === "SELECT") return control.value;
+  return control.type === "checkbox" ? (control.checked ? 1 : 0) : Number(control.value);
+}
+
+function variantLabelsForBank(mode) {
+  return VARIANT_LABELS[mode] || VARIANTS.map((key) => key.replace(/\b\w/g, (c) => c.toUpperCase()));
+}
+
+function updateVariantMenu(mode, selected = ui.sceneMode.value || "primary") {
+  const labels = variantLabelsForBank(mode);
+  ui.sceneMode.innerHTML = "";
+  VARIANTS.forEach((key, index) => {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = labels[index] || key;
+    ui.sceneMode.appendChild(option);
+  });
+  ui.sceneMode.value = VARIANTS.includes(selected) ? selected : "primary";
+  if (ui.sceneMode._customButton) {
+    ui.sceneMode._customButton.textContent = ui.sceneMode.selectedOptions[0]?.textContent || "Select";
+  }
+}
+
+function updatePhysicsControlState(mode = ui.bankMode.value) {
+  const active = mode === "physics";
+  const arcActive = !!ui.arcSluiceOn.checked;
+  document.querySelectorAll(".physics-only").forEach((label) => {
+    label.classList.toggle("inactive", !active);
+    const input = label.querySelector("input");
+    if (input) input.disabled = !active;
+  });
+  document.querySelectorAll(".arc-sluice-only").forEach((label) => {
+    label.classList.toggle("inactive", !arcActive);
+    const input = label.querySelector("input");
+    if (input) input.disabled = !arcActive;
+  });
 }
 
 function normalizeSource(source, index) {
@@ -347,7 +582,9 @@ function blendSnapshots(from, to, t) {
 
 function effectiveBank(bank) {
   if (!bank.morph) return bank;
-  return { ...bank, ...blendSnapshots(bank.morph.from, bank.morph.to, bank.morph.progress), morph: bank.morph };
+  const blended = { ...bank, ...blendSnapshots(bank.morph.from, bank.morph.to, bank.morph.progress), morph: bank.morph };
+  blended.params = preserveArcSluiceParams({ ...blended.params }, bank.params);
+  return blended;
 }
 
 function commitMorph(bank) {
@@ -355,7 +592,7 @@ function commitMorph(bank) {
   const target = bank.morph.to;
   bank.mode = target.mode;
   bank.variant = target.variant || "primary";
-  bank.params = { ...target.params };
+  bank.params = preserveArcSluiceParams({ ...target.params }, bank.params);
   bank.sources = target.sources.map(cloneSource);
   bank.scene = bank.morph.targetKey;
   bank.morph = null;
@@ -364,7 +601,7 @@ function commitMorph(bank) {
 
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = (window.devicePixelRatio || 1) * (state.recordingScale || 1);
   const w = Math.max(640, Math.round(rect.width * dpr));
   const h = Math.max(420, Math.round(rect.height * dpr));
   if (canvas.width !== w || canvas.height !== h) {
@@ -373,10 +610,77 @@ function resizeCanvas() {
   }
 }
 
+function renderPixelScale() {
+  return (window.devicePixelRatio || 1) * (state.recordingScale || 1);
+}
+
 function sourcePosition(bank, source, t) {
   if (bank.morph) return morphSourcePosition(bank, source, t);
+  if (bank.mode === "manual") return constrainPosition(rawSourcePosition(bank, source, t));
+  if (usesVelocitySimulation(bank)) {
+    return simulatedSourcePosition(bank, source, t);
+  }
   const raw = rawSourcePosition(bank, source, t);
-  return applyAnalysisInfluence(bank, source, raw, t);
+  return constrainPosition(applyAnalysisInfluence(bank, source, raw, t));
+}
+
+function usesVelocitySimulation(bank) {
+  return bank.mode === "physics" || Number(state.arcSluice?.arcSluiceOn || 0);
+}
+
+function constrainPosition(pos) {
+  if (ui.spatialConstraint.value !== "hemisphere" || pos.z >= 0) return pos;
+  const x = pos.x;
+  const y = pos.y;
+  const z = 0;
+  return { ...pos, ...outputFromVector({ x, y, z }, { enabled: true, gain: pos.gain ?? 0 }) };
+}
+
+function motionVariantProfile(mode, variant) {
+  const index = Math.max(0, VARIANTS.indexOf(variant || "primary"));
+  const base = { motion: 1, width: 1, disorder: 1, development: 1, topo: 1, gravity: 1 };
+  const generic = [
+    {},
+    { motion: 1.12, disorder: 1.12 },
+    { width: 1.28 },
+    { width: 0.82, topo: 1.15 },
+    { motion: 0.88, development: 1.35 },
+    { gravity: 1.32, width: 0.82 },
+    { motion: 1.42, disorder: 1.28 },
+    { motion: 0.72, disorder: 1.25 },
+    { width: 1.1, topo: 1.55 },
+    { motion: 1.18, width: 0.72 },
+    { width: 0.92, topo: 1.18 },
+    { motion: 1.34, width: 1.08 },
+    { development: 1.55, width: 0.82 },
+    { motion: 1.18, topo: 1.72 },
+    { motion: 0.74, gravity: 0.72 },
+    { motion: 0.45, width: 0.62, disorder: 0.32 },
+  ][index] || {};
+  const byBank = {
+    physics: [
+      { attract: 1.10, damping: 1.30, repel: 0.72, turbulence: 0.65, bounce: 0.55 },
+      { attract: 1.75, damping: 0.78, repel: 0.52, turbulence: 0.72, bounce: 0.60 },
+      { attract: 0.92, repel: 1.10, bounce: 1.15, collision: 1.35, damping: 0.72 },
+      { attract: 0.52, repel: 1.45, turbulence: 1.85, damping: 0.55, width: 1.18 },
+      { attract: 0.45, repel: 1.05, bounce: 1.90, collision: 1.65, damping: 0.38, motion: 1.35 },
+      { attract: 1.30, repel: 0.82, damping: 1.22, development: 1.45, bounce: 0.72 },
+      { attract: 0.62, repel: 1.70, bounce: 1.35, collision: 1.18, turbulence: 1.20, motion: 1.22 },
+      { attract: 0.95, repel: 0.70, damping: 1.72, turbulence: 0.55, motion: 0.62 },
+      { attract: 0.68, repel: 1.25, bounce: 1.45, collision: 1.20, turbulence: 1.10, topo: 1.35 },
+      { attract: 0.58, repel: 1.05, bounce: 1.65, collision: 1.42, damping: 0.52 },
+      { repel: 1.20, collision: 1.15, width: 0.9 },
+      { attract: 0.55, repel: 1.35, bounce: 1.55, turbulence: 1.40, motion: 1.32 },
+      { attract: 1.45, repel: 0.74, damping: 1.12, development: 1.65 },
+      { attract: 1.28, repel: 0.92, turbulence: 1.35, topo: 1.80, motion: 1.12 },
+      { attract: 0.78, repel: 1.08, damping: 0.88, bounce: 1.02 },
+      { attract: 1.10, damping: 2.00, repel: 0.45, turbulence: 0.25, motion: 0.38 },
+    ],
+    fluid: [{}, {}, { width: 1.35 }, {}, {}, {}, { motion: 1.55 }, { motion: 0.62, disorder: 1.25 }, { topo: 1.75 }, { width: 0.65 }, {}, { motion: 1.35 }, {}, { topo: 2.0 }, { damping: 1.2 }, { motion: 0.45 }],
+    flock: [{ attract: 1.25 }, { repel: 1.25 }, { width: 1.28 }, {}, { development: 1.3 }, { gravity: 1.25 }, { disorder: 1.65, motion: 1.35 }, { motion: 0.6 }, {}, {}, {}, { motion: 1.3 }, { attract: 1.4 }, { topo: 1.6 }, { damping: 1.2 }, { motion: 0.4, disorder: 0.25 }],
+    scatter: [{ disorder: 1.2 }, { disorder: 1.45, motion: 1.25 }, { width: 1.35 }, {}, {}, { gravity: 1.2 }, { motion: 1.55, disorder: 1.5 }, { motion: 0.7, disorder: 1.45 }, {}, { width: 0.7 }, {}, { motion: 1.35 }, {}, { topo: 1.7 }, {}, { motion: 0.42, disorder: 0.42 }],
+  };
+  return { ...base, ...generic, ...((byBank[mode] || [])[index] || {}) };
 }
 
 function morphSourcePosition(bank, source, t) {
@@ -395,38 +699,38 @@ function morphSourcePosition(bank, source, t) {
     params: { ...bank.morph.to.params },
     morph: null,
   };
-  const a = rawSourcePosition(fromBank, source, t);
-  const b = rawSourcePosition(toBank, source, t);
+  const frozen = bank.morph.frozen?.[source.id];
+  const fromSource = bank.morph.from.sources.find((item) => item.id === source.id) || source;
+  const toSource = bank.morph.to.sources.find((item) => item.id === source.id) || source;
+  const a = frozen || sourcePosition(fromBank, fromSource, t);
+  const b = sourcePosition(toBank, toSource, t);
   const x = lerp(a.x, b.x, eased);
   const y = lerp(a.y, b.y, eased);
   const z = lerp(a.z, b.z, eased);
-  const azimuth = wrapDeg(radToDeg(Math.atan2(x, y)));
-  const elevation = clamp(radToDeg(Math.atan2(z, Math.hypot(x, y))), -89, 89);
-  const distance = clamp(Math.hypot(x, y, z), 0.1, 3);
-  const raw = { x, y, z, azimuth, elevation, distance, gain: lerp(a.gain, b.gain, eased) };
-  const analysisBank = effectiveBank(bank);
-  return applyAnalysisInfluence(analysisBank, source, raw, t);
+  return constrainPosition(outputFromVector({ x, y, z }, { enabled: true, gain: lerp(a.gain, b.gain, eased) }));
 }
 
 function rawSourcePosition(bank, source, t) {
   const p = bank.params;
   const offset = bank.motionOffset || makeGroupOffset(Math.max(0, Number(bank.id || 1) - 1));
   const phase = fract(source.id / 8 + Number(offset.phase || 0));
-  const motion = p.motion;
-  const width = 0.22 + p.width * 1.8;
-  const disorder = p.disorder;
-  const dev = p.development;
-  const topo = p.topoWarp;
   const variantIndex = Math.max(0, VARIANTS.indexOf(bank.variant || "primary"));
   const variantOffset = variantIndex * 0.061;
   const variantAmt = variantIndex / Math.max(1, VARIANTS.length - 1);
-  const baseAz = degToRad(wrapDeg(source.azimuth + Number(offset.azimuth || 0)));
-  const baseEl = degToRad(clamp(source.elevation + Number(offset.elevation || 0), -85, 85));
-  const base = {
-    x: Math.sin(baseAz) * Math.cos(baseEl),
-    y: Math.cos(baseAz) * Math.cos(baseEl),
-    z: Math.sin(baseEl),
-  };
+  const variantProfile = motionVariantProfile(bank.mode, bank.variant || "primary");
+  const motion = clamp(p.motion * variantProfile.motion, 0, 1.8);
+  const width = 0.22 + clamp(p.width * variantProfile.width, 0, 1.75) * 1.8;
+  const disorder = clamp(p.disorder * variantProfile.disorder, 0, 1.8);
+  const dev = clamp(p.development * variantProfile.development, 0, 1.8);
+  const topo = clamp(p.topoWarp * variantProfile.topo, 0, 1.8);
+  const base = vectorFromAed(
+    source.azimuth + Number(offset.azimuth || 0),
+    (source.elevation + Number(offset.elevation || 0)) * variantProfile.gravity,
+    1
+  );
+  if (bank.mode === "manual") {
+    return outputFromVector(vectorFromAed(source.azimuth, source.elevation, source.distance), source);
+  }
   let x = 0;
   let y = 0;
   let z = 0;
@@ -457,7 +761,7 @@ function rawSourcePosition(bank, source, t) {
     const edge = q * 2 - 1;
     x = side < 2 ? edge * width : (side === 2 ? -width : width);
     y = side < 2 ? (side === 0 ? -width : width) : edge * width;
-    z = (Math.round(fract(t * 2 + phase + variantOffset) * 2) - 0.5) * p.gravity;
+    z = Math.sin(TWO_PI * (t * 0.75 + phase + variantOffset)) * p.gravity * 0.5;
   } else if (bank.mode === "trace") {
     const trail = smooth(pingpong01(t * (0.8 + motion * 4) + phase * 0.7));
     const a = TWO_PI * (trail + phase * 0.35 + variantOffset);
@@ -466,13 +770,14 @@ function rawSourcePosition(bank, source, t) {
     y = Math.cos(a * (1.0 + dev)) * width * (0.35 + tail);
     z = Math.sin(a + tail * TWO_PI) * p.gravity * 0.9;
   } else if (bank.mode === "pulse") {
-    const steps = 3 + Math.round(motion * 9);
-    const step = Math.floor(fract(t + phase + variantOffset) * steps) / steps;
-    const gate = hashNoise(source.id * 19 + step * 101, t * steps, variantOffset) > 0.42 ? 1 : 0.25;
-    const a = TWO_PI * (step + phase * (1 + Math.round(dev * 3)));
+    const rate = 1 + motion * 4.5;
+    const q = fract(t * rate + phase + variantOffset);
+    const pulse = smooth(Math.max(0, 1 - Math.abs(q - 0.5) * 2));
+    const gate = 0.25 + pulse * 0.75;
+    const a = TWO_PI * (q + phase * (1 + dev * 3));
     x = Math.sin(a) * width * gate;
     y = Math.cos(a) * width * gate;
-    z = (gate - 0.35) * p.gravity * Math.sin(TWO_PI * (step + phase));
+    z = (gate - 0.35) * p.gravity * Math.sin(TWO_PI * (q + phase));
   } else if (bank.mode === "suspend") {
     const a = TWO_PI * (phase + variantOffset + Math.sin(t * TWO_PI * (0.2 + motion)) * 0.025);
     const lift = 0.45 + p.gravity * 0.9;
@@ -480,18 +785,167 @@ function rawSourcePosition(bank, source, t) {
     y = Math.cos(a) * width * (0.28 + dev * 0.26);
     z = lift + Math.sin(TWO_PI * (t * (0.3 + motion) + phase)) * 0.12;
   } else if (bank.mode === "leap") {
-    const jumps = 2 + Math.round(motion * 10);
-    const cell = Math.floor(fract(t + phase * 0.21 + variantOffset) * jumps);
-    const seed = source.id * 37 + cell * 17 + variantIndex * 13;
-    x = (hashNoise(seed, cell, 1) * 2 - 1) * width;
-    y = (hashNoise(seed, cell, 2) * 2 - 1) * width;
-    z = (hashNoise(seed, cell, 3) * 2 - 1) * (0.2 + p.gravity);
+    const jumpRate = 0.35 + motion * 2.6;
+    const bend = smoothNoise(source.id * 37 + variantIndex * 13, t * jumpRate + phase * 0.21, variantOffset);
+    const bend2 = smoothNoise(source.id * 53 + variantIndex * 17, t * (jumpRate * 0.83) + phase * 0.37, variantOffset + 0.2);
+    const bend3 = smoothNoise(source.id * 71 + variantIndex * 19, t * (jumpRate * 1.17) + phase * 0.53, variantOffset + 0.4);
+    x = (bend * 2 - 1) * width;
+    y = (bend2 * 2 - 1) * width;
+    z = (bend3 * 2 - 1) * (0.2 + p.gravity);
   } else if (bank.mode === "field") {
     const a = TWO_PI * (phase + variantOffset);
     const pulse = Math.sin(TWO_PI * t * (0.5 + motion * 3) + source.id);
     x = Math.sin(a + pulse * 0.5) * width * (0.55 + dev);
     y = Math.cos(a * 1.5 + pulse) * width;
     z = Math.sin(a * 2 + t * TWO_PI) * p.gravity;
+  } else if (bank.mode === "physics") {
+    const sceneIndex = Math.max(0, SCENES.indexOf(bank.scene || "a"));
+    const energy = motion;
+    const space = p.width;
+    const chaos = disorder;
+    const ret = dev;
+    const dir = (p.gravity - 0.5) * 2;
+    const attractAmt = clamp(Number(p.physAttract ?? 0.32) * (variantProfile.attract || 1), 0, 1.8);
+    const repelAmt = clamp(Number(p.physRepel ?? 0.42) * (variantProfile.repel || 1), 0, 1.8);
+    const bounceAmt = clamp(Number(p.physBounce ?? 0.52) * (variantProfile.bounce || 1), 0, 1.8);
+    const collisionAmt = clamp(Number(p.physCollision ?? 0.34) * (variantProfile.collision || 1), 0, 1.8);
+    const dampingAmt = clamp(Number(p.physDamping ?? 0.38) * (variantProfile.damping || 1), 0, 1.8);
+    const turbulenceAmt = clamp(Number(p.physTurbulence ?? 0.28) * (variantProfile.turbulence || 1), 0, 1.8);
+    const variantPush = 0.55 + variantAmt * 0.95;
+    const a0 = TWO_PI * (phase + variantOffset * 1.7);
+    const rate = 0.18 + energy * 2.6 + variantAmt * 0.55;
+    const tt = t * rate + phase * 0.37 + variantOffset;
+    const swirl = TWO_PI * (tt + dir * 0.18);
+    const rest = {
+      x: base.x * width * (0.28 + ret * 0.62),
+      y: base.y * width * (0.28 + ret * 0.62),
+      z: base.z * (0.18 + p.gravity * 1.1),
+    };
+    const noiseX = smoothNoise(source.id * 19 + sceneIndex * 7, tt * (0.75 + chaos), variantOffset) * 2 - 1;
+    const noiseY = smoothNoise(source.id * 29 + sceneIndex * 11, tt * (0.7 + chaos), variantOffset + 0.23) * 2 - 1;
+    const noiseZ = smoothNoise(source.id * 41 + sceneIndex * 13, tt * (0.65 + chaos), variantOffset + 0.47) * 2 - 1;
+    const pulse = smooth(Math.sin(TWO_PI * (t * (0.55 + energy * 2.2) + phase + variantOffset)) * 0.5 + 0.5);
+    const shock = Math.pow(Math.max(0, Math.sin(TWO_PI * (t * (0.32 + energy * 1.7) + phase * 0.31 + variantOffset))), 5);
+    const repel = 0.18 + space * 1.18;
+    const spring = 0.22 + ret * 0.68;
+    const brown = chaos * (0.18 + energy * 0.62) * variantPush;
+    const ringX = Math.sin(a0 + swirl) * width * repel;
+    const ringY = Math.cos(a0 + swirl) * width * repel;
+    const ringZ = Math.sin(swirl * 0.73 + a0 * 0.5) * (0.14 + p.gravity * 1.35);
+
+    if (sceneIndex === 0) {
+      x = lerp(ringX * 0.18, rest.x, 0.58 + spring * 0.26) + noiseX * brown * 0.16;
+      y = lerp(ringY * 0.18, rest.y, 0.58 + spring * 0.26) + noiseY * brown * 0.16;
+      z = lerp(ringZ * 0.14, rest.z, 0.62 + spring * 0.20) + noiseZ * brown * 0.10;
+    } else if (sceneIndex === 1) {
+      const cloud = 0.72 + space * 1.05;
+      x = ringX * cloud + noiseX * brown * 1.55;
+      y = ringY * cloud + noiseY * brown * 1.55;
+      z = ringZ * (0.65 + space * 0.55) + noiseZ * brown * 1.2;
+      x = lerp(x, rest.x, ret * 0.10);
+      y = lerp(y, rest.y, ret * 0.10);
+      z = lerp(z, rest.z, ret * 0.08);
+    } else if (sceneIndex === 2) {
+      const q = smooth(pingpong01(t * (0.8 + energy * 2.6) + phase + variantOffset));
+      const hit = Math.pow(Math.sin(q * Math.PI), 0.42);
+      const wall = q < 0.5 ? -1 : 1;
+      x = ringX * (0.24 + hit * 1.05) + wall * dir * energy * 0.32;
+      y = ringY * (0.24 + hit * 1.05) + noiseY * brown * 0.42;
+      z = (q * 2 - 1) * (0.48 + p.gravity * 1.35) + noiseZ * chaos * 0.38;
+    } else if (sceneIndex === 3) {
+      const orbitR = width * (0.35 + space * 1.25);
+      x = Math.sin(swirl) * orbitR + rest.x * ret * 0.24;
+      y = Math.cos(swirl) * orbitR + rest.y * ret * 0.24;
+      z = Math.sin(swirl * (0.45 + variantAmt * 0.4) + a0) * (0.18 + p.gravity * 1.35);
+    } else if (sceneIndex === 4) {
+      const elastic = Math.sin(TWO_PI * (tt * 1.6 + source.id * 0.071)) * (0.18 + energy * 0.58);
+      const snap = Math.sin(TWO_PI * (tt * 0.73 + phase)) * chaos * 0.35;
+      x = lerp(ringX + noiseX * brown * 0.55, rest.x, 0.28 + spring * 0.44) + base.x * (elastic + snap);
+      y = lerp(ringY + noiseY * brown * 0.55, rest.y, 0.28 + spring * 0.44) + base.y * (elastic - snap);
+      z = lerp(ringZ + noiseZ * brown * 0.45, rest.z, 0.30 + spring * 0.38) + base.z * elastic * 0.82;
+    } else if (sceneIndex === 5) {
+      x = lerp(rest.x, noiseX * width * (0.8 + space * 1.2), 0.35 + energy * 0.48);
+      y = lerp(rest.y, noiseY * width * (0.8 + space * 1.2), 0.35 + energy * 0.48);
+      z = lerp(rest.z, noiseZ * (0.35 + p.gravity * 1.15), 0.28 + energy * 0.42);
+    } else if (sceneIndex === 6) {
+      const r = width * (0.18 + space * 1.35);
+      const sink = 1 - 0.38 * pulse;
+      x = Math.sin(swirl * 1.65 + noiseX * chaos) * r * sink + noiseX * brown * 0.45;
+      y = Math.cos(swirl * 1.65 + noiseY * chaos) * r * sink + noiseY * brown * 0.45;
+      z = Math.sin(swirl * 0.94 + phase * TWO_PI) * (0.28 + p.gravity * 1.25) * sink;
+    } else {
+      const pull = 0.30 + ret * 0.62;
+      const well = Math.max(0.08, 1 - shock * (0.45 + energy * 0.45));
+      x = (ringX * 0.42 + noiseX * brown * 0.32) * well + rest.x * (1 - pull * 0.34);
+      y = (ringY * 0.42 + noiseY * brown * 0.32) * well + rest.y * (1 - pull * 0.34);
+      z = (ringZ * 0.30 + noiseZ * brown * 0.24) * well + rest.z * (1 - pull * 0.24);
+    }
+
+    const centerPull = attractAmt * (sceneIndex === 7 ? 0.52 : 0.18);
+    const restPull = attractAmt * (sceneIndex === 0 || sceneIndex === 4 ? 0.34 : 0.12);
+    x = lerp(x, 0, centerPull);
+    y = lerp(y, 0, centerPull);
+    z = lerp(z, 0, centerPull * 0.75);
+    x = lerp(x, rest.x, restPull);
+    y = lerp(y, rest.y, restPull);
+    z = lerp(z, rest.z, restPull * 0.82);
+
+    const collisionRadius = 0.18 + collisionAmt * 0.92 + space * 0.22;
+    const repelStrength = repelAmt * (0.12 + space * 0.42) * (sceneIndex === 1 || sceneIndex === 5 ? 1.55 : 1);
+    bank.sources.filter((other) => other.enabled && other.id !== source.id).forEach((other) => {
+      const otherPhase = fract(other.id / 8 + Number(offset.phase || 0));
+      const otherA = TWO_PI * (otherPhase + variantOffset * 1.7);
+      const otherT = t * rate + otherPhase * 0.37 + variantOffset;
+      const otherSwirl = TWO_PI * (otherT + dir * 0.18);
+      const ox = Math.sin(otherA + otherSwirl) * width * repel;
+      const oy = Math.cos(otherA + otherSwirl) * width * repel;
+      const oz = Math.sin(otherSwirl * 0.73 + otherA * 0.5) * (0.14 + p.gravity * 1.35);
+      let dx = x - ox;
+      let dy = y - oy;
+      let dz = z - oz;
+      const d = Math.max(0.001, Math.hypot(dx, dy, dz));
+      if (d < collisionRadius) {
+        const hit = Math.pow((collisionRadius - d) / collisionRadius, 1.35);
+        const push = hit * repelStrength;
+        dx /= d;
+        dy /= d;
+        dz /= d;
+        x += dx * push;
+        y += dy * push;
+        z += dz * push * 0.86;
+      }
+    });
+
+    const boundary = 1.15 + space * 1.45;
+    const dist = Math.max(0.001, Math.hypot(x, y, z));
+    if (dist > boundary) {
+      const nx = x / dist;
+      const ny = y / dist;
+      const nz = z / dist;
+      const over = dist - boundary;
+      const rebound = over * (0.45 + bounceAmt * 1.65);
+      x -= nx * rebound;
+      y -= ny * rebound;
+      z -= nz * rebound;
+      const tangent = Math.sin(TWO_PI * (t * (0.8 + energy * 1.4) + phase + variantOffset));
+      x += -ny * tangent * bounceAmt * 0.18;
+      y += nx * tangent * bounceAmt * 0.18;
+      z += nz * Math.abs(tangent) * bounceAmt * 0.08;
+    }
+
+    if (ui.spatialConstraint.value === "hemisphere" && z < 0) {
+      z = Math.abs(z) * (0.22 + bounceAmt * 0.58);
+      x += noiseX * bounceAmt * 0.08;
+      y += noiseY * bounceAmt * 0.08;
+    }
+
+    const turbulence = turbulenceAmt * (0.08 + energy * 0.32 + chaos * 0.28);
+    x += noiseX * turbulence;
+    y += noiseY * turbulence;
+    z += noiseZ * turbulence * 0.88;
+    x = lerp(x, rest.x, dampingAmt * 0.18);
+    y = lerp(y, rest.y, dampingAmt * 0.18);
+    z = lerp(z, rest.z, dampingAmt * 0.14);
   } else if (bank.mode === "molec") {
     const pair = Math.floor((source.id - 1) / 2);
     const local = source.id % 2 ? -1 : 1;
@@ -522,7 +976,7 @@ function rawSourcePosition(bank, source, t) {
     z = Math.sin(c + source.id) * p.gravity;
   } else if (bank.mode === "eco") {
     const herd = Math.sin(TWO_PI * t * (0.08 + motion * 0.18));
-    const lane = Math.round((phase + herd * 0.1) * 5) / 5;
+    const lane = phase + herd * 0.1;
     const a = TWO_PI * (lane + variantOffset);
     const forage = smoothNoise(source.id * 11, t * (0.25 + motion), variantOffset);
     x = Math.sin(a) * width * (0.42 + forage * 0.48);
@@ -538,30 +992,29 @@ function rawSourcePosition(bank, source, t) {
   } else if (bank.mode === "march") {
     const rank = Math.floor((source.id - 1) / 2);
     const file = (source.id - 1) % 2;
-    const step = Math.floor(fract(t * (1 + motion * 4) + variantOffset) * 4) / 3;
+    const step = smooth(pingpong01(t * (0.45 + motion * 1.8) + variantOffset));
     x = ((file ? 0.5 : -0.5) + (step - 0.5) * dev) * width;
     y = ((rank / 3) * 2 - 1) * width * (0.55 + p.gravity * 0.15);
     z = Math.sin(TWO_PI * (step + phase)) * p.gravity * 0.18;
   } else if (bank.mode === "procession") {
-    const q = fract(t * (0.25 + motion) + phase + variantOffset);
+    const q = smooth(pingpong01(t * (0.25 + motion) + phase + variantOffset));
     const spiral = q * TWO_PI * (1.0 + dev * 2.5);
     const r = width * (0.2 + q * 0.8);
     x = Math.sin(spiral) * r;
     y = Math.cos(spiral) * r;
     z = (q - 0.5) * p.gravity * 1.15;
   } else if (bank.mode === "xenak") {
-    const u = fract(t * (0.25 + motion * 1.4) + phase + variantOffset);
+    const u = smooth(pingpong01(t * (0.25 + motion * 1.4) + phase + variantOffset));
     const ruled = (phase * 2 - 1) * width;
     const helix = TWO_PI * (u + phase * (1 + Math.round(dev * 4)));
     x = lerp(ruled, Math.sin(helix) * width, 0.45 + dev * 0.35);
     y = (u * 2 - 1) * width;
     z = Math.cos(helix) * p.gravity;
   } else if (bank.mode === "cardew") {
-    const cell = Math.floor(fract(t * (2 + motion * 12) + phase + variantOffset) * 12);
-    const sparse = hashNoise(source.id * 13 + cell, cell, variantIndex);
-    const line = Math.round((phase + sparse * dev) * 5) / 5;
+    const sparse = smoothNoise(source.id * 13 + variantIndex, t * (0.8 + motion * 2.2) + phase, variantOffset);
+    const line = phase + (sparse - 0.5) * dev;
     x = (line * 2 - 1) * width;
-    y = (hashNoise(cell * 23 + source.id, cell, 2) * 2 - 1) * width * (0.3 + sparse * 0.7);
+    y = (smoothNoise(source.id * 23 + variantIndex, t * (0.65 + motion * 1.8), 2) * 2 - 1) * width * (0.3 + sparse * 0.7);
     z = (sparse > 0.62 ? sparse - 0.5 : 0) * p.gravity * 1.4;
   } else if (bank.mode === "path") {
     const q = smooth(pingpong01(t * (1 + Math.round(motion * 3)) + phase * 0.5 + variantOffset));
@@ -589,14 +1042,14 @@ function rawSourcePosition(bank, source, t) {
     x = q.x / Math.max(0.1, source.distance);
     y = q.y / Math.max(0.1, source.distance);
     z = q.z / Math.max(0.1, source.distance);
-  } else if (bank.variant === "ribbon") {
+  } else if (bank.variant === "ribbon" && bank.mode !== "physics") {
     const r = Math.hypot(x, y);
     const a = Math.atan2(x, y) + Math.sin(TWO_PI * (t + phase)) * 0.18;
     x = Math.sin(a) * r;
     y = Math.cos(a) * r * 0.62;
   } else if (bank.variant === "gate") {
-    const gate = Math.floor(fract(t * (2 + motion * 8) + phase) * 2);
-    const scale = gate ? 1 : 0.18;
+    const gate = smooth(Math.sin(TWO_PI * (t * (0.8 + motion * 3.2) + phase)) * 0.5 + 0.5);
+    const scale = 0.18 + gate * 0.82;
     x *= scale;
     y *= scale;
     z *= scale;
@@ -628,7 +1081,8 @@ function rawSourcePosition(bank, source, t) {
     z = lerp(z, base.z * (0.2 + p.gravity) * 0.32, 0.78);
   }
 
-  const jitter = disorder * 0.28;
+  const physicsMode = bank.mode === "physics";
+  const jitter = disorder * (physicsMode ? 0.48 : 0.28);
   x += (smoothNoise(source.id, t * 1.7, 1.1) * 2 - 1) * jitter;
   y += (smoothNoise(source.id, t * 1.3, 2.2) * 2 - 1) * jitter;
   z += (smoothNoise(source.id, t * 1.1, 3.3) * 2 - 1) * jitter;
@@ -639,7 +1093,9 @@ function rawSourcePosition(bank, source, t) {
     y = Math.cos(twist) * r;
   }
 
-  const baseBlend = clamp(0.2 + (1 - motion) * 0.45, 0.2, 0.65);
+  const baseBlend = physicsMode
+    ? clamp(0.04 + (1 - motion) * 0.18 + dev * 0.08, 0.04, 0.30)
+    : clamp(0.2 + (1 - motion) * 0.45, 0.2, 0.65);
   x = lerp(x, base.x * width, baseBlend);
   y = lerp(y, base.y * width, baseBlend);
   z = lerp(z, base.z * (0.25 + p.gravity), baseBlend);
@@ -648,10 +1104,7 @@ function rawSourcePosition(bank, source, t) {
   x *= source.distance * groupDistance;
   y *= source.distance * groupDistance;
   z *= source.distance * groupDistance;
-  const azimuth = wrapDeg(radToDeg(Math.atan2(x, y)));
-  const elevation = clamp(radToDeg(Math.atan2(z, Math.hypot(x, y))), -89, 89);
-  const distance = clamp(Math.hypot(x, y, z), 0.1, 3);
-  return { x, y, z, azimuth, elevation, distance, gain: source.enabled ? source.gain : 0 };
+  return outputFromVector({ x, y, z }, source);
 }
 
 function bankAnalysis(bank, t, raw = true) {
@@ -726,10 +1179,7 @@ function applyAnalysisInfluence(bank, source, pos, t) {
     z = lerp(z, previous.z, damping * 0.42);
   }
 
-  const azimuth = wrapDeg(radToDeg(Math.atan2(x, y)));
-  const elevation = clamp(radToDeg(Math.atan2(z, Math.hypot(x, y))), -89, 89);
-  const distance = clamp(Math.hypot(x, y, z), 0.1, 3);
-  return { x, y, z, azimuth, elevation, distance, gain: pos.gain };
+  return outputFromVector({ x, y, z }, { enabled: true, gain: pos.gain });
 }
 
 function smooth(t) {
@@ -776,7 +1226,7 @@ function project(point) {
   };
 }
 
-function draw() {
+function drawFrame() {
   resizeCanvas();
   const w = canvas.width;
   const h = canvas.height;
@@ -785,7 +1235,12 @@ function draw() {
   ctx.fillRect(0, 0, w, h);
   drawGrid();
   drawAnalysis();
+  drawMotionBoundaries();
   drawBanks();
+}
+
+function draw() {
+  drawFrame();
   requestAnimationFrame(tick);
 }
 
@@ -823,28 +1278,632 @@ function pathPoints(pts) {
   pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
 }
 
+function pathPointsWithContext(targetCtx, pts) {
+  targetCtx.beginPath();
+  pts.forEach((p, i) => (i ? targetCtx.lineTo(p.x, p.y) : targetCtx.moveTo(p.x, p.y)));
+}
+
+function arcSluiceWalls(bank, t, profile = null) {
+  const p = bank.params || {};
+  const arcWidth = clamp(Number(p.arcWallWidth ?? 0.42), 0, 1);
+  const dispersion = clamp(Number(p.arcWallSpread ?? 0.36), 0, 1);
+  const wallCount = Math.max(1, Math.min(6, Math.round(Number(p.arcWallCount ?? 1))));
+  const holeCount = Math.max(0, Math.min(4, Math.round(Number(p.arcSluiceHoles ?? 1))));
+  const holeSize = clamp(Number(p.arcSluiceSize ?? 0.55), 0, 1);
+  const pull = clamp(Number(p.arcSluicePull ?? 0.45), 0, 1);
+  const spit = clamp(Number(p.arcSluiceSpit ?? 0.34), 0, 1);
+  const mode = ["quarter", "vertical", "diameter", "full"].includes(p.arcSluiceMode) ? p.arcSluiceMode : "quarter";
+  const offset = bank.motionOffset || makeGroupOffset(Math.max(0, Number(bank.id || 1) - 1));
+  const placementAz = Number(p.arcSluiceAzimuth ?? 0);
+  const azBase = internalAzimuthRad(Number(offset.azimuth || 0) + placementAz);
+  const elMin = mode === "vertical" || mode === "full" ? -Math.PI * 0.5 : 0;
+  const elMax = Math.PI * 0.5;
+  const spreadRad = degToRad(12 + dispersion * 300);
+  const base = azBase;
+  const walls = [];
+  const addWall = (az, holes, laneIndex) => {
+    walls.push({
+      az,
+      halfSpan: degToRad(2.5 + arcWidth * 22),
+      elMin,
+      elMax,
+      radius: DOME_RADIUS,
+      holes: holes.map((hole) => ({ ...hole })),
+      pull,
+      spit,
+      mode,
+      laneIndex,
+    });
+  };
+  for (let i = 0; i < wallCount; i += 1) {
+    const lane = wallCount === 1 ? 0 : i / (wallCount - 1) - 0.5;
+    const holes = [];
+    for (let h = 0; h < holeCount; h += 1) {
+      const seed = Number(offset.phase || 0) * 97 + i * 23 + h * 37;
+      const pos = holeCount === 1 ? 0.5 : (h + 0.5) / holeCount;
+      holes.push({
+        pos: clamp(pos + (hashNoise(seed, 0.13, 1) - 0.5) * 0.30, 0.14, 0.86),
+        dist: clamp(0.24 + (h + 0.5) / holeCount * 0.58 + (hashNoise(seed, 0.37, 2) - 0.5) * 0.18, 0.18, 0.92),
+        radius: clamp(0.045 + holeSize * 0.275 + hashNoise(seed, 0.71, 3) * 0.018, 0.035, 0.38),
+      });
+    }
+    const az = base + lane * spreadRad;
+    addWall(az, holes, i);
+    if (mode === "diameter" || mode === "full") addWall(az + Math.PI, holes, i + wallCount);
+  }
+  return walls;
+}
+
+function simulationKey(bank) {
+  return JSON.stringify({
+    id: bank.id,
+    mode: bank.mode,
+    scene: bank.scene,
+    variant: bank.variant || "primary",
+    params: bank.params,
+    arcSluice: state.arcSluice,
+    sources: bank.sources.map((s) => ({
+      id: s.id,
+      enabled: s.enabled,
+      azimuth: s.azimuth,
+      elevation: s.elevation,
+      distance: s.distance,
+      gain: s.gain,
+    })),
+    offset: bank.motionOffset || {},
+    duration: Number(ui.duration.value || 16),
+    pointRate: Number(ui.pointRate.value || 32),
+    spatialConstraint: ui.spatialConstraint.value,
+    analysis: {
+      influence: Number(ui.analysisInfluence.value || 0),
+      scope: ui.analysisScope.value,
+      neighborLinks: Number(ui.neighborLinks.value || 0),
+      centroid: Number(ui.centroidPull.value || 0),
+      spread: Number(ui.spreadTarget.value || 1.05),
+      damping: Number(ui.activityDamping.value || 0),
+    },
+  });
+}
+
+function targetMotionPosition(bank, source, t) {
+  const raw = rawSourcePosition(bank, source, t);
+  return constrainPosition(applyAnalysisInfluence(bank, source, raw, t));
+}
+
+function outputFromVector(point, source) {
+  const x = point.x;
+  const y = point.y;
+  const z = point.z;
+  return {
+    x,
+    y,
+    z,
+    azimuth: azimuthFromVector(x, y),
+    elevation: clamp(radToDeg(Math.atan2(z, Math.hypot(x, y))), -89, 89),
+    distance: clamp(Math.hypot(x, y, z), 0.1, 3),
+    gain: source.enabled ? source.gain : 0,
+  };
+}
+
+function simulatedSourcePosition(bank, source, t) {
+  const sim = velocitySimulation(bank);
+  const frames = sim.sources[source.id];
+  if (!frames || !frames.length) return targetMotionPosition(bank, source, t);
+  const ft = clamp(t, 0, 1) * (frames.length - 1);
+  const i0 = Math.floor(ft);
+  const i1 = Math.min(frames.length - 1, i0 + 1);
+  const f = ft - i0;
+  const a = frames[i0];
+  const b = frames[i1];
+  const point = {
+    x: lerp(a.x, b.x, f),
+    y: lerp(a.y, b.y, f),
+    z: lerp(a.z, b.z, f),
+  };
+  return outputFromVector(point, source);
+}
+
+function velocitySimulation(bank) {
+  const key = simulationKey(bank);
+  const cached = state.simCache.get(key);
+  if (cached) return cached;
+  if (state.simCache.size > 12) state.simCache.clear();
+  const duration = Math.max(0.1, Number(ui.duration.value || 16));
+  const pointRate = Math.max(4, Number(ui.pointRate.value || 32));
+  const steps = Math.min(4096, Math.max(160, Math.round(duration * pointRate)));
+  const sources = {};
+  const current = {};
+  const velocities = {};
+  bank.sources.forEach((source) => {
+    const p0 = targetMotionPosition(bank, source, 0);
+    const p1 = targetMotionPosition(bank, source, Math.min(1, 1 / steps));
+    current[source.id] = { x: p0.x, y: p0.y, z: p0.z };
+    velocities[source.id] = {
+      x: (p1.x - p0.x) * 0.72,
+      y: (p1.y - p0.y) * 0.72,
+      z: (p1.z - p0.z) * 0.72,
+    };
+    sources[source.id] = [{ ...current[source.id] }];
+  });
+  for (let i = 1; i <= steps; i += 1) {
+    const t = i / steps;
+    const predictedById = {};
+    const velocityById = {};
+    bank.sources.forEach((source) => {
+      const desired = targetMotionPosition(bank, source, t);
+      const pos = current[source.id];
+      const vel = velocities[source.id];
+      const follow = bank.mode === "physics" ? 0.075 : 0.145;
+      const retain = bank.mode === "physics" ? 0.91 : 0.86;
+      vel.x = vel.x * retain + (desired.x - pos.x) * follow;
+      vel.y = vel.y * retain + (desired.y - pos.y) * follow;
+      vel.z = vel.z * retain + (desired.z - pos.z) * follow;
+      predictedById[source.id] = {
+        x: pos.x + vel.x,
+        y: pos.y + vel.y,
+        z: pos.z + vel.z,
+      };
+      velocityById[source.id] = { ...vel };
+    });
+    bank.sources.forEach((source) => {
+      const resolved = resolveVelocityFrame(
+        bank,
+        t,
+        predictedById[source.id],
+        velocityById[source.id],
+        source,
+        predictedById,
+        current[source.id]
+      );
+      current[source.id] = resolved.point;
+      velocities[source.id] = resolved.velocity;
+      sources[source.id].push({ ...resolved.point });
+    });
+  }
+  const sim = { key, steps, sources };
+  state.simCache.set(key, sim);
+  return sim;
+}
+
+function resolveVelocityFrame(bank, t, point, velocity, source, predictedById, previousPoint = null) {
+  let resolved = { point, velocity };
+  if (bank.mode === "physics") {
+    resolved = resolvePhysicsVelocity(bank, t, resolved.point, resolved.velocity, source, predictedById);
+  }
+  if (Number(state.arcSluice?.arcSluiceOn || 0)) {
+    resolved = resolveArcSluiceVelocity(bank, t, resolved.point, resolved.velocity, source, previousPoint);
+  }
+  return resolved;
+}
+
+function resolvePhysicsVelocity(bank, t, point, velocity, source, predictedById) {
+  const p = bank.params || {};
+  const variantProfile = motionVariantProfile(bank.mode, bank.variant || "primary");
+  const attractAmt = clamp(Number(p.physAttract ?? 0.32) * (variantProfile.attract || 1), 0, 1.8);
+  const repelAmt = clamp(Number(p.physRepel ?? 0.42) * (variantProfile.repel || 1), 0, 1.8);
+  const bounceAmt = clamp(Number(p.physBounce ?? 0.52) * (variantProfile.bounce || 1), 0, 1.8);
+  const collisionAmt = clamp(Number(p.physCollision ?? 0.34) * (variantProfile.collision || 1), 0, 1.8);
+  const dampingAmt = clamp(Number(p.physDamping ?? 0.38) * (variantProfile.damping || 1), 0, 1.8);
+  const turbulenceAmt = clamp(Number(p.physTurbulence ?? 0.28) * (variantProfile.turbulence || 1), 0, 1.8);
+  const width = clamp(Number(p.width ?? 0.5), 0, 1);
+  const motion = clamp(Number(p.motion ?? 0.42) * (variantProfile.motion || 1), 0, 1.8);
+  const disorder = clamp(Number(p.disorder ?? 0.35) * (variantProfile.disorder || 1), 0, 1.8);
+  const sceneIndex = Math.max(0, SCENES.indexOf(bank.scene || "a"));
+  let x = point.x;
+  let y = point.y;
+  let z = point.z;
+  let vx = velocity.x;
+  let vy = velocity.y;
+  let vz = velocity.z;
+
+  const activeSources = bank.sources.filter((item) => item.enabled);
+  const centroid = activeSources.reduce((acc, item) => {
+    const other = predictedById[item.id];
+    if (!other) return acc;
+    acc.x += other.x;
+    acc.y += other.y;
+    acc.z += other.z;
+    acc.count += 1;
+    return acc;
+  }, { x: 0, y: 0, z: 0, count: 0 });
+  if (centroid.count) {
+    centroid.x /= centroid.count;
+    centroid.y /= centroid.count;
+    centroid.z /= centroid.count;
+  }
+
+  const rest = targetMotionPosition({ ...bank, mode: "orbit", morph: null }, source, t);
+  const centerPull = attractAmt * (sceneIndex === 7 ? 0.0065 : 0.0032);
+  const restPull = attractAmt * (sceneIndex === 0 || sceneIndex === 4 ? 0.010 : 0.004);
+  vx += (centroid.x - x) * centerPull;
+  vy += (centroid.y - y) * centerPull;
+  vz += (centroid.z - z) * centerPull * 0.82;
+  vx += (rest.x - x) * restPull;
+  vy += (rest.y - y) * restPull;
+  vz += (rest.z - z) * restPull * 0.82;
+
+  const collisionRadius = 0.16 + collisionAmt * 0.72 + width * 0.24;
+  const repelStrength = repelAmt * (0.010 + width * 0.018) * (sceneIndex === 1 || sceneIndex === 5 ? 1.55 : 1);
+  activeSources.forEach((otherSource) => {
+    if (otherSource.id === source.id) return;
+    const other = predictedById[otherSource.id];
+    if (!other) return;
+    let dx = x - other.x;
+    let dy = y - other.y;
+    let dz = z - other.z;
+    const d = Math.max(0.001, Math.hypot(dx, dy, dz));
+    if (d < collisionRadius) {
+      const hit = smooth(clamp((collisionRadius - d) / collisionRadius, 0, 1));
+      dx /= d;
+      dy /= d;
+      dz /= d;
+      const push = hit * repelStrength;
+      vx += dx * push;
+      vy += dy * push;
+      vz += dz * push * 0.86;
+      x += dx * push * 0.42;
+      y += dy * push * 0.42;
+      z += dz * push * 0.32;
+    }
+  });
+
+  const noiseRate = 0.8 + motion * 2.4 + disorder * 1.2;
+  const nx = smoothNoise(source.id * 101 + sceneIndex * 31, t * noiseRate, 0.11) * 2 - 1;
+  const ny = smoothNoise(source.id * 131 + sceneIndex * 37, t * noiseRate * 0.91, 0.33) * 2 - 1;
+  const nz = smoothNoise(source.id * 173 + sceneIndex * 41, t * noiseRate * 1.07, 0.57) * 2 - 1;
+  const turbulence = turbulenceAmt * (0.003 + motion * 0.008 + disorder * 0.006);
+  vx += nx * turbulence;
+  vy += ny * turbulence;
+  vz += nz * turbulence * 0.86;
+
+  const boundary = 1.08 + width * 1.72;
+  const dist = Math.max(0.001, Math.hypot(x, y, z));
+  if (dist > boundary) {
+    const nx = x / dist;
+    const ny = y / dist;
+    const nz = z / dist;
+    const over = dist - boundary;
+    x -= nx * over * (0.82 + collisionAmt * 0.22);
+    y -= ny * over * (0.82 + collisionAmt * 0.22);
+    z -= nz * over * (0.82 + collisionAmt * 0.22);
+    const vn = vx * nx + vy * ny + vz * nz;
+    if (vn > 0) {
+      const impulse = -(1 + bounceAmt * 0.68) * vn;
+      vx += impulse * nx;
+      vy += impulse * ny;
+      vz += impulse * nz;
+    }
+  }
+
+  if (ui.spatialConstraint.value === "hemisphere" && z < 0) {
+    z = Math.abs(z) * (0.24 + bounceAmt * 0.28);
+    if (vz < 0) vz = -vz * (0.32 + bounceAmt * 0.42);
+  }
+
+  const drag = clamp(0.992 - dampingAmt * 0.075, 0.82, 0.994);
+  vx *= drag;
+  vy *= drag;
+  vz *= drag;
+  const speed = Math.hypot(vx, vy, vz);
+  const maxSpeed = 0.055 + motion * 0.135 + bounceAmt * 0.035;
+  if (speed > maxSpeed) {
+    const scale = maxSpeed / speed;
+    vx *= scale;
+    vy *= scale;
+    vz *= scale;
+  }
+
+  return {
+    point: constrainPosition({ x, y, z, azimuth: 0, elevation: 0, distance: 1, gain: source.enabled ? source.gain : 0 }),
+    velocity: { x: vx, y: vy, z: vz },
+  };
+}
+
+function resolveArcSluiceVelocity(bank, t, point, velocity, source, previousPoint = null) {
+  const p = { ...(bank.params || {}), ...(state.arcSluice || {}) };
+  const variantProfile = motionVariantProfile(bank.mode, bank.variant || "primary");
+  const collisionAmt = clamp(Number(p.physCollision ?? 0.34) * (variantProfile.collision || 1), 0, 1.8);
+  const bounceAmt = clamp(Number(p.physBounce ?? 0.52) * (variantProfile.bounce || 1), 0, 1.8);
+  const attractAmt = clamp(Number(p.physAttract ?? 0.32) * (variantProfile.attract || 1), 0, 1.8);
+  const dampingAmt = clamp(Number(p.physDamping ?? 0.38), 0, 1);
+  let x = point.x;
+  let y = point.y;
+  let z = point.z;
+  let vx = velocity.x;
+  let vy = velocity.y;
+  let vz = velocity.z;
+  const reboundFromWall = (nx, ny, nz, overlap = 0.02, extraSpring = 0) => {
+    const vn = vx * nx + vy * ny + vz * nz;
+    const tx = vx - nx * vn;
+    const ty = vy - ny * vn;
+    const tz = vz - nz * vn;
+    const spring = overlap * (0.78 + collisionAmt * 0.34 + bounceAmt * 0.20) + extraSpring;
+    const restitution = clamp(0.34 + bounceAmt * 0.35 - dampingAmt * 0.10, 0.22, 0.88);
+    const normalOut = vn < 0
+      ? (-vn * restitution + spring)
+      : (Math.max(0, vn) * 0.42 + spring * 0.65);
+    const tangentLoss = clamp(0.90 - dampingAmt * 0.22 - Math.min(0.28, overlap * 1.8), 0.48, 0.94);
+    const normalLoss = clamp(0.98 - dampingAmt * 0.08 - Math.min(0.16, overlap * 0.55), 0.76, 0.98);
+    vx = nx * normalOut * normalLoss + tx * tangentLoss;
+    vy = ny * normalOut * normalLoss + ty * tangentLoss;
+    vz = nz * normalOut * normalLoss + tz * tangentLoss;
+  };
+  arcSluiceWalls(globalArcSluiceBank(), t, variantProfile).forEach((wall) => {
+    const radial = Math.max(0.001, Math.hypot(x, y));
+    const pointAz = Math.atan2(x, y);
+    const pointEl = Math.atan2(z, radial);
+    const distNorm = Math.hypot(x, y, z) / Math.max(0.001, wall.radius);
+    const azDelta = signedAngleRad(pointAz, wall.az);
+    const absDelta = Math.abs(azDelta);
+    const wallNxPos = Math.cos(wall.az);
+    const wallNyPos = -Math.sin(wall.az);
+    const signedWallDistance = x * wallNxPos + y * wallNyPos;
+    const wallThickness = Math.max(0.075 + Number(p.arcWallWidth ?? 0.42) * 0.16, wall.halfSpan * Math.max(0.18, radial));
+    const centerStopRadius = 0.18 + Number(p.arcWallWidth ?? 0.42) * 0.26;
+    const elNorm = clamp((pointEl - wall.elMin) / Math.max(0.001, wall.elMax - wall.elMin), 0, 1);
+    if (pointEl < wall.elMin || pointEl > wall.elMax) return;
+    let nearestHole = null;
+    let nearestDistance = Infinity;
+    (wall.holes || []).forEach((hole) => {
+      const dx = (distNorm - hole.dist) / Math.max(0.001, hole.radius);
+      const dy = (elNorm - hole.pos) / Math.max(0.001, hole.radius);
+      const dz = azDelta / Math.max(0.001, wall.halfSpan);
+      const d = Math.hypot(dx, dy, dz);
+      if (d < nearestDistance) {
+        nearestDistance = d;
+        nearestHole = hole;
+      }
+    });
+    const insideSluicePlane = (testDist, testEl) => {
+      return (wall.holes || []).some((hole) => {
+        const dx = (testDist - hole.dist) / Math.max(0.001, hole.radius);
+        const dy = (testEl - hole.pos) / Math.max(0.001, hole.radius);
+        return dx * dx + dy * dy <= 1;
+      });
+    };
+    if (previousPoint) {
+      const prevRadial = Math.max(0.001, Math.hypot(previousPoint.x, previousPoint.y));
+      const prevAz = Math.atan2(previousPoint.x, previousPoint.y);
+      const prevEl = Math.atan2(previousPoint.z, prevRadial);
+      const prevDelta = signedAngleRad(prevAz, wall.az);
+      const prevWallDistance = previousPoint.x * wallNxPos + previousPoint.y * wallNyPos;
+      const crossedPlane = prevWallDistance !== 0 && signedWallDistance !== 0 && Math.sign(prevWallDistance) !== Math.sign(signedWallDistance);
+      const prevInElev = prevEl >= wall.elMin && prevEl <= wall.elMax;
+      const prevDistNorm = Math.hypot(previousPoint.x, previousPoint.y, previousPoint.z) / Math.max(0.001, wall.radius);
+      const crossingDist = clamp((prevDistNorm + distNorm) * 0.5, 0, 1.25);
+      const crossingEl = clamp((((prevEl - wall.elMin) / Math.max(0.001, wall.elMax - wall.elMin)) + elNorm) * 0.5, 0, 1);
+      if (crossedPlane && prevInElev && !insideSluicePlane(crossingDist, crossingEl)) {
+        const side = prevWallDistance >= 0 ? 1 : -1;
+        const targetDistance = side * wallThickness;
+        const correctionDistance = targetDistance - signedWallDistance;
+        x += wallNxPos * correctionDistance;
+        y += wallNyPos * correctionDistance;
+        const nx = wallNxPos * side;
+        const ny = wallNyPos * side;
+        reboundFromWall(nx, ny, 0, Math.max(0.018, Math.abs(correctionDistance) * 0.18), 0.012 + collisionAmt * 0.010);
+        return;
+      }
+    }
+    const feather = 0.42;
+    const wallFeather = nearestDistance <= 1 ? 0 : nearestDistance >= 1 + feather
+      ? 1
+      : smooth(clamp((nearestDistance - 1) / feather, 0, 1));
+    if (nearestHole && nearestDistance <= 1.85) {
+      const reach = smooth(1 - clamp((nearestDistance - 1) / 0.85, 0, 1));
+      const targetEl = lerp(wall.elMin, wall.elMax, nearestHole.pos);
+      const sx = Math.sin(wall.az) * Math.cos(targetEl);
+      const sy = Math.cos(wall.az) * Math.cos(targetEl);
+      const sz = Math.sin(targetEl);
+      const hx = sx * nearestHole.dist * wall.radius;
+      const hy = sy * nearestHole.dist * wall.radius;
+      const hz = sz * nearestHole.dist * wall.radius;
+      const suction = reach * (wall.pull * 0.075 + attractAmt * 0.018);
+      vx += (hx - x) * suction;
+      vy += (hy - y) * suction;
+      vz += (hz - z) * suction;
+    }
+    if (nearestHole && nearestDistance <= 1) {
+      const gate = smooth(1 - clamp(nearestDistance, 0, 1));
+      const targetEl = lerp(wall.elMin, wall.elMax, nearestHole.pos);
+      const sx = Math.sin(wall.az) * Math.cos(targetEl);
+      const sy = Math.cos(wall.az) * Math.cos(targetEl);
+      const sz = Math.sin(targetEl);
+      const hx = sx * nearestHole.dist * wall.radius;
+      const hy = sy * nearestHole.dist * wall.radius;
+      const hz = sz * nearestHole.dist * wall.radius;
+      const pull = gate * (wall.pull * 0.12 + attractAmt * 0.022);
+      vx += (hx - x) * pull;
+      vy += (hy - y) * pull;
+      vz += (hz - z) * pull;
+      const entrySide = previousPoint
+        ? Math.sign(previousPoint.x * wallNxPos + previousPoint.y * wallNyPos)
+        : Math.sign(signedWallDistance);
+      const exitSide = -(entrySide || Math.sign(signedWallDistance) || 1);
+      const throughX = wallNxPos * exitSide;
+      const throughY = wallNyPos * exitSide;
+      const incomingNormal = vx * wallNxPos + vy * wallNyPos;
+      const reverseInertia = Math.abs(incomingNormal) * (0.38 + wall.spit * 0.85);
+      const spit = gate * (wall.spit * (0.060 + bounceAmt * 0.040) + reverseInertia);
+      vx = vx * 0.68 + throughX * spit;
+      vy = vy * 0.68 + throughY * spit;
+      vz = vz * 0.82 + sz * spit * 0.22;
+      return;
+    }
+    if (distNorm < centerStopRadius / Math.max(0.001, wall.radius) && !insideSluicePlane(distNorm, elNorm)) {
+      const prevSide = previousPoint
+        ? Math.sign(previousPoint.x * wallNxPos + previousPoint.y * wallNyPos)
+        : 0;
+      const side = prevSide || Math.sign(signedWallDistance) || 1;
+      const targetDistance = side * wallThickness;
+      const correctionDistance = targetDistance - signedWallDistance;
+      x += wallNxPos * correctionDistance;
+      y += wallNyPos * correctionDistance;
+      const nx = wallNxPos * side;
+      const ny = wallNyPos * side;
+      reboundFromWall(nx, ny, 0, Math.max(0.026, Math.abs(correctionDistance) * 0.22), 0.018 + collisionAmt * 0.014);
+      vx *= 0.92;
+      vy *= 0.92;
+      vz *= 0.96;
+      return;
+    }
+    const hardMargin = degToRad(2.0);
+    const hardWidth = wall.halfSpan + hardMargin;
+    if ((absDelta > hardWidth && Math.abs(signedWallDistance) > wallThickness) || wallFeather <= 0) return;
+    const sign = signedWallDistance >= 0 ? 1 : -1;
+    const nx = wallNxPos * sign;
+    const ny = wallNyPos * sign;
+    const nz = 0;
+    const physicalPenetration = Math.max(0, wallThickness - Math.abs(signedWallDistance));
+    const angularPenetration = Math.max(0, hardWidth - Math.min(absDelta, hardWidth)) * Math.max(0.18, radial);
+    const overlap = Math.max(0.006, Math.max(physicalPenetration, angularPenetration) * wallFeather);
+    const correction = 1.18 + collisionAmt * 0.20;
+    x += nx * overlap * correction;
+    y += ny * overlap * correction;
+    reboundFromWall(nx, ny, nz, overlap, overlap * (0.10 + bounceAmt * 0.05));
+  });
+  const speed = Math.hypot(vx, vy, vz);
+  const maxSpeed = 0.11 + Number(p.motion ?? 0.42) * 0.11 + bounceAmt * 0.035;
+  if (speed > maxSpeed) {
+    const scale = maxSpeed / speed;
+    vx *= scale;
+    vy *= scale;
+    vz *= scale;
+  }
+  return {
+    point: { x, y, z },
+    velocity: { x: vx, y: vy, z: vz },
+  };
+}
+
+function drawMotionBoundaries() {
+  const t = currentT();
+  if (!Number(state.arcSluice?.arcSluiceOn || 0)) return;
+  drawArcSluice(globalArcSluiceBank(), t, 1);
+}
+
+function drawArcSluice(bank, t, alpha = 1) {
+  const walls = arcSluiceWalls(bank, t);
+  const dpr = renderPixelScale();
+  const elSteps = 44;
+
+  const wallPoint = (az, el, dist = 1) => ({
+    x: Math.sin(az) * Math.cos(el) * dist,
+    y: Math.cos(az) * Math.cos(el) * dist,
+    z: Math.sin(el) * dist,
+  });
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.lineCap = "butt";
+
+  walls.forEach((wall, wi) => {
+    const wallAlpha = 1 - Math.min(0.46, wi * 0.07);
+
+    const drawProjectedLine = (points, strokeStyle, lineWidth, close = false) => {
+      if (!points.length) return;
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      points.forEach((pt, pi) => (pi ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y)));
+      if (close) ctx.closePath();
+      ctx.stroke();
+    };
+    const edgeColor = `rgba(255, 201, 124, ${0.82 * wallAlpha})`;
+    const shadeColor = `rgba(6, 8, 10, ${0.74 * wallAlpha})`;
+    const sideA = [];
+    const sideB = [];
+    for (let ei = 0; ei <= elSteps; ei += 1) {
+      const elNorm = ei / elSteps;
+      const el = lerp(wall.elMin, wall.elMax, elNorm);
+      sideA.push(project(wallPoint(wall.az - wall.halfSpan, el, wall.radius)));
+      sideB.push(project(wallPoint(wall.az + wall.halfSpan, el, wall.radius)));
+    }
+    const topEdge = [
+      project(wallPoint(wall.az - wall.halfSpan, wall.elMax, 0.12 * wall.radius)),
+      project(wallPoint(wall.az + wall.halfSpan, wall.elMax, 0.12 * wall.radius)),
+      project(wallPoint(wall.az + wall.halfSpan, wall.elMax, wall.radius)),
+      project(wallPoint(wall.az - wall.halfSpan, wall.elMax, wall.radius)),
+    ];
+    const bottomEdge = [
+      project(wallPoint(wall.az - wall.halfSpan, wall.elMin, 0.12 * wall.radius)),
+      project(wallPoint(wall.az + wall.halfSpan, wall.elMin, 0.12 * wall.radius)),
+      project(wallPoint(wall.az + wall.halfSpan, wall.elMin, wall.radius)),
+      project(wallPoint(wall.az - wall.halfSpan, wall.elMin, wall.radius)),
+    ];
+    [sideA, sideB, topEdge, bottomEdge].forEach((points) => drawProjectedLine(points, shadeColor, 4.4 * dpr, Array.isArray(points) && points.length === 4));
+    [sideA, sideB].forEach((points) => drawProjectedLine(points, edgeColor, 1.55 * dpr));
+    drawProjectedLine(topEdge, edgeColor, 1.4 * dpr, true);
+    drawProjectedLine(bottomEdge, `rgba(255, 183, 94, ${0.50 * wallAlpha})`, 1.1 * dpr, true);
+
+    const holes = wall.holes || [];
+    const isInsideOtherHole = (hole, dist, elNorm) => {
+      return holes.some((other) => {
+        if (other === hole) return false;
+        const dx = (dist - other.dist) / Math.max(0.001, other.radius);
+        const dy = (elNorm - other.pos) / Math.max(0.001, other.radius);
+        return dx * dx + dy * dy < 0.98;
+      });
+    };
+    const drawVisibleHoleRims = (strokeStyle, lineWidth) => {
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth;
+      holes.forEach((hole) => {
+        const rimSteps = 96;
+        let drawing = false;
+        ctx.beginPath();
+        for (let i = 0; i <= rimSteps; i += 1) {
+          const a = TWO_PI * (i / rimSteps);
+          const nextA = TWO_PI * (Math.min(i + 1, rimSteps) / rimSteps);
+          const midA = (a + nextA) * 0.5;
+          const dist = clamp(hole.dist + Math.cos(a) * hole.radius, 0.02, 1);
+          const elNorm = clamp(hole.pos + Math.sin(a) * hole.radius, 0, 1);
+          const midDist = clamp(hole.dist + Math.cos(midA) * hole.radius, 0.02, 1);
+          const midEl = clamp(hole.pos + Math.sin(midA) * hole.radius, 0, 1);
+          const visible = !isInsideOtherHole(hole, midDist, midEl);
+          const pt = project(wallPoint(wall.az, lerp(wall.elMin, wall.elMax, elNorm), dist * wall.radius));
+          if (visible && !drawing) {
+            ctx.moveTo(pt.x, pt.y);
+            drawing = true;
+          } else if (visible) {
+            ctx.lineTo(pt.x, pt.y);
+          } else {
+            drawing = false;
+          }
+        }
+        ctx.stroke();
+      });
+    };
+    drawVisibleHoleRims(`rgba(5, 7, 8, ${0.70 * wallAlpha})`, 5 * dpr);
+    drawVisibleHoleRims(`rgba(255, 190, 112, ${0.92 * wallAlpha})`, 2 * dpr);
+
+  });
+  ctx.restore();
+}
+
 function drawBanks() {
   const t = currentT();
   state.banks.forEach((bank, bi) => {
     const drawBank = effectiveBank(bank);
-    const alpha = bi === state.activeBank ? 1 : 0.32;
+    const focused = state.groupFocus && bi === state.activeBank;
+    const alpha = state.groupFocus ? (focused ? 1 : 0.32) : 1;
     if (ui.showTrails.checked) drawTrails(drawBank, alpha);
     drawBank.sources.forEach((source, si) => {
       const pos = sourcePosition(drawBank, source, t);
       const p = project(pos);
-      const radius = (bi === state.activeBank && si === state.selectedSource ? 11 : 7) * (window.devicePixelRatio || 1);
+      const dpr = renderPixelScale();
+      const radius = (focused && si === state.selectedSource ? 11 : 7) * dpr;
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.fillStyle = source.enabled ? COLORS[si] : "#404848";
-      ctx.strokeStyle = bi === state.activeBank ? "#f2c56e" : "#708080";
-      ctx.lineWidth = 1.5 * (window.devicePixelRatio || 1);
+      ctx.strokeStyle = focused ? "#f2c56e" : "#708080";
+      ctx.lineWidth = 1.5 * dpr;
       ctx.beginPath();
       ctx.arc(p.x, p.y, radius, 0, TWO_PI);
       ctx.fill();
       ctx.stroke();
-      if (ui.showLabels.checked || (bi === state.activeBank && si === state.selectedSource)) {
+      if (ui.showLabels.checked || (focused && si === state.selectedSource)) {
         ctx.fillStyle = "#d7dddd";
-        ctx.font = `${12 * (window.devicePixelRatio || 1)}px Menlo, monospace`;
+        ctx.font = `${12 * dpr}px Menlo, monospace`;
         ctx.fillText(`${bank.id}.${source.id}`, p.x + radius + 4, p.y - radius);
       }
       ctx.restore();
@@ -872,7 +1931,7 @@ function drawTrailSegment(pts, sourceIndex, alpha) {
   ctx.save();
   ctx.globalAlpha = 0.16 * alpha;
   ctx.strokeStyle = COLORS[sourceIndex];
-  ctx.lineWidth = 1 * (window.devicePixelRatio || 1);
+  ctx.lineWidth = 1 * renderPixelScale();
   ctx.beginPath();
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i];
@@ -906,7 +1965,7 @@ function drawAnalysis() {
     ctx.save();
     ctx.strokeStyle = "#f2c56e";
     ctx.fillStyle = "rgba(242, 197, 110, 0.09)";
-    ctx.lineWidth = 1.5 * (window.devicePixelRatio || 1);
+    ctx.lineWidth = 1.5 * renderPixelScale();
     ctx.beginPath();
     ctx.arc(c.x, c.y, Math.max(12, spread * Math.min(canvas.width, canvas.height) * 0.13), 0, TWO_PI);
     ctx.fill();
@@ -920,7 +1979,7 @@ function drawAnalysis() {
 }
 
 function drawAnalysisConnections(positions) {
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = renderPixelScale();
   const projected = positions.map(project);
   const neighborCount = Math.max(1, Math.round(Number(ui.neighborLinks.value || 2)));
   const edges = new Map();
@@ -973,12 +2032,26 @@ function tick(now = performance.now()) {
     applyReaperTransport(now);
   } else if (state.playing) {
     const dur = Number(ui.duration.value);
-    state.playT = pingpong01((now - state.playStart) / 1000 / dur);
-    if (ui.autoNext.checked && !activeBank().morph && now >= state.nextSceneAt) {
+    if (state.recorder) {
+      const recordDuration = Math.max(0.001, Number(state.recordingDuration || dur));
+      state.playT = clamp((now - state.recordingStart) / 1000 / recordDuration, 0, 1);
+      if (state.recordingSceneCycle && !activeBank().morph && now >= state.nextSceneAt) {
+        const nextKey = nextSceneKey(activeBank().scene, false);
+        if (nextKey) startSceneMorph(nextKey);
+        else if (state.recorder.state !== "inactive") state.recorder.stop();
+      }
+      if (state.playT >= 1 && state.recorder.state !== "inactive") state.recorder.stop();
+    } else {
+      state.playT = pingpong01((now - state.playStart) / 1000 / dur);
+    }
+    if (!state.recorder && ui.autoNext.checked && !activeBank().morph && now >= state.nextSceneAt) {
       startSceneMorph();
     }
   }
-  if (!reaperLink.enabled) ui.timeReadout.textContent = `${(state.playT * Number(ui.duration.value)).toFixed(2)}s`;
+  const displayDuration = state.recorder
+    ? Number(state.recordingDuration || ui.duration.value)
+    : Number(ui.duration.value);
+  if (!reaperLink.enabled) ui.timeReadout.textContent = `${(state.playT * displayDuration).toFixed(2)}s`;
   updateSceneDisplays();
   draw();
 }
@@ -1004,18 +2077,29 @@ function syncPanelFromBank() {
   const bank = activeBank();
   const shownBank = effectiveBank(bank);
   ui.bankMode.value = shownBank.mode;
+  updateVariantMenu(shownBank.mode, shownBank.variant || "primary");
   ui.sceneMode.value = shownBank.variant || "primary";
+  if (ui.sceneMode._customButton) {
+    ui.sceneMode._customButton.textContent = ui.sceneMode.selectedOptions[0]?.textContent || "Select";
+  }
   ui.morphTarget.value = nextSceneKey(bank.scene);
   ui.sceneName.value = bank.scenes[bank.scene]?.name || bank.scene.toUpperCase();
   if (bank.scenes[bank.scene]) {
     ui.sceneHold.value = Number(bank.scenes[bank.scene].hold ?? ui.sceneHold.value);
     ui.morphDuration.value = Number(bank.scenes[bank.scene].morph ?? ui.morphDuration.value);
   }
-  for (const key of Object.keys(shownBank.params)) ui[key].value = shownBank.params[key];
+  for (const key of Object.keys(shownBank.params)) {
+    if (!ARC_SLUICE_PARAM_KEYS.has(key)) setParamControlValue(key, shownBank.params[key]);
+  }
+  ARC_SLUICE_PARAM_KEYS.forEach((key) => setParamControlValue(key, state.arcSluice[key]));
+  updatePhysicsControlState(shownBank.mode);
   const source = shownBank.sources[state.selectedSource];
   ui.sourceSelect.value = String(state.selectedSource);
   ui.sourceGain.value = source.gain;
+  ui.sourceAzimuth.value = wrapDeg(source.azimuth);
+  ui.sourceElevation.value = clamp(source.elevation, -85, 85);
   ui.sourceDistance.value = source.distance;
+  updateSourcePositionReadouts();
   ui.toggleSource.textContent = source.enabled ? "Mute Source" : "Unmute Source";
   renderBanks();
   renderScenes();
@@ -1029,6 +2113,7 @@ function captureScene(bank, silent = true) {
     mode: bank.mode,
     variant: bank.variant || "primary",
     params: { ...bank.params },
+    sources: bank.sources.map(cloneSource),
     hold: Number(ui.sceneHold.value || 0),
     morph: Number(ui.morphDuration.value || 4),
   };
@@ -1038,9 +2123,18 @@ function captureScene(bank, silent = true) {
 function syncBankFromPanel() {
   const bank = activeBank();
   if (bank.morph) bank.morph = null;
+  const previousMode = bank.mode;
   bank.mode = ui.bankMode.value;
+  if (previousMode !== bank.mode) {
+    updateVariantMenu(bank.mode, bank.variant || ui.sceneMode.value);
+    updatePhysicsControlState(bank.mode);
+  }
   bank.variant = ui.sceneMode.value;
-  for (const key of Object.keys(bank.params)) bank.params[key] = Number(ui[key].value);
+  updatePhysicsControlState(bank.mode);
+  for (const key of Object.keys(bank.params)) {
+    if (ARC_SLUICE_PARAM_KEYS.has(key)) state.arcSluice[key] = readParamControlValue(key);
+    else bank.params[key] = readParamControlValue(key);
+  }
   propagateMotionFrom(bank);
   captureScene(bank);
   updateAllRangeFills();
@@ -1050,19 +2144,38 @@ function syncSourceFromPanel() {
   const bank = activeBank();
   const source = bank.sources[state.selectedSource];
   source.gain = Number(ui.sourceGain.value);
+  source.azimuth = wrapDeg(Number(ui.sourceAzimuth.value));
+  source.elevation = clamp(Number(ui.sourceElevation.value), -85, 85);
   source.distance = Number(ui.sourceDistance.value);
   updateAllRangeFills();
+  captureScene(bank);
+  renderBanks();
+}
+
+function syncSourcePositionControls(source) {
+  ui.sourceAzimuth.value = Number(wrapDeg(source.azimuth).toFixed(1));
+  ui.sourceElevation.value = Number(clamp(source.elevation, -85, 85).toFixed(1));
+  ui.sourceDistance.value = Number(source.distance.toFixed(3));
+  updateRangeFill(ui.sourceAzimuth);
+  updateRangeFill(ui.sourceElevation);
+  updateRangeFill(ui.sourceDistance);
+  updateSourcePositionReadouts();
 }
 
 function renderBanks() {
   ui.bankList.innerHTML = "";
   state.banks.forEach((bank, i) => {
     const b = document.createElement("button");
-    b.className = `bank-button${i === state.activeBank ? " active" : ""}`;
+    b.className = `bank-button${state.groupFocus && i === state.activeBank ? " active" : ""}`;
     b.type = "button";
     b.textContent = bank.name || `Group ${bank.id}`;
     b.addEventListener("click", () => {
-      state.activeBank = i;
+      if (state.groupFocus && state.activeBank === i) {
+        state.groupFocus = false;
+      } else {
+        state.activeBank = i;
+        state.groupFocus = true;
+      }
       syncPanelFromBank();
     });
     ui.bankList.appendChild(b);
@@ -1140,6 +2253,9 @@ function applyScene(scene) {
   bank.mode = scene.mode;
   bank.variant = scene.variant || "primary";
   bank.params = { ...scene.params };
+  if (scene.sources && scene.sources.length) {
+    bank.sources = Array.from({ length: 8 }, (_, index) => normalizeSource(scene.sources[index], index));
+  }
   ui.sceneHold.value = Number(scene.hold ?? ui.sceneHold.value);
   ui.morphDuration.value = Number(scene.morph ?? ui.morphDuration.value);
   propagateMotionFrom(bank);
@@ -1154,7 +2270,7 @@ function storeScene() {
 
 function startSceneMorph(targetKey = null) {
   const bank = activeBank();
-  captureScene(bank);
+  if (!state.recordingSceneCycle) captureScene(bank);
   targetKey = targetKey || nextSceneKey(bank.scene, ui.sceneLoop.checked);
   if (!targetKey) {
     ui.autoNext.checked = false;
@@ -1166,6 +2282,7 @@ function startSceneMorph(targetKey = null) {
     const current = snapshotBank(effectiveBank(bank));
     current.name = targetKey.toUpperCase();
     current.scene = targetKey;
+    current.sources = bank.sources.map(cloneSource);
     current.hold = Number(ui.sceneHold.value || 0);
     current.morph = Number(ui.morphDuration.value || 4);
     bank.scenes[targetKey] = current;
@@ -1175,18 +2292,26 @@ function startSceneMorph(targetKey = null) {
   const duration = Math.max(0.1, Number(currentScene.morph ?? ui.morphDuration.value ?? 4));
   const targetHold = Math.max(0, Number(scene.hold ?? ui.sceneHold.value ?? 0));
   const started = performance.now();
+  const freezeT = currentT();
   state.banks.forEach((group, index) => {
+    const from = snapshotBank(effectiveBank(group));
+    const frozen = {};
+    from.sources.forEach((source) => {
+      frozen[source.id] = sourcePosition({ ...from, morph: null }, source, freezeT);
+    });
     const target = snapshotBank(effectiveBank(group));
     target.mode = scene.mode;
     target.scene = targetKey;
     target.variant = scene.variant || "primary";
     target.params = { ...scene.params };
+    target.sources = Array.from({ length: 8 }, (_, sourceIndex) => normalizeSource((scene.sources || group.sources || [])[sourceIndex], sourceIndex));
     target.hold = Number(scene.hold ?? targetHold);
     target.morph = Number(scene.morph ?? duration);
     group.morph = {
       targetKey,
-      from: snapshotBank(effectiveBank(group)),
+      from,
       to: target,
+      frozen,
       progress: 0,
       duration,
       started,
@@ -1194,6 +2319,57 @@ function startSceneMorph(targetKey = null) {
   });
   state.nextSceneAt = performance.now() + (duration + targetHold) * 1000;
   updateSceneDisplays();
+}
+
+function sceneCycleDuration(bank = activeBank()) {
+  return SCENES.reduce((total, key, index) => {
+    const scene = bank.scenes[key] || {};
+    const hold = Math.max(0, Number(scene.hold ?? ui.sceneHold.value ?? 0));
+    const morph = index < SCENES.length - 1
+      ? Math.max(0.1, Number(scene.morph ?? ui.morphDuration.value ?? 4))
+      : 0;
+    return total + hold + morph;
+  }, 0);
+}
+
+function sceneMotionSnapshot(bank, key) {
+  const scene = bank.scenes[key] || activeBank().scenes[key] || {};
+  return {
+    ...snapshotBank(bank),
+    mode: scene.mode || bank.mode,
+    scene: key,
+    variant: scene.variant || bank.variant || "primary",
+    params: normalizeParams(scene.params || bank.params),
+    sources: Array.from({ length: 8 }, (_, index) => normalizeSource((scene.sources || bank.sources || [])[index], index)),
+    morph: null,
+  };
+}
+
+function sceneCycleBankAt(bank, seconds, totalDuration) {
+  let cursor = 0;
+  for (let index = 0; index < SCENES.length; index += 1) {
+    const key = SCENES[index];
+    const scene = bank.scenes[key] || activeBank().scenes[key] || {};
+    const current = sceneMotionSnapshot(bank, key);
+    const hold = Math.max(0, Number(scene.hold ?? ui.sceneHold.value ?? 0));
+    if (seconds <= cursor + hold || index === SCENES.length - 1) return current;
+    cursor += hold;
+    const nextKey = SCENES[index + 1];
+    const morph = Math.max(0.1, Number(scene.morph ?? ui.morphDuration.value ?? 4));
+    if (seconds <= cursor + morph) {
+      const next = sceneMotionSnapshot(bank, nextKey);
+      const progress = clamp((seconds - cursor) / morph, 0, 1);
+      return {
+        ...current,
+        ...blendSnapshots(current, next, progress),
+        sources: current.sources.map((source, index) => blendSource(source, next.sources[index] || source, smooth(clamp(progress, 0, 1)))),
+        morph: null,
+      };
+    }
+    cursor += morph;
+  }
+  const finalKey = SCENES[SCENES.length - 1];
+  return sceneMotionSnapshot(bank, finalKey);
 }
 
 function randomizeScene() {
@@ -1216,10 +2392,12 @@ function generatedSceneName(seed, mode = "", index = -1) {
 
 function applyGeneratedMotion(bank, seed, allowBankChange = false) {
   if (allowBankChange) {
-    bank.mode = MOTION_BANKS[Math.abs(seed) % MOTION_BANKS.length];
+    const generatedBanks = MOTION_BANKS.filter((mode) => mode !== "manual");
+    bank.mode = generatedBanks[Math.abs(seed) % generatedBanks.length];
   }
   bank.variant = VARIANTS[seed % VARIANTS.length];
   Object.keys(bank.params).forEach((key, i) => {
+    if (ARC_SLUICE_PARAM_KEYS.has(key)) return;
     const base = hashNoise(seed + i * 13, state.playT + i * 0.071, i);
     const accent = hashNoise(seed + i * 29, state.playT * 0.37 + i * 0.113, i + 9);
     bank.params[key] = clamp(0.07 + base * 0.68 + accent * 0.22, 0, 1);
@@ -1240,6 +2418,7 @@ function generateAllScenes() {
   state.generateSeed += 1;
   const baseSeed = state.generateSeed * 101 + bank.id * 19;
   const previousScene = bank.scene;
+  const globalMorph = Number(ui.morphDuration.value || 4);
   state.banks.forEach((group, index) => {
     group.motionOffset = makeGroupOffset(index, baseSeed + index * 53);
   });
@@ -1248,7 +2427,7 @@ function generateAllScenes() {
     const timing = generatedTiming(sceneSeed, index);
     bank.scene = key;
     ui.sceneHold.value = timing.hold;
-    ui.morphDuration.value = timing.morph;
+    ui.morphDuration.value = ui.randomMorphTime.checked ? timing.morph : globalMorph;
     applyGeneratedMotion(bank, sceneSeed, ui.varySceneBanks.checked);
     ui.sceneName.value = generatedSceneName(sceneSeed, bank.mode, index);
     captureScene(bank);
@@ -1261,7 +2440,7 @@ function generateAllScenes() {
 
 function makeExport() {
   if (!activeBank().morph) syncBankFromPanel();
-  const duration = Number(ui.duration.value);
+  const duration = Math.max(1, sceneCycleDuration(activeBank()));
   const pointRate = Number(ui.pointRate.value);
   const pointCount = Math.max(2, Math.round(duration * pointRate));
   return {
@@ -1272,16 +2451,20 @@ function makeExport() {
     order: 3,
     duration,
     point_rate: pointRate,
+    arc_sluice: { ...state.arcSluice },
     browser_state: {
       active_group: state.activeBank + 1,
+      group_focus: state.groupFocus,
       selected_source: state.selectedSource + 1,
       morph_duration: Number(ui.morphDuration.value),
       hold_duration: Number(ui.sceneHold.value),
       loop_scenes: ui.sceneLoop.checked,
       vary_scene_banks: ui.varySceneBanks.checked,
+      random_morph_time: ui.randomMorphTime.checked,
       camera_azimuth: Number(ui.cameraAz.value),
       camera_elevation: Number(ui.cameraEl.value),
       zoom: Number(ui.zoom.value),
+      spatial_constraint: ui.spatialConstraint.value,
       analysis_scope: ui.analysisScope.value,
       neighbor_links: Number(ui.neighborLinks.value),
       analysis_influence: Number(ui.analysisInfluence.value),
@@ -1294,7 +2477,7 @@ function makeExport() {
       show_labels: ui.showLabels.checked,
     },
     banks: state.banks.map((bank) => {
-      const exportBank = effectiveBank(bank);
+      const exportBank = sceneCycleBankAt(bank, 0, duration);
       return {
       bank: bank.id,
       name: bank.name,
@@ -1316,7 +2499,10 @@ function makeExport() {
         enabled: source.enabled,
         points: Array.from({ length: pointCount }, (_, i) => {
           const t = pointCount <= 1 ? 0 : i / (pointCount - 1);
-          const p = sourcePosition(exportBank, source, t);
+          const seconds = t * duration;
+          const timelineBank = sceneCycleBankAt(bank, seconds, duration);
+          const timelineSource = timelineBank.sources.find((item) => item.id === source.id) || source;
+          const p = sourcePosition(timelineBank, timelineSource, t);
           return {
             t,
             azimuth: Number(p.azimuth.toFixed(4)),
@@ -1342,6 +2528,97 @@ function exportJson() {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function recorderMimeType() {
+  const candidates = [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ];
+  return candidates.find((type) => window.MediaRecorder?.isTypeSupported(type)) || "";
+}
+
+function recordCanvasClip() {
+  if (state.recorder) {
+    state.recorder.stop();
+    return;
+  }
+  if (!canvas.captureStream || !window.MediaRecorder) {
+    ui.analysisReadout.textContent = "canvas recording is not supported in this browser";
+    return;
+  }
+  const bank = activeBank();
+  if (!bank.scenes.a) captureScene(bank);
+  bank.scene = "a";
+  applyScene(bank.scenes.a || snapshotBank(bank));
+  const duration = Math.max(1, sceneCycleDuration(bank));
+  const rect = canvas.getBoundingClientRect();
+  const baseDpr = window.devicePixelRatio || 1;
+  const baseLongEdge = Math.max(rect.width, rect.height) * baseDpr;
+  const targetLongEdge = 2560;
+  const recordingScale = clamp(targetLongEdge / Math.max(1, baseLongEdge), 1, 3);
+  state.recordingScale = recordingScale;
+  resizeCanvas();
+  drawFrame();
+  const stream = canvas.captureStream(30);
+  const mimeType = recorderMimeType();
+  const chunks = [];
+  const recorderOptions = {
+    videoBitsPerSecond: 16_000_000,
+    ...(mimeType ? { mimeType } : {}),
+  };
+  const recorder = new MediaRecorder(stream, recorderOptions);
+  const wasPlaying = state.playing;
+  const previousT = state.playT;
+  recorder.ondataavailable = (event) => {
+    if (event.data && event.data.size) chunks.push(event.data);
+  };
+  recorder.onstop = () => {
+    stream.getTracks().forEach((track) => track.stop());
+    state.recorder = null;
+    state.recordingStart = 0;
+    state.recordingDuration = 0;
+    state.recordingSceneCycle = false;
+    state.recordingScale = 1;
+    resizeCanvas();
+    ui.recordClip.textContent = "Record";
+    ui.recordClip.classList.remove("active");
+    const type = recorder.mimeType || "video/webm";
+    if (chunks.length) {
+      downloadBlob(new Blob(chunks, { type }), `s3g-mc-mover-${Date.now()}.webm`);
+      ui.analysisReadout.textContent = `recorded ${duration.toFixed(1)}s A-H scene-cycle HD clip`;
+    }
+    state.playing = wasPlaying;
+    state.playT = wasPlaying ? state.playT : previousT;
+    state.playStart = performance.now() - state.playT * duration * 1000;
+  };
+  state.recorder = recorder;
+  state.recordingDuration = duration;
+  state.recordingSceneCycle = true;
+  state.recordingStart = performance.now();
+  state.playT = 0;
+  state.playing = true;
+  state.playStart = state.recordingStart;
+  state.nextSceneAt = state.recordingStart + Math.max(0, Number(bank.scenes.a?.hold ?? ui.sceneHold.value ?? 0)) * 1000;
+  ui.recordClip.textContent = "Stop Rec";
+  ui.recordClip.classList.add("active");
+  ui.analysisReadout.textContent = `recording ${duration.toFixed(1)}s A-H scene-cycle HD clip at ${canvas.width} x ${canvas.height}`;
+  recorder.start();
+  window.setTimeout(() => {
+    if (state.recorder === recorder && recorder.state !== "inactive") recorder.stop();
+  }, duration * 1000 + 250);
 }
 
 function importJsonFile(file) {
@@ -1382,6 +2659,7 @@ function loadMoverJson(data) {
         mode: scene.mode || bank.mode,
         variant: VARIANTS.includes(scene.variant) ? scene.variant : bank.variant,
         params: normalizeParams(scene.params || bank.params),
+        sources: Array.from({ length: 8 }, (_, si) => normalizeSource((scene.sources || bank.sources || [])[si], si)),
         hold: Number(scene.hold ?? data.browser_state?.hold_duration ?? 1),
         morph: Number(scene.morph ?? data.browser_state?.morph_duration ?? 4),
       };
@@ -1392,6 +2670,7 @@ function loadMoverJson(data) {
         mode: bank.mode,
         variant: bank.variant,
         params: { ...bank.params },
+        sources: bank.sources.map(cloneSource),
         hold: Number(data.browser_state?.hold_duration ?? 1),
         morph: Number(data.browser_state?.morph_duration ?? 4),
       };
@@ -1399,6 +2678,10 @@ function loadMoverJson(data) {
     return bank;
   });
   if (!state.banks.length) state.banks = [makeBank(0, "Group 1")];
+  const firstArcSource = state.banks.find((bank) => Number(bank.params?.arcSluiceOn || 0))?.params
+    || state.banks[0]?.params
+    || defaultArcSluiceParams();
+  state.arcSluice = normalizeArcSluiceParams(data.arc_sluice || firstArcSource);
 
   const bs = data.browser_state || {};
   ui.duration.value = Number(data.duration || 16);
@@ -1407,9 +2690,11 @@ function loadMoverJson(data) {
   ui.sceneHold.value = Number(bs.hold_duration ?? ui.sceneHold.value);
   ui.sceneLoop.checked = bs.loop_scenes !== false;
   ui.varySceneBanks.checked = bs.vary_scene_banks === true;
+  ui.randomMorphTime.checked = bs.random_morph_time !== false;
   ui.cameraAz.value = Number(bs.camera_azimuth ?? ui.cameraAz.value);
   ui.cameraEl.value = Number(bs.camera_elevation ?? ui.cameraEl.value);
   ui.zoom.value = Number(bs.zoom ?? ui.zoom.value);
+  ui.spatialConstraint.value = bs.spatial_constraint === "hemisphere" ? "hemisphere" : "sphere";
   ui.analysisScope.value = bs.analysis_scope === "active" ? "active" : "global";
   ui.neighborLinks.value = Number(bs.neighbor_links ?? ui.neighborLinks.value);
   ui.analysisInfluence.value = Number(bs.analysis_influence ?? ui.analysisInfluence.value);
@@ -1421,6 +2706,7 @@ function loadMoverJson(data) {
   ui.showTrails.checked = bs.show_path_preview === true;
   ui.showLabels.checked = bs.show_labels === true;
   state.activeBank = clamp(Number(bs.active_group || 1) - 1, 0, state.banks.length - 1);
+  state.groupFocus = bs.group_focus !== false;
   state.selectedSource = clamp(Number(bs.selected_source || 1) - 1, 0, 7);
   syncPanelFromBank();
   updateAllRangeFills();
@@ -1506,6 +2792,20 @@ function hitTest(event) {
   return best;
 }
 
+function placeSelectedSourceFromPointer(event) {
+  const mouse = pointerPoint(event);
+  const scale = Math.min(canvas.width, canvas.height) * 0.26 * Number(ui.zoom.value);
+  const dx = (mouse.x - canvas.width * 0.5) / scale;
+  const dy = -(mouse.y - canvas.height * 0.52) / scale;
+  const source = activeBank().sources[state.selectedSource];
+  source.azimuth = azimuthFromVector(dx, Math.max(0.001, dy));
+  source.elevation = clamp(dy * 45, -80, 80);
+  source.distance = clamp(Math.hypot(dx, dy), 0.1, 3);
+  source.enabled = true;
+  source.gain = Math.max(Number(source.gain || 0), 0.001);
+  syncSourcePositionControls(source);
+}
+
 canvas.addEventListener("pointerdown", (event) => {
   if (event.shiftKey) {
     const mouse = pointerPoint(event);
@@ -1521,10 +2821,29 @@ canvas.addEventListener("pointerdown", (event) => {
   const hit = hitTest(event);
   if (hit) {
     state.activeBank = hit.bank;
+    state.groupFocus = true;
     state.selectedSource = hit.source;
+    const bank = activeBank();
+    if (bank.mode !== "manual") {
+      bank.mode = "manual";
+      bank.variant = "primary";
+      propagateMotionFrom(bank);
+    }
     state.dragging = hit;
     canvas.setPointerCapture(event.pointerId);
     syncPanelFromBank();
+  } else {
+    const bank = activeBank();
+    if (bank.mode === "manual") {
+      state.groupFocus = true;
+      state.dragging = { bank: state.activeBank, source: state.selectedSource };
+      placeSelectedSourceFromPointer(event);
+      canvas.setPointerCapture(event.pointerId);
+      syncPanelFromBank();
+    } else {
+      state.groupFocus = false;
+      renderBanks();
+    }
   }
 });
 
@@ -1541,23 +2860,33 @@ canvas.addEventListener("pointermove", (event) => {
     return;
   }
   if (!state.dragging) return;
-  const mouse = pointerPoint(event);
-  const dx = (mouse.x - canvas.width * 0.5) / (Math.min(canvas.width, canvas.height) * 0.26 * Number(ui.zoom.value));
-  const dy = -(mouse.y - canvas.height * 0.52) / (Math.min(canvas.width, canvas.height) * 0.26 * Number(ui.zoom.value));
-  const source = activeBank().sources[state.selectedSource];
-  source.azimuth = wrapDeg(radToDeg(Math.atan2(dx, Math.max(0.001, dy))));
-  source.elevation = clamp(dy * 45, -80, 80);
-  source.distance = clamp(Math.hypot(dx, dy), 0.1, 3);
-  ui.sourceDistance.value = source.distance;
+  placeSelectedSourceFromPointer(event);
 });
 
 canvas.addEventListener("pointerup", (event) => {
+  if (state.dragging && activeBank().mode === "manual") {
+    captureScene(activeBank());
+    propagateMotionFrom(activeBank());
+    syncPanelFromBank();
+  }
   state.dragging = null;
   state.viewDrag = null;
   try {
     canvas.releasePointerCapture(event.pointerId);
   } catch (_) {}
 });
+
+canvas.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  const current = Number(ui.zoom.value || 1);
+  const min = Number(ui.zoom.min || 0.45);
+  const max = Number(ui.zoom.max || 2.8);
+  const direction = event.deltaY < 0 ? 1 : -1;
+  const amount = event.altKey ? 0.035 : event.shiftKey ? 0.16 : 0.08;
+  const next = clamp(current * (1 + direction * amount), min, max);
+  ui.zoom.value = next.toFixed(2);
+  updateRangeFill(ui.zoom);
+}, { passive: false });
 
 ui.play.addEventListener("click", () => {
   state.playing = true;
@@ -1576,6 +2905,7 @@ ui.jsonFile.addEventListener("change", () => {
   importJsonFile(ui.jsonFile.files && ui.jsonFile.files[0]);
 });
 ui.exportJson.addEventListener("click", exportJson);
+ui.recordClip.addEventListener("click", recordCanvasClip);
 ui.fullscreenView.addEventListener("click", () => {
   ui.app.classList.add("visual-fullscreen");
   resizeCanvas();
@@ -1593,9 +2923,10 @@ ui.addBank.addEventListener("click", () => {
   const next = makeBank(state.banks.length, `Group ${state.banks.length + 1}`);
   next.mode = current.mode;
   next.scene = current.scene;
-  next.params = { ...current.params };
+  next.params = preserveArcSluiceParams({ ...current.params }, next.params);
   state.banks.push(next);
   state.activeBank = state.banks.length - 1;
+  state.groupFocus = true;
   syncPanelFromBank();
 });
 ui.deleteBank.addEventListener("click", () => {
@@ -1606,6 +2937,7 @@ ui.deleteBank.addEventListener("click", () => {
     b.name = b.name || `Group ${i + 1}`;
   });
   state.activeBank = clamp(state.activeBank, 0, state.banks.length - 1);
+  state.groupFocus = true;
   syncPanelFromBank();
 });
 ui.storeScene.addEventListener("click", storeScene);
@@ -1638,14 +2970,15 @@ ui.resetSources.addEventListener("click", () => {
 
 document.querySelectorAll("input, select").forEach((input) => {
   input.addEventListener("input", () => {
-    const sourceControls = ["sourceGain", "sourceDistance"];
+    const sourceControls = ["sourceGain", "sourceAzimuth", "sourceElevation", "sourceDistance"];
     const interfaceControls = [
-      "morphTarget", "autoNext", "sceneLoop", "varySceneBanks",
-      "cameraAz", "cameraEl", "zoom", "analysisScope", "neighborLinks", "showAnalysis", "showCentroid", "showTrails", "showLabels",
+      "morphTarget", "autoNext", "sceneLoop", "varySceneBanks", "randomMorphTime",
+      "cameraAz", "cameraEl", "zoom", "spatialConstraint", "analysisScope", "neighborLinks", "showAnalysis", "showCentroid", "showTrails", "showLabels",
     ];
     if (sourceControls.includes(input.id)) {
       if (input.type === "range") updateRangeFill(input);
       syncSourceFromPanel();
+      updateSourcePositionReadouts();
       return;
     }
     if (input.id === "morphDuration" || input.id === "sceneHold") {

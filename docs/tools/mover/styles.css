@@ -298,6 +298,23 @@ label {
   color: var(--muted);
 }
 
+label.physics-only,
+label.arc-sluice-only {
+  transition: opacity 120ms linear;
+}
+
+label.physics-only.inactive,
+label.arc-sluice-only.inactive {
+  opacity: 0.34;
+}
+
+label.physics-only.inactive input[type="range"],
+label.arc-sluice-only.inactive input[type="range"] {
+  border-color: #2b2b2b;
+  background:
+    linear-gradient(90deg, #4c4c4c 0 var(--fill, 50%), #1b1b1b var(--fill, 50%) 100%);
+}
+
 .value-readout {
   float: right;
   color: var(--text);

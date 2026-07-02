@@ -441,8 +441,69 @@ function mapLocal(edge, along, outward) {
   };
 }
 
+function chamberLocalPolygon(alongStart, alongWidth, outwardDepth, shape) {
+  const x = alongStart;
+  const w = alongWidth;
+  const d = outwardDepth;
+  const skew = Math.min(w * 0.18, d * 0.28);
+  if (shape === "trapezoid") {
+    return [
+      { x, y: 0 },
+      { x: x + w, y: 0 },
+      { x: x + w, y: d },
+      { x: x + skew, y: d },
+      { x, y: d },
+      { x, y: d * 0.84 }
+    ];
+  }
+  if (shape === "wedge") {
+    return [
+      { x, y: 0 },
+      { x: x + w, y: 0 },
+      { x: x + w, y: d * 0.26 },
+      { x: x + w * 0.64, y: d },
+      { x: x + w, y: d },
+      { x, y: d }
+    ];
+  }
+  if (shape === "skew") {
+    return [
+      { x, y: 0 },
+      { x: x + w, y: 0 },
+      { x: x + w + skew * 0.35, y: d * 0.46 },
+      { x: x + w, y: d },
+      { x, y: d },
+      { x: x - skew * 0.25, y: d * 0.44 }
+    ];
+  }
+  if (shape === "diamond") {
+    return [
+      { x, y: 0 },
+      { x: x + w, y: 0 },
+      { x: x + w, y: d * 0.54 },
+      { x: x + w * 0.54, y: d },
+      { x: x + w, y: d },
+      { x, y: d },
+      { x, y: d * 0.54 }
+    ];
+  }
+  if (shape === "impossible") {
+    return [
+      { x, y: 0 },
+      { x: x + w, y: 0 },
+      { x: x + w * 1.04, y: d * 0.22 },
+      { x: x + w * 0.82, y: d * 0.46 },
+      { x: x + w * 1.02, y: d },
+      { x: x + w, y: d },
+      { x, y: d },
+      { x: x - w * 0.08, y: d * 0.38 }
+    ];
+  }
+  return polygonForBox(x, 0, w, d, "rect");
+}
+
 function transformLocalPolygon(edge, alongStart, alongWidth, outwardDepth, shape) {
-  return polygonForBox(alongStart, 0, alongWidth, outwardDepth, shape).map((point) => mapLocal(edge, point.x, point.y));
+  return chamberLocalPolygon(alongStart, alongWidth, outwardDepth, shape).map((point) => mapLocal(edge, point.x, point.y));
 }
 
 function boundsFromPoly(poly) {
@@ -921,6 +982,23 @@ function svgPoints(points) {
   return points.map((point) => `${round(point.x, 2)},${round(point.y, 2)}`).join(" ");
 }
 
+function svgOpeningMarker(projection, segment, color) {
+  const p1 = projection.point({ x: segment.x1, y: segment.y1 });
+  const p2 = projection.point({ x: segment.x2, y: segment.y2 });
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const len = Math.max(0.001, Math.hypot(dx, dy));
+  const nx = -dy / len;
+  const ny = dx / len;
+  const tick = 7;
+  return `
+    <line x1="${round(p1.x, 2)}" y1="${round(p1.y, 2)}" x2="${round(p2.x, 2)}" y2="${round(p2.y, 2)}" stroke="#050607" stroke-width="5.8" vector-effect="non-scaling-stroke" />
+    <line x1="${round(p1.x, 2)}" y1="${round(p1.y, 2)}" x2="${round(p2.x, 2)}" y2="${round(p2.y, 2)}" stroke="${color}" stroke-width="1.8" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />
+    <line x1="${round(p1.x - nx * tick, 2)}" y1="${round(p1.y - ny * tick, 2)}" x2="${round(p1.x + nx * tick, 2)}" y2="${round(p1.y + ny * tick, 2)}" stroke="${color}" stroke-width="1.4" vector-effect="non-scaling-stroke" />
+    <line x1="${round(p2.x - nx * tick, 2)}" y1="${round(p2.y - ny * tick, 2)}" x2="${round(p2.x + nx * tick, 2)}" y2="${round(p2.y + ny * tick, 2)}" stroke="${color}" stroke-width="1.4" vector-effect="non-scaling-stroke" />
+  `;
+}
+
 function renderVectorRoom(s) {
   const vectorView = state.view === "top" || state.view === "sphere";
   roomSvg.parentElement.classList.toggle("svg-active", vectorView);
@@ -953,12 +1031,9 @@ function renderVectorFloorplan(s, projection) {
   const room = roomPolygon(s).map(projection.point);
   const chambers = chamberGeometries(s) || [];
   const outsideSvg = roomOpeningSegments(s).map((outside) => {
-    const p1 = projection.point({ x: outside.x1, y: outside.y1 });
-    const p2 = projection.point({ x: outside.x2, y: outside.y2 });
     const label = projection.point(outside.center);
     return `
-      <line x1="${round(p1.x, 2)}" y1="${round(p1.y, 2)}" x2="${round(p2.x, 2)}" y2="${round(p2.y, 2)}" stroke="#050607" stroke-width="5.6" vector-effect="non-scaling-stroke" />
-      <line x1="${round(p1.x, 2)}" y1="${round(p1.y, 2)}" x2="${round(p2.x, 2)}" y2="${round(p2.y, 2)}" stroke="rgba(200,245,235,0.82)" stroke-width="1.7" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />
+      ${svgOpeningMarker(projection, outside, "rgba(200,245,235,0.82)")}
       <text x="${round(label.x + 8, 2)}" y="${round(label.y - 8, 2)}" class="svg-tiny svg-outside">${svgEscape(`outside ${outside.index + 1}`)}</text>
     `;
   }).join("");
@@ -967,13 +1042,11 @@ function renderVectorFloorplan(s, projection) {
     const alpha = Math.max(0.04, 0.06 + s.chamber_coupling * 0.08 + (1 - material.absorption) * 0.03 - chamber.level * 0.01);
     const poly = chamberPolygon(chamber).map(projection.point);
     const opening = chamberOpeningSegment(chamber);
-    const p1 = projection.point({ x: opening.x1, y: opening.y1 });
-    const p2 = projection.point({ x: opening.x2, y: opening.y2 });
     const label = chamber.level === 0 ? `chamber ${chamber.index + 1}` : `nested ${chamber.level}`;
     const text = projection.point({ x: chamber.x, y: chamber.y });
     return `
       <polygon points="${svgPoints(poly)}" fill="rgba(120,190,150,${alpha.toFixed(3)})" stroke="rgba(120,190,150,${chamber.level === 0 ? 0.78 : 0.5})" stroke-width="1.3" vector-effect="non-scaling-stroke" />
-      <line x1="${round(p1.x, 2)}" y1="${round(p1.y, 2)}" x2="${round(p2.x, 2)}" y2="${round(p2.y, 2)}" stroke="#050607" stroke-width="4" vector-effect="non-scaling-stroke" />
+      ${svgOpeningMarker(projection, opening, chamber.level === 0 ? "rgba(184,255,202,0.88)" : "rgba(184,255,202,0.64)")}
       <text x="${round(text.x + 8, 2)}" y="${round(text.y + 16, 2)}" class="svg-small svg-chamber">${svgEscape(label)}</text>
       <text x="${round(text.x + 8, 2)}" y="${round(text.y + 29, 2)}" class="svg-tiny svg-muted">${svgEscape(material.material_key)} a${round(material.absorption, 2)} s${round(material.scattering, 2)}</text>
     `;
@@ -2309,18 +2382,26 @@ function mergedOpeningSegments(segments) {
     const length = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
     const tx = dx / length;
     const ty = dy / length;
+    const normal = segment.x1 * -(ty) + segment.y1 * tx;
     const key = [
       segment.side || "wall",
       Math.round(Math.abs(tx) * 1000),
       Math.round(Math.abs(ty) * 1000),
+      Math.round(normal * 1000),
       Math.round((segment.outward?.x || 0) * 1000),
       Math.round((segment.outward?.y || 0) * 1000)
     ].join(":");
     const start = segment.x1 * tx + segment.y1 * ty;
     const end = segment.x2 * tx + segment.y2 * ty;
-    const normal = segment.x1 * -(ty) + segment.y1 * tx;
     if (!groups.has(key)) groups.set(key, { tx, ty, normal, side: segment.side, outward: segment.outward, items: [] });
-    groups.get(key).items.push({ start: Math.min(start, end), end: Math.max(start, end), height: segment.height || 0, original: segment });
+    groups.get(key).items.push({
+      start: Math.min(start, end),
+      end: Math.max(start, end),
+      height: segment.height || 0,
+      kind: segment.kind || "opening",
+      level: Number(segment.level || 0),
+      original: segment
+    });
   });
   const merged = [];
   groups.forEach((group) => {
@@ -2331,8 +2412,11 @@ function mergedOpeningSegments(segments) {
       if (last && item.start <= last.end + 0.04) {
         last.end = Math.max(last.end, item.end);
         last.height = Math.max(last.height || 0, item.height || 0);
+        last.level = Math.max(Number(last.level || 0), Number(item.level || 0));
+        if (item.kind === "chamber") last.kind = "chamber";
+        else if (item.kind === "outside" && last.kind !== "chamber") last.kind = "outside";
       } else {
-        spans.push({ start: item.start, end: item.end, height: item.height || 0 });
+        spans.push({ start: item.start, end: item.end, height: item.height || 0, kind: item.kind, level: Number(item.level || 0) });
       }
     });
     spans.forEach((span) => {
@@ -2352,6 +2436,8 @@ function mergedOpeningSegments(segments) {
         outward: group.outward,
         index: merged.length,
         height: span.height || 0,
+        kind: span.kind || "opening",
+        level: Number(span.level || 0),
         center: { x: (x1 + x2) * 0.5, y: (y1 + y2) * 0.5 }
       });
     });
@@ -2362,6 +2448,7 @@ function mergedOpeningSegments(segments) {
 function openingSegmentsForModel(s) {
   const openings = roomOpeningSegments(s).map((segment) => ({
     ...segment,
+    kind: "outside",
     height: s.room_z * 0.86
   }));
   (chamberGeometries(s) || []).forEach((chamber) => {
@@ -2369,6 +2456,8 @@ function openingSegmentsForModel(s) {
     openings.push({
       ...chamberOpeningSegment(chamber),
       index: openings.length,
+      kind: "chamber",
+      level: chamber.level,
       side: chamber.side,
       outward: chamber.edgeOutward || chamberOutwardVector(chamber.side),
       height: Math.min(s.room_z, chamberHeight) * 0.92
@@ -2381,18 +2470,49 @@ function addSegmentPortalMesh(meshes, name, segment, outward, height, materialIn
   if (!segment) return;
   outward = outward || { x: 0, y: 1 };
   const offset = 0.035;
+  const dx = segment.x2 - segment.x1;
+  const dy = segment.y2 - segment.y1;
+  const length = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
+  const tx = dx / length;
+  const ty = dy / length;
+  const frame = clamp(length * 0.034, 0.055, 0.14);
   const ox = (outward.x || 0) * offset;
   const oy = (outward.y || 0) * offset;
-  const x1 = segment.x1 + ox;
-  const y1 = segment.y1 + oy;
-  const x2 = segment.x2 + ox;
-  const y2 = segment.y2 + oy;
   const positions = [];
-  pushVec3(positions, x1, 0.01, -y1);
-  pushVec3(positions, x2, 0.01, -y2);
-  pushVec3(positions, x2, height, -y2);
-  pushVec3(positions, x1, height, -y1);
-  meshes.push({ name, positions, indices: [0, 1, 2, 0, 2, 3], materialIndex });
+  const indices = [];
+  const pushPortalQuad = (ax, ay, bx, by, bottom, top) => {
+    const base = positions.length / 3;
+    pushVec3(positions, ax + ox, bottom, -(ay + oy));
+    pushVec3(positions, bx + ox, bottom, -(by + oy));
+    pushVec3(positions, bx + ox, top, -(by + oy));
+    pushVec3(positions, ax + ox, top, -(ay + oy));
+    indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  };
+  pushPortalQuad(
+    segment.x1 - tx * frame,
+    segment.y1 - ty * frame,
+    segment.x1 + tx * frame,
+    segment.y1 + ty * frame,
+    0.01,
+    height
+  );
+  pushPortalQuad(
+    segment.x2 - tx * frame,
+    segment.y2 - ty * frame,
+    segment.x2 + tx * frame,
+    segment.y2 + ty * frame,
+    0.01,
+    height
+  );
+  pushPortalQuad(
+    segment.x1,
+    segment.y1,
+    segment.x2,
+    segment.y2,
+    Math.max(0.01, height - frame * 2.4),
+    height
+  );
+  meshes.push({ name, positions, indices, materialIndex, portalFrame: true, portalSegment: { ...segment, height } });
 }
 
 function buildGltfMeshes(s = settings()) {
@@ -2491,7 +2611,7 @@ function buildGltf(s = settings()) {
       { name: "Chambers green", pbrMetallicRoughness: { baseColorFactor: [0.32, 0.78, 0.52, 0.48], metallicFactor: 0, roughnessFactor: 0.86 }, alphaMode: "BLEND", doubleSided: true },
       { name: "Field center", pbrMetallicRoughness: { baseColorFactor: [0.9, 0.9, 0.9, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
       { name: "IR groups", pbrMetallicRoughness: { baseColorFactor: [0.93, 0.62, 0.22, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
-      { name: "Openings / cutouts", pbrMetallicRoughness: { baseColorFactor: [0.015, 0.018, 0.02, 0.92], metallicFactor: 0, roughnessFactor: 0.96 }, alphaMode: "BLEND", doubleSided: true }
+      { name: "Opening frames", pbrMetallicRoughness: { baseColorFactor: [0.78, 0.96, 0.92, 0.28], metallicFactor: 0, roughnessFactor: 0.96 }, alphaMode: "BLEND", doubleSided: true }
     ],
     accessors,
     bufferViews,
@@ -2577,7 +2697,7 @@ function drawGltfPreview() {
     "rgba(120,190,150,0.24)",
     "rgba(230,230,230,0.88)",
     "rgba(216,162,74,0.92)",
-    "rgba(5,6,7,0.90)"
+    "rgba(200,245,235,0.70)"
   ];
   const strokes = [
     "rgba(90,168,199,0)",
@@ -2606,6 +2726,7 @@ function drawGltfPreview() {
   });
   triangles.sort((a, b) => a.depth - b.depth);
   triangles.forEach((tri) => {
+    if (tri.materialIndex === 4) return;
     gltfCtx.beginPath();
     gltfCtx.moveTo(tri.pts[0].x, tri.pts[0].y);
     gltfCtx.lineTo(tri.pts[1].x, tri.pts[1].y);
@@ -2622,25 +2743,11 @@ function drawGltfPreview() {
     { stroke: "rgba(120,190,150,0.78)", width: 1.2 },
     null,
     null,
-    { stroke: "rgba(200,245,235,0.92)", width: 1.2 }
+    null
   ];
   meshes.forEach((mesh) => {
     const style = outlineStyles[mesh.materialIndex];
     if (!style) return;
-    if (mesh.materialIndex === 4 && mesh.positions.length === 12) {
-      const points = [];
-      for (let i = 0; i < 4; i += 1) {
-        const pi = i * 3;
-        points.push(project({ x: mesh.positions[pi], y: mesh.positions[pi + 1], z: mesh.positions[pi + 2] }));
-      }
-      gltfCtx.strokeStyle = style.stroke;
-      gltfCtx.lineWidth = style.width;
-      gltfCtx.beginPath();
-      points.forEach((p, index) => index === 0 ? gltfCtx.moveTo(p.x, p.y) : gltfCtx.lineTo(p.x, p.y));
-      gltfCtx.closePath();
-      gltfCtx.stroke();
-      return;
-    }
     if (mesh.positions.length < 18) return;
     const vertexCount = mesh.positions.length / 3;
     const half = vertexCount / 2;
@@ -2665,6 +2772,56 @@ function drawGltfPreview() {
       gltfCtx.lineTo(top[i].x, top[i].y);
     }
     gltfCtx.stroke();
+  });
+  meshes.filter((mesh) => mesh.portalFrame && mesh.portalSegment).forEach((mesh) => {
+    const segment = mesh.portalSegment;
+    const chamberPortal = segment.kind === "chamber";
+    const nestedPortal = chamberPortal && Number(segment.level || 0) > 0;
+    const p1b = project({ x: segment.x1, y: 0.02, z: -segment.y1 });
+    const p2b = project({ x: segment.x2, y: 0.02, z: -segment.y2 });
+    const p1t = project({ x: segment.x1, y: segment.height, z: -segment.y1 });
+    const p2t = project({ x: segment.x2, y: segment.height, z: -segment.y2 });
+    gltfCtx.save();
+    gltfCtx.globalCompositeOperation = "source-over";
+    gltfCtx.strokeStyle = "rgba(3,5,6,0.82)";
+    gltfCtx.lineWidth = 5.2;
+    gltfCtx.beginPath();
+    gltfCtx.moveTo(p1b.x, p1b.y);
+    gltfCtx.lineTo(p1t.x, p1t.y);
+    gltfCtx.moveTo(p2b.x, p2b.y);
+    gltfCtx.lineTo(p2t.x, p2t.y);
+    gltfCtx.moveTo(p1t.x, p1t.y);
+    gltfCtx.lineTo(p2t.x, p2t.y);
+    gltfCtx.stroke();
+    gltfCtx.strokeStyle = nestedPortal
+      ? "rgba(255,202,126,0.98)"
+      : chamberPortal
+        ? "rgba(184,255,202,0.98)"
+        : "rgba(220,255,248,0.98)";
+    gltfCtx.lineWidth = nestedPortal ? 3.0 : chamberPortal ? 2.6 : 2.2;
+    gltfCtx.beginPath();
+    gltfCtx.moveTo(p1b.x, p1b.y);
+    gltfCtx.lineTo(p1t.x, p1t.y);
+    gltfCtx.moveTo(p2b.x, p2b.y);
+    gltfCtx.lineTo(p2t.x, p2t.y);
+    gltfCtx.moveTo(p1t.x, p1t.y);
+    gltfCtx.lineTo(p2t.x, p2t.y);
+    gltfCtx.stroke();
+    if (chamberPortal) {
+      gltfCtx.setLineDash(nestedPortal ? [3, 3] : [5, 4]);
+      gltfCtx.strokeStyle = nestedPortal ? "rgba(255,202,126,0.95)" : "rgba(120,190,150,0.95)";
+      gltfCtx.lineWidth = nestedPortal ? 1.9 : 1.5;
+      gltfCtx.beginPath();
+      gltfCtx.moveTo(p1b.x, p1b.y);
+      gltfCtx.lineTo(p2b.x, p2b.y);
+      if (nestedPortal) {
+        gltfCtx.moveTo(p1t.x, p1t.y);
+        gltfCtx.lineTo(p2t.x, p2t.y);
+      }
+      gltfCtx.stroke();
+      gltfCtx.setLineDash([]);
+    }
+    gltfCtx.restore();
   });
   gltfCtx.fillStyle = "#aeb7bd";
   gltfCtx.font = "11px Menlo, monospace";
