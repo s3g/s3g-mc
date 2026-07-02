@@ -1,12 +1,12 @@
 ---
 layout: default
-title: Image Score Generator
+title: Image Score
 utility_nav: true
 prev_page:
   title: Utilities
   url: /utilities.html
 next_page:
-  title: IR Room Sketch Designer
+  title: IR Sketch
   url: /utilities-ir-room-sketch-designer.html
 toc:
   - title: Open Tool
@@ -21,15 +21,15 @@ toc:
     href: "#export"
 ---
 
-# Image Score Generator
+# Image Score
 
 ## Open Tool
 
-[Open Image Score Generator](tools/image-score-generator/){:target="_blank" rel="noopener noreferrer" .utility-link}
+[Open Image Score](utilities/image-score-generator/){:target="_blank" rel="noopener noreferrer" .utility-link}
 
 ## Purpose
 
-The Image Score Generator prepares PNG scores for `3OAFX Image Sonogram Field`.
+The Image Score prepares PNG scores for `3OAFX Image Sonogram Field`.
 It is useful when the image is part of the composition rather than only a file
 chosen at render time.
 

@@ -11,7 +11,7 @@ next_page:
 toc:
   - title: Panners
     href: "#panners"
-  - title: Mover
+  - title: Spatial Score
     href: "#s3g-mc-mover"
   - title: Spatial Automation Composer
     href: "#spatial-automation-composer"
@@ -56,14 +56,14 @@ The `12ch Dodeca Panner` uses an AED-native spherical layout drawn as a dodecahe
 
 For automation, use the controller's automation controls to show, hide, arm, and write relevant lanes. In `Trim/Read`, the GUI can audition control changes without writing automation. Use write modes when you intentionally want controller motion recorded.
 
-## Mover
+## Spatial Score
 
-Mover is a browser-based motion designer for banked 8-source 3OA encoder
+Spatial Score is a browser-based motion designer for banked 8-source 3OA encoder
 groups. Use the browser tool to build and preview motion scenes, export JSON,
-then run `Load Mover JSON` in REAPER. The loader creates a 3OA encoder bus with
+then run `Load Spatial Score JSON` in REAPER. The loader creates a 3OA encoder bus with
 child tracks and writes source automation for `s3g 8ch 3OA Object Encoder`.
 
-After loading a JSON file, `Mover Browser Link` can reopen the same browser
+After loading a JSON file, `Spatial Score Browser Link` can reopen the same browser
 score and follow REAPER transport. This gives a larger visual monitor for
 automation that has already been written to the timeline.
 

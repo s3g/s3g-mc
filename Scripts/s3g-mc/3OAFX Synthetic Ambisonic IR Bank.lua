@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category 3OAFX
 -- @render Yes; NumPy-backed synthetic ambisonic IR bank generator.
--- @method Designs encoded ACN/SN3D ambisonic impulse-response WAVs for the direction layer used by 3OAFX Offline Ambisonic Convolve. Room size, material absorption, scattering, source distance, early reflections, late diffuse taps, and optional IR Room Sketch Designer JSON files shape the synthetic space.
+-- @method Designs encoded ACN/SN3D ambisonic impulse-response WAVs for the direction layer used by 3OAFX Offline Ambisonic Convolve. Room size, material absorption, scattering, source distance, early reflections, late diffuse taps, and optional IR Sketch JSON files shape the synthetic space.
 -- @about
 --   Creates either one encoded ambisonic IR file per virtual direction or one
 --   stacked multichannel bank with one ambisonic channel block per direction.
@@ -123,7 +123,7 @@ local function apply_room_sketch(settings, path)
   local text = nr.read_file(path)
   if text == "" then return false, "Could not read JSON file." end
   if not text:find('"target_process"%s*:%s*"3OAFX Synthetic Ambisonic IR Bank"', 1) then
-    return false, "This does not look like an IR Room Sketch Designer export."
+    return false, "This does not look like an IR Sketch export."
   end
   settings.sketch_path = path
   settings.room_x = json_number(text, "room_x") or settings.room_x

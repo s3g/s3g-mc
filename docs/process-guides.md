@@ -19,7 +19,7 @@ toc:
 
 # Process Guides
 
-These pages provide practical notes for selected tools. The guide categories follow the Package Browser and [Tools](tools.md) page.
+These pages provide practical notes for selected processes. The guide categories follow the Package Browser and [Processes](tools.md) page.
 
 Many processes use custom ImGui interfaces with diagrams, tables, breakpoint
 lanes, or spatial views. These visuals are meant to show how the process is

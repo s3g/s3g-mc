@@ -517,7 +517,7 @@ Direction formats:
 
 The stacked 2OA bank is `72ch`. The stacked 3OA bank is `128ch`, which fits REAPER's maximum track channel count. The script also writes a direction-map CSV next to the generated IRs so the direction order can be checked later.
 
-The browser-based IR Room Sketch Designer can be used to preview the same bank groups, source positions, and stacked channel ranges before rendering. Export a JSON sketch from the browser tool, then use `Load Room Sketch JSON` in this renderer. Imported sketches can set the room dimensions, material values, source distance, duration, pre-delay, early-reflection count, and ambisonic order. If the sketch includes polygon room data, field offset, chamber networks, exterior openings, and Bank Map group positions, the renderer uses that data to place each IR source across the larger floorplan, add chamber-return timing, and apply exterior-leak thinning to the late field.
+The browser-based IR Sketch can be used to preview the same bank groups, source positions, and stacked channel ranges before rendering. Export a JSON sketch from the browser tool, then use `Load Room Sketch JSON` in this renderer. Imported sketches can set the room dimensions, material values, source distance, duration, pre-delay, early-reflection count, and ambisonic order. If the sketch includes polygon room data, field offset, chamber networks, exterior openings, and Bank Map group positions, the renderer uses that data to place each IR source across the larger floorplan, add chamber-return timing, and apply exterior-leak thinning to the late field.
 
 Main controls:
 

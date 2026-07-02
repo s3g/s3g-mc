@@ -5,7 +5,7 @@ prev_page:
   title: Installation
   url: /installation.html
 next_page:
-  title: Tools
+  title: Processes
   url: /tools.html
 toc:
   - title: Dependencies

@@ -1,9 +1,9 @@
 ---
 layout: default
-title: Mover
+title: Spatial Score
 utility_nav: true
 prev_page:
-  title: IR Room Sketch Designer
+  title: IR Sketch
   url: /utilities-ir-room-sketch-designer.html
 next_page:
   title: References
@@ -27,15 +27,15 @@ toc:
     href: "#max-bridge"
 ---
 
-# Mover
+# Spatial Score
 
 ## Open Tool
 
-[Open Mover](tools/mover/){:target="_blank" rel="noopener noreferrer" .utility-link}
+[Open Spatial Score](utilities/mover/){:target="_blank" rel="noopener noreferrer" .utility-link}
 
 ## Purpose
 
-Mover is a browser-based spatial motion designer for banked 8-source
+Spatial Score is a browser-based spatial motion designer for banked 8-source
 third-order ambisonic motion. It is meant for composing motion first, then
 writing that motion into REAPER as editable automation.
 
@@ -87,7 +87,7 @@ connecting every point to every other point.
 
 ## REAPER Export
 
-Exported JSON can be loaded in REAPER with `Load Mover JSON`. The loader
+Exported JSON can be loaded in REAPER with `Load Spatial Score JSON`. The loader
 creates encoder tracks and writes source motion as automation for `s3g 8ch 3OA
 Object Encoder`.
 
@@ -96,20 +96,20 @@ automation is placed, edited against media, and rendered.
 
 ## Browser Link
 
-After loading a Mover JSON in REAPER, run `Mover Browser Link` to reopen the
+After loading a Spatial Score JSON in REAPER, run `Spatial Score Browser Link` to reopen the
 same JSON in the browser and follow REAPER transport. The link starts a local
 browser view, writes a small playhead file while the ReaScript window is open,
-and lets the Mover visual act as a large monitor for the automation already
+and lets the Spatial Score visual act as a large monitor for the automation already
 written into REAPER.
 
 ## Max Bridge
 
-The optional Max bridge in `tools/mover-max-bridge` reads exported Mover JSON
-directly with a V8 script. It plays back the exported automation arrays at
-control rate. In ICST mode it outputs AmbiMonitor point messages in the format
-`aed index azimuth elevation distance`.
+The optional Max bridge in `Scripts/s3g-mc/utilities/mover-max-bridge` reads
+exported Spatial Score JSON directly with a V8 script. It plays back the exported
+automation arrays at control rate. In ICST mode it outputs AmbiMonitor point
+messages in the format `aed index azimuth elevation distance`.
 
-This keeps Mover JSON as the source format and avoids converting continuous
+This keeps Spatial Score JSON as the source format and avoids converting continuous
 motion into ICST snapshot XML. The bridge is a translation layer: adapt its
 generic source-message outlet if another Max-based monitoring patch needs
 group, source, or gain data.

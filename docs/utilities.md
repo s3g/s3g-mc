@@ -9,12 +9,14 @@ next_page:
   title: References
   url: /references.html
 toc:
-  - title: Image Score Generator
-    href: "#image-score-generator"
-  - title: IR Room Sketch Designer
-    href: "#ir-room-sketch-designer"
-  - title: Mover
-    href: "#mover"
+  - title: Automation Score
+    href: "#automation-score"
+  - title: Image Score
+    href: "#image-score"
+  - title: IR Sketch
+    href: "#ir-sketch"
+  - title: Spatial Score
+    href: "#spatial-score"
 ---
 
 # Utilities
@@ -23,21 +25,35 @@ Browser-based companion tools for preparing scores, motion data, and impulse
 response sketches used by the REAPER package. These run outside REAPER, then
 export material that package scripts can load or render.
 
-## Image Score Generator
+When the package is installed with `Scripts/s3g-mc/utilities` in place, the Package Browser can launch these tools from REAPER.
 
-[Open Image Score Generator](tools/image-score-generator/){:target="_blank" rel="noopener noreferrer" .utility-link}
+## Automation Score
 
-[Read Image Score Generator notes](utilities-image-score-generator.md)
+[Open Automation Score](utilities/automation-score-designer/){:target="_blank" rel="noopener noreferrer" .utility-link}
+
+[Read Automation Score notes](utilities-automation-score-designer.md)
+
+Composes generic breakpoint lanes for REAPER automation. Export JSON from the
+browser, then run `Load Automation Score JSON` to write those lanes to selected
+track volume envelopes or sequential FX parameter envelopes.
+
+## Image Score
+
+[Open Image Score](utilities/image-score-generator/){:target="_blank" rel="noopener noreferrer" .utility-link}
+
+[Read Image Score notes](utilities-image-score-generator.md)
 
 Composes `512 x 256` PNG scores for `3OAFX Image Sonogram Field`. Color can
 drive AED placement, alpha or mask data can drive amplitude, and the tool
 includes drawing, generator, preview, and export controls.
 
-## IR Room Sketch Designer
+The same utility can be launched from REAPER with `Image Score`.
 
-[Open IR Room Sketch Designer](tools/ir-room-sketch-designer/){:target="_blank" rel="noopener noreferrer" .utility-link}
+## IR Sketch
 
-[Read IR Room Sketch Designer notes](utilities-ir-room-sketch-designer.md)
+[Open IR Sketch](utilities/ir-room-sketch-designer/){:target="_blank" rel="noopener noreferrer" .utility-link}
+
+[Read IR Sketch notes](utilities-ir-room-sketch-designer.md)
 
 Sketches synthetic ambisonic impulse-response banks for `3OAFX Synthetic
 Ambisonic IR Bank`, including room geometry, chambers, exterior leak openings,
@@ -46,14 +62,16 @@ room export. Load the exported JSON with `Load Room Sketch JSON` inside
 `3OAFX Synthetic Ambisonic IR Bank`; the generated IRs can then be used with
 `3OAFX Offline Ambisonic Convolve`.
 
-## Mover
+The same utility can be launched from REAPER with `IR Sketch`.
 
-[Open Mover](tools/mover/){:target="_blank" rel="noopener noreferrer" .utility-link}
+## Spatial Score
 
-[Read Mover notes](utilities-mover.md)
+[Open Spatial Score](utilities/mover/){:target="_blank" rel="noopener noreferrer" .utility-link}
+
+[Read Spatial Score notes](utilities-mover.md)
 
 Designs banked third-order ambisonic source motion in the browser. Exported
-JSON can be loaded in REAPER with `Load Mover JSON`, which creates encoder
+JSON can be loaded in REAPER with `Load Spatial Score JSON`, which creates encoder
 tracks and writes automation for `s3g 8ch 3OA Object Encoder`. An optional Max
-bridge in `tools/mover-max-bridge` can read the same JSON for ICST
-AmbiMonitor-style playback and monitoring patches.
+bridge in `Scripts/s3g-mc/utilities/mover-max-bridge` can read the same JSON
+for ICST AmbiMonitor-style playback and monitoring patches.

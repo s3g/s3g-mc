@@ -13,20 +13,20 @@ Many of these tools are inspired by or extend existing computer music
 practices, with references mentioned in the documentation where they are
 useful.
 
-## Tools
+## Processes
 
 For step-by-step notes on selected processes, see the [Process Guides](docs/process-guides.md).
 
-Current package snapshot: the browser exposes 111 user-facing tools/controllers,
+Current package snapshot: the browser exposes 115 user-facing tools/controllers,
 plus the Package Browser. Of those, 48 are Python/NumPy-backed offline
-processes, 25 load, control, or render included JSFX, and 38 are native
+processes, 25 load, control, or render included JSFX, and 42 are native
 Lua/ReaImGui REAPER actions. The repository also ships 23 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and internal
 dialogs that are not shown as Package Browser entries.
 
 Package Browser group counts:
 
-- Channel Mixing / Automation: 5
+- Channel Mixing / Automation: 7
 - MIDI Composition: 8
 - Procedural Synthesis: 6
 - Offline Synthesis / IR: 9
@@ -36,6 +36,7 @@ Package Browser group counts:
 - Multichannel Texture / Montage: 20
 - Item Channel Transforms: 10
 - Track Building / Routing: 3
+- Package / Utilities: 2
 
 ### Channel Mixing / Automation
 
@@ -49,6 +50,15 @@ Package Browser group counts:
   layouts can be mixed as spatial objects or aligned stacked shapes. The
   controller includes track-name node labels, routing overview, top/side camera
   views, cursor falloff/gate controls, and automation lane helpers.
+- `Automation Score`: opens the browser utility for composing generic
+  breakpoint lanes that can later be assigned to track or FX automation.
+- `Image Score`: opens the browser utility for composing PNG scores
+  used by `3OAFX Image Sonogram Field`.
+- `IR Sketch`: opens the browser utility for preparing room
+  sketch JSON used by `3OAFX Synthetic Ambisonic IR Bank`.
+- `Load Automation Score JSON`: opens an ImGui target-assignment window for
+  mapping Automation Score lanes to selected track volume envelopes or
+  named FX parameter envelopes.
 - `MC to Stereo Autogain`: multichannel fold-down with layout modes, width,
   rotation, weighting, 3D projection attenuation, autogain, and output trim.
 - `Transaural Crosstalk Canceller`: stereo loudspeaker playback processor with
@@ -151,10 +161,10 @@ modulation afterward.
   cube, 12ch ring, 16ch ring, 16ch double ring, 20ch double ring, and 24ch dome
   without overhead. Speaker numbering starts near the stereo-right position and
   proceeds clockwise.
-- `Load Mover JSON`: loads exported Mover JSON into REAPER, creates the
+- `Load Spatial Score JSON`: loads exported Spatial Score JSON into REAPER, creates the
   3OA encoder bus/child tracks, and writes source motion as editable automation.
-- `Mover Browser Link`: opens the browser-based Mover with the last loaded
-  Mover JSON and follows REAPER transport from a local browser link.
+- `Spatial Score Browser Link`: opens the browser-based Spatial Score with the last loaded
+  Spatial Score JSON and follows REAPER transport from a local browser link.
 - `25ch Cosine Dome Panner`: soft angular-focus panning for up to 8 mono
   sources across the 25-speaker dome.
 - `25ch DBAP Dome Panner`: distance-weighted amplitude panning for up to 8 mono
@@ -387,6 +397,9 @@ Copy or symlink the package folders into your REAPER resource path:
 Scripts/s3g-mc -> REAPER/Scripts/s3g-mc
 Effects/s3g    -> REAPER/Effects/s3g
 ```
+
+The browser utilities are included inside `Scripts/s3g-mc/utilities`; do not
+install them as a generic top-level folder in the REAPER resource path.
 
 In REAPER:
 

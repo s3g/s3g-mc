@@ -1,12 +1,12 @@
 ---
 layout: default
-title: IR Room Sketch Designer
+title: IR Sketch
 utility_nav: true
 prev_page:
-  title: Image Score Generator
+  title: Image Score
   url: /utilities-image-score-generator.html
 next_page:
-  title: Mover
+  title: Spatial Score
   url: /utilities-mover.html
 toc:
   - title: Open Tool
@@ -25,15 +25,15 @@ toc:
     href: "#export"
 ---
 
-# IR Room Sketch Designer
+# IR Sketch
 
 ## Open Tool
 
-[Open IR Room Sketch Designer](tools/ir-room-sketch-designer/){:target="_blank" rel="noopener noreferrer" .utility-link}
+[Open IR Sketch](utilities/ir-room-sketch-designer/){:target="_blank" rel="noopener noreferrer" .utility-link}
 
 ## Purpose
 
-The IR Room Sketch Designer plans synthetic ambisonic impulse-response banks for
+The IR Sketch plans synthetic ambisonic impulse-response banks for
 `3OAFX Synthetic Ambisonic IR Bank`. It sketches room dimensions,
 source/listener geometry, direction groups, early-reflection timing, estimated
 decay, material behavior, and the channel blocks used by the rendered bank.

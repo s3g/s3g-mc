@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>s3g-mc Automation Score</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="stage">
+        <header class="topbar">
+          <div>
+            <h1>s3g-mc Automation Score</h1>
+            <p>Generic breakpoint scores for REAPER track and FX automation</p>
+          </div>
+          <div class="transport">
+            <button id="play" type="button" title="Play">▶</button>
+            <button id="stop" type="button" title="Stop">■</button>
+            <button id="openSpaceView" type="button">3D View</button>
+            <button id="importJson" type="button">Import</button>
+            <button id="exportJson" type="button">Export</button>
+            <input id="jsonFile" type="file" accept="application/json,.json" hidden />
+          </div>
+        </header>
+        <canvas id="field" width="1200" height="760"></canvas>
+        <canvas id="playbar" width="1200" height="96"></canvas>
+        <canvas id="heatmap" width="1200" height="96"></canvas>
+        <div class="statusbar">
+          <span id="timeReadout">0.00s / 16.00s</span>
+          <span id="laneReadout">Lane 1 | 2 points</span>
+          <span id="valueReadout">value 0.50</span>
+        </div>
+      </section>
+      <aside class="panel">
+        <section>
+          <h2>Lanes</h2>
+          <div class="row two">
+            <button id="addLane" type="button">Add Lane</button>
+            <button id="deleteLane" type="button">Delete Lane</button>
+          </div>
+          <div id="laneList" class="lane-list"></div>
+        </section>
+        <section>
+          <h2>Selected Lane</h2>
+          <label>Name <input id="laneName" type="text" /></label>
+          <label class="check"><input id="laneEnabled" type="checkbox" checked /> Enabled</label>
+          <label>Color <input id="laneColor" type="color" /></label>
+          <label>Interpolation
+            <select id="laneCurve">
+              <option value="linear">Linear</option>
+              <option value="smooth">Smooth</option>
+              <option value="step">Step</option>
+            </select>
+          </label>
+          <div class="row two">
+            <button id="addPoint" type="button">Add Point</button>
+            <button id="clearLane" type="button">Clear Lane</button>
+          </div>
+        </section>
+        <section>
+          <h2>Generate</h2>
+          <label>Shape
+            <select id="shape">
+              <option value="ramp">Ramp</option>
+              <option value="fadeIn">Fade In</option>
+              <option value="fadeOut">Fade Out</option>
+              <option value="triangle">Triangle</option>
+              <option value="pulse">Pulse</option>
+              <option value="wave">Wave</option>
+              <option value="randomWalk">Random Walk</option>
+              <option value="stagger">Stagger Lanes</option>
+              <option value="mirror">Mirror Pair</option>
+              <option value="gate">Gate</option>
+            </select>
+          </label>
+          <label>Amount <span id="amountValue" class="value-readout">0.65</span><input id="amount" type="range" min="0" max="1" value="0.65" step="0.01" /></label>
+          <label>Points <span id="pointValue" class="value-readout">8</span><input id="pointCount" type="range" min="2" max="64" value="8" step="1" /></label>
+          <label>Seed <input id="seed" type="number" value="1" step="1" /></label>
+          <div class="row two">
+            <button id="generateLane" type="button">Lane</button>
+            <button id="generateAll" type="button">All Lanes</button>
+          </div>
+        </section>
+        <section>
+          <h2>Relationship Generate</h2>
+          <label>Target
+            <select id="relationshipTarget">
+              <option value="stddev">Standard Deviation</option>
+              <option value="spread">Spread / Range</option>
+              <option value="synchrony">Synchrony</option>
+              <option value="density">Activity Density</option>
+              <option value="divergence">Divergence Waves</option>
+            </select>
+          </label>
+          <label>Strength <span id="relationshipStrengthValue" class="value-readout">0.55</span><input id="relationshipStrength" type="range" min="0" max="1" value="0.55" step="0.01" /></label>
+          <label>Motion <span id="relationshipMotionValue" class="value-readout">0.45</span><input id="relationshipMotion" type="range" min="0" max="1" value="0.45" step="0.01" /></label>
+          <label>Center <span id="relationshipCenterValue" class="value-readout">0.50</span><input id="relationshipCenter" type="range" min="0" max="1" value="0.5" step="0.01" /></label>
+          <button id="generateRelationship" type="button">Generate Relationships</button>
+        </section>
+        <section>
+          <h2>Derive Lane</h2>
+          <label>Method
+            <select id="deriveMethod">
+              <option value="complement">Complement</option>
+              <option value="inverse">Inverse Around Center</option>
+              <option value="echo">Echo / Lag</option>
+              <option value="offset">Time Offset</option>
+              <option value="phase">Phase Wrap</option>
+              <option value="gate">Gate From Source</option>
+              <option value="smooth">Smooth Copy</option>
+              <option value="variation">Seeded Variation</option>
+            </select>
+          </label>
+          <label>Amount <span id="deriveAmountValue" class="value-readout">0.35</span><input id="deriveAmount" type="range" min="0" max="1" value="0.35" step="0.01" /></label>
+          <label>Center <span id="deriveCenterValue" class="value-readout">0.50</span><input id="deriveCenter" type="range" min="0" max="1" value="0.5" step="0.01" /></label>
+          <label>Destination
+            <select id="deriveDestination">
+              <option value="next">Write Next Lane</option>
+              <option value="append">Append Lane</option>
+            </select>
+          </label>
+          <button id="deriveLane" type="button">Derive From Selected</button>
+        </section>
+        <section>
+          <h2>View / Export</h2>
+          <label>Duration s <span id="durationValue" class="value-readout">16.00s</span><input id="duration" type="range" min="1" max="600" value="16" step="0.25" /></label>
+          <label>Point rate / s <span id="rateValue" class="value-readout">16/s</span><input id="pointRate" type="range" min="1" max="96" value="16" step="1" /></label>
+          <label>View
+            <select id="viewMode">
+              <option value="overlay">Overlay</option>
+              <option value="stacked">Stacked Lanes</option>
+            </select>
+          </label>
+          <label>Aggregate
+            <select id="aggregateMode">
+              <option value="mean">Mean + Spread</option>
+              <option value="median">Median</option>
+              <option value="range">Range</option>
+              <option value="stddev">Standard Deviation</option>
+              <option value="variance">Variance</option>
+              <option value="sum">Sum</option>
+              <option value="density">Activity Density</option>
+              <option value="delta">Change Rate</option>
+              <option value="pairwise">Pairwise Distance</option>
+              <option value="synchrony">Synchrony</option>
+            </select>
+          </label>
+          <label>Projection
+            <select id="projectionMode">
+              <option value="line">Aggregate Line</option>
+              <option value="space">3D Space</option>
+              <option value="ribbons">3D Ribbons</option>
+            </select>
+          </label>
+          <label class="check"><input id="showSamples" type="checkbox" /> Show sampled points</label>
+          <button id="reset" type="button">Reset Field</button>
+        </section>
+      </aside>
+    </main>
+    <div id="spaceModal" class="space-modal" aria-hidden="true">
+      <div class="space-window">
+        <header class="space-header">
+          <div>
+            <h2>Automation Space</h2>
+            <p>time / value / lane projection</p>
+          </div>
+          <div class="transport">
+            <button id="spacePlay" type="button" title="Play">▶</button>
+            <button id="spaceStop" type="button" title="Stop">■</button>
+            <button data-camera="iso" type="button">3/4</button>
+            <button data-camera="top" type="button">Top</button>
+            <button data-camera="front" type="button">Front</button>
+            <button data-camera="side" type="button">Side</button>
+            <button id="closeSpaceView" type="button">Close</button>
+          </div>
+        </header>
+        <canvas id="spaceView" width="1400" height="900"></canvas>
+        <div class="space-controls">
+          <label>Camera az <span id="cameraAzValue" class="value-readout">-35</span><input id="cameraAz" type="range" min="-180" max="180" value="-35" step="1" /></label>
+          <label>Camera el <span id="cameraElValue" class="value-readout">32</span><input id="cameraEl" type="range" min="-85" max="85" value="32" step="1" /></label>
+          <label>Zoom <span id="cameraZoomValue" class="value-readout">1.00</span><input id="cameraZoom" type="range" min="0.45" max="2.2" value="1" step="0.01" /></label>
+        </div>
+      </div>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

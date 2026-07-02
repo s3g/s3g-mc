@@ -2,7 +2,7 @@
 layout: default
 title: Workflows
 prev_page:
-  title: Tools
+  title: Processes
   url: /tools.html
 next_page:
   title: Process Guides
@@ -223,10 +223,10 @@ map, source positions, and panner-specific controls.
 
 Use `Spatial Automation Composer` to compose spatial movement offline as
 editable REAPER automation for supported 8-source AED and XYZ s3g panners. For
-larger 3OA motion designs, Mover provides a browser-based scene/bank
-editor; export Mover JSON, then use `Load Mover JSON` to create encoder tracks
-and write automation in REAPER. `Mover Browser Link` can reopen the last loaded
-Mover JSON and follow REAPER transport as a visual monitor.
+larger 3OA motion designs, Spatial Score provides a browser-based scene/bank
+editor; export Spatial Score JSON, then use `Load Spatial Score JSON` to create encoder tracks
+and write automation in REAPER. `Spatial Score Browser Link` can reopen the last loaded
+Spatial Score JSON and follow REAPER transport as a visual monitor.
 
 The package includes these spatial panners:
 
