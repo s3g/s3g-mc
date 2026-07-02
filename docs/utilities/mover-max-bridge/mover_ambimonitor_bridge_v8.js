@@ -31,14 +31,14 @@ function loadjson(text, label) {
   try {
     var data = JSON.parse(String(text || ""));
     if (!data || data.format !== "s3g_mc_mover_v1") {
-      throw new Error("not a Mover JSON file");
+      throw new Error("not a Spatial Score JSON file");
     }
     mover = data;
     duration = Math.max(0.001, Number(data.duration || 1));
     position = 0;
     direction = 1;
     lastMs = nowMs();
-    status("loaded " + (label || "Mover JSON") + " | " + sourceCount() + " sources | " + duration.toFixed(3) + "s");
+    status("loaded " + (label || "Spatial Score JSON") + " | " + sourceCount() + " sources | " + duration.toFixed(3) + "s");
     meta();
     outputFrame();
   } catch (error) {

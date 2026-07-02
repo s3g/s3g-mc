@@ -12,7 +12,7 @@ toc:
   - title: Panners
     href: "#panners"
   - title: Spatial Score
-    href: "#s3g-mc-mover"
+    href: "#spatial-score"
   - title: Spatial Automation Composer
     href: "#spatial-automation-composer"
 ---

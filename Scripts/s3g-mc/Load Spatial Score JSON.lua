@@ -325,7 +325,7 @@ local function main()
     local bank = data.banks[index]
     local bank_id = tonumber(bank.bank) or index
     local name = bank.name or ("Bank " .. tostring(bank_id))
-    local track = create_track("Mover " .. name, CHANNELS, insert_index + index)
+    local track = create_track("Spatial Score " .. name, CHANNELS, insert_index + index)
     reaper.SetMediaTrackInfo_Value(track, "B_MAINSEND", 0)
     local fx = add_encoder(track)
     if fx < 0 then
