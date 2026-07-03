@@ -11,6 +11,8 @@ next_page:
 toc:
   - title: Automation Score
     href: "#automation-score"
+  - title: Displacement Score
+    href: "#displacement-score"
   - title: Image Score
     href: "#image-score"
   - title: IR Sketch
@@ -39,6 +41,18 @@ those lanes to selected track volume envelopes or sequential FX parameter
 envelopes, with optional project markers. An optional Max bridge in
 `Scripts/s3g-mc/utilities/automation-score-max-bridge` can read the same JSON
 for control-rate playback in Max.
+
+## Displacement Score
+
+[Open Displacement Score](utilities/displacement-score/){:target="_blank" rel="noopener noreferrer" .utility-link}
+
+[Read Displacement Score notes](utilities-displacement-score.md)
+
+Designs 24-point virtual speaker displacement JSON for 3OAFX workflows. The
+score is intended for offline renderers that decode to the 24-point direction
+layer, apply the displacement, and re-encode to ACN/SN3D.
+
+The same utility can be launched from REAPER with `Displacement Score`.
 
 ## Image Score
 

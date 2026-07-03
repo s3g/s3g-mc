@@ -38,8 +38,7 @@ The `Layout Panner` is the general option for quad, rings, cube, double-ring, an
 `Distance rolloff` controls level as a source moves beyond the array edge.
 `Distance diffusion` broadens the panning focus as distance increases, so an
 outside-the-array gesture can become both quieter and less point-like. Leave
-`Energy preserve` enabled in the LBAP panner when you want the earlier
-equal-power behavior.
+`Energy preserve` enabled in the LBAP panner when you want equal-power behavior.
 
 The 25-channel dome panners share the RISD SRST dome layout but use different panning ideas:
 

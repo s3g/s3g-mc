@@ -4,8 +4,8 @@ title: Image Score
 utility_nav: true
 lightbox: true
 prev_page:
-  title: Utilities
-  url: /utilities.html
+  title: Displacement Score
+  url: /utilities-displacement-score.html
 next_page:
   title: IR Sketch
   url: /utilities-ir-room-sketch-designer.html

@@ -73,11 +73,10 @@ keeps the grain as the spatial object.
 
 Method:
 
-The engine adapts a triggered voice-rotation granulator model for offline 3OA
-rendering. Trigger density and chance decide when grains happen. The voice
-rotation, source spray, pitch spread, reverse chance, source-position
-quantization, window morph, and drive controls shape the grain stream. AED
-trajectory modes decide where those grains appear in the ambisonic field.
+Trigger density and chance decide when grains happen. Voice rotation, source
+spray, pitch spread, reverse chance, source-position quantization, window
+morph, and drive controls shape the grain stream. AED trajectory modes decide
+where those grains appear in the ambisonic field.
 
 Main controls:
 

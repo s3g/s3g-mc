@@ -53,8 +53,8 @@ useful when the score is driving MIDI-style controller data.
 `mode generic` is the most descriptive Max-native output. It includes the lane
 number, lane name, normalized value, and enabled state in one message.
 
-The patch also reports playback position, duration metadata, and section marker
-changes. In the default OSC-style mode, marker hits use this shape when the
+The patch also reports playback position, duration metadata, and marker hits.
+In the default OSC-style mode, marker hits use this shape when the
 cursor enters a marker section:
 
 ```text
@@ -77,9 +77,13 @@ Loop modes:
 - `playbackmode loop`: wrap from the end back to the beginning.
 - `playbackmode palindrome`: play forward, then backward, reversing at each end.
 - `playbackmode once`: play to the end and stop.
+- `speed n`: scale running playback speed. `speed 0.5` is half speed,
+  `speed 2` is double speed. `rate n` and `playbackspeed n` are aliases.
 
 In palindrome mode the reported playback duration is doubled: a 24 second
 Automation Score export becomes a 48 second forward/backward cycle.
+Speed changes scale automatic playback only; JSON time positions and manual
+`seconds` / `norm` scrubbing remain tied to the score timeline.
 
 The bridge reads the exported `lanes` and `sections` arrays from Automation
 Score JSON. It does not regenerate or reinterpret the score; it plays the stored

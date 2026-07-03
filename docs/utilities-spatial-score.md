@@ -61,14 +61,12 @@ scene name. `Auto Next` advances through the scenes in order during preview.
 Motion banks provide families of movement such as orbit, weave, lattice, frame,
 trace, pulse, suspend, leap, field, molec, fluid, forsy, flock, eco, contact,
 march, procession, xenak, cardew, path, scatter, and physics. The physics bank
-adapts the older Max physics macro idea into deterministic scene behaviors such
-as calm, swarm, bounce, orbit, tether, drift, vortex, and well. Variants change
-the local behavior within a bank.
+adds force-driven scene behaviors such as calm, swarm, bounce, orbit, tether,
+drift, vortex, and well. Variants change the local behavior within a bank.
 
 Variant names change with the selected motion bank. They keep the same stored
-keys for JSON compatibility, but the visible names and internal profile nudges
-are bank aware, so variants steer each bank toward a more specific movement
-style.
+keys in the exported JSON, while the visible names and motion profiles change
+with the selected bank.
 
 For the physics bank, `Attract`, `Repel`, `Bounce`, `Collision`, `Damping`, and
 `Turbulence` act inside the motion generator. Physics variants also shape these

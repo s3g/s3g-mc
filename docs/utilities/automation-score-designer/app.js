@@ -7,7 +7,9 @@ const heatCtx = heatmap.getContext("2d");
 const spaceCanvas = document.getElementById("spaceView");
 const spaceCtx = spaceCanvas.getContext("2d");
 
+const STORAGE_KEY = "s3g-mc-automation-score-autosave-v1";
 const palette = ["#5aa8c7", "#d8a24a", "#ff7f6e", "#8fcf7a", "#c18bd8", "#69b6a7", "#d66f9b", "#b6c05b", "#7aa4e8", "#e0a16f", "#8ecfbc", "#d0d0d0"];
+let lastAutosaveJson = "";
 
 const state = {
   duration: 16,
@@ -1268,6 +1270,30 @@ function downloadJson() {
   URL.revokeObjectURL(a.href);
 }
 
+function autosave() {
+  try {
+    const json = JSON.stringify(exportData());
+    if (json === lastAutosaveJson) return;
+    localStorage.setItem(STORAGE_KEY, json);
+    lastAutosaveJson = json;
+  } catch (error) {
+    // Autosave should never interrupt editing.
+  }
+}
+
+function restoreAutosave() {
+  try {
+    const json = localStorage.getItem(STORAGE_KEY);
+    if (!json) return false;
+    loadData(JSON.parse(json));
+    lastAutosaveJson = json;
+    return true;
+  } catch (error) {
+    localStorage.removeItem(STORAGE_KEY);
+    return false;
+  }
+}
+
 function loadData(data) {
   const validFormat = data && (data.format === "s3g-mc-automation-score" || data.format === "s3g-mc-automation-field");
   if (!validFormat) throw new Error("not an Automation Score JSON file");
@@ -1639,5 +1665,7 @@ document.addEventListener("keydown", event => {
   }
 });
 
-resetField();
+if (!restoreAutosave()) resetField();
+setInterval(autosave, 2000);
+window.addEventListener("beforeunload", autosave);
 requestAnimationFrame(renderLoop);

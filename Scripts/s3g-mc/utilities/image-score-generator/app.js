@@ -1,5 +1,7 @@
 const W = 512;
 const H = 256;
+const STORAGE_KEY = "s3g-mc-image-score-autosave-v1";
+let lastAutosaveJson = "";
 
 const scoreCanvas = document.getElementById("scoreCanvas");
 const overlayCanvas = document.getElementById("overlayCanvas");
@@ -1369,6 +1371,87 @@ function importImage(file) {
   img.src = URL.createObjectURL(file);
 }
 
+function compositeDataUrl() {
+  const rgb = imageDataRgb();
+  const alpha = alphaData();
+  const out = document.createElement("canvas");
+  out.width = W;
+  out.height = H;
+  const ctx = out.getContext("2d");
+  const image = ctx.createImageData(W, H);
+  for (let i = 0; i < rgb.data.length; i += 4) {
+    image.data[i] = rgb.data[i];
+    image.data[i + 1] = rgb.data[i + 1];
+    image.data[i + 2] = rgb.data[i + 2];
+    image.data[i + 3] = alpha.data[i];
+  }
+  ctx.putImageData(image, 0, 0);
+  return out.toDataURL("image/png");
+}
+
+function autosave() {
+  try {
+    const snapshot = {
+      version: 1,
+      state: {
+        tool: state.tool,
+        layer: state.layer,
+        aedCamera: state.aedCamera,
+        aedYaw: state.aedYaw,
+        aedPitch: state.aedPitch,
+        playhead: state.playhead,
+      },
+      controls: Object.fromEntries(Object.entries(controls)
+        .filter(([, control]) => control && "value" in control)
+        .map(([key, control]) => [key, control.value])),
+      rgba: compositeDataUrl(),
+    };
+    const json = JSON.stringify(snapshot);
+    if (json === lastAutosaveJson) return;
+    localStorage.setItem(STORAGE_KEY, json);
+    lastAutosaveJson = json;
+  } catch (error) {
+    // Autosave should not interrupt drawing.
+  }
+}
+
+function restoreAutosave() {
+  try {
+    const json = localStorage.getItem(STORAGE_KEY);
+    if (!json) return false;
+    const snapshot = JSON.parse(json);
+    Object.entries(snapshot.controls || {}).forEach(([key, value]) => {
+      if (controls[key] && "value" in controls[key]) controls[key].value = value;
+    });
+    Object.assign(state, snapshot.state || {});
+    const img = new Image();
+    img.onload = () => {
+      colorCtx.clearRect(0, 0, W, H);
+      alphaCtx.clearRect(0, 0, W, H);
+      colorCtx.drawImage(img, 0, 0, W, H);
+      const data = colorCtx.getImageData(0, 0, W, H);
+      const alphaImage = alphaCtx.createImageData(W, H);
+      for (let i = 0; i < data.data.length; i += 4) {
+        const a = data.data[i + 3];
+        alphaImage.data[i] = a;
+        alphaImage.data[i + 1] = a;
+        alphaImage.data[i + 2] = a;
+        alphaImage.data[i + 3] = 255;
+        data.data[i + 3] = 255;
+      }
+      colorCtx.putImageData(data, 0, 0);
+      alphaCtx.putImageData(alphaImage, 0, 0);
+      refresh();
+    };
+    img.src = snapshot.rgba;
+    lastAutosaveJson = json;
+    return true;
+  } catch (error) {
+    localStorage.removeItem(STORAGE_KEY);
+    return false;
+  }
+}
+
 scoreCanvas.addEventListener("pointerdown", (event) => {
   const point = canvasPoint(event);
   state.drawing = true;
@@ -1616,8 +1699,12 @@ drawOverlay();
 updateAedSwatch();
 updateAllRangeFills();
 document.querySelector('[data-aed-camera="front"]')?.classList.add("active");
-chooseInitialGradientScore();
-updateAllRangeFills();
-generateScore();
+if (!restoreAutosave()) {
+  chooseInitialGradientScore();
+  updateAllRangeFills();
+  generateScore();
+}
 setPlayhead(0);
+setInterval(autosave, 2500);
+window.addEventListener("beforeunload", autosave);
 requestAnimationFrame(() => window.scrollTo(0, 0));

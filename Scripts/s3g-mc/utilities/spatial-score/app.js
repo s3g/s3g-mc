@@ -88,6 +88,9 @@ const ui = {
   showLabels: el("showLabels"),
 };
 
+const STORAGE_KEY = "s3g-mc-spatial-score-autosave-v1";
+let lastAutosaveJson = "";
+
 const COLORS = ["#6ee7f2", "#f2c56e", "#ff7f6e", "#9de67f", "#b998ff", "#f06eca", "#86a7ff", "#ffffff"];
 const SCENE_COLORS = ["#5aa8c7", "#d8a24a", "#cf695f", "#7ea65a", "#9b83d8", "#cf6bb0", "#7f9bd8", "#d7d7d7"];
 const SCENES = ["a", "b", "c", "d", "e", "f", "g", "h"];
@@ -2530,6 +2533,30 @@ function exportJson() {
   URL.revokeObjectURL(url);
 }
 
+function autosave() {
+  try {
+    const json = JSON.stringify(makeExport());
+    if (json === lastAutosaveJson) return;
+    localStorage.setItem(STORAGE_KEY, json);
+    lastAutosaveJson = json;
+  } catch (error) {
+    // Autosave is a recovery aid only.
+  }
+}
+
+function restoreAutosave() {
+  try {
+    const json = localStorage.getItem(STORAGE_KEY);
+    if (!json) return false;
+    loadMoverJson(JSON.parse(json));
+    lastAutosaveJson = json;
+    return true;
+  } catch (error) {
+    localStorage.removeItem(STORAGE_KEY);
+    return false;
+  }
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -3121,9 +3148,11 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
-captureScene(activeBank());
+if (!restoreAutosave()) captureScene(activeBank());
 enhanceCustomSelects();
 syncPanelFromBank();
 updateAllRangeFills();
 initReaperLink();
+setInterval(autosave, 2000);
+window.addEventListener("beforeunload", autosave);
 tick();

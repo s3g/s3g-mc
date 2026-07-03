@@ -21,12 +21,15 @@
 html,
 body {
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  overflow-anchor: none;
 }
 
 body {
   margin: 0;
   width: 100%;
-  overflow: auto;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: "Menlo", "Monaco", "Courier New", monospace;
@@ -214,9 +217,14 @@ input[type="range"]::-moz-range-thumb {
 .app {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  position: fixed;
+  inset: 0;
   height: 100vh;
+  height: 100dvh;
   min-height: 0;
   overflow: hidden;
+  overscroll-behavior: none;
+  overflow-anchor: none;
 }
 
 .topbar {
@@ -345,6 +353,8 @@ h2 {
   align-items: stretch;
   min-height: 0;
   overflow: hidden;
+  overscroll-behavior: none;
+  overflow-anchor: none;
 }
 
 .panel {
@@ -352,6 +362,8 @@ h2 {
   border-left: 1px solid var(--line);
   overflow: auto;
   min-height: 0;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
 }
 
 .panel.tools {
@@ -419,6 +431,8 @@ label select {
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
   scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
@@ -456,6 +470,7 @@ label select {
   width: 100%;
   height: 100%;
   image-rendering: pixelated;
+  touch-action: none;
 }
 
 #overlayCanvas {

@@ -9,6 +9,8 @@ const timelineCanvas = $("timelineCanvas");
 const timelineCtx = timelineCanvas.getContext("2d");
 const gltfCanvas = $("gltfCanvas");
 const gltfCtx = gltfCanvas.getContext("2d");
+const STORAGE_KEY = "s3g-mc-ir-sketch-autosave-v1";
+let lastAutosaveJson = "";
 
 const controls = {
   roomX: $("roomX"),
@@ -2308,6 +2310,86 @@ function downloadJson() {
   URL.revokeObjectURL(link.href);
 }
 
+const RESTORE_KEYS = {
+  room_x: "roomX",
+  room_y: "roomY",
+  room_z: "roomZ",
+  material_preset: "materialPreset",
+  absorption: "absorption",
+  scattering: "scattering",
+  tail_soften: "tailSoften",
+  space_shape: "spaceShape",
+  room_shape: "roomShape",
+  topology_bias: "topologyBias",
+  chamber_shape: "chamberShape",
+  chamber_side: "chamberSide",
+  chamber_material: "chamberMaterial",
+  chamber_material_mode: "chamberMaterialMode",
+  chamber_width: "chamberWidth",
+  chamber_depth: "chamberDepth",
+  chamber_count: "chamberCount",
+  chamber_position: "chamberPosition",
+  nested_chambers: "nestedChambers",
+  opening_width: "openingWidth",
+  chamber_coupling: "chamberCoupling",
+  chamber_material_mix: "chamberMaterialMix",
+  outside_opening_side: "outsideOpeningSide",
+  outside_opening_count: "outsideOpeningCount",
+  outside_opening_position: "outsideOpeningPosition",
+  outside_opening_spread: "outsideOpeningSpread",
+  outside_opening_width: "outsideOpeningWidth",
+  outside_leak: "outsideLeak",
+  field_x: "fieldX",
+  field_y: "fieldY",
+  source_azimuth: "sourceAz",
+  source_elevation: "sourceEl",
+  source_distance: "sourceDistance",
+  spread_deg: "spreadDeg",
+  group_variation: "groupVariation",
+  surface_contrast: "surfaceContrast",
+  distance_variation: "distanceVariation",
+  order: "order",
+  direction_set: "directionSet",
+  duration: "duration",
+  pre_delay_ms: "preDelay",
+  early_reflections: "earlyReflections",
+};
+
+function applyExportObject(data) {
+  Object.entries(RESTORE_KEYS).forEach(([key, controlId]) => {
+    if (data[key] === undefined || !controls[controlId]) return;
+    controls[controlId].value = data[key];
+  });
+  if (data.exterior_opening && controls.outsideOpening) controls.outsideOpening.checked = data.exterior_opening.enabled !== false;
+  if (data.view) state.view = data.view;
+  updateAllRangeFills();
+  drawRoom();
+}
+
+function autosave() {
+  try {
+    const json = JSON.stringify({ ...exportObject(), view: state.view });
+    if (json === lastAutosaveJson) return;
+    localStorage.setItem(STORAGE_KEY, json);
+    lastAutosaveJson = json;
+  } catch (error) {
+    // Autosave is best-effort.
+  }
+}
+
+function restoreAutosave() {
+  try {
+    const json = localStorage.getItem(STORAGE_KEY);
+    if (!json) return false;
+    applyExportObject(JSON.parse(json));
+    lastAutosaveJson = json;
+    return true;
+  } catch (error) {
+    localStorage.removeItem(STORAGE_KEY);
+    return false;
+  }
+}
+
 function polygonArea(poly) {
   let area = 0;
   for (let i = 0; i < poly.length; i += 1) {
@@ -3358,4 +3440,6 @@ function enhanceCustomSelects(root = document) {
 
 updateAllRangeFills();
 enhanceCustomSelects();
-applyMaterial();
+if (!restoreAutosave()) applyMaterial();
+setInterval(autosave, 2000);
+window.addEventListener("beforeunload", autosave);

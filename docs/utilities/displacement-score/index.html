@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>s3g-mc Displacement Score</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="stage">
+        <header class="topbar">
+          <div>
+            <h1>s3g-mc Displacement Score</h1>
+            <p>24-point 3OAFX virtual speaker displacement score</p>
+          </div>
+          <div class="toolbar">
+            <button id="play" type="button" title="Play">▶</button>
+            <button id="stop" type="button" title="Stop">■</button>
+            <button id="viewGlobe" type="button">Globe</button>
+            <button id="viewMap" type="button">Map</button>
+            <button id="viewTop" type="button">Top</button>
+            <button id="viewFront" type="button">Front</button>
+            <button id="viewSide" type="button">Side</button>
+            <button id="viewIso" type="button">3/4</button>
+            <button id="importJson" type="button">Import</button>
+            <button id="exportJson" type="button">Export</button>
+            <input id="jsonFile" type="file" accept="application/json,.json" hidden />
+          </div>
+        </header>
+        <canvas id="field" width="1280" height="820"></canvas>
+        <canvas id="playbar" width="1280" height="86"></canvas>
+        <div class="statusbar">
+          <span id="timeReadout">0.00s / 16.00s</span>
+          <span id="coordReadout">24-point polygon displacement</span>
+          <span id="modeReadout">scene A</span>
+        </div>
+      </section>
+      <aside class="panel">
+        <section>
+          <h2>Score</h2>
+          <label>Name <input id="scoreName" type="text" value="Displacement Score" /></label>
+          <label>Method
+            <select id="method">
+              <option value="target">Target geometry</option>
+              <option value="offset">Offset vectors</option>
+            </select>
+          </label>
+          <label class="check"><input id="normalizeRadius" type="checkbox" checked /> Normalize radius for encode</label>
+          <label class="check"><input id="showPoints" type="checkbox" checked /> Show points</label>
+          <label class="check"><input id="showPolygon" type="checkbox" checked /> Show polygon mesh</label>
+          <label class="check"><input id="showHeatmap" type="checkbox" /> Show displacement heatmap</label>
+          <label>Heatmap scale
+            <select id="heatmapPalette">
+              <option value="thermal">Thermal blue-red</option>
+              <option value="classic">Classic cold-hot</option>
+              <option value="inferno">Inferno</option>
+              <option value="viridis">Viridis</option>
+              <option value="magma">Magma</option>
+              <option value="greyscale">Greyscale</option>
+            </select>
+          </label>
+          <label>Polygon
+            <select id="polygonMode">
+              <option value="resolved">Resolved displacement</option>
+              <option value="target">Target geometry</option>
+              <option value="source">Source geometry</option>
+              <option value="all">Source + target + resolved</option>
+            </select>
+          </label>
+        </section>
+        <section>
+          <h2>Displacement</h2>
+          <label>Amount <span id="amountValue" class="value-readout">0.65</span><input id="amount" type="range" min="0" max="1" value="0.65" step="0.01" /></label>
+          <label>Azimuth scale <span id="azScaleValue" class="value-readout">1.00</span><input id="azScale" type="range" min="-2" max="2" value="1" step="0.01" /></label>
+          <label>Elevation scale <span id="elScaleValue" class="value-readout">1.00</span><input id="elScale" type="range" min="-2" max="2" value="1" step="0.01" /></label>
+          <label>Radius scale <span id="rScaleValue" class="value-readout">1.00</span><input id="rScale" type="range" min="0" max="2" value="1" step="0.01" /></label>
+        </section>
+        <section>
+          <h2>Time Layer</h2>
+          <label>Duration s <span id="durationValue" class="value-readout">16.00s</span><input id="duration" type="range" min="1" max="600" value="16" step="0.25" /></label>
+          <label>Preview time <span id="timeValue" class="value-readout">0.000</span><input id="timePosition" type="range" min="0" max="1" value="0" step="0.001" /></label>
+          <label>Frames <span id="frameCountValue" class="value-readout">32</span><input id="frameCount" type="range" min="2" max="128" value="32" step="1" /></label>
+        </section>
+        <section>
+          <h2>Displacement Scenes</h2>
+          <label>Scene
+            <select id="sceneSelect"></select>
+          </label>
+          <label>Scene name <input id="sceneName" type="text" value="A" /></label>
+          <label>Scene time s <input id="sceneTime" type="number" min="0" value="0" step="0.25" /></label>
+          <div class="row two">
+            <button id="addScene" type="button">Add</button>
+            <button id="deleteScene" type="button">Delete</button>
+          </div>
+          <button id="captureScene" type="button">Capture Current Displacement</button>
+        </section>
+        <section>
+          <h2>Whole Layout Method</h2>
+          <label>Shape
+            <select id="preset">
+              <option value="aed">AED transform</option>
+              <option value="shear">Azimuth shear</option>
+              <option value="fold">Fold upper/lower</option>
+              <option value="vortex">Vortex twist</option>
+              <option value="pinch">Polar pinch</option>
+              <option value="rupture">Rupture bands</option>
+              <option value="scatter">Seeded scatter</option>
+              <option value="mirror">Mirror left/right</option>
+              <option value="wave">Elevation wave</option>
+            </select>
+          </label>
+          <label>Strength <span id="strengthValue" class="value-readout">0.55</span><input id="strength" type="range" min="0" max="1" value="0.55" step="0.01" /></label>
+          <label>Seed <input id="seed" type="number" value="7" step="1" /></label>
+          <label>Rotate azimuth <span id="rotateAzValue" class="value-readout">0</span><input id="rotateAz" type="range" min="-180" max="180" value="0" step="1" /></label>
+          <label>Shift elevation <span id="shiftElValue" class="value-readout">0</span><input id="shiftEl" type="range" min="-90" max="90" value="0" step="1" /></label>
+          <label>Twist by height <span id="twistValue" class="value-readout">0.00</span><input id="twist" type="range" min="-2" max="2" value="0" step="0.01" /></label>
+          <label>Collapse to equator <span id="collapseValue" class="value-readout">0.00</span><input id="collapse" type="range" min="0" max="1" value="0" step="0.01" /></label>
+          <label>Distance scale <span id="distanceScaleValue" class="value-readout">1.00</span><input id="distanceScale" type="range" min="0.05" max="3" value="1" step="0.01" /></label>
+          <label>Distance flare <span id="distanceFlareValue" class="value-readout">0.00</span><input id="distanceFlare" type="range" min="-1" max="1" value="0" step="0.01" /></label>
+          <div class="row two">
+            <button id="applyPreset" type="button">Apply</button>
+            <button id="resetTargets" type="button">Reset</button>
+          </div>
+        </section>
+        <section>
+          <h2>View</h2>
+          <label>Azim <span id="cameraAzValue" class="value-readout">38</span><input id="cameraAz" type="range" min="-180" max="180" value="38" step="1" /></label>
+          <label>Elev <span id="cameraElValue" class="value-readout">24</span><input id="cameraEl" type="range" min="-90" max="90" value="24" step="1" /></label>
+          <label>Zoom <span id="zoomValue" class="value-readout">1.00</span><input id="zoom" type="range" min="0.55" max="1.8" value="1" step="0.01" /></label>
+        </section>
+      </aside>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

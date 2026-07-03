@@ -7,8 +7,8 @@ prev_page:
   title: Utilities
   url: /utilities.html
 next_page:
-  title: Image Score
-  url: /utilities-image-score-generator.html
+  title: Displacement Score
+  url: /utilities-displacement-score.html
 toc:
   - title: Overview
     href: "#overview"
@@ -81,7 +81,7 @@ project markers at the corresponding positions within the imported score range.
 The optional Max bridge in `Scripts/s3g-mc/utilities/automation-score-max-bridge`
 reads the same Automation Score JSON. Open `Automation Score Player.maxpat`,
 drop a JSON export onto the patch, then use the playback controls to output
-interpolated lane values, section changes, and timing metadata at control rate.
+interpolated lane values, marker hits, and timing metadata at control rate.
 
 The default output is OSC-style token data:
 `/automation/lane lane-index normalized-value`. The address is a single
@@ -90,3 +90,20 @@ stream directly. Other modes are available for compact normalized values,
 MIDI-CC-style `0..127` values, and more descriptive generic lane messages that
 include the lane name and enabled state. Print gates are closed by default so
 the patch can run without filling the Max console.
+
+The Max bridge uses five outlets:
+
+```text
+1 lanes
+2 clock
+3 metadata
+4 markers
+5 status
+```
+
+In the default OSC mode, marker hits use
+`/automation/marker marker-index marker-name time-seconds bang`.
+
+Send `speed n` to the player to scale running playback without changing the
+stored score timing. For example, `speed 0.5` plays at half speed and `speed 2`
+plays at double speed.

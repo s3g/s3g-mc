@@ -34,13 +34,14 @@ toc:
 
 For step-by-step notes on selected processes, see the [Process Guides](process-guides.md).
 The [Utilities](utilities.md) pages cover the browser-based companion tools for
-automation fields, image scores, IR room sketches, and Spatial Score automation JSON.
+Automation Score breakpoint lanes, image scores, IR room sketches, and Spatial
+Score automation JSON.
 
-Current package snapshot: the browser exposes 116 user-facing tools/controllers,
+Current package snapshot: the browser exposes 117 user-facing tools/controllers,
 plus the Package Browser. Of those, 48 are Python/NumPy-backed offline
 processes, 25 load, control, or render included JSFX, and 43 are native
 Lua/ReaImGui REAPER actions. The repository also ships 23 underlying JSFX
-engine/effect files. The Lua folder includes helper libraries and internal
+engine/effect files. The Lua folder includes helper libraries and support
 dialogs that are not shown as Package Browser entries.
 
 Package Browser group counts:
@@ -55,7 +56,7 @@ Package Browser group counts:
 - Multichannel Texture / Montage: 20
 - Item Channel Transforms: 10
 - Track Building / Routing: 3
-- Utils: 8
+- Utils: 9
 
 ## Utils
 
@@ -64,6 +65,8 @@ Package Browser group counts:
   FX automation. An optional Max bridge in
   `Scripts/s3g-mc/utilities/automation-score-max-bridge` can play the same JSON
   at control rate in Max.
+- `Displacement Score`: opens the browser utility for designing 24-point 3OAFX
+  virtual speaker displacement JSON.
 - `Image Score`: opens the browser utility for composing PNG scores
   used by `3OAFX Image Sonogram Field`.
 - `IR Sketch`: opens the browser utility for preparing room

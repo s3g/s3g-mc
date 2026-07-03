@@ -65,9 +65,9 @@ loudspeaker playback stage that tries to reduce speaker-to-opposite-ear
 crosstalk. `Matrix inverse` uses the inverse-filter transaural model, while
 `Feedforward` uses a direct delayed cancellation path.
 
-These tools sit near large-format console, matrix mixer, and spatial control
-workflows: channels can be treated as tracks, objects, speaker feeds, or
-intermediate routing lanes rather than only as fixed left/right outputs.
+These tools support large-format mixer and spatial-control workflows: channels
+can be treated as tracks, objects, speaker feeds, or intermediate routing lanes
+rather than only as fixed left/right outputs.
 
 ## MIDI Composition
 
@@ -76,11 +76,10 @@ geometry, tables, paths, Euclidean/polymetric rhythm, learned source traits,
 audio spectral traces, and song-duration form maps as visible ways to compose
 note data before it is sent to procedural synths or external instruments.
 
-Some of the visual approaches sit near broader composition references,
-including Jerry Hunt's layered table and gesture work, Godfried Toussaint's
-rhythm geometry, and Julian Hook's writing on musical spaces. In the package,
-those ideas are translated into REAPER MIDI items rather than preserved as
-separate notation or performance systems.
+Several scripts use geometric displays, table-like layouts, and rhythm-space
+views so generated MIDI can be inspected before it is written to the timeline.
+The result is ordinary REAPER MIDI that can be edited, quantized, routed, or
+used with external instruments.
 
 ## Item and Stem Workflows
 
@@ -149,18 +148,14 @@ group includes offline render actions, ambisonic convolution and spectral
 profile tools, stereo and compact-speaker decoders, and live send/return
 routing.
 
-The workflow inherits ideas from
-<a href="https://github.com/risdsound/foafx" target="_blank" rel="noopener noreferrer">FOAFX</a>:
-decode an ambisonic signal to a controlled virtual speaker layer, process a
-spatially selected wet path, then recombine or re-encode the result. In
-`s3g-mc`, that logic extends across live send/return routing, offline
-ambisonic rendering, convolution, spectral processing, and monitoring tools.
+A common 3OAFX method is to decode an ambisonic signal to a controlled virtual
+speaker layer, process a spatially selected wet path, then recombine or
+re-encode the result. The package applies that method across live send/return
+routing, offline ambisonic rendering, convolution, spectral processing, and
+monitoring tools.
 
-Other 3OAFX workflows sit near spatial-audio references including Natasha
-Barrett's object/space terminology, Michael Gerzon's stereo-to-surround
-thinking, Bruce Wiggins's ambisonic convolution workflow, and Deleflie and
-Schiemer's spatial-grain model. The process guides describe the package tools
-in operational terms.
+The FOAFX project and other spatial-audio references are listed on the
+[References](references.md) page.
 
 `3OAFX Send Return Controller` uses one 72-channel REAPER track so a
 24-channel effect lane can be focused, masked, mixed with dry signal, and

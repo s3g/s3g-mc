@@ -10,6 +10,7 @@ var lastMs = 0;
 var loop = true;
 var palindromeEnabled = false;
 var direction = 1;
+var playbackSpeed = 1;
 var selectedLane = "all";
 var outputMode = "osc";
 var lastSectionIndex = -1;
@@ -80,7 +81,7 @@ function advance(delta) {
     position = 0;
     return;
   }
-  position += delta * direction;
+  position += delta * playbackSpeed * direction;
   if (loop && palindromeEnabled) {
     while (position > duration || position < 0) {
       if (position > duration) {
@@ -121,6 +122,20 @@ function setduration(v) {
   if (automationScore) automationScore.duration = duration;
   status("duration " + duration.toFixed(3));
   meta();
+}
+
+function speed(v) {
+  playbackSpeed = clamp(Number(v), 0, 64);
+  status("speed " + playbackSpeed.toFixed(3));
+  meta();
+}
+
+function rate(v) {
+  speed(v);
+}
+
+function playbackspeed(v) {
+  speed(v);
 }
 
 function setloop(v) {
@@ -180,6 +195,7 @@ function meta() {
   outlet(2, ["duration", Number(playbackDuration().toFixed(6))]);
   outlet(2, ["source_duration", Number(duration.toFixed(6))]);
   outlet(2, ["point_rate", Number(automationScore.point_rate || 0)]);
+  outlet(2, ["speed", Number(playbackSpeed.toFixed(6))]);
   outlet(2, ["lanes", laneCount()]);
   outlet(2, ["sections", (automationScore.sections || []).length]);
 }
