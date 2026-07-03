@@ -2,6 +2,7 @@
 layout: default
 title: Displacement Score
 utility_nav: true
+lightbox: true
 prev_page:
   title: Automation Score
   url: /utilities-automation-score-designer.html
@@ -20,6 +21,12 @@ toc:
 ---
 
 # Displacement Score
+
+<div class="utility-screenshot">
+  <button class="utility-screenshot-button" type="button" data-lightbox-image="assets/images/utilities/DisplacementScore.png" aria-label="Open Displacement Score screenshot">
+    <img src="assets/images/utilities/DisplacementScore.png" alt="Displacement Score browser utility">
+  </button>
+</div>
 
 [Open Displacement Score](utilities/displacement-score/){:target="_blank" rel="noopener noreferrer" .utility-link}
 

@@ -343,11 +343,20 @@ function project(p) {
 function mapRect() {
   const marginX = state.showHeatmap ? 78 : 54;
   const marginY = 44;
+  const aspect = Math.PI;
+  const availW = Math.max(120, canvas.width - marginX * 2);
+  const availH = Math.max(80, canvas.height - marginY * 2);
+  let w = availW;
+  let h = w / aspect;
+  if (h > availH) {
+    h = availH;
+    w = h * aspect;
+  }
   return {
-    x: marginX,
-    y: marginY,
-    w: canvas.width - marginX * 2,
-    h: canvas.height - marginY * 2,
+    x: (canvas.width - w) * 0.5,
+    y: (canvas.height - h) * 0.5,
+    w,
+    h,
   };
 }
 
