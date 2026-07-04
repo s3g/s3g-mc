@@ -1011,6 +1011,8 @@ function syncControls() {
   $("sceneSelect").value = String(state.selectedScene);
   $("sceneName").value = currentScene().name || `Scene ${state.selectedScene + 1}`;
   $("sceneTime").value = (currentScene().t * state.duration).toFixed(3);
+  $("deleteScene").disabled = state.selectedScene === 0;
+  $("deleteScene").title = state.selectedScene === 0 ? "Scene A is the fixed 24-channel speaker layout" : "Delete selected scene";
   $("cameraAz").value = state.cameraAz;
   $("cameraAzValue").textContent = Math.round(state.cameraAz);
   $("cameraEl").value = state.cameraEl;
@@ -1056,6 +1058,7 @@ function addScene() {
 
 function deleteScene() {
   if (state.scenes.length <= 1) return;
+  if (state.selectedScene === 0) return;
   state.scenes.splice(state.selectedScene, 1);
   state.selectedScene = clamp(state.selectedScene, 0, state.scenes.length - 1);
   syncTargetFromScene();

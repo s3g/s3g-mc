@@ -10,6 +10,8 @@ next_page:
 toc:
   - title: Package Browser
     href: "#package-browser"
+  - title: Browser Utilities
+    href: "#browser-utilities"
   - title: Track-Level Channel Mixing
     href: "#track-level-channel-mixing"
   - title: MIDI Composition
@@ -37,6 +39,26 @@ or refreshing the individual REAPER actions. It groups scripts by use: channel m
 MIDI composition, procedural synthesis, offline synthesis, spatial panners,
 3OAFX, spectral/convolution, multichannel texture/montage, item transforms, and
 track routing.
+
+## Browser Utilities
+
+The browser utilities are companion editors for material that is easier to
+compose visually outside a REAPER dialog. They can be opened from the
+`Utils` group in the Package Browser or directly from the [Utilities](utilities.md)
+page.
+
+The usual pattern is to design a score or map in the browser, export JSON or
+PNG, then load that file with a paired REAPER action or process. `Automation
+Score` writes generic breakpoint lanes that can be assigned to track or FX
+automation. `Spatial Score` writes 3OA source-motion automation and can also be
+monitored through its browser link or Max bridge. `Image Score` prepares PNG
+scores for image-to-sound 3OAFX rendering. `IR Sketch` prepares room and impulse
+bank layouts for synthetic ambisonic IR generation. `Displacement Score`
+prepares 24-point virtual speaker geometry changes for 3OAFX displacement
+workflows.
+
+These utilities do not replace REAPER edits; they create reusable visual source
+files that can be loaded, rendered, or translated into ordinary project data.
 
 ## Track-Level Channel Mixing
 

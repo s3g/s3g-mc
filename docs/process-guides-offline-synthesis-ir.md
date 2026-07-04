@@ -21,6 +21,8 @@ toc:
     href: "#karplus-field"
   - title: Mass Partial Field
     href: "#mass-partial-field"
+  - title: Modal Terrain
+    href: "#modal-terrain"
   - title: Partial Trace Resynth
     href: "#partial-trace-resynth"
   - title: Resonant Terrain
@@ -164,6 +166,28 @@ Initial settings:
 - Shape amplitude and density with breakpoints before adding wide pitch drift.
 
 This process is organized around mass behavior: many small related events that change density, register, and spatial focus over time. Render time increases with duration, partial count, event count, and channel count. The detailed breakpoint editor can be collapsed while setting other controls.
+
+
+
+## Modal Terrain
+
+Use this for generated resonant fields made from many modal frequencies struck or excited over time. It is a source-free offline synth: the script creates the excitation events, resonant modes, and spatial distribution internally.
+
+Output:
+
+- `3OA ACN/SN3D` writes a 16-channel third-order ambisonic item.
+- `Multichannel ring` writes an even-channel ring bed.
+
+Main controls:
+
+- `Mode count` sets the size of the resonator bank.
+- `Events` and `Modes / event` control how many excitations occur and how many modes each event activates.
+- `Frequency model` selects inharmonic, metallic-clustered, stretched-harmonic, or scale-lattice tuning.
+- `Exciter` changes the event shape from short strikes to dust, swells, or layered strata.
+- `Decay`, `Damping spread`, `Brightness`, and `Detune` shape the modal tail and spectral motion.
+- `Spatial mode`, `Spatial width`, and `Motion` determine how the resonances move through the chosen output format.
+
+Breakpoint envelopes can shape amplitude, density, motion, and spatial width across the render. Use shorter durations and smaller mode counts while setting the behavior, then increase the mode and event counts for denser fields.
 
 
 

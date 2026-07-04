@@ -76,6 +76,7 @@ const ui = {
   cameraEl: el("cameraEl"),
   zoom: el("zoom"),
   spatialConstraint: el("spatialConstraint"),
+  pointColorMode: el("pointColorMode"),
   analysisScope: el("analysisScope"),
   neighborLinks: el("neighborLinks"),
   analysisInfluence: el("analysisInfluence"),
@@ -344,6 +345,42 @@ function vectorFromAed(azimuthDeg, elevationDeg, distance = 1) {
     y: Math.cos(az) * Math.cos(el) * distance,
     z: Math.sin(el) * distance,
   };
+}
+
+function linearToSrgb(v) {
+  const x = clamp(v, 0, 1);
+  return x <= 0.0031308 ? x * 12.92 : 1.055 * Math.pow(x, 1 / 2.4) - 0.055;
+}
+
+function oklchToRgb(hue, chroma, light) {
+  const L = clamp(light, 0, 1);
+  const C = clamp(chroma, 0, 1) * 0.37;
+  const a = Math.cos(hue * TWO_PI) * C;
+  const b = Math.sin(hue * TWO_PI) * C;
+  const l3 = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m3 = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s3 = L - 0.0894841775 * a - 1.2914855480 * b;
+  const l = l3 * l3 * l3;
+  const m = m3 * m3 * m3;
+  const s = s3 * s3 * s3;
+  const r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  const bb = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+  return {
+    r: Math.round(linearToSrgb(r) * 255),
+    g: Math.round(linearToSrgb(g) * 255),
+    b: Math.round(linearToSrgb(bb) * 255),
+  };
+}
+
+function pointColorFromPosition(pos, sourceIndex, enabled = true) {
+  if (!enabled) return "#404848";
+  if (ui.pointColorMode.value !== "oklch") return COLORS[sourceIndex] || COLORS[0];
+  const hue = ((Number(pos.azimuth || 0) / 360) % 1 + 1) % 1;
+  const chroma = clamp(Number(pos.distance || 1) / 2.4, 0.08, 1);
+  const light = (clamp(Number(pos.elevation || 0), -90, 90) + 90) / 180;
+  const rgb = oklchToRgb(hue, chroma, light);
+  return `rgb(${rgb.r} ${rgb.g} ${rgb.b})`;
 }
 
 function fract(v) {
@@ -1897,7 +1934,7 @@ function drawBanks() {
       const radius = (focused && si === state.selectedSource ? 11 : 7) * dpr;
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = source.enabled ? COLORS[si] : "#404848";
+      ctx.fillStyle = pointColorFromPosition(pos, si, source.enabled);
       ctx.strokeStyle = focused ? "#f2c56e" : "#708080";
       ctx.lineWidth = 1.5 * dpr;
       ctx.beginPath();
@@ -2032,6 +2069,8 @@ function tick(now = performance.now()) {
   });
   if (reaperLink.enabled) {
     pollReaperPlayhead(now);
+  }
+  if (reaperLink.enabled && !state.playing) {
     applyReaperTransport(now);
   } else if (state.playing) {
     const dur = Number(ui.duration.value);
@@ -2045,7 +2084,7 @@ function tick(now = performance.now()) {
       }
       if (state.playT >= 1 && state.recorder.state !== "inactive") state.recorder.stop();
     } else {
-      state.playT = pingpong01((now - state.playStart) / 1000 / dur);
+      state.playT = pingpong01((now - state.playStart) / 1000 / Math.max(0.001, dur));
     }
     if (!state.recorder && ui.autoNext.checked && !activeBank().morph && now >= state.nextSceneAt) {
       startSceneMorph();
@@ -2054,7 +2093,7 @@ function tick(now = performance.now()) {
   const displayDuration = state.recorder
     ? Number(state.recordingDuration || ui.duration.value)
     : Number(ui.duration.value);
-  if (!reaperLink.enabled) ui.timeReadout.textContent = `${(state.playT * displayDuration).toFixed(2)}s`;
+  if (!reaperLink.enabled || state.playing) ui.timeReadout.textContent = `${(state.playT * displayDuration).toFixed(2)}s`;
   updateSceneDisplays();
   draw();
 }
@@ -2468,6 +2507,7 @@ function makeExport() {
       camera_elevation: Number(ui.cameraEl.value),
       zoom: Number(ui.zoom.value),
       spatial_constraint: ui.spatialConstraint.value,
+      point_color_mode: ui.pointColorMode.value,
       analysis_scope: ui.analysisScope.value,
       neighbor_links: Number(ui.neighborLinks.value),
       analysis_influence: Number(ui.analysisInfluence.value),
@@ -2534,6 +2574,7 @@ function exportJson() {
 }
 
 function autosave() {
+  if (state.playing || state.recorder) return;
   try {
     const json = JSON.stringify(makeExport());
     if (json === lastAutosaveJson) return;
@@ -2722,6 +2763,7 @@ function loadMoverJson(data) {
   ui.cameraEl.value = Number(bs.camera_elevation ?? ui.cameraEl.value);
   ui.zoom.value = Number(bs.zoom ?? ui.zoom.value);
   ui.spatialConstraint.value = bs.spatial_constraint === "hemisphere" ? "hemisphere" : "sphere";
+  ui.pointColorMode.value = bs.point_color_mode === "source" ? "source" : "oklch";
   ui.analysisScope.value = bs.analysis_scope === "active" ? "active" : "global";
   ui.neighborLinks.value = Number(bs.neighbor_links ?? ui.neighborLinks.value);
   ui.analysisInfluence.value = Number(bs.analysis_influence ?? ui.analysisInfluence.value);
@@ -2771,7 +2813,6 @@ async function pollReaperPlayhead(now) {
       reaperLink.duration = duration;
       updateRangeFill(ui.duration);
     }
-    state.playing = false;
     reaperLink.playing = data.playing === true;
     reaperLink.basePosition = Number(data.position || 0);
     reaperLink.baseT = clamp(Number(data.t || 0), 0, 1);
@@ -2917,12 +2958,13 @@ canvas.addEventListener("wheel", (event) => {
 
 ui.play.addEventListener("click", () => {
   state.playing = true;
-  state.playStart = performance.now() - state.playT * Number(ui.duration.value) * 1000;
+  state.playStart = performance.now() - state.playT * Math.max(0.001, Number(ui.duration.value || 1)) * 1000;
   state.nextSceneAt = performance.now() + Number(ui.sceneHold.value || 0) * 1000;
 });
 ui.stop.addEventListener("click", () => {
   state.playing = false;
-  state.playT = 0;
+  if (!reaperLink.enabled) state.playT = 0;
+  else state.playT = clamp(reaperLink.displayT || reaperLink.baseT || 0, 0, 1);
 });
 ui.importJson.addEventListener("click", () => {
   ui.jsonFile.value = "";
@@ -3000,7 +3042,7 @@ document.querySelectorAll("input, select").forEach((input) => {
     const sourceControls = ["sourceGain", "sourceAzimuth", "sourceElevation", "sourceDistance"];
     const interfaceControls = [
       "morphTarget", "autoNext", "sceneLoop", "varySceneBanks", "randomMorphTime",
-      "cameraAz", "cameraEl", "zoom", "spatialConstraint", "analysisScope", "neighborLinks", "showAnalysis", "showCentroid", "showTrails", "showLabels",
+      "cameraAz", "cameraEl", "zoom", "spatialConstraint", "pointColorMode", "analysisScope", "neighborLinks", "showAnalysis", "showCentroid", "showTrails", "showLabels",
     ];
     if (sourceControls.includes(input.id)) {
       if (input.type === "range") updateRangeFill(input);

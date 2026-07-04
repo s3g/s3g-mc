@@ -17,8 +17,8 @@ useful.
 
 For step-by-step notes on selected processes, see the [Process Guides](docs/process-guides.md).
 
-Current package snapshot: the browser exposes 117 user-facing tools/controllers,
-plus the Package Browser. Of those, 48 are Python/NumPy-backed offline
+Current package snapshot: the browser exposes 119 user-facing tools/controllers,
+plus the Package Browser. Of those, 50 are Python/NumPy-backed offline
 processes, 25 load, control, or render included JSFX, and 43 are native
 Lua/ReaImGui REAPER actions. The repository also ships 23 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and support
@@ -29,9 +29,9 @@ Package Browser group counts:
 - Channel Mixing / Automation: 5
 - MIDI Composition: 8
 - Procedural Synthesis: 6
-- Offline Synthesis / IR: 9
+- Offline Synthesis / IR: 10
 - Spatial Panners: 10
-- 3OAFX: 22
+- 3OAFX: 23
 - Spectral / Convolution: 16
 - Multichannel Texture / Montage: 20
 - Item Channel Transforms: 10
@@ -156,13 +156,16 @@ modulation afterward.
   tail fade, normalization, early reflections, and channel decorrelation.
 - `Karplus Field`: Karplus-Strong plucked resonator events distributed across
   a multichannel bed.
-- `Subharmonic Bank`: subharmonic divider-bank synthesis with masks,
-  instability, pulse/sine blend, folded articulation, and spatial spread.
 - `Mass Partial Field`: additive partial events with drift and channel motion.
+- `Modal Terrain`: source-free modal/resonator-bank synthesis with struck,
+  dust, swell, and strata excitation models, rendered as 3OA ACN/SN3D or an
+  even-channel ring.
 - `Partial Trace Resynth`: STFT peak tracing rendered as a multichannel
   oscillator field, with linked, point, smear, and frozen trace modes.
 - `Resonant Terrain`: struck resonator banks for metallic, synthetic-IR, and
   resonant-dust materials.
+- `Subharmonic Bank`: subharmonic divider-bank synthesis with masks,
+  instability, pulse/sine blend, folded articulation, and spatial spread.
 
 ### Spatial Panners
 
@@ -259,6 +262,10 @@ behaviors.
   Grain position, envelope, duration, rate, and overlap are shared across all
   encoded channels, with source-time navigation and optional HOA yaw/order
   transforms.
+- `3OAFX Spatial Freeze Trace`: NumPy-backed ambisonic spectral freeze and
+  trace renderer. A selected spectral imprint or moving trace is applied
+  coherently across encoded channels, with optional HOA yaw drift and order
+  weighting.
 - `3OAFX Spectral Hole Maker`: carves profile-shaped spectral space from an
   ambisonic source per direction.
 - `3OAFX Spectral Profile Match`: steers the source spectrum toward a reference

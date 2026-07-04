@@ -926,6 +926,170 @@ def render_resonant_terrain(cfg):
     print(f"Pre-normalize peak: {pre_peak:.6f}")
 
 
+def render_modal_terrain(cfg):
+    sample_rate = int(cfg.get("sample_rate", 48000))
+    duration = max(0.05, float(cfg.get("duration", 10.0)))
+    frames = max(1, int(round(duration * sample_rate)))
+    output_mode = str(cfg.get("output_mode", "3oa")).lower()
+    order = max(1, min(3, int(cfg.get("order", 3))))
+    ring_channels = max(1, min(128, int(cfg.get("channels", 8))))
+    if output_mode == "ring":
+        channels = ring_channels
+    else:
+        channels = (order + 1) * (order + 1)
+    out = np.zeros((frames, channels), dtype=np.float32)
+    rng = np.random.default_rng(int(cfg.get("seed", 1)))
+
+    model = str(cfg.get("frequency_model", "inharmonic_cloud"))
+    exciter = str(cfg.get("exciter", "impulse_cloud"))
+    spatial = str(cfg.get("spatial_mode", "sphere_scatter"))
+    mode_count = max(8, min(4096, int(cfg.get("mode_count", 512))))
+    event_count = max(1, min(20000, int(cfg.get("events", 220))))
+    modes_per_event = max(1, min(96, int(cfg.get("modes_per_event", 12))))
+    base = max(8.0, float(cfg.get("base_freq", 55.0)))
+    spread_oct = max(0.0, float(cfg.get("spread_oct", 6.0)))
+    decay_ms = max(5.0, float(cfg.get("decay_ms", 1800.0)))
+    damping_spread = float(np.clip(cfg.get("damping_spread", 0.55), 0.0, 1.0))
+    brightness = float(np.clip(cfg.get("brightness", 0.58), 0.0, 1.5))
+    detune = float(np.clip(cfg.get("detune", 0.18), 0.0, 1.0))
+    density = float(np.clip(cfg.get("density", 1.0), 0.0, 1.0))
+    motion = float(np.clip(cfg.get("motion", 0.28), 0.0, 1.0))
+    spatial_width = float(np.clip(cfg.get("spatial_width", 0.65), 0.02, 8.0))
+    excitation_tone = float(np.clip(cfg.get("excitation_tone", 0.35), 0.0, 1.0))
+
+    scale_ratios = np.array([1.0, 9/8, 5/4, 4/3, 3/2, 5/3, 15/8, 2.0], dtype=np.float64)
+    freqs = np.zeros(mode_count, dtype=np.float64)
+    clusters = rng.uniform(-spread_oct, spread_oct, size=max(2, min(24, mode_count // 8)))
+    for i in range(mode_count):
+        if model == "stretched_harmonic":
+            harmonic = i + 1
+            stretch = 1.0 + 0.22 * detune
+            freq = base * (harmonic ** stretch)
+            while freq > sample_rate * 0.43:
+                freq *= 0.5
+        elif model == "scale_lattice":
+            degree = int(rng.integers(0, scale_ratios.size))
+            octave = rng.uniform(-1.0, spread_oct)
+            freq = base * scale_ratios[degree] * (2.0 ** octave)
+        elif model == "clustered_metals":
+            center = clusters[i % clusters.size]
+            freq = base * (2.0 ** (center + rng.normal(0.0, 0.10 + detune * 0.35)))
+            freq *= rng.choice([1.0, 1.4142, 1.618, 2.236, 2.718, 3.1416])
+        else:
+            freq = base * (2.0 ** rng.uniform(0.0, spread_oct))
+            freq *= 1.0 + rng.normal(0.0, 0.03 + detune * 0.18)
+        freqs[i] = float(np.clip(freq, 14.0, sample_rate * 0.43))
+
+    freq_norm = np.clip((freqs - np.min(freqs)) / max(1e-9, np.max(freqs) - np.min(freqs)), 0.0, 1.0)
+    mode_decay = decay_ms * np.exp(rng.normal(0.0, 0.25 + damping_spread * 0.8, size=mode_count))
+    mode_decay *= 1.25 - 0.72 * freq_norm * brightness
+    mode_decay = np.clip(mode_decay, 8.0, max(10.0, duration * 1000.0 * 1.8))
+    mode_amp = (freqs / max(1.0, base)) ** (-0.20 - brightness * 0.92)
+    mode_amp *= rng.uniform(0.35, 1.0, size=mode_count)
+    mode_amp = mode_amp / (np.max(mode_amp) + 1e-12)
+
+    mode_az = rng.uniform(-180.0, 180.0, size=mode_count)
+    if spatial == "orbiting_bands":
+        bands = rng.choice([-45.0, -20.0, 0.0, 20.0, 45.0], size=mode_count)
+        mode_el = bands + rng.normal(0.0, 6.0, size=mode_count)
+    elif spatial == "ring_drift":
+        mode_el = rng.normal(0.0, 7.5, size=mode_count)
+    else:
+        mode_el = np.degrees(np.arcsin(rng.uniform(-1.0, 1.0, size=mode_count)))
+    mode_el = np.clip(mode_el, -85.0, 85.0)
+
+    if exciter == "dust":
+        event_times = np.sort(rng.random(event_count) ** (1.0 + 2.0 * (1.0 - density)) * duration)
+    elif exciter == "swells":
+        event_times = np.linspace(0.02, max(0.02, duration * 0.98), event_count)
+        event_times += rng.normal(0.0, duration / max(16.0, event_count * 2.0), size=event_count)
+        event_times = np.clip(event_times, 0.0, duration)
+    elif exciter == "strata":
+        strata = max(3, min(24, int(math.sqrt(event_count))))
+        centers = np.linspace(duration * 0.08, duration * 0.92, strata)
+        event_times = centers[np.arange(event_count) % strata] + rng.normal(0.0, duration * 0.025, size=event_count)
+        event_times = np.clip(event_times, 0.0, duration)
+        event_times.sort()
+    else:
+        event_times = np.sort(rng.random(event_count) * duration)
+
+    accepted = 0
+    for event_index, event_time in enumerate(event_times):
+        u_event = float(event_time / max(1e-9, duration))
+        local_density = env_value(cfg, "density", u_event, density)
+        if rng.random() > float(np.clip(local_density, 0.0, 1.0)):
+            continue
+        start = int(round(event_time * sample_rate))
+        if start >= frames:
+            continue
+        local_amp = env_value(cfg, "amplitude", u_event, 1.0)
+        local_motion = env_value(cfg, "motion", u_event, motion)
+        local_spread = env_value(cfg, "spatial_width", u_event, spatial_width)
+        picked = rng.choice(mode_count, size=min(modes_per_event, mode_count), replace=False)
+        event_gain = (0.12 * local_amp) / math.sqrt(max(1.0, event_count * modes_per_event / 480.0))
+        if exciter == "swells":
+            event_gain *= 0.45
+        for m in picked:
+            freq = freqs[m] * (1.0 + rng.normal(0.0, detune * 0.006))
+            local_decay = mode_decay[m] * rng.uniform(0.62, 1.55)
+            length = min(frames - start, max(32, int(round(local_decay * sample_rate / 1000.0 * (3.5 if exciter != "dust" else 2.2)))))
+            if length <= 16:
+                continue
+            t = np.arange(length, dtype=np.float64) / sample_rate
+            if exciter == "swells":
+                attack = min(length, max(8, int(round(0.18 * local_decay * sample_rate / 1000.0))))
+                env = np.exp(-t / max(0.001, local_decay / 1000.0))
+                env[:attack] *= np.sin(np.linspace(0.0, math.pi * 0.5, attack)) ** 2
+            else:
+                attack = min(length, max(2, int(round((1.0 + excitation_tone * 16.0) * sample_rate / 1000.0))))
+                env = np.exp(-t / max(0.001, local_decay / 1000.0))
+                env[:attack] *= np.linspace(0.0, 1.0, attack)
+            phase = rng.uniform(0.0, 2.0 * math.pi)
+            mod = 1.0 + local_motion * 0.006 * np.sin(2.0 * math.pi * (0.03 + rng.random() * 0.11) * t + phase)
+            sig = np.sin(2.0 * math.pi * freq * t * mod + phase)
+            if excitation_tone < 0.9:
+                sig += (1.0 - excitation_tone) * 0.35 * np.sin(2.0 * math.pi * freq * 1.997 * t + phase * 0.37)
+            tone = (sig * env * event_gain * mode_amp[m]).astype(np.float32)
+            az = float(mode_az[m] + local_motion * 90.0 * math.sin(2.0 * math.pi * (u_event + m / max(1, mode_count))))
+            el = float(np.clip(mode_el[m] + local_motion * 22.0 * math.cos(2.0 * math.pi * u_event + m * 0.13), -89.0, 89.0))
+            if output_mode == "ring":
+                pos = ((az + 180.0) / 360.0) * max(1, channels - 1)
+                weights = pan_weights(pos, channels, local_spread)
+            else:
+                weights = np.array(ambisonic_basis(order, az, el), dtype=np.float32)
+                weights /= math.sqrt(max(1e-12, float(np.sum(weights * weights))))
+            out[start:start + length] += tone[:, None] * weights[None, :]
+        accepted += 1
+
+    out = apply_output_envelope(out, cfg, "amplitude")
+    corr = mean_neighbor_correlation(out)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("soft_limit", True)):
+        peak = float(np.max(np.abs(out))) if out.size else 0.0
+        if peak > 1.0:
+            ceiling = 0.92
+            out = (ceiling * np.tanh(out / ceiling)).astype(np.float32)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out.astype(np.float32), sample_rate)
+    print("Process: Modal Terrain")
+    print(f"Output mode: {output_mode}")
+    print(f"Output channels: {channels}")
+    print(f"Duration: {duration:.3f} sec")
+    print(f"Mode count: {mode_count}")
+    print(f"Events: {event_count}")
+    print(f"Accepted events: {accepted}")
+    print(f"Modes per event: {modes_per_event}")
+    print(f"Frequency model: {model}")
+    print(f"Exciter: {exciter}")
+    print(f"Spatial mode: {spatial}")
+    print(f"Mean neighbor correlation: {corr:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+
+
 def render_partial_trace_resynth(cfg):
     sample_rate = int(cfg.get("sample_rate", 48000))
     source, source_rate = read_wav(cfg["source_path"])
@@ -1781,6 +1945,114 @@ def spectral_pitch_shift_region(signal, semitones):
     return stft_process(signal, fft_size, hop, shift_frame)
 
 
+def spectral_freeze_trace_hoa(signal, sample_rate, order, cfg):
+    fft_size = int(cfg.get("fft_size", 2048))
+    fft_size = max(512, min(8192, fft_size))
+    hop = max(64, fft_size // max(2, int(cfg.get("overlap", 4))))
+    mode = str(cfg.get("mode", "freeze"))
+    freeze_pos = float(np.clip(cfg.get("freeze_pos", 0.5), 0.0, 1.0))
+    trace_width = float(np.clip(cfg.get("trace_width", 0.25), 0.01, 1.0))
+    amount = float(np.clip(cfg.get("amount", 0.85), 0.0, 1.0))
+    wet_mix = float(np.clip(cfg.get("wet_mix", 1.0), 0.0, 1.0))
+    floor = float(np.clip(cfg.get("floor", 0.035), 0.0, 0.75))
+    smooth_bins = int(max(0, min(160, cfg.get("smooth_bins", 9))))
+    ghost_smooth = int(max(smooth_bins, cfg.get("ghost_smooth_bins", 48)))
+    duration = max(0.05, float(cfg.get("duration", signal.shape[0] / max(1, sample_rate))))
+    out_frames = max(1, int(round(duration * sample_rate)))
+    source_frames = signal.shape[0]
+    channels = signal.shape[1]
+
+    source_x = np.arange(source_frames, dtype=np.float64)
+    read_x = np.linspace(0, max(0, source_frames - 1), out_frames, dtype=np.float64)
+    carrier = np.stack([
+        np.interp(read_x, source_x, signal[:, ch]).astype(np.float32)
+        for ch in range(channels)
+    ], axis=1)
+
+    window = np.hanning(fft_size).astype(np.float32)
+    pad = fft_size
+    padded_source = np.pad(signal, ((pad, pad), (0, 0)), mode="constant")
+    source_frame_count = 1 + max(0, (padded_source.shape[0] - fft_size) // hop)
+    source_mags = []
+    for frame_index in range(source_frame_count):
+        start = frame_index * hop
+        frame = padded_source[start:start + fft_size] * window[:, None]
+        source_mags.append(np.abs(np.fft.rfft(frame, axis=0)).astype(np.float32))
+    source_mags = np.stack(source_mags, axis=0)
+
+    padded_carrier = np.pad(carrier, ((pad, pad), (0, 0)), mode="constant")
+    out = np.zeros_like(padded_carrier, dtype=np.float32)
+    norm = np.zeros(padded_carrier.shape[0], dtype=np.float32)
+    out_frame_count = 1 + max(0, (padded_carrier.shape[0] - fft_size) // hop)
+    center = freeze_pos * max(0, source_frame_count - 1)
+    span = trace_width * max(1, source_frame_count - 1)
+    lo = max(0.0, center - span * 0.5)
+    hi = min(float(source_frame_count - 1), center + span * 0.5)
+    if hi <= lo:
+        hi = min(float(source_frame_count - 1), lo + 1.0)
+
+    def source_mag_at(position):
+        position = float(np.clip(position, 0.0, max(0, source_frame_count - 1)))
+        i0 = int(math.floor(position))
+        i1 = min(source_frame_count - 1, i0 + 1)
+        frac = position - i0
+        mag = source_mags[i0] * (1.0 - frac) + source_mags[i1] * frac
+        if smooth_bins > 0:
+            mag = smooth_profile_bins(mag, smooth_bins)
+        return mag
+
+    frozen_mag = source_mag_at(center)
+    if mode == "formant_ghost":
+        frozen_mag = smooth_profile_bins(frozen_mag, ghost_smooth)
+
+    for frame_index in range(out_frame_count):
+        start = frame_index * hop
+        frame = padded_carrier[start:start + fft_size] * window[:, None]
+        spec = np.fft.rfft(frame, axis=0)
+        carrier_mag = np.abs(spec).astype(np.float32)
+        phase = np.exp(1j * np.angle(spec))
+        u = frame_index / max(1, out_frame_count - 1)
+        if mode == "trace":
+            target_mag = source_mag_at(lo + (hi - lo) * u)
+        elif mode == "residue_cloud":
+            target_mag = np.abs(carrier_mag - frozen_mag)
+            if smooth_bins > 0:
+                target_mag = smooth_profile_bins(target_mag, smooth_bins)
+        elif mode == "formant_ghost":
+            trace_mag = source_mag_at(lo + (hi - lo) * u)
+            target_mag = smooth_profile_bins(trace_mag * 0.35 + frozen_mag * 0.65, ghost_smooth)
+        else:
+            target_mag = frozen_mag
+        if floor > 0.0:
+            target_mag = np.maximum(target_mag, carrier_mag * floor)
+        new_mag = carrier_mag * (1.0 - amount) + target_mag * amount
+        resynth = np.fft.irfft(new_mag * phase, n=fft_size, axis=0).real.astype(np.float32)
+        out[start:start + fft_size] += resynth * window[:, None]
+        norm[start:start + fft_size] += window * window
+
+    wet = out[pad:pad + out_frames]
+    wet /= np.maximum(norm[pad:pad + out_frames, None], 1e-8)
+    rendered = carrier * (1.0 - wet_mix) + wet * wet_mix
+
+    yaw_start = float(cfg.get("yaw_start", 0.0))
+    yaw_end = float(cfg.get("yaw_end", 0.0))
+    if abs(yaw_start) > 1e-9 or abs(yaw_end) > 1e-9:
+        block = 2048
+        rotated = np.empty_like(rendered, dtype=np.float32)
+        for start in range(0, rendered.shape[0], block):
+            end = min(rendered.shape[0], start + block)
+            u = (start + end - 1) * 0.5 / max(1, rendered.shape[0] - 1)
+            rotated[start:end] = apply_hoa_yaw(rendered[start:end], order, yaw_start + (yaw_end - yaw_start) * u)
+        rendered = rotated
+
+    w_weight = float(np.clip(cfg.get("w_weight", 1.0), 0.0, 2.0))
+    higher_weight = float(np.clip(cfg.get("higher_order_weight", 1.0), 0.0, 2.0))
+    if abs(w_weight - 1.0) > 1e-9 or abs(higher_weight - 1.0) > 1e-9:
+        rendered = apply_hoa_order_weights(rendered, order, higher_weight, higher_weight, higher_weight, w_weight)
+
+    return rendered.astype(np.float32)
+
+
 def smooth_profile_bins(profile, bins):
     bins = int(max(0, bins))
     if bins <= 0:
@@ -2417,6 +2689,45 @@ def render_foafx_spatial_granulator(cfg):
     print(f"Density: {density:.2f}")
     print(f"Yaw start/end/scatter: {yaw_start:.2f} / {yaw_end:.2f} / {yaw_scatter:.2f}")
     print(f"Room memory: {room_memory:.3f}")
+    print(f"Pre-normalize peak: {pre_peak:.6f}")
+    print(f"Sample rate: {sample_rate} Hz")
+
+
+def render_foafx_spatial_freeze_trace(cfg):
+    source, source_rate = read_wav(cfg["source_path"])
+    sample_rate = int(cfg.get("sample_rate", source_rate))
+    audio = segment(source, source_rate, cfg.get("source_start", 0.0), cfg.get("source_duration", 1.0), sample_rate)
+    order = int(cfg.get("order", ambisonic_order_from_channels(audio.shape[1])))
+    order = max(1, min(3, order))
+    ambi_channels = (order + 1) * (order + 1)
+    if audio.shape[1] < ambi_channels:
+        raise RuntimeError(f"Selected source has {audio.shape[1]} channels, but {order}OA needs {ambi_channels}.")
+    audio = audio[:, :ambi_channels].astype(np.float32, copy=False)
+    mode = str(cfg.get("mode", "freeze"))
+    out = spectral_freeze_trace_hoa(audio, sample_rate, order, cfg)
+    if bool(cfg.get("dc_protect", True)):
+        out -= np.mean(out, axis=0, keepdims=True)
+    if bool(cfg.get("soft_limit", True)):
+        peak = float(np.max(np.abs(out))) if out.size else 0.0
+        if peak > 1.0:
+            ceiling = 0.92
+            out = (ceiling * np.tanh(out / ceiling)).astype(np.float32)
+    if bool(cfg.get("normalize", True)):
+        out, pre_peak = normalize_peak(out, float(cfg.get("normalize_db", -6.0)))
+    else:
+        pre_peak = float(np.max(np.abs(out))) if out.size else 0.0
+    write_pcm24_wav(cfg["output_path"], out.astype(np.float32), sample_rate)
+    print("Process: 3OAFX Spatial Freeze / Trace")
+    print(f"Ambisonic order: {order}OA")
+    print(f"Output channels: {ambi_channels}")
+    print(f"Mode: {mode}")
+    print(f"Duration: {out.shape[0] / sample_rate:.3f} sec")
+    print(f"FFT size: {int(cfg.get('fft_size', 2048))}")
+    print(f"Freeze position: {float(cfg.get('freeze_pos', 0.5)):.3f}")
+    print(f"Trace width: {float(cfg.get('trace_width', 0.25)):.3f}")
+    print(f"Amount: {float(cfg.get('amount', 0.85)):.3f}")
+    print(f"Wet mix: {float(cfg.get('wet_mix', 1.0)):.3f}")
+    print(f"Yaw start/end: {float(cfg.get('yaw_start', 0.0)):.2f} / {float(cfg.get('yaw_end', 0.0)):.2f}")
     print(f"Pre-normalize peak: {pre_peak:.6f}")
     print(f"Sample rate: {sample_rate} Hz")
 
@@ -6857,7 +7168,7 @@ def render_image_amp_preview(cfg):
 
 def main():
     if len(sys.argv) != 3:
-        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|partial_trace_resynth|fata_morgana|image_aed_sonogram|image_edge_preview|stereo_expand_ambisonic_bed|foafx_offline|foafx_object_space|foafx_spatial_occupation_montage|foafx_scene_navigator|foafx_object_field_split|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|foafx_aed_granulator|foafx_pulsar_field|foafx_particle_cloud|evp_field|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner|midi_spectral_trace> <manifest.json>")
+        raise SystemExit("Usage: s3g_numpy_render.py <dense_grain|loop_drift_bed|loop_rift|ir_toolkit|mass_partial|resonant_terrain|modal_terrain|partial_trace_resynth|fata_morgana|image_aed_sonogram|image_edge_preview|stereo_expand_ambisonic_bed|foafx_offline|foafx_object_space|foafx_spatial_occupation_montage|foafx_scene_navigator|foafx_object_field_split|foafx_profile_subtract|foafx_spectral_profile_tool|multichannel_spectral_profile_tool|foafx_spatial_grains|foafx_spatial_freeze_trace|foafx_aed_granulator|foafx_pulsar_field|foafx_particle_cloud|evp_field|karplus_field|subharmonic_bank|chaotic_resonant_eq|ambisonic_convolve|ambisonic_kernel_collage|synthetic_ambisonic_ir_bank|midi_terrain_form|midi_form_learner|midi_spectral_trace> <manifest.json>")
     mode = sys.argv[1]
     with open(sys.argv[2], "r", encoding="utf-8") as handle:
         cfg = json.load(handle)
@@ -6873,6 +7184,8 @@ def main():
         render_mass_partial(cfg)
     elif mode == "resonant_terrain":
         render_resonant_terrain(cfg)
+    elif mode == "modal_terrain":
+        render_modal_terrain(cfg)
     elif mode == "partial_trace_resynth":
         render_partial_trace_resynth(cfg)
     elif mode == "fata_morgana":
@@ -6901,6 +7214,8 @@ def main():
         render_multichannel_spectral_profile_tool(cfg)
     elif mode == "foafx_spatial_grains":
         render_foafx_spatial_granulator(cfg)
+    elif mode == "foafx_spatial_freeze_trace":
+        render_foafx_spatial_freeze_trace(cfg)
     elif mode == "foafx_aed_granulator":
         render_foafx_aed_granulator(cfg)
     elif mode == "foafx_pulsar_field":

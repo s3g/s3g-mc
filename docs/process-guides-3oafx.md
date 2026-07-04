@@ -43,6 +43,8 @@ toc:
     href: "#3oafx-spectral-profile-subtract"
   - title: 3OAFX Spectral Profile Tools
     href: "#3oafx-spectral-profile-tools"
+  - title: 3OAFX Spatial Freeze Trace
+    href: "#3oafx-spatial-freeze-trace"
   - title: 3OAFX Spatial Grains
     href: "#3oafx-spatial-grains"
 ---
@@ -631,6 +633,40 @@ Useful first controls:
   result feels too narrow, watery, or frame-like.
 
 
+
+## 3OAFX Spatial Freeze Trace
+
+Use this to turn a moment or short region of an ambisonic recording into a
+longer spatial-spectral object. Select one WAV-backed `ACN/SN3D` ambisonic
+media item, choose the output order, and render a new ambisonic item.
+
+The process works directly on the encoded channel set. The same STFT frame or
+trace path is applied to every encoded channel, so the ambisonic channels remain
+coherent while the spectral content is held, stretched, or ghosted.
+
+Modes:
+
+- `Freeze` imposes one spectral imprint across the rendered duration.
+- `Trace` moves through a window of spectral frames around the selected
+  position.
+- `Formant Ghost` smooths the spectral contour more heavily so the output keeps
+  broad spectral shape rather than fine partial detail.
+- `Residue Cloud` emphasizes the difference between the carrier spectrum and
+  the frozen imprint.
+
+Main controls:
+
+- `Freeze position` selects the center of the source region.
+- `Trace width` sets how much source time is scanned by trace-based modes.
+- `Freeze/trace amount` sets how strongly the imprint replaces the carrier
+  spectrum.
+- `Wet mix` blends the processed result with a stretched carrier version of the
+  selected item.
+- `Spectral smoothing bins`, `Ghost smoothing bins`, and `Envelope floor` shape
+  the spectral envelope.
+- `Yaw start` and `Yaw end` can rotate the ambisonic field over the render.
+- `Higher-order weight` and `W weight` adjust broad HOA balance after the
+  spectral process.
 
 ## 3OAFX Spatial Grains
 
