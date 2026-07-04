@@ -19,7 +19,7 @@ For step-by-step notes on selected processes, see the [Process Guides](docs/proc
 
 Current package snapshot: the browser exposes 119 user-facing tools/controllers,
 plus the Package Browser. Of those, 50 are Python/NumPy-backed offline
-processes, 25 load, control, or render included JSFX, and 43 are native
+processes, 25 load, control, or render included JSFX, and 44 are native
 Lua/ReaImGui REAPER actions. The repository also ships 23 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and support
 dialogs that are not shown as Package Browser entries.
@@ -46,7 +46,9 @@ Package Browser group counts:
   `Scripts/s3g-mc/utilities/automation-score-max-bridge` can play the same JSON
   at control rate in Max.
 - `Displacement Score`: opens the browser utility for designing 24-point 3OAFX
-  virtual speaker displacement JSON.
+  virtual speaker displacement JSON. An optional Jitter bridge in
+  `Scripts/s3g-mc/utilities/displacement-score-jitter-bridge` can display the
+  exported geometry in Max with points, polygon lines, and a projected heatmap.
 - `Image Score`: opens the browser utility for composing PNG scores
   used by `3OAFX Image Sonogram Field`.
 - `IR Sketch`: opens the browser utility for preparing room
@@ -410,15 +412,16 @@ behaviors.
 
 ## Install
 
-Copy or symlink the package folders into your REAPER resource path:
+Copy the repository's `Scripts` and `Effects` folders into the matching folders
+in your REAPER resource path:
 
 ```text
-Scripts/s3g-mc -> REAPER/Scripts/s3g-mc
-Effects/s3g    -> REAPER/Effects/s3g
+repo/Scripts/s3g-mc -> REAPER/Scripts/s3g-mc
+repo/Effects/s3g    -> REAPER/Effects/s3g
 ```
 
-The browser utilities are included inside `Scripts/s3g-mc/utilities`; do not
-install them as a generic top-level folder in the REAPER resource path.
+The browser utilities are already included inside `Scripts/s3g-mc/utilities`.
+There is no separate top-level utilities folder to install.
 
 In REAPER:
 

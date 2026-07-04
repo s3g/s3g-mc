@@ -16,6 +16,8 @@ toc:
     href: "#3oafx-use"
   - title: Time Layer
     href: "#time-layer"
+  - title: Max Bridge
+    href: "#max-bridge"
   - title: Export
     href: "#export"
 ---
@@ -48,7 +50,7 @@ Use `Globe` for the camera-based 3D view or `Map` for a flattened
 Peters-style equal-area projection. Shift-drag the globe view to rotate the
 camera. Use the mouse wheel to zoom the globe view.
 
-The heatmap toggle colors the projected sphere as a virtual-speaker radiation
+The heatmap view colors the projected sphere as a virtual-speaker radiation
 field. Each current point is hot at its center and falls away through warm and
 cool regions. Cool areas show parts of the sphere with less nearby point
 influence. Several color scales are available, including thermal, classic
@@ -73,6 +75,19 @@ scale this to the selected media item or render duration, so the same score can
 expand across short or long processes. The export includes scene times and
 sampled geometry frames for the moving 24-point layout. The first timeline
 position is pinned to the original 24-point layout.
+
+## Max Bridge
+
+The optional Max bridge in
+`Scripts/s3g-mc/utilities/displacement-score-jitter-bridge` reads the exported
+JSON and displays the stored 24-point geometry timeline in Max. It draws the
+source layout, displaced points, polygon lines, and a separate thermal heatmap
+matrix. The heatmap uses the same projected-map energy model as the browser
+utility. The flattened map view uses the same aspect ratio as the heatmap,
+while the sphere view keeps the geometry in 3D space.
+
+The bridge is for display, monitoring, and translation to Max patching
+workflows. It does not edit or regenerate the displacement score.
 
 ## Export
 

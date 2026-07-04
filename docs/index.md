@@ -21,6 +21,13 @@ It includes Lua actions, ReaImGui controllers, and JSFX for channel editing, aut
 
 Current package snapshot: the browser exposes 119 user-facing tools/controllers, plus the Package Browser. Of those, 50 are Python/NumPy-backed offline processes, 25 load, control, or render included JSFX, and 44 are native Lua/ReaImGui REAPER actions. The repository also ships 23 underlying JSFX engine/effect files. The Lua folder includes helper libraries and support dialogs that are not shown as Package Browser entries.
 
+The package also includes browser-based companion utilities for spatial motion,
+automation lanes, image scores, IR room sketches, and 3OAFX displacement maps.
+They live inside `Scripts/s3g-mc/utilities` and can be launched from the
+Package Browser or opened from the docs. Automation Score, Displacement Score,
+and Spatial Score also include Max bridge examples for playing exported JSON in
+Max patches.
+
 Many of these tools are inspired by or extend existing computer music practices, with references mentioned in the documentation where they are useful.
 
 ## Start Here
@@ -43,7 +50,7 @@ Many of these tools are inspired by or extend existing computer music practices,
 - Stereo-to-ambisonic source expansion for building 3OAFX beds from mono or stereo material
 - Multi-source ambisonic scene navigation with editable node maps and listener paths
 - Node-based multichannel track mixing with routing overview, cursor automation, and tunable blend curves
-- Browser-based utility scores for spatial motion, generic automation lanes, image-to-sound scoring, IR room sketches, and 3OAFX displacement maps
+- Browser-based utility scores for spatial motion, generic automation lanes, image-to-sound scoring, IR room sketches, and 3OAFX displacement maps, with Max bridge examples for selected JSON workflows
 - Stereo loudspeaker transaural crosstalk cancellation with matrix-inverse approximation
 - Multichannel workflow helpers for item transforms, track routing, and stems
 - MIDI rule generators for drum states, musical-space paths, learned forms, and polymetric lanes

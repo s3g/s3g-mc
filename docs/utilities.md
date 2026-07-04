@@ -50,7 +50,10 @@ for control-rate playback in Max.
 
 Designs 24-point virtual speaker displacement JSON for 3OAFX workflows. The
 score is intended for offline renderers that decode to the 24-point direction
-layer, apply the displacement, and re-encode to ACN/SN3D.
+layer, apply the displacement, and re-encode to ACN/SN3D. An optional Jitter
+bridge in `Scripts/s3g-mc/utilities/displacement-score-jitter-bridge` displays
+the exported geometry in Max with OpenGL points, polygon lines, and a separate
+heatmap matrix.
 
 The same utility can be launched from REAPER with `Displacement Score`.
 
