@@ -3,11 +3,13 @@
 -- @version 0.1
 -- @requires ReaImGui; JSFX: s3g MC to Stereo Autogain
 -- @category Channel Mixing / Automation
--- @method Auto-loads the JSFX and folds a multichannel track to stereo using selectable 2D and 3D projection layouts, width/rotation, layout weighting, 3D attenuation, autogain, and output gain.
+-- @method Auto-loads the JSFX and folds a multichannel track to stereo using selectable 2D and 3D projection layouts, width/rotation, layout weighting, 3D attenuation, autogain, and output gain. The JSFX declares only stereo outputs; in multichannel chains, set the plugin I/O to zero unmapped output channels.
 -- @about
 --   ReaImGui control surface for JS: s3g MC to Stereo Autogain. Downmixes a
 --   multichannel track to stereo with width, rotation, layout, output gain,
---   3D attenuation, and autogain controls.
+--   3D attenuation, and autogain controls. The JSFX declares only stereo
+--   outputs; in multichannel chains, set the plugin I/O to zero unmapped
+--   output channels.
 
 if not reaper.APIExists("ImGui_GetVersion") then
   reaper.MB("ReaImGui is not installed or not loaded.", "MC to Stereo Autogain", 0)
@@ -18,6 +20,9 @@ package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
 
 local PROJECT = 0
+local MAX_CH = 128
+local PIN_MAP_BLOCK_SIZE = 64
+local PIN_MAP_BLOCK_OFFSET = 0x1000000
 local FX_NAME = "s3g MC to Stereo Autogain"
 local FX_NAME_OLD = "s3g Stereo Autogain"
 local FX_NAME_OLDER = "s3g MC Stereo Autogain"
@@ -31,7 +36,6 @@ local PARAM = {
   autogain = 3,
   output_gain = 4,
   layout = 5,
-  extra = 6,
   weight = 7,
   attenuation = 8,
 }
@@ -47,10 +51,9 @@ local LAYOUT = {
   "Hemisphere projection",
   "Cube projection",
 }
-local EXTRA = { "Keep extra channels", "Clear extra channels" }
-
 local ctx = ImGui.CreateContext("MC to Stereo Autogain")
 local open = true
+local last_pin_track, last_pin_fx, last_pin_ch
 
 local COLORS = {
   bg = ImGui.ColorConvertDouble4ToU32(0.055, 0.060, 0.065, 1),
@@ -108,21 +111,116 @@ local function add_named_jsfx(track, name)
   return fx
 end
 
+local function capture_normalized_params(track, fx)
+  if not track or fx < 0 then return nil end
+  local values = {}
+  for param = 0, reaper.TrackFX_GetNumParams(track, fx) - 1 do
+    values[param] = reaper.TrackFX_GetParamNormalized(track, fx, param)
+  end
+  return values
+end
+
+local function restore_normalized_params(track, fx, values)
+  if not values or not track or fx < 0 then return end
+  local count = reaper.TrackFX_GetNumParams(track, fx)
+  for param, value in pairs(values) do
+    if param < count then
+      reaper.TrackFX_SetParamNormalized(track, fx, param, value)
+    end
+  end
+end
+
+local function get_track_channels(track)
+  if not track then return 2 end
+  return clamp(math.floor(reaper.GetMediaTrackInfo_Value(track, "I_NCHAN") + 0.5), 2, MAX_CH)
+end
+
+local function pin_block_for_channel(ch)
+  if ch < 1 or ch > MAX_CH then return nil, nil end
+  local block = math.floor((ch - 1) / PIN_MAP_BLOCK_SIZE)
+  local block_ch = ((ch - 1) % PIN_MAP_BLOCK_SIZE) + 1
+  return block, block_ch
+end
+
+local function pin_index_for_block(source_ch, block)
+  return (source_ch - 1) + block * PIN_MAP_BLOCK_OFFSET
+end
+
+local function mask_for_block_channel(block_ch)
+  if block_ch < 1 or block_ch > PIN_MAP_BLOCK_SIZE then return nil, nil end
+  if block_ch <= 32 then return 1 << (block_ch - 1), 0 end
+  return 0, 1 << (block_ch - 33)
+end
+
+local function set_pin_mapping_block(track, fx, side, source_ch, block, low, high)
+  return reaper.TrackFX_SetPinMappings(track, fx, side, pin_index_for_block(source_ch, block), low or 0, high or 0)
+end
+
+local function set_pin_single(track, fx, side, source_ch, dest_ch)
+  local dest_block, dest_block_ch = pin_block_for_channel(dest_ch)
+  if not dest_block then return false end
+  for block = 0, 1 do
+    local low, high = 0, 0
+    if block == dest_block then
+      low, high = mask_for_block_channel(dest_block_ch)
+    end
+    set_pin_mapping_block(track, fx, side, source_ch, block, low, high)
+  end
+  return true
+end
+
+local function clear_pin_all_blocks(track, fx, side, source_ch)
+  for block = 0, 1 do
+    set_pin_mapping_block(track, fx, side, source_ch, block, 0, 0)
+  end
+end
+
+local function repair_stereo_output_pins(track, fx, active_ch, force)
+  if not track or fx < 0 then return end
+  active_ch = clamp(math.floor((active_ch or 2) + 0.5), 2, MAX_CH)
+  if not force and last_pin_track == track and last_pin_fx == fx and last_pin_ch == active_ch then return end
+  for ch = 1, MAX_CH do
+    if ch <= active_ch then
+      set_pin_single(track, fx, 0, ch, ch)
+    else
+      clear_pin_all_blocks(track, fx, 0, ch)
+    end
+
+    if ch <= 2 then
+      set_pin_single(track, fx, 1, ch, ch)
+    else
+      clear_pin_all_blocks(track, fx, 1, ch)
+    end
+  end
+  last_pin_track, last_pin_fx, last_pin_ch = track, fx, active_ch
+end
+
 local function maybe_load(track, force)
   if not track then return -1 end
+  local track_ch = get_track_channels(track)
   local fx = find_fx(track)
-  if fx >= 0 and not force then return fx end
+  if fx >= 0 and force then
+    local _, _, output_pins = reaper.TrackFX_GetIOSize(track, fx)
+    if (output_pins or 0) ~= 2 then
+      local values = capture_normalized_params(track, fx)
+      reaper.TrackFX_Delete(track, fx)
+      fx = add_named_jsfx(track, FX_NAME)
+      restore_normalized_params(track, fx, values)
+    end
+  end
+  if fx >= 0 and not force then
+    repair_stereo_output_pins(track, fx, track_ch, false)
+    return fx
+  end
   if fx < 0 then fx = add_named_jsfx(track, FX_NAME) end
   if fx < 0 then fx = add_named_jsfx(track, FX_NAME_OLD) end
   if fx < 0 then fx = add_named_jsfx(track, FX_NAME_OLDER) end
   if fx < 0 then fx = add_named_jsfx(track, FX_NAME_CLEAN) end
   if fx < 0 then fx = add_named_jsfx(track, FX_NAME_LEGACY) end
+  if fx >= 0 then
+    repair_stereo_output_pins(track, fx, track_ch, true)
+  end
   return fx
-end
-
-local function get_track_channels(track)
-  if not track then return 2 end
-  return clamp(math.floor(reaper.GetMediaTrackInfo_Value(track, "I_NCHAN") + 0.5), 2, 128)
 end
 
 local function get_param(track, fx, param, fallback)
@@ -524,23 +622,22 @@ local function loop()
       if fx < 0 then
         ImGui.TextColored(ctx, COLORS.warn, "Could not load JS: " .. FX_NAME)
       else
-        local input_ch = math.floor(get_param(track, fx, PARAM.input_channels, math.min(track_ch, 64)) + 0.5)
+        local input_ch = math.floor(get_param(track, fx, PARAM.input_channels, math.min(track_ch, MAX_CH)) + 0.5)
         if ImGui.Button(ctx, "Use track channels") then
-          set_param(track, fx, PARAM.input_channels, math.min(track_ch, 64))
+          set_param(track, fx, PARAM.input_channels, math.min(track_ch, MAX_CH))
         end
         ImGui.SameLine(ctx)
         ImGui.TextColored(ctx, COLORS.muted, "Input channels: " .. tostring(input_ch))
 
         ImGui.Separator(ctx)
         ImGui.BeginGroup(ctx)
-          slider_param(track, fx, "Input channels", PARAM.input_channels, 2, 64, "%.0f")
+          slider_param(track, fx, "Input channels", PARAM.input_channels, 2, MAX_CH, "%.0f")
           slider_param(track, fx, "Spread / width", PARAM.width, 0, 200, "%.0f%%")
           slider_param(track, fx, "Rotation", PARAM.rotation, -180, 180, "%.0f deg")
           option_buttons(track, fx, "Layout", PARAM.layout, LAYOUT, 2)
           slider_param(track, fx, "Layout weighting", PARAM.weight, 0, 100, "%.0f%%")
           slider_param(track, fx, "3D attenuation", PARAM.attenuation, 0, 100, "%.0f%%")
           option_buttons(track, fx, "Autogain", PARAM.autogain, AUTOGAIN)
-          option_buttons(track, fx, "Extra channel output", PARAM.extra, EXTRA)
           ImGui.Spacing(ctx)
           if ImGui.Button(ctx, "-6 dB") then set_param(track, fx, PARAM.output_gain, -6) end
           ImGui.SameLine(ctx)

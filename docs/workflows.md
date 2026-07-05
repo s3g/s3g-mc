@@ -70,8 +70,10 @@ for tracks up to REAPER's 128-channel limit.
 Use `MC to Stereo Autogain` when a multichannel track needs a practical stereo
 fold-down for monitoring, previewing, or rendering. The controller exposes
 layout, width, rotation, weighting, 3D projection attenuation, output trim, and
-autogain controls so the fold-down can be shaped without losing the
-multichannel source.
+autogain controls so the fold-down can be shaped without changing the
+multichannel source. The JSFX declares only stereo outputs. In multichannel
+listening chains, open the plugin pin connector / I/O panel for this FX and set
+unused or unmapped output channels to `Zero out unmapped output channels`.
 
 Use `128ch Node Track Mixer` when several source tracks remain intact as
 multichannel objects and are mixed through a shared cursor. Selected tracks are

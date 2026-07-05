@@ -1,13 +1,17 @@
 desc:s3g MC to Stereo Autogain
 tags: multichannel stereo mixer downmix utility
 
-slider1:8<2,64,1>Input channels
+<? loop(x=1; 128, printf("in_pin:ch %03d\n", x); x += 1); ?>
+out_pin:Left
+out_pin:Right
+
+slider1:8<2,128,1>Input channels
 slider2:100<0,200,1>Spread/width (%)
 slider3:0<-180,180,1>Rotation (degrees)
 slider4:1<0,2,1{Off,Power/sqrt(N),Energy sum}>Autogain
 slider5:0<-24,24,0.1>Output gain (dB)
 slider6:0<0,7,1{Ring projection,Linear left-right,Odd/even stereo,Center-out,Pair-preserving,Sphere projection,Hemisphere projection,Cube projection}>Layout
-slider7:1<0,1,1{Keep extra channels,Clear extra channels}>Extra channel output
+slider7:1<1,1,1>Stereo output only
 slider8:100<0,100,1>Layout weighting (%)
 slider9:45<0,100,1>3D attenuation (%)
 
@@ -15,14 +19,13 @@ slider9:45<0,100,1>3D attenuation (%)
 two_pi = 2 * $pi;
 
 @slider
-chan_count = max(2, min(64, floor(slider1 + 0.5)));
+chan_count = max(2, min(128, floor(slider1 + 0.5)));
 width = max(0, slider2 / 100);
 rotation = slider3 * $pi / 180;
 autogain = floor(slider4 + 0.5);
 out_gain = 10 ^ (slider5 / 20);
 raw_layout = floor(slider6 + 0.5);
 layout = raw_layout > 7 ? 0 : raw_layout;
-clear_extra = floor(slider7 + 0.5);
 layout_weight = max(0, min(1, slider8 / 100));
 projection_atten = max(0, min(1, slider9 / 100));
 
@@ -192,10 +195,8 @@ loop(chan_count,
 spl0 = left * auto * out_gain;
 spl1 = right * auto * out_gain;
 
-clear_extra ? (
-  i = 2;
-  loop(chan_count - 2,
-    spl(i) = 0;
-    i += 1;
-  );
+i = 2;
+loop(126,
+  spl(i) = 0;
+  i += 1;
 );

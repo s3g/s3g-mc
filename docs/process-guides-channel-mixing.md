@@ -247,7 +247,9 @@ the node bus, so the bus becomes the monitored/output path.
 
 ## MC to Stereo Autogain
 
-Use this at the end of a multichannel sketch when you need a stereo monitor or print. It is not a substitute for an actual multichannel render; it is a controlled fold-down.
+Use this at the end of a multichannel sketch when you need a stereo monitor or print. It is not a substitute for an actual multichannel render; it is a controlled fold-down. The JSFX declares only stereo outputs, so channels 1 and 2 carry the fold-down.
+
+In a multichannel listening environment, open the plugin pin connector / I/O panel for this FX and set unused or unmapped output channels to `Zero out unmapped output channels`. If REAPER is left on `Pass through unused output channels`, channels above 1-2 can continue through the FX chain even though the fold-down itself is stereo.
 
 Important controls:
 

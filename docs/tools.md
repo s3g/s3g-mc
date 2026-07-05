@@ -99,6 +99,8 @@ Package Browser group counts:
   views, cursor falloff/gate controls, and automation lane helpers.
 - `MC to Stereo Autogain`: multichannel fold-down with layout modes, width,
   rotation, weighting, 3D projection attenuation, autogain, and output trim.
+  The JSFX declares only stereo outputs; in multichannel listening chains, set
+  its plugin I/O to zero unmapped output channels.
 - `Transaural Crosstalk Canceller`: stereo loudspeaker playback processor with
   feedforward and matrix-inverse crosstalk cancellation modes, speaker
   geometry, low protection, stereo preservation, and safety gain controls.
