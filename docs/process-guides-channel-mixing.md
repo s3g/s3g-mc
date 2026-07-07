@@ -19,6 +19,8 @@ toc:
     href: "#128ch-ambisonic-node-track-mixer"
   - title: 128ch Node Track Mixer
     href: "#128ch-node-track-mixer"
+  - title: Focused FX Automation Capture
+    href: "#focused-fx-automation-capture"
   - title: MC to Stereo Autogain
     href: "#mc-to-stereo-autogain"
   - title: Transaural Crosstalk Canceller
@@ -242,6 +244,25 @@ Starting approach:
 
 The script turns off the selected source tracks' master sends when it creates
 the node bus, so the bus becomes the monitored/output path.
+
+
+## Focused FX Automation Capture
+
+Use this when a plugin window is already open and you want to turn its current
+settings into editable automation lanes. Focus the FX window, run `Focused FX
+Automation Capture`, refresh the parameter list if needed, then filter and
+select the parameters to include.
+
+The direct write modes create lanes from the current setting: one point at the
+edit cursor, a constant value across the current time selection, or visible and
+armed lanes without writing points.
+
+For timeline snapshots, set the edit cursor, adjust the plugin, and click
+`Capture Snapshot`. Move later in the timeline, adjust the plugin again, choose
+the interpolation rule from the previous snapshot, and capture another
+snapshot. `Write Snapshots` creates FX envelopes for the captured parameters
+and writes the automation between the stored times. The first version targets
+track FX; take FX are not included.
 
 
 

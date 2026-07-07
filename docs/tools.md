@@ -37,16 +37,16 @@ The [Utilities](utilities.md) pages cover the browser-based companion tools for
 Automation Score breakpoint lanes, image scores, IR room sketches, and Spatial
 Score automation JSON.
 
-Current package snapshot: the browser exposes 119 user-facing tools/controllers,
+Current package snapshot: the browser exposes 120 user-facing tools/controllers,
 plus the Package Browser. Of those, 50 are Python/NumPy-backed offline
-processes, 25 load, control, or render included JSFX, and 44 are native
+processes, 25 load, control, or render included JSFX, and 45 are native
 Lua/ReaImGui REAPER actions. The repository also ships 23 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and support
 dialogs that are not shown as Package Browser entries.
 
 Package Browser group counts:
 
-- Channel Mixing / Automation: 5
+- Channel Mixing / Automation: 6
 - MIDI Composition: 8
 - Procedural Synthesis: 6
 - Offline Synthesis / IR: 10
@@ -97,6 +97,9 @@ Package Browser group counts:
   layouts can be mixed as spatial objects or aligned stacked shapes. The
   controller includes track-name node labels, routing overview, top/side camera
   views, cursor falloff/gate controls, and automation lane helpers.
+- `Focused FX Automation Capture`: reads the currently focused track FX,
+  filters and selects parameters, captures timeline snapshots, and writes
+  editable automation between those snapshots.
 - `MC to Stereo Autogain`: multichannel fold-down with layout modes, width,
   rotation, weighting, 3D projection attenuation, autogain, and output trim.
   The JSFX declares only stereo outputs; in multichannel listening chains, set
