@@ -98,8 +98,8 @@ Package Browser group counts:
   controller includes track-name node labels, routing overview, top/side camera
   views, cursor falloff/gate controls, and automation lane helpers.
 - `Focused FX Automation Capture`: reads the currently focused track FX,
-  filters and selects parameters, captures timeline snapshots, and writes
-  editable automation between those snapshots.
+  filters and stores parameter buckets, and writes current plugin settings as
+  editable automation points at the edit cursor.
 - `MC to Stereo Autogain`: multichannel fold-down with layout modes, width,
   rotation, weighting, 3D projection attenuation, autogain, and output trim.
   The JSFX declares only stereo outputs; in multichannel listening chains, set

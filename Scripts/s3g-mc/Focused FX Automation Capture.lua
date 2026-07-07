@@ -3,11 +3,11 @@
 -- @version 0.1
 -- @requires ReaImGui
 -- @category Channel Mixing / Automation
--- @method ReaImGui utility for the currently focused track FX. Lists parameters, filters/selects them, captures timeline snapshots, and writes interpolated automation lanes.
+-- @method ReaImGui utility for the currently focused or touched track FX. Filters/selects parameters and writes the current FX state as editable automation points at the edit cursor.
 -- @about
---   Captures the current settings of the focused track FX into visible, armed
---   automation lanes. Use the filter and checkboxes to snapshot all parameters
---   or a selected subset, then write editable automation between snapshots.
+--   Captures the current settings of the focused/touched track FX into visible,
+--   armed automation lanes. Use the filter and bucket controls to choose a
+--   parameter set, then save the current plugin state at the edit cursor.
 
 if not reaper.APIExists("ImGui_GetVersion") then
   reaper.MB("ReaImGui is not installed or not loaded.", "Focused FX Automation Capture", 0)
@@ -18,23 +18,29 @@ package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
 
 local TITLE = "Focused FX Automation Capture"
+local EXT = "s3g-mc Focused FX Automation Capture"
 local ctx = ImGui.CreateContext(TITLE)
 local open = true
 
 local params = {}
 local selected = {}
+local buckets = {}
+local bucket_name = "Bucket 1"
+local active_bucket = 1
 local filter_text = ""
 local skip_empty = true
 local arm_lanes = true
 local show_lanes = true
 local lane_height = 72
-local write_mode = 1 -- 1 point at edit cursor, 2 constant over time selection, 3 lanes only
-local interp_mode = 2
-local curve_points = 16
-local replace_between_snapshots = true
+local show_params = false
 local last_key = ""
-local status = "Focus an FX window, then refresh."
-local snapshots = {}
+local status = "Focus or touch an FX parameter, then lock the FX."
+local target_track = nil
+local target_fx = -1
+local target_key = ""
+local make_key
+local fx_name
+local param_label
 
 local COLORS = {
   muted = ImGui.ColorConvertDouble4ToU32(0.55, 0.59, 0.60, 1),
@@ -42,17 +48,77 @@ local COLORS = {
   ok = ImGui.ColorConvertDouble4ToU32(0.45, 0.86, 0.58, 1),
 }
 
-local INTERP = {
-  "Hold then jump",
-  "Linear",
-  "Smooth ease",
-  "Ease in",
-  "Ease out",
-  "Stepped",
-}
-
 local function lower(s)
   return string.lower(s or "")
+end
+
+local function enc(s)
+  s = tostring(s or "")
+  s = s:gsub("%%", "%%25")
+  s = s:gsub("\t", "%%09")
+  s = s:gsub("\n", "%%0A")
+  s = s:gsub("\r", "%%0D")
+  return s
+end
+
+local function dec(s)
+  s = tostring(s or "")
+  s = s:gsub("%%0D", "\r")
+  s = s:gsub("%%0A", "\n")
+  s = s:gsub("%%09", "\t")
+  s = s:gsub("%%25", "%%")
+  return s
+end
+
+local function ext_key_for_fx(track, fx)
+  local name = fx_name(track, fx)
+  return "buckets:" .. enc(name)
+end
+
+local function bucket_preview(bucket)
+  if not bucket or not bucket.params then return "" end
+  local labels = {}
+  for _, param in ipairs(bucket.params) do
+    labels[#labels + 1] = param_label(param)
+    if #labels >= 4 then break end
+  end
+  local suffix = #bucket.params > 4 and ", ..." or ""
+  return table.concat(labels, ", ") .. suffix
+end
+
+local function load_buckets(track, fx)
+  buckets = {}
+  active_bucket = 1
+  if not track or fx < 0 then return end
+  local text = reaper.GetExtState(EXT, ext_key_for_fx(track, fx))
+  for line in (text or ""):gmatch("[^\n]+") do
+    local name, indices = line:match("^(.-)\t(.*)$")
+    if name and name ~= "" then
+      local bucket = { name = dec(name), params = {} }
+      for token in tostring(indices or ""):gmatch("[^,]+") do
+        local param = tonumber(token)
+        if param then bucket.params[#bucket.params + 1] = math.floor(param) end
+      end
+      if #bucket.params > 0 then buckets[#buckets + 1] = bucket end
+    end
+  end
+end
+
+local function save_buckets(track, fx)
+  if not track or fx < 0 then return end
+  local lines = {}
+  for _, bucket in ipairs(buckets) do
+    local indices = {}
+    for _, param in ipairs(bucket.params or {}) do indices[#indices + 1] = tostring(param) end
+    lines[#lines + 1] = enc(bucket.name) .. "\t" .. table.concat(indices, ",")
+  end
+  reaper.SetExtState(EXT, ext_key_for_fx(track, fx), table.concat(lines, "\n"), true)
+end
+
+local function track_from_number(track_number)
+  if track_number == 0 then return reaper.GetMasterTrack(0) end
+  if track_number and track_number > 0 then return reaper.GetTrack(0, track_number - 1) end
+  return nil
 end
 
 local function focused_track_fx()
@@ -67,14 +133,41 @@ local function focused_track_fx()
     return nil, -1, "Focused take FX are not supported in this first version."
   end
 
-  local track
-  if track_number == 0 then
-    track = reaper.GetMasterTrack(0)
-  elseif track_number and track_number > 0 then
-    track = reaper.GetTrack(0, track_number - 1)
-  end
+  local track = track_from_number(track_number)
   if not track or not fx_number or fx_number < 0 then return nil, -1, "Focused FX is not a track FX." end
   return track, fx_number, nil
+end
+
+local function touched_track_fx()
+  if not reaper.GetLastTouchedFX then return nil, -1, "No focused or touched FX." end
+  local ok, track_number, fx_number = reaper.GetLastTouchedFX()
+  if not ok or ok == 0 then return nil, -1, "No focused or touched FX." end
+  local track = track_from_number(track_number)
+  if not track or not fx_number or fx_number < 0 then return nil, -1, "Last touched FX is not a track FX." end
+  return track, fx_number, nil
+end
+
+local function discover_track_fx()
+  local track, fx, err = focused_track_fx()
+  if not err then return track, fx, nil, "focused" end
+  track, fx, err = touched_track_fx()
+  if not err then return track, fx, nil, "touched" end
+  return nil, -1, err or "No focused or touched track FX.", nil
+end
+
+local function lock_target(track, fx)
+  target_track = track
+  target_fx = fx or -1
+  target_key = make_key(track, target_fx)
+end
+
+local function target_track_fx()
+  if target_track and target_fx and target_fx >= 0 then
+    return target_track, target_fx, nil
+  end
+  local track, fx, err = discover_track_fx()
+  if not err then lock_target(track, fx) end
+  return track, fx, err
 end
 
 local function track_name(track)
@@ -85,7 +178,7 @@ local function track_name(track)
   return number > 0 and ("Track " .. tostring(number)) or "(unnamed track)"
 end
 
-local function fx_name(track, fx)
+function fx_name(track, fx)
   local ok, name = reaper.TrackFX_GetFXName(track, fx, "")
   if ok and name and name ~= "" then return name end
   return "(focused FX)"
@@ -104,13 +197,13 @@ local function param_display(track, fx, param)
   return string.format("%.4f", actual or 0)
 end
 
-local function make_key(track, fx)
+function make_key(track, fx)
   if not track or fx < 0 then return "" end
   return tostring(reaper.GetTrackGUID(track) or track) .. ":" .. tostring(fx)
 end
 
 local function refresh_params(preserve_selection)
-  local track, fx, err = focused_track_fx()
+  local track, fx, err, source = discover_track_fx()
   if err then
     params = {}
     selected = {}
@@ -137,7 +230,9 @@ local function refresh_params(preserve_selection)
     end
   end
   last_key = key
-  status = string.format("%s / %s / %d params", track_name(track), fx_name(track, fx), #params)
+  lock_target(track, fx)
+  load_buckets(track, fx)
+  status = string.format("Locked %s FX: %s / %s / %d params", source or "target", track_name(track), fx_name(track, fx), #params)
   return track, fx
 end
 
@@ -175,7 +270,76 @@ local function selected_params()
   return out
 end
 
-local function param_label(param)
+local function visible_params()
+  local out = {}
+  for _, p in ipairs(params) do
+    if visible_param(p) then out[#out + 1] = p.index end
+  end
+  return out
+end
+
+local function set_selected_params(indices, merge)
+  if not merge then selected = {} end
+  for _, param in ipairs(indices or {}) do selected[param] = true end
+end
+
+local function save_bucket_from(indices)
+  local track, fx, err = target_track_fx()
+  if err then status = err return end
+  if not indices or #indices == 0 then
+    status = "No parameters to store in bucket."
+    return
+  end
+  local name = bucket_name
+  if not name or name == "" then name = "Bucket " .. tostring(#buckets + 1) end
+
+  local unique, clean = {}, {}
+  for _, param in ipairs(indices) do
+    if not unique[param] then
+      unique[param] = true
+      clean[#clean + 1] = param
+    end
+  end
+  table.sort(clean)
+
+  local replaced = false
+  for i, bucket in ipairs(buckets) do
+    if lower(bucket.name) == lower(name) then
+      buckets[i] = { name = name, params = clean }
+      active_bucket = i
+      replaced = true
+      break
+    end
+  end
+  if not replaced then
+    buckets[#buckets + 1] = { name = name, params = clean }
+    active_bucket = #buckets
+  end
+  save_buckets(track, fx)
+  status = string.format("%s bucket '%s' with %d params.", replaced and "Updated" or "Saved", name, #clean)
+end
+
+local function recall_bucket(merge)
+  local bucket = buckets[active_bucket]
+  if not bucket then status = "No bucket selected." return end
+  set_selected_params(bucket.params, merge)
+  bucket_name = bucket.name
+  status = string.format("%s %d params from bucket '%s'.", merge and "Added" or "Selected", #(bucket.params or {}), bucket.name)
+end
+
+local function delete_bucket()
+  local track, fx, err = target_track_fx()
+  if err then status = err return end
+  local bucket = buckets[active_bucket]
+  if not bucket then status = "No bucket selected." return end
+  local name = bucket.name
+  table.remove(buckets, active_bucket)
+  active_bucket = math.max(1, math.min(active_bucket, #buckets))
+  save_buckets(track, fx)
+  status = "Deleted bucket '" .. name .. "'."
+end
+
+function param_label(param)
   for _, p in ipairs(params) do
     if p.index == param then return p.name end
   end
@@ -194,17 +358,20 @@ local function ensure_envelope(track, fx, param)
   return env
 end
 
-local function current_write_range()
-  local start_pos, end_pos = reaper.GetSet_LoopTimeRange(false, false, 0, 0, false)
-  if end_pos and start_pos and end_pos > start_pos then return start_pos, end_pos, true end
-  local pos = reaper.GetCursorPosition()
-  return pos, pos, false
+local function current_envelope_value(env, track, fx, param)
+  local value = reaper.TrackFX_GetParam(track, fx, param)
+  if value == nil then value = reaper.TrackFX_GetParamNormalized(track, fx, param) end
+  if reaper.GetEnvelopeScalingMode and reaper.ScaleToEnvelopeMode then
+    local mode = reaper.GetEnvelopeScalingMode(env)
+    if mode and mode ~= 0 then value = reaper.ScaleToEnvelopeMode(mode, value) end
+  end
+  return value or 0
 end
 
 local function write_selected()
-  local track, fx, err = focused_track_fx()
+  local track, fx, err = target_track_fx()
   if err then status = err return end
-  local start_pos, end_pos, has_range = current_write_range()
+  local cursor_pos = reaper.GetCursorPosition()
   local wrote, lanes = 0, 0
 
   reaper.Undo_BeginBlock()
@@ -213,16 +380,9 @@ local function write_selected()
       local env = ensure_envelope(track, fx, p.index)
       if env then
         lanes = lanes + 1
-        local value = reaper.TrackFX_GetParamNormalized(track, fx, p.index)
-        if write_mode == 1 then
-          reaper.InsertEnvelopePoint(env, start_pos, value, 0, 0, false, true)
-          wrote = wrote + 1
-        elseif write_mode == 2 and has_range then
-          reaper.DeleteEnvelopePointRange(env, start_pos - 0.000001, end_pos + 0.000001)
-          reaper.InsertEnvelopePoint(env, start_pos, value, 0, 0, false, true)
-          reaper.InsertEnvelopePoint(env, end_pos, value, 0, 0, false, true)
-          wrote = wrote + 2
-        end
+        local value = current_envelope_value(env, track, fx, p.index)
+        reaper.InsertEnvelopePoint(env, cursor_pos, value, 0, 0, false, true)
+        wrote = wrote + 1
         reaper.Envelope_SortPoints(env)
       end
     end
@@ -231,177 +391,28 @@ local function write_selected()
   reaper.TrackList_AdjustWindows(false)
   reaper.UpdateArrange()
 
-  if write_mode == 3 then
-    status = string.format("Created/showed %d automation lanes.", lanes)
-  elseif write_mode == 2 and not has_range then
-    status = "No time selection; use Point at edit cursor or make a time selection."
-  else
-    status = string.format("Wrote %d envelope points across %d lanes.", wrote, lanes)
-  end
+  status = string.format("Wrote %d envelope points across %d lanes.", wrote, lanes)
 end
 
-local function capture_snapshot()
-  local track, fx, err = focused_track_fx()
+local function save_point_at_cursor()
+  write_selected()
+end
+
+local function show_selected_lanes()
+  local track, fx, err = target_track_fx()
   if err then status = err return end
-  local picks = selected_params()
-  if #picks == 0 then
-    status = "Select at least one parameter to capture."
-    return
-  end
-
-  local t = reaper.GetCursorPosition()
-  local snap = {
-    time = t,
-    interp_from_prev = interp_mode,
-    fx_key = make_key(track, fx),
-    fx_name = fx_name(track, fx),
-    track_name = track_name(track),
-    values = {},
-    displays = {},
-  }
-  for _, param in ipairs(picks) do
-    snap.values[param] = reaper.TrackFX_GetParamNormalized(track, fx, param)
-    snap.displays[param] = param_display(track, fx, param)
-  end
-
-  local replaced = false
-  for i, existing in ipairs(snapshots) do
-    if math.abs(existing.time - t) < 0.0005 and existing.fx_key == snap.fx_key then
-      snapshots[i] = snap
-      replaced = true
-      break
-    end
-  end
-  if not replaced then snapshots[#snapshots + 1] = snap end
-  table.sort(snapshots, function(a, b) return a.time < b.time end)
-  status = string.format("%s snapshot at %.3fs with %d params.", replaced and "Replaced" or "Captured", t, #picks)
-end
-
-local function clear_snapshots()
-  snapshots = {}
-  status = "Cleared snapshots."
-end
-
-local function union_snapshot_params()
-  local seen, out = {}, {}
-  for _, snap in ipairs(snapshots) do
-    for param in pairs(snap.values) do
-      if not seen[param] then
-        seen[param] = true
-        out[#out + 1] = param
-      end
-    end
-  end
-  table.sort(out)
-  return out
-end
-
-local function eased(u, mode)
-  if mode == 3 then
-    return u * u * (3 - 2 * u)
-  elseif mode == 4 then
-    return u * u
-  elseif mode == 5 then
-    return 1 - ((1 - u) * (1 - u))
-  end
-  return u
-end
-
-local function write_snapshot_segment(env, a, b, param)
-  local va, vb = a.values[param], b.values[param]
-  if va == nil or vb == nil then return 0 end
-  local mode = b.interp_from_prev or 2
-  local t1, t2 = a.time, b.time
-  if t2 <= t1 then return 0 end
-
-  if mode == 1 then
-    reaper.InsertEnvelopePoint(env, t1, va, 0, 0, false, true)
-    reaper.InsertEnvelopePoint(env, math.max(t1, t2 - 0.000001), va, 0, 0, false, true)
-    reaper.InsertEnvelopePoint(env, t2, vb, 0, 0, false, true)
-    return 3
-  elseif mode == 6 then
-    local steps = math.max(2, math.min(32, curve_points))
-    local wrote = 0
-    for i = 0, steps do
-      local u = i / steps
-      local stepped = math.floor(u * steps) / steps
-      local value = va + (vb - va) * stepped
-      reaper.InsertEnvelopePoint(env, t1 + (t2 - t1) * u, value, 0, 0, false, true)
-      wrote = wrote + 1
-    end
-    return wrote
-  elseif mode == 2 then
-    reaper.InsertEnvelopePoint(env, t1, va, 0, 0, false, true)
-    reaper.InsertEnvelopePoint(env, t2, vb, 0, 0, false, true)
-    return 2
-  end
-
-  local points = math.max(4, math.min(64, curve_points))
-  local wrote = 0
-  for i = 0, points do
-    local u = i / points
-    local value = va + (vb - va) * eased(u, mode)
-    reaper.InsertEnvelopePoint(env, t1 + (t2 - t1) * u, value, 0, 0, false, true)
-    wrote = wrote + 1
-  end
-  return wrote
-end
-
-local function write_snapshots()
-  local track, fx, err = focused_track_fx()
-  if err then status = err return end
-  if #snapshots == 0 then status = "Capture at least one snapshot first." return end
-
-  local current_key = make_key(track, fx)
-  for _, snap in ipairs(snapshots) do
-    if snap.fx_key ~= current_key then
-      status = "Snapshots belong to a different focused FX. Refocus that FX or clear snapshots."
-      return
-    end
-  end
-
-  table.sort(snapshots, function(a, b) return a.time < b.time end)
-  local snapshot_params = union_snapshot_params()
-  local wrote, lanes = 0, 0
-
+  local lanes = 0
   reaper.Undo_BeginBlock()
-  for _, param in ipairs(snapshot_params) do
-    local env = ensure_envelope(track, fx, param)
-    if env then
-      lanes = lanes + 1
-      if replace_between_snapshots then
-        local t1 = snapshots[1].time
-        local t2 = snapshots[#snapshots].time
-        reaper.DeleteEnvelopePointRange(env, t1 - 0.000001, t2 + 0.000001)
-      end
-      if #snapshots == 1 then
-        local value = snapshots[1].values[param]
-        if value ~= nil then
-          reaper.InsertEnvelopePoint(env, snapshots[1].time, value, 0, 0, false, true)
-          wrote = wrote + 1
-        end
-      else
-        for i = 2, #snapshots do
-          wrote = wrote + write_snapshot_segment(env, snapshots[i - 1], snapshots[i], param)
-        end
-      end
-      reaper.Envelope_SortPoints(env)
+  for _, p in ipairs(params) do
+    if selected[p.index] then
+      local env = ensure_envelope(track, fx, p.index)
+      if env then lanes = lanes + 1 end
     end
   end
-  reaper.Undo_EndBlock("Focused FX Snapshot Automation", -1)
+  reaper.Undo_EndBlock("Focused FX Automation Capture Show Lanes", -1)
   reaper.TrackList_AdjustWindows(false)
   reaper.UpdateArrange()
-  status = string.format("Wrote %d envelope points across %d lanes from %d snapshots.", wrote, lanes, #snapshots)
-end
-
-local function draw_mode_buttons()
-  local labels = { "Point at cursor", "Constant in time selection", "Show/arm lanes only" }
-  for i, label in ipairs(labels) do
-    if i > 1 then ImGui.SameLine(ctx) end
-    if write_mode == i then ImGui.PushStyleColor(ctx, ImGui.Col_Button, ImGui.ColorConvertDouble4ToU32(0.18, 0.46, 0.52, 1)) end
-    if ImGui.Button(ctx, label) then write_mode = i end
-    if write_mode == i then ImGui.PopStyleColor(ctx) end
-  end
+  status = string.format("Created/showed %d automation lanes.", lanes)
 end
 
 local function loop()
@@ -409,78 +420,85 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    local track, fx, err = focused_track_fx()
+    local focused_track, focused_fx, focused_err = focused_track_fx()
+    local track, fx, err = target_track_fx()
     if err then
       ImGui.TextColored(ctx, COLORS.warn, err)
     else
-      ImGui.Text(ctx, track_name(track))
+      ImGui.Text(ctx, "Locked: " .. track_name(track))
       ImGui.SameLine(ctx)
       ImGui.TextColored(ctx, COLORS.muted, " / " .. fx_name(track, fx))
     end
 
-    if ImGui.Button(ctx, "Refresh") then refresh_params(true) end
-    ImGui.SameLine(ctx)
     local changed
+    if ImGui.Button(ctx, "Lock FX", 78, 24) then refresh_params(true) end
+    if focused_err then
+      ImGui.SameLine(ctx)
+      ImGui.TextColored(ctx, COLORS.muted, "Focus or touch a plugin parameter, then lock.")
+    elseif focused_track and focused_fx >= 0 then
+      ImGui.SameLine(ctx)
+      ImGui.TextColored(ctx, COLORS.muted, "Focused: " .. track_name(focused_track) .. " / " .. fx_name(focused_track, focused_fx))
+    end
+    ImGui.SameLine(ctx)
+    ImGui.SetNextItemWidth(ctx, 330)
     changed, filter_text = ImGui.InputText(ctx, "Filter", filter_text)
     ImGui.SameLine(ctx)
-    changed, skip_empty = ImGui.Checkbox(ctx, "Skip empty", skip_empty)
-
-    draw_mode_buttons()
-    changed, show_lanes = ImGui.Checkbox(ctx, "Show lanes", show_lanes)
-    ImGui.SameLine(ctx)
-    changed, arm_lanes = ImGui.Checkbox(ctx, "Arm lanes", arm_lanes)
-    ImGui.SameLine(ctx)
-    changed, lane_height = ImGui.SliderInt(ctx, "Lane height", lane_height, 32, 140)
-
-    if ImGui.Button(ctx, "Select visible") then select_visible(true) end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "None") then select_visible(false) end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Invert") then invert_visible() end
-    ImGui.SameLine(ctx)
     ImGui.TextColored(ctx, COLORS.muted, tostring(selected_count()) .. " selected")
+    ImGui.SameLine(ctx)
+    changed, show_params = ImGui.Checkbox(ctx, "Show list", show_params)
+
+    if ImGui.Button(ctx, "Select visible", 104, 24) then select_visible(true) end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "None", 58, 24) then select_visible(false) end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Invert", 64, 24) then invert_visible() end
+    ImGui.SameLine(ctx)
+    changed, skip_empty = ImGui.Checkbox(ctx, "Skip empty names", skip_empty)
 
     ImGui.Separator(ctx)
-    ImGui.Text(ctx, "Snapshots")
-    ImGui.SameLine(ctx)
-    if ImGui.BeginCombo(ctx, "Interpolation from previous", INTERP[interp_mode]) then
-      for i, label in ipairs(INTERP) do
-        local chosen = i == interp_mode
-        if ImGui.Selectable(ctx, label, chosen) then interp_mode = i end
+    local preview = buckets[active_bucket] and buckets[active_bucket].name or "(none)"
+    ImGui.SetNextItemWidth(ctx, 220)
+    if ImGui.BeginCombo(ctx, "Stored", preview) then
+      for i, bucket in ipairs(buckets) do
+        local chosen = i == active_bucket
+        local label = bucket.name .. " (" .. tostring(#(bucket.params or {})) .. ")"
+        if ImGui.Selectable(ctx, label, chosen) then
+          active_bucket = i
+          bucket_name = bucket.name
+        end
         if chosen then ImGui.SetItemDefaultFocus(ctx) end
       end
       ImGui.EndCombo(ctx)
     end
-    changed, curve_points = ImGui.SliderInt(ctx, "Curve points", curve_points, 4, 64)
     ImGui.SameLine(ctx)
-    changed, replace_between_snapshots = ImGui.Checkbox(ctx, "Replace range", replace_between_snapshots)
-
-    if ImGui.Button(ctx, "Capture Snapshot", 150, 28) then capture_snapshot() end
+    ImGui.SetNextItemWidth(ctx, 160)
+    changed, bucket_name = ImGui.InputText(ctx, "Bucket name", bucket_name)
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Write Snapshots", 140, 28) then write_snapshots() end
+    if ImGui.Button(ctx, "Save visible", 96, 24) then save_bucket_from(visible_params()) end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Clear Snapshots", 130, 28) then clear_snapshots() end
+    if ImGui.Button(ctx, "Save selected", 104, 24) then save_bucket_from(selected_params()) end
+    if ImGui.Button(ctx, "Recall", 72, 24) then recall_bucket(false) end
     ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, COLORS.muted, tostring(#snapshots) .. " captured")
-
-    if #snapshots > 0 then
-      for i, snap in ipairs(snapshots) do
-        local label = string.format("%02d  %.3fs  %s", i, snap.time, i == 1 and "start" or INTERP[snap.interp_from_prev or 2])
-        ImGui.TextColored(ctx, COLORS.muted, label)
-        ImGui.SameLine(ctx)
-        local names = {}
-        for param in pairs(snap.values) do names[#names + 1] = param_label(param) end
-        table.sort(names)
-        local text = table.concat(names, ", ")
-        if #text > 80 then text = text:sub(1, 77) .. "..." end
-        ImGui.Text(ctx, text)
-      end
+    if ImGui.Button(ctx, "Add", 54, 24) then recall_bucket(true) end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Delete", 64, 24) then delete_bucket() end
+    ImGui.SameLine(ctx)
+    if buckets[active_bucket] then
+      ImGui.TextColored(ctx, COLORS.muted, bucket_preview(buckets[active_bucket]))
+    else
+      ImGui.TextColored(ctx, COLORS.muted, "No stored bucket for this FX.")
     end
 
     ImGui.Separator(ctx)
-    local footer_height = 76
-    local child_flags = ImGui.ChildFlags_Borders and ImGui.ChildFlags_Borders() or ImGui.ChildFlags_Border and ImGui.ChildFlags_Border() or 0
-    if ImGui.BeginChild(ctx, "##focused_fx_params", 0, -footer_height, child_flags) then
+    if ImGui.Button(ctx, "Save Point at Cursor", 168, 30) then save_point_at_cursor() end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Show Selected Lanes", 154, 30) then show_selected_lanes() end
+    ImGui.SameLine(ctx)
+    ImGui.TextColored(ctx, COLORS.muted, "Move cursor, adjust plugin GUI, save again. REAPER handles envelope interpolation.")
+
+    if show_params then
+      ImGui.Separator(ctx)
+      ImGui.TextColored(ctx, COLORS.muted, "Parameters")
       if #params == 0 and track and fx >= 0 then refresh_params(false) end
       for _, p in ipairs(params) do
         if visible_param(p) then
@@ -496,18 +514,13 @@ local function loop()
         end
       end
     end
-    ImGui.EndChild(ctx)
 
     if status ~= "" then
-      local ok_status = status:find("Wrote", 1, true) or status:find("Created", 1, true) or status:find("Captured", 1, true) or status:find("Replaced", 1, true)
+      local ok_status = status:find("Wrote", 1, true) or status:find("Created", 1, true) or status:find("Saved", 1, true) or status:find("Updated", 1, true) or status:find("Selected", 1, true)
       local col = ok_status and COLORS.ok or COLORS.muted
       ImGui.TextColored(ctx, col, status)
     end
-    if ImGui.Button(ctx, "Write Current", 130, 30) then write_selected() end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Write Snapshots", 140, 30) then write_snapshots() end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Close", 90, 30) then open = false end
+    if ImGui.Button(ctx, "Close", 90, 28) then open = false end
     ImGui.End(ctx)
   end
 

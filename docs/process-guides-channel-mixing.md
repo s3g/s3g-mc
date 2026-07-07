@@ -249,20 +249,25 @@ the node bus, so the bus becomes the monitored/output path.
 ## Focused FX Automation Capture
 
 Use this when a plugin window is already open and you want to turn its current
-settings into editable automation lanes. Focus the FX window, run `Focused FX
-Automation Capture`, refresh the parameter list if needed, then filter and
-select the parameters to include.
+settings into editable automation lanes. Focus the FX window or touch one of
+its parameters, run `Focused FX Automation Capture`, then click `Lock FX`.
+After the FX is locked, adjust the plugin, return to the capture window, and
+capture or write from the locked target. The parameter filter and bucket
+controls help choose which parameters are included.
 
-The direct write modes create lanes from the current setting: one point at the
-edit cursor, a constant value across the current time selection, or visible and
-armed lanes without writing points.
+For plugins with long parameter lists, use the filter to narrow the visible
+parameters, then save either the selected parameters or the visible result as a
+named bucket. Buckets are recalled for the same focused FX and can be used to
+quickly reselect a working set of parameters before saving automation points.
 
-For timeline snapshots, set the edit cursor, adjust the plugin, and click
-`Capture Snapshot`. Move later in the timeline, adjust the plugin again, choose
-the interpolation rule from the previous snapshot, and capture another
-snapshot. `Write Snapshots` creates FX envelopes for the captured parameters
-and writes the automation between the stored times. The first version targets
-track FX; take FX are not included.
+The main workflow is point-based. Set the edit cursor, adjust the locked
+plugin GUI, and click `Save Point at Cursor`. Move the edit cursor later in
+the timeline, adjust the plugin again, and save another point. REAPER's normal
+envelope behavior handles the interpolation between those points.
+
+`Show Selected Lanes` creates, shows, and arms the selected FX envelopes
+without writing a point. The first version targets track FX; take FX are not
+included.
 
 
 
