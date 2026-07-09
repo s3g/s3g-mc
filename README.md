@@ -13,6 +13,15 @@ Many of these tools are inspired by or extend existing computer music
 practices, with references mentioned in the documentation where they are
 useful.
 
+## Related Projects
+
+[`s3g-dsp`](https://github.com/s3g/s3g-dsp) is a sibling project for native
+macOS CLAP plugins that can be used alongside `s3g-mc` or independently.
+
+[`s3g-rnbo-clap`](https://github.com/s3g/s3g-rnbo-clap) is a separate
+experimental wrapper for RNBO/Max-generated C++ exports in the same CLAP
+workflow.
+
 ## Processes
 
 For step-by-step notes on selected processes, see the [Process Guides](docs/process-guides.md).
