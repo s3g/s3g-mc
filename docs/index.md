@@ -66,5 +66,3 @@ Zero-Clause BSD. See the package
 Attribution is appreciated for software development, publications, research,
 teaching materials, and projects that build on or adapt this package. See
 <a href="https://github.com/s3g/s3g-mc/blob/main/CITATION.cff" target="_blank" rel="noopener noreferrer">CITATION.cff</a>.
-
-Development assistance: OpenAI Codex.
