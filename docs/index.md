@@ -9,6 +9,8 @@ toc:
     href: "#start-here"
   - title: Highlights
     href: "#highlights"
+  - title: Related Projects
+    href: "#related-projects"
   - title: License
     href: "#license"
 ---
@@ -57,6 +59,15 @@ Many of these tools are inspired by or extend existing computer music practices,
 - Offline spectral, convolution, and resynthesis processes
 - Multichannel texture and montage actions
 - Procedural synth engines with offline render and MIDI-controller workflows
+
+## Related Projects
+
+[`s3g-dsp`](https://github.com/s3g/s3g-dsp) is a sibling project for native
+macOS CLAP plugins that can be used alongside `s3g-mc` or independently.
+
+[`s3g-rnbo-clap`](https://github.com/s3g/s3g-rnbo-clap) is a separate
+experimental wrapper for RNBO/Max-generated C++ exports in the same CLAP
+workflow.
 
 ## License
 
