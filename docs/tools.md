@@ -37,9 +37,9 @@ The [Utilities](utilities.md) pages cover the browser-based companion tools for
 Automation Score breakpoint lanes, image scores, IR room sketches, and Spatial
 Score automation JSON.
 
-Current package snapshot: the browser exposes 120 user-facing tools/controllers,
+Current package snapshot: the browser exposes 119 user-facing tools/controllers,
 plus the Package Browser. Of those, 50 are Python/NumPy-backed offline
-processes, 25 load, control, or render included JSFX, and 45 are native
+processes, 25 load, control, or render included JSFX, and 44 are native
 Lua/ReaImGui REAPER actions. The repository also ships 23 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and support
 dialogs that are not shown as Package Browser entries.
@@ -56,7 +56,7 @@ Package Browser group counts:
 - Multichannel Texture / Montage: 20
 - Item Channel Transforms: 10
 - Track Building / Routing: 3
-- Utils: 9
+- Utils: 8
 
 ## Utils
 
@@ -77,12 +77,12 @@ Package Browser group counts:
   mapping Automation Score lanes to selected track volume envelopes or
   named FX parameter envelopes, with append or replace write modes and optional
   project marker writing.
-- `Load Spatial Score JSON`: loads exported Spatial Score JSON into REAPER, creates the
-  3OA encoder bus/child tracks, and writes source motion as editable automation.
+- `Load Spatial Score JSON`: loads exported Spatial Score JSON into REAPER,
+  writing AED automation to a focused/touched FX with Azimuth, Elevation, and
+  Distance parameters, or alternatively creating the 3OA encoder bus/child
+  tracks.
 - `Spatial Score`: opens the browser utility for composing spatial motion JSON
   outside REAPER.
-- `Spatial Score Browser Link`: opens the browser-based Spatial Score with the last loaded
-  Spatial Score JSON and follows REAPER transport from a local browser link.
 - `s3g-mc Package Browser`: browses and launches the installed package scripts.
 
 ## Channel Mixing / Automation

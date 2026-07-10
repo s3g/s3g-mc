@@ -2401,11 +2401,22 @@ function sceneCycleBankAt(bank, seconds, totalDuration) {
     if (seconds <= cursor + morph) {
       const next = sceneMotionSnapshot(bank, nextKey);
       const progress = clamp((seconds - cursor) / morph, 0, 1);
+      const freezeT = totalDuration > 0 ? clamp(cursor / totalDuration, 0, 1) : 0;
+      const frozen = {};
+      current.sources.forEach((source) => {
+        frozen[source.id] = sourcePosition({ ...current, morph: null }, source, freezeT);
+      });
       return {
         ...current,
-        ...blendSnapshots(current, next, progress),
-        sources: current.sources.map((source, index) => blendSource(source, next.sources[index] || source, smooth(clamp(progress, 0, 1)))),
-        morph: null,
+        morph: {
+          targetKey: nextKey,
+          from: current,
+          to: next,
+          frozen,
+          progress,
+          duration: morph,
+          started: 0,
+        },
       };
     }
     cursor += morph;

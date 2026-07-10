@@ -5,3 +5,7 @@ tools/mover/reaper-link.json
 tools/mover/reaper-playhead.json
 docs/tools/mover/reaper-link.json
 docs/tools/mover/reaper-playhead.json
+Scripts/s3g-mc/utilities/spatial-score/reaper-link.json
+Scripts/s3g-mc/utilities/spatial-score/reaper-playhead.json
+docs/utilities/spatial-score/reaper-link.json
+docs/utilities/spatial-score/reaper-playhead.json

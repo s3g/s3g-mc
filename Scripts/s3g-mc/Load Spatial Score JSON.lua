@@ -3,7 +3,7 @@
 -- @version 0.1
 -- @requires JSFX: s3g 8ch 3OA Object Encoder
 -- @category Utils
--- @method Loads a s3g-mc Spatial Score JSON file, creates bank encoder tracks and a 16-channel 3OA bus, and writes source motion automation from the exported browser composition.
+-- @method Loads a s3g-mc Spatial Score JSON file. The default path writes motion to a focused/touched FX that exposes Azimuth, Elevation, and Distance parameters; the alternate path creates bank encoder tracks and a 16-channel 3OA bus.
 
 local script_name = "Load Spatial Score JSON"
 local ENCODER_NAME = "JS: s3g 8ch 3OA Object Encoder"
@@ -154,8 +154,137 @@ local function read_file(path)
   return text
 end
 
+local function remember_link_state(path, start_pos, duration)
+  reaper.SetExtState(EXT_SECTION, "json_path", path, true)
+  reaper.SetExtState(EXT_SECTION, "start_pos", tostring(start_pos), true)
+  reaper.SetExtState(EXT_SECTION, "duration", tostring(duration), true)
+end
+
 local function source_param_base(source_index)
   return 2 + (source_index - 1) * 5
+end
+
+local function track_from_number(track_number)
+  if track_number == 0 then return reaper.GetMasterTrack(0) end
+  if track_number and track_number > 0 then return reaper.GetTrack(0, track_number - 1) end
+  return nil
+end
+
+local function focused_track_fx()
+  local retval, track_number, item_number, fx_number
+  if reaper.GetFocusedFX2 then
+    retval, track_number, item_number, fx_number = reaper.GetFocusedFX2()
+  else
+    retval, track_number, item_number, fx_number = reaper.GetFocusedFX()
+  end
+  if retval == 0 then return nil, -1, "No focused track FX." end
+  if item_number and item_number >= 0 then return nil, -1, "Focused take FX are not supported." end
+  local track = track_from_number(track_number)
+  if not track or not fx_number or fx_number < 0 then return nil, -1, "Focused FX is not a track FX." end
+  return track, fx_number, nil
+end
+
+local function touched_track_fx()
+  if not reaper.GetLastTouchedFX then return nil, -1, "No focused or touched FX." end
+  local ok, track_number, item_number, fx_number = reaper.GetLastTouchedFX()
+  if not ok or ok == 0 then return nil, -1, "No focused or touched FX." end
+  if item_number and item_number >= 0 then return nil, -1, "Last touched take FX are not supported." end
+  local track = track_from_number(track_number)
+  if not track or not fx_number or fx_number < 0 then return nil, -1, "Last touched FX is not a track FX." end
+  return track, fx_number, nil
+end
+
+local function target_track_fx()
+  local track, fx, err = focused_track_fx()
+  if not err then return track, fx, nil end
+  track, fx, err = touched_track_fx()
+  if not err then return track, fx, nil end
+  return nil, -1, err or "Focus or touch a target FX before choosing target-FX mode."
+end
+
+local function fx_name(track, fx)
+  local _, name = reaper.TrackFX_GetFXName(track, fx, "")
+  if name and name ~= "" then return name end
+  return "FX " .. tostring((fx or 0) + 1)
+end
+
+local function track_name(track)
+  if track == reaper.GetMasterTrack(0) then return "Master" end
+  local _, name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
+  if name and name ~= "" then return name end
+  local number = math.floor(reaper.GetMediaTrackInfo_Value(track, "IP_TRACKNUMBER") or 0)
+  return number > 0 and ("Track " .. tostring(number)) or "(unnamed track)"
+end
+
+local function param_name(track, fx, param)
+  local _, name = reaper.TrackFX_GetParamName(track, fx, param, "")
+  if name and name ~= "" then return name end
+  return "Param " .. tostring(param + 1)
+end
+
+local function has_token(text, token)
+  local start_at = 1
+  while true do
+    local a, b = text:find(token, start_at, true)
+    if not a then return false end
+    local before = a == 1 and "" or text:sub(a - 1, a - 1)
+    local after = b >= #text and "" or text:sub(b + 1, b + 1)
+    if not before:match("[%w_]") and not after:match("[%w_]") then return true end
+    start_at = b + 1
+  end
+end
+
+local function param_kind(name)
+  local lower_name = string.lower(name or "")
+  if lower_name:find("azimuth", 1, true) or has_token(lower_name, "az") then return "azimuth" end
+  if lower_name:find("elevation", 1, true) or lower_name:find("elev", 1, true) or has_token(lower_name, "el") then return "elevation" end
+  if lower_name:find("distance", 1, true) or has_token(lower_name, "dist") then return "distance" end
+  return nil
+end
+
+local function param_point_index(name)
+  local lower_name = string.lower(name or "")
+  local pnum = lower_name:match("^p(%d+)") or lower_name:match("[^%w_]p(%d+)")
+  if pnum then return tonumber(pnum) end
+  pnum = lower_name:match("point%s*(%d+)")
+  if pnum then return tonumber(pnum) end
+  pnum = lower_name:match("source%s*(%d+)")
+  if pnum then return tonumber(pnum) end
+  pnum = lower_name:match("^s(%d+)") or lower_name:match("[^%w_]s(%d+)")
+  if pnum then return tonumber(pnum) end
+  return nil
+end
+
+local function discover_aed_params(track, fx)
+  local map = {}
+  local singles = {}
+  local count = reaper.TrackFX_GetNumParams and (reaper.TrackFX_GetNumParams(track, fx) or 0) or 0
+  for param = 0, count - 1 do
+    local name = param_name(track, fx, param)
+    local kind = param_kind(name)
+    if kind then
+      local point = param_point_index(name)
+      if point and point >= 1 then
+        map[point] = map[point] or {}
+        map[point][kind] = param
+      elseif not singles[kind] then
+        singles[kind] = param
+      end
+    end
+  end
+  if next(map) == nil and (singles.azimuth or singles.elevation or singles.distance) then
+    map[1] = singles
+  end
+  return map
+end
+
+local function sorted_point_indices(map)
+  local indices = {}
+  for index, params in pairs(map or {}) do
+    if params.azimuth or params.elevation or params.distance then indices[#indices + 1] = index end
+  end
+  table.sort(indices)
+  return indices
 end
 
 local function set_fx_param(track, fx, param, value)
@@ -289,6 +418,67 @@ local function write_bank(track, fx, bank, start_pos, duration)
   return written
 end
 
+local function spatial_automation_entries(data)
+  local entries = {}
+  for _, bank in ipairs(data.banks or {}) do
+    local bank_id = tonumber(bank.bank) or #entries + 1
+    for _, source_auto in ipairs(bank.automation or {}) do
+      local source_index = tonumber(source_auto.source) or 1
+      if source_index >= 1 and source_index <= 8 then
+        entries[#entries + 1] = {
+          bank = bank_id,
+          source = source_index,
+          points = source_auto.points or {},
+          enabled = source_auto.enabled ~= false,
+        }
+      end
+    end
+  end
+  table.sort(entries, function(a, b)
+    if a.bank == b.bank then return a.source < b.source end
+    return a.bank < b.bank
+  end)
+  return entries
+end
+
+local function write_target_fx(data, start_pos, duration)
+  local track, fx, err = target_track_fx()
+  if err then message(err) return false end
+  local map = discover_aed_params(track, fx)
+  local target_points = sorted_point_indices(map)
+  if #target_points == 0 then
+    message("The focused/touched FX does not expose recognizable Azimuth, Elevation, or Distance parameters.")
+    return false
+  end
+
+  local entries = spatial_automation_entries(data)
+  if #entries == 0 then
+    message("Spatial Score JSON does not contain source automation.")
+    return false
+  end
+
+  local written, used = 0, 0
+  for slot, entry in ipairs(entries) do
+    local target_index = target_points[slot]
+    if not target_index then break end
+    local params = map[target_index]
+    local visible = true
+    if params.azimuth then written = written + write_param_points(track, fx, params.azimuth, start_pos, duration, entry.points, "azimuth", nil, visible) end
+    if params.elevation then written = written + write_param_points(track, fx, params.elevation, start_pos, duration, entry.points, "elevation", nil, visible) end
+    if params.distance then written = written + write_param_points(track, fx, params.distance, start_pos, duration, entry.points, "distance", nil, visible) end
+    used = used + 1
+  end
+
+  reaper.Main_OnCommand(40297, 0) -- Track: Unselect all tracks.
+  reaper.SetTrackSelected(track, true)
+  reaper.GetSet_ArrangeView2(0, true, 0, 0, start_pos, start_pos + duration)
+  reaper.SetEditCurPos(start_pos, false, false)
+  local skipped = math.max(0, #entries - used)
+  local extra = skipped > 0 and string.format("\n\nThe score contains %d point path(s), but the target FX exposes %d AED point set(s). Only the first %d point path(s) were used.", #entries, #target_points, used) or ""
+  message(string.format("Wrote %d Spatial Score point path(s) to %s / %s and inserted %d AED automation points from %.2f to %.2f seconds.%s", used, track_name(track), fx_name(track, fx), written, start_pos, start_pos + duration, extra))
+  return true
+end
+
 local function main()
   local ok, path = reaper.GetUserFileNameForRead("", "Load s3g-mc Spatial Score JSON", ".json")
   if not ok or path == "" then return end
@@ -309,8 +499,25 @@ local function main()
   local start_pos
   start_pos, duration = selected_time_range(duration)
   if not start_pos or not duration then return end
+  remember_link_state(path, start_pos, duration)
+
+  local mode = reaper.MB(
+    "Load Spatial Score JSON how?\n\nYes: write AED automation to the focused/touched FX.\nNo: create a new Spatial Score 3OA bus and load JSFX encoder tracks.\nCancel: stop.\n\nFocused-FX mode uses the first score point paths that fit the target. If the score has more points than the target FX exposes, later paths are skipped.",
+    script_name,
+    3
+  )
+  if mode == 2 then return end
 
   reaper.Undo_BeginBlock()
+
+  if mode == 6 then
+    local ok_target = write_target_fx(data, start_pos, duration)
+    reaper.TrackList_AdjustWindows(false)
+    reaper.UpdateArrange()
+    reaper.Undo_EndBlock(script_name, -1)
+    return ok_target
+  end
+
   reaper.PreventUIRefresh(1)
 
   local bank_count = math.min(#data.banks, MAX_BANKS)
@@ -348,9 +555,7 @@ local function main()
   reaper.SetTrackSelected(bus, true)
   reaper.GetSet_ArrangeView2(0, true, 0, 0, start_pos, start_pos + duration)
   reaper.SetEditCurPos(start_pos, false, false)
-  reaper.SetExtState(EXT_SECTION, "json_path", path, true)
-  reaper.SetExtState(EXT_SECTION, "start_pos", tostring(start_pos), true)
-  reaper.SetExtState(EXT_SECTION, "duration", tostring(duration), true)
+  remember_link_state(path, start_pos, duration)
 
   reaper.PreventUIRefresh(-1)
   reaper.TrackList_AdjustWindows(false)

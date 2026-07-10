@@ -243,9 +243,9 @@ map, source positions, and panner-specific controls.
 Use `Spatial Automation Composer` to compose spatial movement offline as
 editable REAPER automation for supported 8-source AED and XYZ s3g panners. For
 larger 3OA motion designs, Spatial Score provides a browser-based scene/bank
-editor; export Spatial Score JSON, then use `Load Spatial Score JSON` to create encoder tracks
-and write automation in REAPER. `Spatial Score Browser Link` can reopen the last loaded
-Spatial Score JSON and follow REAPER transport as a visual monitor.
+editor; export Spatial Score JSON, then use `Load Spatial Score JSON` to target
+an existing AED-capable effect, or create encoder tracks and write automation
+in REAPER.
 
 The package includes these spatial panners:
 

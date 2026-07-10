@@ -22,8 +22,6 @@ toc:
     href: "#preview"
   - title: REAPER Export
     href: "#reaper-export"
-  - title: Browser Link
-    href: "#browser-link"
   - title: Max Bridge
     href: "#max-bridge"
 ---
@@ -93,19 +91,14 @@ connecting every point to every other point.
 ## REAPER Export
 
 Exported JSON can be loaded in REAPER with `Load Spatial Score JSON`. The loader
+first offers to target a focused/touched FX that exposes Azimuth, Elevation,
+and Distance parameters. If the score has more point paths than the target FX
+exposes, the first matching point paths are used. The alternate loader path
 creates encoder tracks and writes source motion as automation for `s3g 8ch 3OA
 Object Encoder`.
 
 The browser utility is the design surface; REAPER remains the place where the
 automation is placed, edited against media, and rendered.
-
-## Browser Link
-
-After loading a Spatial Score JSON in REAPER, run `Spatial Score Browser Link` to reopen the
-same JSON in the browser and follow REAPER transport. The link starts a local
-browser view, writes a small playhead file while the ReaScript window is open,
-and lets the Spatial Score visual act as a large monitor for the automation already
-written into REAPER.
 
 ## Max Bridge
 
