@@ -91,7 +91,8 @@ The same utility can be launched from REAPER with `IR Sketch`.
 [Read Spatial Score notes](utilities-spatial-score.md)
 
 Designs banked third-order ambisonic source motion in the browser. Exported
-JSON can be loaded in REAPER with `Load Spatial Score JSON`, which creates encoder
-tracks and writes automation for `s3g 8ch 3OA Object Encoder`. An optional Max
-bridge in `Scripts/s3g-mc/utilities/spatial-score-max-bridge` can read the same JSON
-for ICST AmbiMonitor-style playback and monitoring patches.
+JSON can be loaded in REAPER with `Load Spatial Score JSON`, either targeting a
+focused encoder/effect with AED or XYZ parameters or creating encoder tracks for
+`s3g 8ch 3OA Object Encoder`. An optional Max bridge in
+`Scripts/s3g-mc/utilities/spatial-score-max-bridge` can read the same JSON for
+ICST AmbiMonitor-style playback and monitoring patches.

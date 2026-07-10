@@ -79,8 +79,10 @@ Package Browser group counts:
   project marker writing.
 - `Load Spatial Score JSON`: loads exported Spatial Score JSON into REAPER,
   writing AED automation to a focused/touched FX with Azimuth, Elevation, and
-  Distance parameters, or alternatively creating the 3OA encoder bus/child
-  tracks.
+  Distance parameters, falling back to X/Y/Z when AED is unavailable, or
+  alternatively creating the 3OA encoder bus/child tracks. It can be used with
+  plugins such as `s3g Ambi Point Encoder`, SPARTA `AmbiENC`, IEM
+  `MultiEncoder`, and ICST `AmbiEncoder`, depending on exposed parameters.
 - `Spatial Score`: opens the browser utility for composing spatial motion JSON
   outside REAPER.
 - `s3g-mc Package Browser`: browses and launches the installed package scripts.

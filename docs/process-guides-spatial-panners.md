@@ -61,10 +61,17 @@ Spatial Score is a browser-based motion designer for banked 8-source 3OA encoder
 groups. Use the browser tool to build and preview motion scenes, export JSON,
 then run `Load Spatial Score JSON` in REAPER. The primary loader path writes
 the motion to a focused/touched FX with Azimuth, Elevation, and Distance
-parameters, such as `s3g Ambi Point Encoder`. If the score has more point paths
-than the target exposes, the first matching point paths are used. The alternate
-loader path creates a 3OA encoder bus with child tracks and writes source
-automation for `s3g 8ch 3OA Object Encoder`.
+parameters, such as `s3g Ambi Point Encoder`, and falls back to X/Y/Z when AED
+is unavailable. If the score has more point paths than the target exposes, the
+first matching point paths are used. The alternate loader path creates a 3OA
+encoder bus with child tracks and writes source automation for `s3g 8ch 3OA
+Object Encoder`.
+
+External encoder compatibility depends on what the plugin exposes to REAPER.
+SPARTA `AmbiENC` and IEM `MultiEncoder` can receive azimuth/elevation
+automation but do not provide distance controls. ICST `AmbiEncoder` exposes
+X/Y/Z controls, which the loader handles by deriving XYZ from the score's AED
+data.
 
 ## Spatial Automation Composer
 

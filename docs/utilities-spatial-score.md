@@ -92,10 +92,18 @@ connecting every point to every other point.
 
 Exported JSON can be loaded in REAPER with `Load Spatial Score JSON`. The loader
 first offers to target a focused/touched FX that exposes Azimuth, Elevation,
-and Distance parameters. If the score has more point paths than the target FX
-exposes, the first matching point paths are used. The alternate loader path
-creates encoder tracks and writes source motion as automation for `s3g 8ch 3OA
-Object Encoder`.
+and Distance parameters. If no AED parameters are found, it can derive X/Y/Z
+automation from the same score. If the score has more point paths than the
+target FX exposes, the first matching point paths are used. The alternate
+loader path creates encoder tracks and writes source motion as automation for
+`s3g 8ch 3OA Object Encoder`.
+
+The focused-FX path works to varying degrees with several ambisonic encoders.
+`s3g Ambi Point Encoder` exposes azimuth, elevation, and distance. SPARTA
+`AmbiENC` and IEM `MultiEncoder` expose azimuth/elevation but not distance, so
+only those coordinates are written. ICST `AmbiEncoder` advertises X/Y/Z
+parameters; the loader converts the Spatial Score AED data for that case when
+AED parameters are not available.
 
 The browser utility is the design surface; REAPER remains the place where the
 automation is placed, edited against media, and rendered.

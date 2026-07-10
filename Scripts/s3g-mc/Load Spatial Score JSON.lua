@@ -3,7 +3,7 @@
 -- @version 0.1
 -- @requires JSFX: s3g 8ch 3OA Object Encoder
 -- @category Utils
--- @method Loads a s3g-mc Spatial Score JSON file. The default path writes motion to a focused/touched FX that exposes Azimuth, Elevation, and Distance parameters; the alternate path creates bank encoder tracks and a 16-channel 3OA bus.
+-- @method Loads a s3g-mc Spatial Score JSON file. The default path writes motion to a focused/touched FX, preferring Azimuth/Elevation/Distance parameters and falling back to X/Y/Z if AED is unavailable; the alternate path creates bank encoder tracks and a 16-channel 3OA bus.
 
 local script_name = "Load Spatial Score JSON"
 local ENCODER_NAME = "JS: s3g 8ch 3OA Object Encoder"
@@ -236,13 +236,16 @@ end
 
 local function param_kind(name)
   local lower_name = string.lower(name or "")
-  if lower_name:find("azimuth", 1, true) or has_token(lower_name, "az") then return "azimuth" end
+  if lower_name:find("azimuth", 1, true) or lower_name:find("azim", 1, true) or has_token(lower_name, "az") or has_token(lower_name, "azi") then return "azimuth" end
   if lower_name:find("elevation", 1, true) or lower_name:find("elev", 1, true) or has_token(lower_name, "el") then return "elevation" end
   if lower_name:find("distance", 1, true) or has_token(lower_name, "dist") then return "distance" end
+  if lower_name:find("x position", 1, true) or lower_name:find("x pos", 1, true) or lower_name:match("^x[%s_%-%d]") or lower_name:match("[%s_%-]x[%s_%-%d]") then return "x" end
+  if lower_name:find("y position", 1, true) or lower_name:find("y pos", 1, true) or lower_name:match("^y[%s_%-%d]") or lower_name:match("[%s_%-]y[%s_%-%d]") then return "y" end
+  if lower_name:find("z position", 1, true) or lower_name:find("z pos", 1, true) or lower_name:match("^z[%s_%-%d]") or lower_name:match("[%s_%-]z[%s_%-%d]") then return "z" end
   return nil
 end
 
-local function param_point_index(name)
+local function raw_param_point_index(name)
   local lower_name = string.lower(name or "")
   local pnum = lower_name:match("^p(%d+)") or lower_name:match("[^%w_]p(%d+)")
   if pnum then return tonumber(pnum) end
@@ -252,24 +255,38 @@ local function param_point_index(name)
   if pnum then return tonumber(pnum) end
   pnum = lower_name:match("^s(%d+)") or lower_name:match("[^%w_]s(%d+)")
   if pnum then return tonumber(pnum) end
+  pnum = lower_name:match("[_%-%s](%d+)$")
+  if pnum then return tonumber(pnum) end
+  pnum = lower_name:match("(%d+)$")
+  if pnum then return tonumber(pnum) end
   return nil
 end
 
 local function discover_aed_params(track, fx)
-  local map = {}
+  local raw = {}
   local singles = {}
+  local saw_zero_index = false
   local count = reaper.TrackFX_GetNumParams and (reaper.TrackFX_GetNumParams(track, fx) or 0) or 0
   for param = 0, count - 1 do
     local name = param_name(track, fx, param)
     local kind = param_kind(name)
     if kind then
-      local point = param_point_index(name)
-      if point and point >= 1 then
-        map[point] = map[point] or {}
-        map[point][kind] = param
+      local point = raw_param_point_index(name)
+      if point and point >= 0 then
+        if point == 0 then saw_zero_index = true end
+        raw[point] = raw[point] or {}
+        raw[point][kind] = param
       elseif not singles[kind] then
         singles[kind] = param
       end
+    end
+  end
+  local map = {}
+  for point, params in pairs(raw) do
+    local normalized = saw_zero_index and (point + 1) or point
+    if normalized >= 1 then
+      map[normalized] = map[normalized] or {}
+      for kind, param in pairs(params) do map[normalized][kind] = param end
     end
   end
   if next(map) == nil and (singles.azimuth or singles.elevation or singles.distance) then
@@ -278,13 +295,93 @@ local function discover_aed_params(track, fx)
   return map
 end
 
+local function filter_param_map(map, kinds)
+  local keep = {}
+  local wanted = {}
+  for _, kind in ipairs(kinds) do wanted[kind] = true end
+  for point, params in pairs(map or {}) do
+    for kind in pairs(wanted) do
+      if params[kind] then
+        keep[point] = keep[point] or {}
+        for copy_kind in pairs(wanted) do keep[point][copy_kind] = params[copy_kind] end
+        break
+      end
+    end
+  end
+  return keep
+end
+
 local function sorted_point_indices(map)
   local indices = {}
   for index, params in pairs(map or {}) do
-    if params.azimuth or params.elevation or params.distance then indices[#indices + 1] = index end
+    if params.azimuth or params.elevation or params.distance or params.x or params.y or params.z then indices[#indices + 1] = index end
   end
   table.sort(indices)
   return indices
+end
+
+local function wrap_degrees(value)
+  value = tonumber(value) or 0
+  while value > 180 do value = value - 360 end
+  while value < -180 do value = value + 360 end
+  return value
+end
+
+local function aed_to_xyz(point)
+  local az = wrap_degrees(point.azimuth or 0) * math.pi / 180
+  local el = (tonumber(point.elevation) or 0) * math.pi / 180
+  local distance = tonumber(point.distance) or 1
+  local planar = math.cos(el) * distance
+  return {
+    x = planar * math.cos(az),
+    y = planar * math.sin(az),
+    z = math.sin(el) * distance,
+  }
+end
+
+local function xyz_points(points)
+  local out = {}
+  for _, point in ipairs(points or {}) do
+    local xyz = aed_to_xyz(point)
+    out[#out + 1] = {
+      t = point.t,
+      x = xyz.x,
+      y = xyz.y,
+      z = xyz.z,
+    }
+  end
+  return out
+end
+
+local function target_param_transform(track, fx, param, field)
+  local _, min_value, max_value = reaper.TrackFX_GetParam(track, fx, param)
+  min_value = tonumber(min_value)
+  max_value = tonumber(max_value)
+  local normalized = min_value and max_value and max_value > min_value and min_value >= -0.000001 and max_value <= 1.000001
+
+  if field == "azimuth" then
+    if normalized then
+      return function(value) return clamp((wrap_degrees(value) + 180) / 360, 0, 1) end
+    end
+    return function(value) return clamp(wrap_degrees(value), min_value or -180, max_value or 180) end
+  elseif field == "elevation" then
+    if normalized then
+      return function(value) return clamp(((tonumber(value) or 0) + 90) / 180, 0, 1) end
+    end
+    return function(value) return clamp(tonumber(value) or 0, min_value or -90, max_value or 90) end
+  elseif field == "distance" then
+    if normalized then
+      return function(value) return clamp(((tonumber(value) or 1) - 0.15) / 1.85, 0, 1) end
+    end
+    return function(value) return clamp(tonumber(value) or 1, min_value or 0.15, max_value or 2.0) end
+  elseif field == "x" or field == "y" or field == "z" then
+    if normalized then
+      return function(value) return clamp(((tonumber(value) or 0) + 1) * 0.5, 0, 1) end
+    end
+    return function(value) return clamp(tonumber(value) or 0, min_value or -2.0, max_value or 2.0) end
+  end
+
+  return nil
 end
 
 local function set_fx_param(track, fx, param, value)
@@ -444,10 +541,14 @@ end
 local function write_target_fx(data, start_pos, duration)
   local track, fx, err = target_track_fx()
   if err then message(err) return false end
-  local map = discover_aed_params(track, fx)
+  local discovered = discover_aed_params(track, fx)
+  local aed_map = filter_param_map(discovered, { "azimuth", "elevation", "distance" })
+  local xyz_map = filter_param_map(discovered, { "x", "y", "z" })
+  local use_xyz = next(aed_map) == nil and next(xyz_map) ~= nil
+  local map = use_xyz and xyz_map or aed_map
   local target_points = sorted_point_indices(map)
   if #target_points == 0 then
-    message("The focused/touched FX does not expose recognizable Azimuth, Elevation, or Distance parameters.")
+    message("The focused/touched FX does not expose recognizable Azimuth/Elevation/Distance or X/Y/Z parameters.")
     return false
   end
 
@@ -463,9 +564,16 @@ local function write_target_fx(data, start_pos, duration)
     if not target_index then break end
     local params = map[target_index]
     local visible = true
-    if params.azimuth then written = written + write_param_points(track, fx, params.azimuth, start_pos, duration, entry.points, "azimuth", nil, visible) end
-    if params.elevation then written = written + write_param_points(track, fx, params.elevation, start_pos, duration, entry.points, "elevation", nil, visible) end
-    if params.distance then written = written + write_param_points(track, fx, params.distance, start_pos, duration, entry.points, "distance", nil, visible) end
+    if use_xyz then
+      local converted = xyz_points(entry.points)
+      if params.x then written = written + write_param_points(track, fx, params.x, start_pos, duration, converted, "x", target_param_transform(track, fx, params.x, "x"), visible) end
+      if params.y then written = written + write_param_points(track, fx, params.y, start_pos, duration, converted, "y", target_param_transform(track, fx, params.y, "y"), visible) end
+      if params.z then written = written + write_param_points(track, fx, params.z, start_pos, duration, converted, "z", target_param_transform(track, fx, params.z, "z"), visible) end
+    else
+      if params.azimuth then written = written + write_param_points(track, fx, params.azimuth, start_pos, duration, entry.points, "azimuth", target_param_transform(track, fx, params.azimuth, "azimuth"), visible) end
+      if params.elevation then written = written + write_param_points(track, fx, params.elevation, start_pos, duration, entry.points, "elevation", target_param_transform(track, fx, params.elevation, "elevation"), visible) end
+      if params.distance then written = written + write_param_points(track, fx, params.distance, start_pos, duration, entry.points, "distance", target_param_transform(track, fx, params.distance, "distance"), visible) end
+    end
     used = used + 1
   end
 
@@ -474,8 +582,9 @@ local function write_target_fx(data, start_pos, duration)
   reaper.GetSet_ArrangeView2(0, true, 0, 0, start_pos, start_pos + duration)
   reaper.SetEditCurPos(start_pos, false, false)
   local skipped = math.max(0, #entries - used)
-  local extra = skipped > 0 and string.format("\n\nThe score contains %d point path(s), but the target FX exposes %d AED point set(s). Only the first %d point path(s) were used.", #entries, #target_points, used) or ""
-  message(string.format("Wrote %d Spatial Score point path(s) to %s / %s and inserted %d AED automation points from %.2f to %.2f seconds.%s", used, track_name(track), fx_name(track, fx), written, start_pos, start_pos + duration, extra))
+  local coordinate_label = use_xyz and "XYZ" or "AED"
+  local extra = skipped > 0 and string.format("\n\nThe score contains %d point path(s), but the target FX exposes %d %s point set(s). Only the first %d point path(s) were used.", #entries, #target_points, coordinate_label, used) or ""
+  message(string.format("Wrote %d Spatial Score point path(s) to %s / %s as %s automation and inserted %d points from %.2f to %.2f seconds.%s", used, track_name(track), fx_name(track, fx), coordinate_label, written, start_pos, start_pos + duration, extra))
   return true
 end
 
