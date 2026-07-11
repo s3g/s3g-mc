@@ -70,6 +70,8 @@ const ui = {
   sourceElevationValue: el("sourceElevationValue"),
   sourceDistance: el("sourceDistance"),
   sourceDistanceValue: el("sourceDistanceValue"),
+  lockDistance: el("lockDistance"),
+  lockedMotionScale: el("lockedMotionScale"),
   toggleSource: el("toggleSource"),
   resetSources: el("resetSources"),
   cameraAz: el("cameraAz"),
@@ -194,19 +196,6 @@ let state = {
   recordingScale: 1,
 };
 
-let reaperLink = {
-  enabled: false,
-  loaded: false,
-  nextPoll: 0,
-  lastUpdated: 0,
-  playing: false,
-  basePosition: 0,
-  baseT: 0,
-  displayT: 0,
-  duration: 16,
-  receivedAt: performance.now(),
-};
-
 function makeSource(index) {
   const a = (index / 8) * TWO_PI;
   return {
@@ -305,7 +294,46 @@ function updateTimeReadouts() {
 function updateSourcePositionReadouts() {
   ui.sourceAzimuthValue.textContent = `${Number(ui.sourceAzimuth.value).toFixed(0)} deg`;
   ui.sourceElevationValue.textContent = `${Number(ui.sourceElevation.value).toFixed(0)} deg`;
-  ui.sourceDistanceValue.textContent = `${Number(ui.sourceDistance.value).toFixed(2)} m`;
+  ui.sourceDistanceValue.textContent = distanceLocked() ? "1.00 locked" : `${Number(ui.sourceDistance.value).toFixed(2)} m`;
+}
+
+function distanceLocked() {
+  return ui.lockDistance?.checked === true;
+}
+
+function sourceForOutput(source) {
+  return { ...source, distance: distanceLocked() ? 1 : Number(source.distance ?? 1) };
+}
+
+function lockedMotionScale() {
+  return clamp(Number(ui.lockedMotionScale?.value ?? 0.72), 0.15, 1);
+}
+
+function enforceDistanceLock() {
+  if (!distanceLocked()) return;
+  state.banks.forEach((bank) => {
+    bank.sources.forEach((source) => { source.distance = 1; });
+    Object.values(bank.scenes || {}).forEach((scene) => {
+      (scene.sources || []).forEach((source) => { source.distance = 1; });
+    });
+  });
+  ui.sourceDistance.value = 1;
+  ui.sourceDistance.disabled = true;
+  state.simCache.clear();
+  updateRangeFill(ui.sourceDistance);
+  updateSourcePositionReadouts();
+}
+
+function updateDistanceLockUi() {
+  if (distanceLocked()) enforceDistanceLock();
+  else ui.sourceDistance.disabled = false;
+  document.querySelectorAll(".lock-distance-only").forEach((label) => {
+    label.classList.toggle("inactive", !distanceLocked());
+    const input = label.querySelector("input");
+    if (input) input.disabled = !distanceLocked();
+  });
+  state.simCache.clear();
+  updateSourcePositionReadouts();
 }
 
 function lerp(a, b, t) {
@@ -472,7 +500,7 @@ function serializeScenes(scenes) {
       mode: scene.mode || "orbit",
       variant: scene.variant || "primary",
       params: { ...(scene.params || {}) },
-      sources: (scene.sources || []).map(cloneSource),
+      sources: (scene.sources || []).map(sourceForOutput),
       hold: Number(scene.hold ?? 1),
       morph: Number(scene.morph ?? 4),
     };
@@ -1402,6 +1430,7 @@ function simulationKey(bank) {
       spread: Number(ui.spreadTarget.value || 1.05),
       damping: Number(ui.activityDamping.value || 0),
     },
+    lockDistance: distanceLocked(),
   });
 }
 
@@ -1414,13 +1443,22 @@ function outputFromVector(point, source) {
   const x = point.x;
   const y = point.y;
   const z = point.z;
+  const azimuth = azimuthFromVector(x, y);
+  const elevation = clamp(radToDeg(Math.atan2(z, Math.hypot(x, y))), -89, 89);
+  const rawDistance = Math.max(0.0001, Math.hypot(x, y, z));
+  const distance = distanceLocked() ? 1 : clamp(rawDistance, 0.1, 3);
+  let out = { x, y, z };
+  if (distanceLocked()) {
+    const scale = lockedMotionScale() / Math.max(1, rawDistance);
+    out = { x: x * scale, y: y * scale, z: z * scale };
+  }
   return {
-    x,
-    y,
-    z,
-    azimuth: azimuthFromVector(x, y),
-    elevation: clamp(radToDeg(Math.atan2(z, Math.hypot(x, y))), -89, 89),
-    distance: clamp(Math.hypot(x, y, z), 0.1, 3),
+    x: out.x,
+    y: out.y,
+    z: out.z,
+    azimuth,
+    elevation,
+    distance,
     gain: source.enabled ? source.gain : 0,
   };
 }
@@ -2067,12 +2105,7 @@ function tick(now = performance.now()) {
     bank.morph.progress = clamp((now - bank.morph.started) / (bank.morph.duration * 1000), 0, 1);
     if (bank.morph.progress >= 1) commitMorph(bank);
   });
-  if (reaperLink.enabled) {
-    pollReaperPlayhead(now);
-  }
-  if (reaperLink.enabled && !state.playing) {
-    applyReaperTransport(now);
-  } else if (state.playing) {
+  if (state.playing) {
     const dur = Number(ui.duration.value);
     if (state.recorder) {
       const recordDuration = Math.max(0.001, Number(state.recordingDuration || dur));
@@ -2093,26 +2126,9 @@ function tick(now = performance.now()) {
   const displayDuration = state.recorder
     ? Number(state.recordingDuration || ui.duration.value)
     : Number(ui.duration.value);
-  if (!reaperLink.enabled || state.playing) ui.timeReadout.textContent = `${(state.playT * displayDuration).toFixed(2)}s`;
+  ui.timeReadout.textContent = `${(state.playT * displayDuration).toFixed(2)}s`;
   updateSceneDisplays();
   draw();
-}
-
-function applyReaperTransport(now = performance.now()) {
-  const duration = Math.max(0.001, Number(reaperLink.duration || ui.duration.value || 1));
-  let position = Number(reaperLink.basePosition || 0);
-  if (reaperLink.playing) {
-    position += (now - reaperLink.receivedAt) / 1000;
-  }
-  const targetT = clamp(Number(reaperLink.baseT || 0) + (position - Number(reaperLink.basePosition || 0)) / duration, 0, 1);
-  const diff = targetT - reaperLink.displayT;
-  if (!reaperLink.playing || Math.abs(diff) > 0.04) {
-    reaperLink.displayT = targetT;
-  } else {
-    reaperLink.displayT += diff * 0.18;
-  }
-  state.playT = clamp(reaperLink.displayT, 0, 1);
-  ui.timeReadout.textContent = `${position.toFixed(2)}s REAPER${reaperLink.playing ? "" : " paused"}`;
 }
 
 function syncPanelFromBank() {
@@ -2140,7 +2156,8 @@ function syncPanelFromBank() {
   ui.sourceGain.value = source.gain;
   ui.sourceAzimuth.value = wrapDeg(source.azimuth);
   ui.sourceElevation.value = clamp(source.elevation, -85, 85);
-  ui.sourceDistance.value = source.distance;
+  ui.sourceDistance.value = distanceLocked() ? 1 : source.distance;
+  ui.sourceDistance.disabled = distanceLocked();
   updateSourcePositionReadouts();
   ui.toggleSource.textContent = source.enabled ? "Mute Source" : "Unmute Source";
   renderBanks();
@@ -2188,7 +2205,7 @@ function syncSourceFromPanel() {
   source.gain = Number(ui.sourceGain.value);
   source.azimuth = wrapDeg(Number(ui.sourceAzimuth.value));
   source.elevation = clamp(Number(ui.sourceElevation.value), -85, 85);
-  source.distance = Number(ui.sourceDistance.value);
+  source.distance = distanceLocked() ? 1 : Number(ui.sourceDistance.value);
   updateAllRangeFills();
   captureScene(bank);
   renderBanks();
@@ -2197,7 +2214,8 @@ function syncSourceFromPanel() {
 function syncSourcePositionControls(source) {
   ui.sourceAzimuth.value = Number(wrapDeg(source.azimuth).toFixed(1));
   ui.sourceElevation.value = Number(clamp(source.elevation, -85, 85).toFixed(1));
-  ui.sourceDistance.value = Number(source.distance.toFixed(3));
+  ui.sourceDistance.value = distanceLocked() ? 1 : Number(source.distance.toFixed(3));
+  ui.sourceDistance.disabled = distanceLocked();
   updateRangeFill(ui.sourceAzimuth);
   updateRangeFill(ui.sourceElevation);
   updateRangeFill(ui.sourceDistance);
@@ -2529,6 +2547,8 @@ function makeExport() {
       show_centroid: ui.showCentroid.checked,
       show_path_preview: ui.showTrails.checked,
       show_labels: ui.showLabels.checked,
+      lock_distance_to_1: distanceLocked(),
+      locked_motion_scale: lockedMotionScale(),
     },
     banks: state.banks.map((bank) => {
       const exportBank = sceneCycleBankAt(bank, 0, duration);
@@ -2547,7 +2567,7 @@ function makeExport() {
         spread_target: Number(ui.spreadTarget.value),
         activity_damping: Number(ui.activityDamping.value),
       },
-      sources: exportBank.sources.map((source) => ({ ...source })),
+      sources: exportBank.sources.map(sourceForOutput),
       automation: exportBank.sources.map((source) => ({
         source: source.id,
         enabled: source.enabled,
@@ -2774,6 +2794,8 @@ function loadMoverJson(data) {
   ui.cameraEl.value = Number(bs.camera_elevation ?? ui.cameraEl.value);
   ui.zoom.value = Number(bs.zoom ?? ui.zoom.value);
   ui.spatialConstraint.value = bs.spatial_constraint === "hemisphere" ? "hemisphere" : "sphere";
+  ui.lockDistance.checked = bs.lock_distance_to_1 === true;
+  ui.lockedMotionScale.value = Number(bs.locked_motion_scale ?? ui.lockedMotionScale.value);
   ui.pointColorMode.value = bs.point_color_mode === "source" ? "source" : "oklch";
   ui.analysisScope.value = bs.analysis_scope === "active" ? "active" : "global";
   ui.neighborLinks.value = Number(bs.neighbor_links ?? ui.neighborLinks.value);
@@ -2788,64 +2810,10 @@ function loadMoverJson(data) {
   state.activeBank = clamp(Number(bs.active_group || 1) - 1, 0, state.banks.length - 1);
   state.groupFocus = bs.group_focus !== false;
   state.selectedSource = clamp(Number(bs.selected_source || 1) - 1, 0, 7);
+  updateDistanceLockUi();
   syncPanelFromBank();
   updateAllRangeFills();
   ui.analysisReadout.textContent = `imported ${state.banks.length} group${state.banks.length === 1 ? "" : "s"} from JSON`;
-}
-
-async function loadReaperLinkJson() {
-  try {
-    const response = await fetch(`reaper-link.json?cache=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    loadMoverJson(data);
-    reaperLink.loaded = true;
-    state.playing = false;
-    ui.analysisReadout.textContent = `REAPER link loaded ${state.banks.length} group${state.banks.length === 1 ? "" : "s"}`;
-  } catch (error) {
-    ui.analysisReadout.textContent = `REAPER link waiting for JSON: ${error.message}`;
-  }
-}
-
-async function pollReaperPlayhead(now) {
-  if (now < reaperLink.nextPoll) return;
-  reaperLink.nextPoll = now + 45;
-  try {
-    const response = await fetch(`reaper-playhead.json?cache=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const data = await response.json();
-    const updated = Number(data.updated || 0);
-    if (updated && updated === reaperLink.lastUpdated) return;
-    const firstSample = reaperLink.lastUpdated === 0;
-    reaperLink.lastUpdated = updated;
-    const duration = Number(data.duration || ui.duration.value || 1);
-    if (duration > 0) {
-      ui.duration.value = duration;
-      reaperLink.duration = duration;
-      updateRangeFill(ui.duration);
-    }
-    reaperLink.playing = data.playing === true;
-    reaperLink.basePosition = Number(data.position || 0);
-    reaperLink.baseT = clamp(Number(data.t || 0), 0, 1);
-    reaperLink.receivedAt = now;
-    if (!reaperLink.playing || firstSample) {
-      reaperLink.displayT = reaperLink.baseT;
-      state.playT = reaperLink.baseT;
-    }
-  } catch (_) {
-    if (reaperLink.loaded) ui.analysisReadout.textContent = "REAPER link waiting for playhead";
-  }
-}
-
-function initReaperLink() {
-  const params = new URLSearchParams(window.location.search);
-  reaperLink.enabled = params.get("reaper_link") === "1";
-  if (!reaperLink.enabled) return;
-  state.playing = false;
-  ui.play.textContent = "R";
-  ui.play.title = "Following REAPER transport";
-  ui.stop.title = "REAPER link is controlled from REAPER";
-  loadReaperLinkJson();
 }
 
 function pointerPoint(event) {
@@ -2879,7 +2847,7 @@ function placeSelectedSourceFromPointer(event) {
   const source = activeBank().sources[state.selectedSource];
   source.azimuth = azimuthFromVector(dx, Math.max(0.001, dy));
   source.elevation = clamp(dy * 45, -80, 80);
-  source.distance = clamp(Math.hypot(dx, dy), 0.1, 3);
+  source.distance = distanceLocked() ? 1 : clamp(Math.hypot(dx, dy), 0.1, 3);
   source.enabled = true;
   source.gain = Math.max(Number(source.gain || 0), 0.001);
   syncSourcePositionControls(source);
@@ -2974,8 +2942,7 @@ ui.play.addEventListener("click", () => {
 });
 ui.stop.addEventListener("click", () => {
   state.playing = false;
-  if (!reaperLink.enabled) state.playT = 0;
-  else state.playT = clamp(reaperLink.displayT || reaperLink.baseT || 0, 0, 1);
+  state.playT = 0;
 });
 ui.importJson.addEventListener("click", () => {
   ui.jsonFile.value = "";
@@ -3053,8 +3020,14 @@ document.querySelectorAll("input, select").forEach((input) => {
     const sourceControls = ["sourceGain", "sourceAzimuth", "sourceElevation", "sourceDistance"];
     const interfaceControls = [
       "morphTarget", "autoNext", "sceneLoop", "varySceneBanks", "randomMorphTime",
-      "cameraAz", "cameraEl", "zoom", "spatialConstraint", "pointColorMode", "analysisScope", "neighborLinks", "showAnalysis", "showCentroid", "showTrails", "showLabels",
+      "cameraAz", "cameraEl", "zoom", "spatialConstraint", "pointColorMode", "analysisScope", "neighborLinks", "showAnalysis", "showCentroid", "showTrails", "showLabels", "lockedMotionScale",
     ];
+    if (input.id === "lockDistance") {
+      updateDistanceLockUi();
+      captureScene(activeBank());
+      renderBanks();
+      return;
+    }
     if (sourceControls.includes(input.id)) {
       if (input.type === "range") updateRangeFill(input);
       syncSourceFromPanel();
@@ -3202,10 +3175,10 @@ window.addEventListener("keydown", (event) => {
 });
 
 if (!restoreAutosave()) captureScene(activeBank());
+updateDistanceLockUi();
 enhanceCustomSelects();
 syncPanelFromBank();
 updateAllRangeFills();
-initReaperLink();
 setInterval(autosave, 2000);
 window.addEventListener("beforeunload", autosave);
 tick();

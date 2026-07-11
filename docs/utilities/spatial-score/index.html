@@ -162,6 +162,8 @@
           <label>Azimuth <span id="sourceAzimuthValue" class="value-readout">0 deg</span><input id="sourceAzimuth" type="range" min="-180" max="180" value="0" step="1" /></label>
           <label>Elevation <span id="sourceElevationValue" class="value-readout">0 deg</span><input id="sourceElevation" type="range" min="-85" max="85" value="0" step="1" /></label>
           <label>Distance <span id="sourceDistanceValue" class="value-readout">1.00 m</span><input id="sourceDistance" type="range" min="0.1" max="3" value="1" step="0.01" /></label>
+          <label class="check"><input id="lockDistance" type="checkbox" /> Lock distance to 1 for AE encoders</label>
+          <label class="lock-distance-only">AE motion scale <input id="lockedMotionScale" type="range" min="0.15" max="1" value="0.72" step="0.01" /></label>
           <div class="row two">
             <button id="toggleSource" type="button">Mute Source</button>
             <button id="resetSources" type="button">Reset Sources</button>
