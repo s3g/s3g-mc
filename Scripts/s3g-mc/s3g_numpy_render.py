@@ -119,6 +119,27 @@ def write_pcm24_wav(path, data, sample_rate):
         handle.write(payload)
 
 
+def write_pcm16_wav(path, data, sample_rate):
+    if data.ndim == 1:
+        data = data[:, None]
+    channels = int(data.shape[1])
+    cleaned = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+    clipped = np.clip(cleaned, -1.0, 1.0)
+    payload = np.rint(clipped * 32767.0).astype("<i2", copy=False).tobytes()
+    fmt = struct.pack("<HHIIHH", 1, channels, int(sample_rate), int(sample_rate) * channels * 2, channels * 2, 16)
+    riff_size = 4 + (8 + len(fmt)) + (8 + len(payload))
+    with open(path, "wb") as handle:
+        handle.write(b"RIFF")
+        handle.write(struct.pack("<I", riff_size))
+        handle.write(b"WAVE")
+        handle.write(b"fmt ")
+        handle.write(struct.pack("<I", len(fmt)))
+        handle.write(fmt)
+        handle.write(b"data")
+        handle.write(struct.pack("<I", len(payload)))
+        handle.write(payload)
+
+
 def segment(data, source_rate, start_seconds, duration_seconds, target_rate):
     start = max(0, int(round(float(start_seconds) * source_rate)))
     count = max(1, int(round(float(duration_seconds) * source_rate)))
@@ -3279,6 +3300,31 @@ def find_espeak_ng():
     return shutil.which("espeak-ng")
 
 
+def find_speex_tool(name):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    configured_path = os.path.join(script_dir, f"{name}_path.txt")
+    if os.path.exists(configured_path):
+        with open(configured_path, "r", encoding="utf-8") as handle:
+            configured = handle.read().strip()
+        if configured and os.path.exists(configured):
+            return configured
+    candidates = [
+        os.path.join("/opt/homebrew/bin", name),
+        os.path.join("/usr/local/bin", name),
+        os.path.join("/usr/bin", name),
+    ]
+    home = os.path.expanduser("~")
+    if home:
+        candidates.extend([
+            os.path.join(home, "homebrew/bin", name),
+            os.path.join(home, ".local/bin", name),
+        ])
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return shutil.which(name)
+
+
 def synthesize_espeak_ng(text, sample_rate, voice="en-us", speed=150, pitch=45, amplitude=140):
     exe = find_espeak_ng()
     if not exe:
@@ -3684,6 +3730,76 @@ def evp_apply_spectral_shaper(mono, sample_rate, cfg):
     return shaped.astype(np.float32)
 
 
+def evp_apply_speex_codec_damage(mono, sample_rate, cfg):
+    mode = str(cfg.get("codec_damage", "off")).lower()
+    mono = np.asarray(mono, dtype=np.float32).reshape(-1)
+    if mode == "off" or mono.size < 32:
+        return mono
+    amount = float(np.clip(cfg.get("codec_amount", 0.65), 0.0, 1.0))
+    if amount <= 0.0:
+        return mono
+    mode_info = {
+        "speex_nb": ("--narrowband", "--force-nb", 8000, "narrowband"),
+        "speex_wb": ("--wideband", "--force-wb", 16000, "wideband"),
+        "speex_uwb": ("--ultra-wideband", "--force-uwb", 32000, "ultra-wideband"),
+    }.get(mode)
+    if mode_info is None:
+        return mono
+    speexenc = find_speex_tool("speexenc")
+    speexdec = find_speex_tool("speexdec")
+    if not speexenc or not speexdec:
+        raise RuntimeError(
+            "Codec Damage requires Speex command-line tools (speexenc and speexdec). "
+            "On macOS: brew install speex. If REAPER still cannot find them, put the full paths in "
+            "speexenc_path.txt and speexdec_path.txt beside the scripts."
+        )
+    enc_band, dec_band, codec_rate, _label = mode_info
+    quality = int(max(0, min(10, cfg.get("codec_quality", 3))))
+    packet_loss = float(np.clip(cfg.get("codec_packet_loss", 0.0), 0.0, 0.95))
+    residue = bool(cfg.get("codec_residue", False))
+    source_peak = float(np.max(np.abs(mono))) if mono.size else 0.0
+    if source_peak > 0.96:
+        work = mono * (0.96 / source_peak)
+    else:
+        work = mono.copy()
+    resampled = resample_audio(work[:, None], sample_rate, codec_rate)[:, 0]
+    with tempfile.TemporaryDirectory(prefix="s3g_evp_speex_") as temp_dir:
+        wav_in = os.path.join(temp_dir, "codec_in.wav")
+        spx_path = os.path.join(temp_dir, "codec.spx")
+        wav_out = os.path.join(temp_dir, "codec_out.wav")
+        write_pcm16_wav(wav_in, resampled, codec_rate)
+        enc_cmd = [speexenc, enc_band, "--quality", str(quality), "--comp", "10", wav_in, spx_path]
+        enc = subprocess.run(enc_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if enc.returncode != 0:
+            raise RuntimeError("Speex encode failed:\n" + (enc.stderr or enc.stdout or "unknown error"))
+        loss_percent = int(round(packet_loss * 100.0))
+        dec_cmd = [speexdec, dec_band, "--no-enh"]
+        if loss_percent > 0:
+            dec_cmd += ["--packet-loss", str(loss_percent)]
+        dec_cmd += [spx_path, wav_out]
+        dec = subprocess.run(dec_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if dec.returncode != 0:
+            raise RuntimeError("Speex decode failed:\n" + (dec.stderr or dec.stdout or "unknown error"))
+        decoded, decoded_rate = read_wav(wav_out)
+    damaged = decoded[:, 0].astype(np.float32)
+    damaged = resample_audio(damaged[:, None], decoded_rate, sample_rate)[:, 0]
+    if damaged.shape[0] < mono.shape[0]:
+        damaged = np.pad(damaged, (0, mono.shape[0] - damaged.shape[0]))
+    damaged = damaged[:mono.shape[0]].astype(np.float32)
+    if residue:
+        wet = (mono - damaged).astype(np.float32)
+        wet_peak = float(np.max(np.abs(wet))) if wet.size else 0.0
+        if wet_peak > 1e-9 and source_peak > 1e-9:
+            wet *= source_peak / wet_peak
+    else:
+        wet = damaged
+    out = ((1.0 - amount) * mono + amount * wet).astype(np.float32)
+    peak = float(np.max(np.abs(out))) if out.size else 0.0
+    if peak > 1.2 and source_peak > 1e-9:
+        out *= min(1.0, source_peak / peak)
+    return out.astype(np.float32)
+
+
 def render_evp_field(cfg):
     sample_rate = int(cfg.get("sample_rate", 48000))
     duration = max(0.05, float(cfg.get("duration", 12.0)))
@@ -3771,6 +3887,10 @@ def render_evp_field(cfg):
             source_mono = speech_mono[:speech_frames].astype(np.float32)
             treated = evp_treatment_audio(source_mono, sample_rate, cfg, rng)
             treated = evp_apply_spectral_shaper(treated, sample_rate, cfg)
+            try:
+                treated = evp_apply_speex_codec_damage(treated, sample_rate, cfg)
+            except RuntimeError as err:
+                raise SystemExit(str(err))
             speech_frames = min(frames, treated.shape[0])
             mono = treated[:speech_frames].astype(np.float32)
             u_axis = np.linspace(0.0, 1.0, speech_frames, dtype=np.float64)
@@ -3813,6 +3933,12 @@ def render_evp_field(cfg):
         print(f"Time expansion: {cfg.get('time_mode', 'fill_duration')}")
         print(f"Effective expansion: {speech_mono.shape[0] / max(1, raw_speech_frames):.3f}")
         print(f"Spectral shaper: {cfg.get('spectral_shaper', 'off')}")
+        print(f"Codec damage: {cfg.get('codec_damage', 'off')}")
+        if str(cfg.get("codec_damage", "off")).lower() != "off":
+            print(f"Codec amount: {float(cfg.get('codec_amount', 0.65)):.3f}")
+            print(f"Codec quality: {int(cfg.get('codec_quality', 3))}")
+            print(f"Codec packet loss: {float(cfg.get('codec_packet_loss', 0.0)):.3f}")
+            print(f"Codec residue: {bool(cfg.get('codec_residue', False))}")
         if str(cfg.get("spectral_shaper", "off")).lower() == "profile_item":
             print(f"Spectral profile: {cfg.get('profile_path', '')}")
         elif str(cfg.get("spectral_shaper", "off")).lower() == "tone_list":

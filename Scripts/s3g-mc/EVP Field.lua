@@ -1,10 +1,10 @@
 -- @description EVP Field
 -- @author s3g
--- @version 0.4
--- @requires ReaImGui; Python 3 with NumPy; eSpeak NG
+-- @version 0.5
+-- @requires ReaImGui; Python 3 with NumPy; eSpeak NG; optional Speex
 -- @category Offline Synthesis / IR
 -- @render Yes; NumPy-backed synthetic voice/formant field.
--- @method Offline speech/formant synth for EVP/glossolalia textures. eSpeak NG provides the text-to-speech source; voice treatments bend it toward chant, melody, choir, apparition, and damaged broadcast behavior. Output can be fixed 3OA ACN/SN3D or a multichannel speaker shape such as ring, double ring, cube, or dome.
+-- @method Offline speech/formant synth for EVP/glossolalia textures. eSpeak NG provides the text-to-speech source; voice treatments bend it toward chant, melody, choir, apparition, damaged broadcast, and optional Speex codec damage behavior. Output can be fixed 3OA ACN/SN3D or a multichannel speaker shape such as ring, double ring, cube, or dome.
 
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
@@ -41,6 +41,8 @@ local SHAPER_KEYS = { "off", "preset", "tone_list", "profile_item" }
 local SHAPER_LABELS = { "Off", "Preset", "Tone list", "Profile item" }
 local SHAPER_PRESET_KEYS = { "throat", "telephone", "glass", "choir_air", "metal_mouth", "submerged", "thin_radio" }
 local SHAPER_PRESET_LABELS = { "Throat", "Telephone", "Glass", "Choir air", "Metal mouth", "Submerged", "Thin radio" }
+local CODEC_KEYS = { "off", "speex_nb", "speex_wb", "speex_uwb" }
+local CODEC_LABELS = { "Off", "Speex narrowband", "Speex wideband", "Speex ultra-wideband" }
 local TIME_KEYS = { "fill_duration", "manual_expand", "speech_length" }
 local TIME_LABELS = { "Fill duration", "Manual expansion", "Speech length" }
 local CHANNEL_VALUES = { 2, 4, 6, 8, 10, 12, 16, 20, 24, 32, 48, 64 }
@@ -122,6 +124,11 @@ local settings = {
   shaper_partials = math.floor(getn("shaper_partials", 6)),
   shaper_brightness = getn("shaper_brightness", 0.0),
   shaper_follow_melody = getb("shaper_follow_melody", true),
+  codec_damage = math.max(1, math.min(#CODEC_KEYS, math.floor(getn("codec_damage", 1)))),
+  codec_amount = getn("codec_amount", 0.65),
+  codec_quality = math.floor(getn("codec_quality", 3)),
+  codec_packet_loss = getn("codec_packet_loss", 0.0),
+  codec_residue = getb("codec_residue", false),
   gain_db = getn("gain_db", -12.0),
   normalize = getb("normalize", true),
   normalize_db = getn("normalize_db", -9.0),
@@ -259,6 +266,11 @@ local function render()
     shaper_partials = settings.shaper_partials,
     shaper_brightness = settings.shaper_brightness,
     shaper_follow_melody = settings.shaper_follow_melody,
+    codec_damage = CODEC_KEYS[settings.codec_damage],
+    codec_amount = settings.codec_amount,
+    codec_quality = settings.codec_quality,
+    codec_packet_loss = settings.codec_packet_loss,
+    codec_residue = settings.codec_residue,
     gain_db = settings.gain_db,
     normalize = settings.normalize,
     normalize_db = settings.normalize_db,
@@ -329,6 +341,15 @@ local function loop()
         changed, settings.shaper_partials = ImGui.SliderInt(ctx, "Shaper partials", settings.shaper_partials, 1, 16)
         changed, settings.shaper_brightness = ImGui.SliderDouble(ctx, "Shaper brightness", settings.shaper_brightness, -1.0, 1.0, "%.2f")
         changed, settings.shaper_follow_melody = ImGui.Checkbox(ctx, "Follow melody", settings.shaper_follow_melody)
+      end
+      ImGui.Separator(ctx)
+      settings.codec_damage = combo(ctx, "Codec damage", settings.codec_damage, CODEC_LABELS)
+      if CODEC_KEYS[settings.codec_damage] ~= "off" then
+        ImGui.TextWrapped(ctx, "Requires Speex command-line tools: speexenc and speexdec.")
+        changed, settings.codec_amount = ImGui.SliderDouble(ctx, "Codec amount", settings.codec_amount, 0.0, 1.0, "%.2f")
+        changed, settings.codec_quality = ImGui.SliderInt(ctx, "Codec quality", settings.codec_quality, 0, 10)
+        changed, settings.codec_packet_loss = ImGui.SliderDouble(ctx, "Packet loss", settings.codec_packet_loss, 0.0, 0.45, "%.2f")
+        changed, settings.codec_residue = ImGui.Checkbox(ctx, "Residue instead of decoded speech", settings.codec_residue)
       end
       ImGui.Separator(ctx)
       changed, settings.pitch_hz = ImGui.SliderDouble(ctx, "Pitch Hz", settings.pitch_hz, 35.0, 420.0, "%.1f")

@@ -168,9 +168,10 @@ modulation afterward.
   possession, and damaged-broadcast textures. Voice treatments reshape the
   spoken source, time expansion can fill the requested duration, and an
   optional spectral shaper can apply preset masks, typed tone-list resonances,
-  or a selected-item profile imprint before fixed 3OA ACN/SN3D or multichannel
-  ring, double-ring, cube, and dome output. eSpeak NG is required for this
-  process.
+  or a selected-item profile imprint. Optional Speex codec damage can be added
+  before fixed 3OA ACN/SN3D or multichannel ring, double-ring, cube, and dome
+  output. eSpeak NG is required for this process; Speex is only required when
+  `Codec damage` is enabled.
 - `Fata Morgana Resynth`: hybrid oscillator resynthesis from 2-16 selected
   source items, recombining timing, pitch, amplitude, and spatial traits.
 - `IR Toolkit`: reshapes a selected impulse response item with silence trim,
@@ -425,6 +426,11 @@ behaviors.
   `brew install espeak-ng`. If REAPER cannot find it, put the full path in
   `espeak_ng_path.txt` beside the scripts, for example
   `/opt/homebrew/bin/espeak-ng`.
+- <a href="https://www.speex.org/" target="_blank" rel="noopener noreferrer">Speex</a>
+  is optional for `EVP Field` and is only needed when `Codec damage` is enabled.
+  On macOS it can be installed with `brew install speex`. If REAPER cannot find
+  Speex, put the full paths in `speexenc_path.txt` and `speexdec_path.txt`
+  beside the scripts.
 - <a href="https://leomccormack.github.io/sparta-site/" target="_blank" rel="noopener noreferrer">SPARTA plugins</a>, specifically
   AmbiDEC and AmbiENC, are recommended for the 3OA workflow. Source and releases:
   <a href="https://github.com/leomccormack/SPARTA" target="_blank" rel="noopener noreferrer">leomccormack/SPARTA</a>.

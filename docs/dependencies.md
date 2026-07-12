@@ -24,6 +24,8 @@ toc:
   for NumPy-backed offline processes
 - <a href="https://github.com/espeak-ng/espeak-ng" target="_blank" rel="noopener noreferrer">eSpeak NG</a>
   for `EVP Field` only
+- <a href="https://www.speex.org/" target="_blank" rel="noopener noreferrer">Speex</a>
+  for the optional `EVP Field` `Codec damage` stage only
 - <a href="https://leomccormack.github.io/sparta-site/" target="_blank" rel="noopener noreferrer">SPARTA plugins</a>
   for the 3OA workflow
 
@@ -44,6 +46,17 @@ brew install espeak-ng
 If REAPER cannot find eSpeak NG after installation, put an
 `espeak_ng_path.txt` file beside the scripts containing the full path to the
 binary, for example `/opt/homebrew/bin/espeak-ng`.
+
+Speex is only required if `EVP Field` uses `Codec damage`. On macOS, install it
+with Homebrew:
+
+```sh
+brew install speex
+```
+
+The render backend looks for `speexenc` and `speexdec` in common Homebrew
+locations and in the system path. If REAPER still cannot find them, put the full
+paths in `speexenc_path.txt` and `speexdec_path.txt` beside the scripts.
 
 SPARTA source and releases are available at
 <a href="https://github.com/leomccormack/SPARTA" target="_blank" rel="noopener noreferrer">leomccormack/SPARTA</a>.

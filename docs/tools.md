@@ -179,9 +179,10 @@ modulation afterward.
   possession, and damaged-broadcast textures. Voice treatments reshape the
   spoken source, time expansion can fill the requested duration, and an
   optional spectral shaper can apply preset masks, typed tone-list resonances,
-  or a selected-item profile imprint before fixed 3OA ACN/SN3D or multichannel
-  ring, double-ring, cube, and dome output. eSpeak NG is required for this
-  process.
+  or a selected-item profile imprint. Optional Speex codec damage can be added
+  before fixed 3OA ACN/SN3D or multichannel ring, double-ring, cube, and dome
+  output. eSpeak NG is required for this process; Speex is only required when
+  `Codec damage` is enabled.
 - `Fata Morgana Resynth`: hybrid oscillator resynthesis from 2-16 selected
   source items, recombining timing, pitch, amplitude, and spatial traits.
 - `IR Toolkit`: reshapes a selected impulse response item with silence trim,

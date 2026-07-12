@@ -61,7 +61,7 @@ Use lower grain counts while setting the event shape and spatial spread, then ra
 Use this to render synthetic speech-like formant material as a multichannel or
 ambisonic field. eSpeak NG creates the spoken source, then the selected voice
 treatment reshapes it before spatial rendering. eSpeak NG is required for this
-process.
+process. Speex is optional and is only required when `Codec damage` is enabled.
 
 Output:
 
@@ -89,6 +89,12 @@ Main controls:
   imprints the spectrum of the first selected WAV media item.
 - `Shaper strength`, `Shaper bandwidth`, `Shaper partials`, and
   `Shaper brightness` control how strongly the mask is applied.
+- `Codec damage` runs the treated speech through Speex before spatial output.
+  Narrowband, wideband, and ultra-wideband modes use different codec sample
+  rates. `Codec amount` blends the damaged signal with the source, `Codec
+  quality` sets the Speex encode quality, `Packet loss` simulates dropped codec
+  packets, and `Residue instead of decoded speech` uses the difference between
+  the source and codec result as the damaged layer.
 - `Pitch`, `Pitch spread`, `Formant shift`, and `Mouth size` shift the vocal
   register and formant character.
 - `Breath`, `Noise`, `Whisper`, and `Formant smear` add air, residue, and
