@@ -323,9 +323,10 @@ surface during playback.
 Use `Vertical Timeline Navigator` as a companion view when a top-to-bottom time
 display makes a project easier to read. Tracks are arranged left-to-right, and
 time runs vertically. The view shows media items, markers, regions, edit cursor,
-play cursor, and the current time selection. Media items inherit muted REAPER
-item/track colors when available, and multichannel items draw internal channel
-subdivisions across the item width with a channel-count label.
+play cursor, a linked transport strip, and the current time selection. Media
+items inherit muted REAPER item/track colors when available, and multichannel
+items draw internal channel subdivisions across the item width with a
+channel-count label.
 
 This script does not replace REAPER's arrange view or change project layout. It
 provides a second navigation surface for reading structure, selecting items,
@@ -339,13 +340,13 @@ to create a time selection.
 `Fit Selection` focuses the current time selection. `Follow play` keeps the
 play cursor near the center of the visible range during playback. `Seconds /
 pixel`, `View start`, `Visible tracks`, and `First track` provide manual view
-control for larger sessions.
+control for larger sessions. Use `First track` for predictable side-to-side
+movement through large track sets.
 
 Mouse gestures:
 
 - Wheel scrolls through time.
 - `Cmd`/`Ctrl` + wheel zooms around the mouse position.
-- Right-drag pans the view through time and tracks.
 - `Shift` + wheel pages through tracks.
 - Horizontal wheel input also pages through tracks when available.
 

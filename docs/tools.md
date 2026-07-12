@@ -115,8 +115,9 @@ Package Browser group counts:
   geometry, low protection, stereo preservation, and safety gain controls.
 - `Vertical Timeline Navigator`: ReaImGui companion view that draws time
   top-to-bottom and tracks left-to-right for navigating items, markers,
-  regions, edit cursor, time selection, item moves, mouse scroll, and mouse
-  zoom.
+  regions, edit cursor, linked transport, time selection, item moves,
+  muted REAPER-derived item colors, channel subdivisions, mouse scroll, and
+  mouse zoom.
 
 ## MIDI Composition
 

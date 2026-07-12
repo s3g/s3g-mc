@@ -751,7 +751,7 @@ local function loop()
     changed, view_start = ImGui.SliderDouble(ctx, "View start", view_start, 0.0, math.max(0.0, project_len), "%.2f sec")
     changed, visible_tracks = ImGui.SliderInt(ctx, "Visible tracks", visible_tracks, 1, math.max(1, math.min(64, track_count)))
     changed, track_start = ImGui.SliderInt(ctx, "First track", track_start, 1, math.max(1, track_count))
-    ImGui.TextColored(ctx, COLORS.muted, "Wheel scrolls time. Cmd/Ctrl-wheel zooms. Right-drag or arrow keys pan time/tracks.")
+    ImGui.TextColored(ctx, COLORS.muted, "Wheel scrolls time. Cmd/Ctrl-wheel zooms. First track slider moves side-to-side.")
 
     local canvas_w, avail_h = ImGui.GetContentRegionAvail(ctx)
     local canvas_h = math.max(320, avail_h - 26)
