@@ -5,6 +5,12 @@ local M = {}
 
 local has_imgui = reaper.APIExists and reaper.APIExists("ImGui_CreateContext")
 
+local function module_dir()
+  local source = debug.getinfo(1, "S").source or ""
+  source = source:gsub("^@", "")
+  return source:match("^(.*[/\\])") or ""
+end
+
 local function split_csv(text)
   local values = {}
   text = tostring(text or "")
@@ -32,7 +38,7 @@ local function ensure_imgui(title)
     reaper.MB("ReaImGui is required for this dialog.", title or "s3g-mc", 0)
     return nil
   end
-  package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
+  package.path = module_dir() .. "?.lua;" .. reaper.ImGui_GetBuiltinPath() .. "/?.lua"
   local ok, imgui_loader = pcall(require, "imgui")
   if not ok or not imgui_loader then
     reaper.MB("Could not load ReaImGui.", title or "s3g-mc", 0)
@@ -48,6 +54,8 @@ function M.prompt_csv(title, labels_csv, defaults_csv, on_submit, opts)
   opts = opts or {}
   local ImGui = ensure_imgui(title)
   if not ImGui then return false end
+  local ok_theme, theme = pcall(require, "s3g-mc ImGui Theme")
+  if not ok_theme then theme = nil end
 
   local labels = type(labels_csv) == "table" and labels_csv or split_csv(labels_csv)
   local values = type(defaults_csv) == "table" and defaults_csv or split_csv(defaults_csv)
@@ -56,9 +64,10 @@ function M.prompt_csv(title, labels_csv, defaults_csv, on_submit, opts)
   end
 
   local ctx = ImGui.CreateContext(title or "s3g-mc Input")
+  local theme_font = theme and theme.attach_font(ImGui, ctx, 11) or nil
   local open = true
   local submitted = false
-  local window_height = math.min(720, math.max(180, 116 + #labels * 42))
+  local window_height = math.min(730, math.max(190, 126 + #labels * 42))
   local window_width = opts.width or 460
   local button_label = opts.button_label or "Run"
 
@@ -73,6 +82,8 @@ function M.prompt_csv(title, labels_csv, defaults_csv, on_submit, opts)
     end
 
     ImGui.SetNextWindowSize(ctx, window_width, window_height, ImGui.Cond_Appearing)
+    local theme_stack = theme and theme.push(ImGui, ctx) or nil
+    local font_pushed = theme and theme.push_font(ImGui, ctx, theme_font) or false
     local visible
     visible, open = ImGui.Begin(ctx, title or "s3g-mc Input", open)
     if visible then
@@ -98,6 +109,10 @@ function M.prompt_csv(title, labels_csv, defaults_csv, on_submit, opts)
         open = false
       end
       ImGui.End(ctx)
+    end
+    if theme then
+      theme.pop_font(ImGui, ctx, font_pushed)
+      theme.pop(ImGui, ctx, theme_stack)
     end
 
     if submitted then

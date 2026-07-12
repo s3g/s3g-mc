@@ -17,6 +17,17 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+do
+  local _s3g_theme_path = ({ reaper.get_action_context() })[2]
+  if not _s3g_theme_path or _s3g_theme_path == "" then
+    _s3g_theme_path = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
+  end
+  local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
+  package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+end
+
 
 local MODES = {
   [1] = "Rotate",

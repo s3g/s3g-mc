@@ -19,6 +19,8 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+package.path = script_dir .. "?.lua;" .. package.path
+local theme = require("s3g-mc ImGui Theme")
 local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 local EXT = "s3g_mc_3oafx_offline_renderer_v1"
 local COLOR_WARN = ImGui.ColorConvertDouble4ToU32(1.0, 0.35, 0.22, 1.0)
@@ -477,6 +479,7 @@ function main()
   be.load_extstate(EXT, ENV_DEFS, env_points, env_enabled)
 
   ctx = ImGui.CreateContext("3OAFX Offline Renderer")
+  local theme_font = theme.attach_font(ImGui, ctx, 11)
   local open = true
   local should_render = false
   local selected_env = 1
@@ -484,7 +487,9 @@ function main()
   local env_opts = { height = 150, overview_lane_h = 54, random_amount = 0.28, random_count = 10, random_dispersion = 0.25, random_smooth = true }
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 900, 760, WINDOW_OPEN_COND)
+    ImGui.SetNextWindowSize(ctx, 900, 770, WINDOW_OPEN_COND)
+    local theme_stack = theme.push(ImGui, ctx)
+    local font_pushed = theme.push_font(ImGui, ctx, theme_font)
     local visible
     visible, open = ImGui.Begin(ctx, "3OAFX Offline Renderer", open)
     if visible then
@@ -549,6 +554,8 @@ function main()
       if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
       ImGui.End(ctx)
     end
+    theme.pop_font(ImGui, ctx, font_pushed)
+    theme.pop(ImGui, ctx, theme_stack)
 
     if should_render then
       open = false

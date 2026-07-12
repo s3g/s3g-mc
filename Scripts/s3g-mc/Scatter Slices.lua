@@ -22,6 +22,17 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+do
+  local _s3g_theme_path = ({ reaper.get_action_context() })[2]
+  if not _s3g_theme_path or _s3g_theme_path == "" then
+    _s3g_theme_path = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
+  end
+  local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
+  package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+end
+
 
 local SLICE_EQUAL = 1
 local SLICE_MARKERS = 2
@@ -845,8 +856,9 @@ local function main()
     visible, open = ImGui.Begin(ctx, "Scatter Slices", open)
 
     if visible then
-      local footer_h = 54
-      local control_h = math.max(260, ImGui.GetWindowHeight(ctx) - footer_h)
+      local footer_h = 64
+      local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+      local control_h = math.max(260, avail_h - footer_h)
       if ImGui.BeginChild(ctx, "##scatter_slices_controls", 0, control_h) then
       ImGui.Text(ctx, "Sources: " .. tostring(#sources) .. " selected audio item(s)")
       ImGui.Text(ctx, "Combined source length: " .. string.format("%.3f sec", total_length))
@@ -921,6 +933,7 @@ local function main()
       if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
       ImGui.SameLine(ctx)
       if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+      ImGui.Dummy(ctx, 1, 10)
       ImGui.End(ctx)
     end
 

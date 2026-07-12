@@ -16,10 +16,16 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local script_path = ({ reaper.get_action_context() })[2]
+local script_dir = script_path:match("^(.*[/\\])") or ""
+package.path = script_dir .. "?.lua;" .. package.path
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local PROJECT = 0
 local NUM_SOURCES = 8
 local ctx = ImGui.CreateContext("Spatial Automation Composer")
+local theme_font = theme.attach_font(ImGui, ctx, 11)
 local open = true
 local last_status = ""
 local view_yaw_deg = -35
@@ -62,13 +68,13 @@ local settings = {
 }
 
 local COLORS = {
-  bg = ImGui.ColorConvertDouble4ToU32(0.035, 0.04, 0.045, 1),
-  panel = ImGui.ColorConvertDouble4ToU32(0.075, 0.082, 0.088, 1),
-  edge = ImGui.ColorConvertDouble4ToU32(0.29, 0.31, 0.33, 1),
-  text = ImGui.ColorConvertDouble4ToU32(0.82, 0.88, 0.9, 1),
-  muted = ImGui.ColorConvertDouble4ToU32(0.50, 0.58, 0.60, 1),
+  bg = THEME.bg,
+  panel = THEME.panel,
+  edge = THEME.edge,
+  text = THEME.text,
+  muted = THEME.muted,
   active = ImGui.ColorConvertDouble4ToU32(0.16, 0.63, 0.38, 1),
-  warn = ImGui.ColorConvertDouble4ToU32(0.95, 0.46, 0.34, 1),
+  warn = THEME.warn,
 }
 
 local source_colors = {
@@ -631,12 +637,14 @@ local function loop()
   if preview_play then
     preview_t = (preview_t + dt * preview_speed / math.max(0.1, settings.duration)) % 1.0
   end
-  ImGui.SetNextWindowSize(ctx, 820, 740, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 820, 750, ImGui.Cond_Appearing)
+  local theme_stack = theme.push(ImGui, ctx)
+  local font_pushed = theme.push_font(ImGui, ctx, theme_font)
   local visible
   visible, open = ImGui.Begin(ctx, "Spatial Automation Composer", open)
   if visible then
     local footer_track, footer_fx, footer_spec, footer_start, footer_end = nil, nil, nil, nil, nil
-    local footer_h = 58
+    local footer_h = 68
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(280, avail_h - footer_h)
     if ImGui.BeginChild(ctx, "##spatial_automation_controls", 0, control_h) then
@@ -726,8 +734,11 @@ local function loop()
     if not footer_spec then ImGui.EndDisabled(ctx) end
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Close", 100, 30) then open = false end
+    ImGui.Dummy(ctx, 1, 10)
     ImGui.End(ctx)
   end
+  theme.pop_font(ImGui, ctx, font_pushed)
+  theme.pop(ImGui, ctx, theme_stack)
   if open then reaper.defer(loop) end
 end
 

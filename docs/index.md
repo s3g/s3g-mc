@@ -21,7 +21,7 @@ s3g-mc is a collection of REAPER tools for multichannel composition, spatial aud
 
 It includes Lua actions, ReaImGui controllers, and JSFX for channel editing, automation, fold-down monitoring, dome panning, 3OA send/return routing, and render-based multichannel processes.
 
-Current package snapshot: the browser exposes 119 user-facing tools/controllers, plus the Package Browser. Of those, 50 are Python/NumPy-backed offline processes, 25 load, control, or render included JSFX, and 44 are native Lua/ReaImGui REAPER actions. The repository also ships 23 underlying JSFX engine/effect files. The Lua folder includes helper libraries and support dialogs that are not shown as Package Browser entries.
+Current package snapshot: the browser exposes 120 user-facing tools/controllers, plus the Package Browser. Of those, 50 are Python/NumPy-backed offline processes, 26 load, control, or render included JSFX, and 44 are native Lua/ReaImGui REAPER actions. The repository also ships 24 underlying JSFX engine/effect files. The Lua folder includes helper libraries and support dialogs that are not shown as Package Browser entries.
 
 The package also includes browser-based companion utilities for spatial motion,
 automation lanes, image scores, IR room sketches, and 3OAFX displacement maps.
@@ -48,6 +48,8 @@ Many of these tools are inspired by or extend existing computer music practices,
 - Common-layout panning plus 12ch, 17ch, and 25ch panners for RISD SRST arrays
 - 3OAFX ambisonic send/return workflow for 24-channel effect inserts
 - Track-level automation mixer for up to 128 channels, with plugin pin control
+- Snapshot surfaces for interpolating captured track and FX states with an
+  automatable cursor
 - Ambisonic stereo fold-down based on virtual speaker fields and stereo pickup models
 - Stereo-to-ambisonic source expansion for building 3OAFX beds from mono or stereo material
 - Multi-source ambisonic scene navigation with editable node maps and listener paths

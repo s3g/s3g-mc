@@ -21,6 +21,10 @@ local open = true
 local script_path = ({reaper.get_action_context()})[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local script_name = script_path:match("[^/\\]+$") or "s3g-mc Package Browser.lua"
+package.path = script_dir .. "?.lua;" .. package.path
+local theme = require("s3g-mc ImGui Theme")
+local theme_font = theme.attach_font(ImGui, ctx, 11)
+local THEME = theme.palette(ImGui)
 local search = ""
 local active_category = "All"
 local status = ""
@@ -29,10 +33,10 @@ local scripts = {}
 local command_cache = {}
 
 local COLORS = {
-  panel = ImGui.ColorConvertDouble4ToU32(0.055, 0.060, 0.065, 1),
-  edge = ImGui.ColorConvertDouble4ToU32(0.29, 0.31, 0.33, 1),
-  text = ImGui.ColorConvertDouble4ToU32(0.78, 0.82, 0.84, 1),
-  dim = ImGui.ColorConvertDouble4ToU32(0.48, 0.52, 0.54, 1),
+  panel = THEME.panel,
+  edge = THEME.edge,
+  text = THEME.text,
+  dim = THEME.muted,
 }
 
 local CATEGORY_ORDER = {
@@ -319,9 +323,6 @@ local function draw_wrapped_metadata(label, value, width)
   ImGui.TextWrapped(ctx, label .. value)
   ImGui.PopTextWrapPos(ctx)
   ImGui.PopStyleColor(ctx)
-  if ImGui.IsItemHovered(ctx) and #value > 90 then
-    ImGui.SetTooltip(ctx, value)
-  end
 end
 
 local function draw_script_card(entry)
@@ -376,7 +377,9 @@ local function draw_script_card(entry)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 820, 720, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 820, 730, ImGui.Cond_Appearing)
+  local theme_stack = theme.push(ImGui, ctx)
+  local font_pushed = theme.push_font(ImGui, ctx, theme_font)
   local visible
   visible, open = ImGui.Begin(ctx, "s3g-mc Package Browser", open)
 
@@ -406,6 +409,8 @@ local function loop()
 
     ImGui.End(ctx)
   end
+  theme.pop_font(ImGui, ctx, font_pushed)
+  theme.pop(ImGui, ctx, theme_stack)
 
   if open then reaper.defer(loop) end
 end

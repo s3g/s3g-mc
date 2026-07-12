@@ -8,7 +8,13 @@
 
 local script_path=({reaper.get_action_context()})[2]; local script_dir=script_path:match("^(.*[/\\])") or ""; local mc=dofile(script_dir.."Multichannel Library.lua"); local nr=dofile(script_dir.."NumPy Render Library.lua")
 if not reaper.APIExists("ImGui_GetVersion") then reaper.MB("ReaImGui is not installed.","Subharmonic Bank",0) return end
-package.path=reaper.ImGui_GetBuiltinPath().."/?.lua"; local ImGui=require("imgui")("0.10"); local EXT="s3g_mc_subharmonic_bank_v1"
+package.path=reaper.ImGui_GetBuiltinPath().."/?.lua"; local ImGui=require("imgui")("0.10")
+do
+  package.path = script_dir .. "?.lua;" .. package.path
+  local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+end
+local EXT="s3g_mc_subharmonic_bank_v1"
 local function getn(k,d)return tonumber(reaper.GetExtState(EXT,k))or d end; local function getb(k,d)local v=reaper.GetExtState(EXT,k);if v==""then return d end;return v~="0"end; local function set(k,v)reaper.SetExtState(EXT,k,type(v)=="boolean"and(v and"1"or"0")or tostring(v),true)end
 local s={duration=getn("duration",12),channels=getn("channels",8),voices=getn("voices",24),root_freq=getn("root_freq",110),instability=getn("instability",0.12),pulse_blend=getn("pulse_blend",0.55),fold=getn("fold",0.2),event_mask=getn("event_mask",0.55),spatial_width=getn("spatial_width",1.8),normalize=getb("normalize",true),normalize_db=getn("normalize_db",-12),seed=getn("seed",1)}
 local ctx=ImGui.CreateContext("Subharmonic Bank"); local open=true; local go=false

@@ -82,6 +82,19 @@ objects or stacked channel-shapes. The controller provides a routing overview,
 camera presets, cursor falloff/gate tuning, and automation helpers for writing
 cursor or curve movement to REAPER lanes.
 
+Use `Snapshot Surface` when a set of track or FX states should be explored as
+regions rather than as separate envelope lanes. Capture one scoped snapshot to
+define the target set, then capture later snapshots from the same targets after
+changing the mixer or plugin state. The cursor can be moved by hand or driven
+from the included `s3g Snapshot Surface Cursor` JSFX automation lanes.
+
+This workflow sits near Ross Bencina's
+<a href="https://www.audiomulch.com/tutorials/beginners-tutorial-4-using-the-metasurface" target="_blank" rel="noopener noreferrer">AudioMulch MetaSurface</a>
+idea and Max's
+<a href="https://docs.cycling74.com/reference/pattrstorage/" target="_blank" rel="noopener noreferrer">`pattrstorage`</a>
+preset interpolation, adapted here to ordinary REAPER tracks, FX parameters,
+project extstate, and automatable JSFX cursor parameters.
+
 Use `Transaural Crosstalk Canceller` after a binaural decoder or binaural
 stereo render when that signal needs to play over loudspeakers from a fixed
 listening position. It is not a binaural headphone decoder; it is the

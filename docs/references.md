@@ -157,6 +157,9 @@ Live page available as of access date.</p>
 <p class="bib-entry">Cornut, Omar, and Dear ImGui contributors. n.d. <em>Dear ImGui</em>. GitHub repository. Accessed June 28, 2026.
 <a href="https://github.com/ocornut/imgui" target="_blank" rel="noopener noreferrer">https://github.com/ocornut/imgui</a>.</p>
 
+<p class="bib-entry">Cycling '74. n.d. "`pattrstorage`." <em>Max Reference</em>. Accessed July 12, 2026.
+<a href="https://docs.cycling74.com/reference/pattrstorage/" target="_blank" rel="noopener noreferrer">https://docs.cycling74.com/reference/pattrstorage/</a>.</p>
+
 <p class="bib-entry">Fillion, Christian. n.d. <em>ReaImGui: ReaScript Binding and REAPER Backend for Dear ImGui</em>. GitHub repository. Accessed June 28, 2026.
 <a href="https://github.com/cfillion/reaimgui" target="_blank" rel="noopener noreferrer">https://github.com/cfillion/reaimgui</a>.</p>
 
@@ -174,6 +177,9 @@ Live page available as of access date.</p>
 ## Further Reading and Method Context
 
 <div class="bibliography">
+
+<p class="bib-entry">Bencina, Ross. n.d. "Beginner's Tutorial 4: Using the Metasurface." <em>AudioMulch</em>. Accessed July 12, 2026.
+<a href="https://www.audiomulch.com/tutorials/beginners-tutorial-4-using-the-metasurface" target="_blank" rel="noopener noreferrer">https://www.audiomulch.com/tutorials/beginners-tutorial-4-using-the-metasurface</a>.</p>
 
 <p class="bib-entry">Bregman, Albert S. 1990. <em>Auditory Scene Analysis: The Perceptual Organization of Sound</em>. Cambridge, MA: MIT Press.</p>
 

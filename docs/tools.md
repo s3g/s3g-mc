@@ -37,16 +37,16 @@ The [Utilities](utilities.md) pages cover the browser-based companion tools for
 Automation Score breakpoint lanes, image scores, IR room sketches, and Spatial
 Score automation JSON.
 
-Current package snapshot: the browser exposes 119 user-facing tools/controllers,
+Current package snapshot: the browser exposes 120 user-facing tools/controllers,
 plus the Package Browser. Of those, 50 are Python/NumPy-backed offline
-processes, 25 load, control, or render included JSFX, and 44 are native
-Lua/ReaImGui REAPER actions. The repository also ships 23 underlying JSFX
+processes, 26 load, control, or render included JSFX, and 44 are native
+Lua/ReaImGui REAPER actions. The repository also ships 24 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and support
 dialogs that are not shown as Package Browser entries.
 
 Package Browser group counts:
 
-- Channel Mixing / Automation: 6
+- Channel Mixing / Automation: 7
 - MIDI Composition: 8
 - Procedural Synthesis: 6
 - Offline Synthesis / IR: 10
@@ -106,6 +106,9 @@ Package Browser group counts:
   rotation, weighting, 3D projection attenuation, autogain, and output trim.
   The JSFX declares only stereo outputs; in multichannel listening chains, set
   its plugin I/O to zero unmapped output channels.
+- `Snapshot Surface`: captures track and FX states as named Voronoi regions,
+  stores them in the REAPER project, and interpolates between snapshots with a
+  manual cursor or automatable `s3g Snapshot Surface Cursor` JSFX.
 - `Transaural Crosstalk Canceller`: stereo loudspeaker playback processor with
   feedforward and matrix-inverse crosstalk cancellation modes, speaker
   geometry, low protection, stereo preservation, and safety gain controls.

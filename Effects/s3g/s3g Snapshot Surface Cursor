@@ -1,0 +1,77 @@
+desc:s3g Snapshot Surface Cursor
+tags: automation control snapshot surface cursor utility
+
+slider1:0.5<0,1,0.001>Cursor X
+slider2:0.5<0,1,0.001>Cursor Y
+slider3:1<0,1,1{Off,On}>Enable Cursor Output
+slider4:2<0.25,8,0.01>Interpolation Focus
+
+options:no_meter
+
+@init
+ext_tail_size = -2;
+ext_noinit = 1;
+gfx_ext_retina == 0 ? gfx_ext_retina = 1;
+
+@sample
+// Control-only JSFX. Pass audio unchanged if the track has any audio routed through it.
+
+@gfx 420 220
+sc = gfx_ext_retina;
+bg = gfx_getsyscol();
+bgr = bg & 255; bgg = (bg >> 8) & 255; bgb = (bg >> 16) & 255;
+fg = bgr*130 + bgg*256 + bgb*50 < 60000;
+
+gfx_clear = bg;
+gfx_setfont(1, "Arial", 14 * sc);
+gfx_setfont(2, "Arial", 11 * sc);
+
+function set_rgb(r g b a) ( gfx_set(r, g, b, a); );
+function set_fg(a) ( gfx_set(fg, fg, fg, a); );
+function clamp01(v) ( v < 0 ? 0 : v > 1 ? 1 : v; );
+function draw_text(x y str font)
+(
+  gfx_setfont(font);
+  gfx_x = x * sc;
+  gfx_y = y * sc;
+  gfx_drawstr(str);
+);
+
+x = clamp01(slider1);
+y = clamp01(slider2);
+enabled = slider3 >= 0.5;
+
+pad = 18 * sc;
+plot_x = pad;
+plot_y = 46 * sc;
+plot_w = gfx_w - pad * 2;
+plot_h = gfx_h - plot_y - pad;
+
+set_rgb(0.04, 0.045, 0.05, 1);
+gfx_rect(plot_x, plot_y, plot_w, plot_h);
+set_fg(0.32);
+gfx_rect(plot_x, plot_y, plot_w, plot_h, 0);
+
+i = 1;
+loop(7,
+  gx = plot_x + plot_w * i / 8;
+  gy = plot_y + plot_h * i / 8;
+  set_fg(0.12);
+  gfx_line(gx, plot_y, gx, plot_y + plot_h);
+  gfx_line(plot_x, gy, plot_x + plot_w, gy);
+  i += 1;
+);
+
+cx = plot_x + plot_w * x;
+cy = plot_y + plot_h * y;
+enabled ? set_rgb(0.58, 0.75, 0.82, 1) : set_rgb(0.35, 0.38, 0.40, 1);
+gfx_line(cx - 11 * sc, cy, cx + 11 * sc, cy);
+gfx_line(cx, cy - 11 * sc, cx, cy + 11 * sc);
+gfx_rect(cx - 4 * sc, cy - 4 * sc, 8 * sc, 8 * sc, 0);
+
+set_fg(0.9);
+draw_text(18, 14, "s3g Snapshot Surface Cursor", 1);
+set_fg(0.62);
+draw_text(18, 30, enabled ? "Enable: On" : "Enable: Off", 2);
+sprintf(#readout, "X %.3f   Y %.3f   Focus %.2f", slider1, slider2, slider4);
+draw_text(180, 30, #readout, 2);

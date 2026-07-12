@@ -14,6 +14,17 @@ local nr = dofile(script_dir .. "NumPy Render Library.lua")
 if not reaper.APIExists("ImGui_GetVersion") then reaper.MB("ReaImGui is not installed.", "3OAFX Spatial Grains", 0) return end
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+do
+  local _s3g_theme_path = ({ reaper.get_action_context() })[2]
+  if not _s3g_theme_path or _s3g_theme_path == "" then
+    _s3g_theme_path = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
+  end
+  local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
+  package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+end
+
 local EXT = "s3g_mc_foafx_spatial_grains_v1"
 local MODES = { "scan", "cloud", "dual", "jump", "freeze" }
 local MODE_LABELS = { "Index scan", "Cloud", "Dual state", "Jump scan", "Freeze cloud" }

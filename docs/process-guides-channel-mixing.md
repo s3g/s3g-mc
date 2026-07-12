@@ -21,6 +21,8 @@ toc:
     href: "#128ch-node-track-mixer"
   - title: Focused FX Automation Capture
     href: "#focused-fx-automation-capture"
+  - title: Snapshot Surface
+    href: "#snapshot-surface"
   - title: MC to Stereo Autogain
     href: "#mc-to-stereo-autogain"
   - title: Transaural Crosstalk Canceller
@@ -268,6 +270,31 @@ envelope behavior handles the interpolation between those points.
 `Show Selected Lanes` creates, shows, and arms the selected FX envelopes
 without writing a point. The first version targets track FX; take FX are not
 included.
+
+
+## Snapshot Surface
+
+Use `Snapshot Surface` when several track or FX states should become named
+regions on a two-dimensional control surface. Each snapshot stores current
+values for the captured target set, and the surface cursor interpolates between
+nearby snapshots. The display uses Voronoi-style cells so each named region has
+a visible area, center point, and editable position.
+
+The first capture defines the target set. Choose a capture scope, then click
+`Capture From Scope`. After that, adjust the same track or plugin controls and
+use `Capture From Target Set` for additional snapshots. This avoids repeatedly
+reselecting tracks or refocusing plugin windows while building a surface.
+
+Captured data is saved in the REAPER project with project extstate, so the
+surface reopens with the `.RPP`. Targets are resolved by track GUID plus FX and
+parameter index. Renaming tracks is fine; deleting tracks or changing the order
+of captured FX can orphan or redirect some targets.
+
+For timeline control, click `Create / Link Cursor FX`. This creates or finds a
+control track with the `s3g Snapshot Surface Cursor` JSFX. Its `Cursor X` and
+`Cursor Y` parameters can be automated in REAPER. Enable `Follow cursor FX` and
+`Apply while dragging cursor` when those automation lanes should drive the
+surface during playback.
 
 
 

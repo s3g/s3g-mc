@@ -183,6 +183,12 @@ local function draw_combo(ImGui, ctx, label, current, names)
   return current
 end
 
+local function draw_square_handle(ImGui, dl, cx, cy, size, fill, edge, thickness)
+  local half = size * 0.5
+  ImGui.DrawList_AddRectFilled(dl, cx - half, cy - half, cx + half, cy + half, fill)
+  ImGui.DrawList_AddRect(dl, cx - half, cy - half, cx + half, cy + half, edge, 0, 0, thickness or 1)
+end
+
 local function draw_overview(ImGui, ctx, defs, points, enabled, selected, selected_point, current_values, opts)
   local width = math.max(320, ImGui.GetContentRegionAvail(ctx) - 2)
   local lane_h = opts.overview_lane_h or 54
@@ -194,14 +200,15 @@ local function draw_overview(ImGui, ctx, defs, points, enabled, selected, select
   local hovered = ImGui.IsItemHovered(ctx)
   local dl = ImGui.GetWindowDrawList(ctx)
   local mx, my = ImGui.GetMousePos(ctx)
-  local c_bg = color(ImGui, 0.040, 0.044, 0.046, 1)
-  local c_bg_active = color(ImGui, 0.070, 0.066, 0.052, 1)
-  local c_grid = color(ImGui, 0.50, 0.56, 0.56, 0.09)
-  local c_edge = color(ImGui, 0.55, 0.60, 0.58, 0.28)
-  local c_selected = color(ImGui, 1.00, 0.88, 0.38, 0.95)
-  local c_active = color(ImGui, 0.90, 0.72, 0.32, 0.95)
-  local c_inactive = color(ImGui, 0.52, 0.56, 0.55, 0.45)
-  local c_text = color(ImGui, 0.72, 0.76, 0.74, 1)
+  local c_bg = color(ImGui, 0.040, 0.043, 0.046, 1)
+  local c_bg_active = color(ImGui, 0.060, 0.064, 0.068, 1)
+  local c_grid = color(ImGui, 0.56, 0.59, 0.60, 0.10)
+  local c_edge = color(ImGui, 0.32, 0.34, 0.36, 0.62)
+  local c_selected = color(ImGui, 0.82, 0.86, 0.88, 1.0)
+  local c_active = color(ImGui, 0.62, 0.67, 0.69, 0.96)
+  local c_inactive = color(ImGui, 0.42, 0.45, 0.46, 0.52)
+  local c_handle_edge = color(ImGui, 0.08, 0.09, 0.10, 1)
+  local c_text = color(ImGui, 0.70, 0.74, 0.75, 1)
   local plot_x0 = x0 + 118
   local plot_x1 = x1 - 10
   local drag_env = opts.overview_drag_env
@@ -253,8 +260,8 @@ local function draw_overview(ImGui, ctx, defs, points, enabled, selected, select
         local px = M.lerp(plot_x0, plot_x1, point.x)
         local py = M.lerp(ly1 - 8, ly0 + 8, point.y)
         local selected_here = is_selected and point_index == selected_point
-        ImGui.DrawList_AddCircleFilled(dl, px, py, selected_here and 5.7 or (is_selected and 4.6 or 3.8),
-          selected_here and c_selected or (is_selected and c_selected or c_active))
+        draw_square_handle(ImGui, dl, px, py, selected_here and 10.5 or (is_selected and 8.5 or 7.0),
+          selected_here and c_selected or (is_selected and c_selected or c_active), c_handle_edge, selected_here and 1.5 or 1.0)
       end
     end
 
@@ -381,13 +388,14 @@ function M.draw(ImGui, ctx, defs, points, enabled, selected, selected_point, cur
   local hovered = ImGui.IsItemHovered(ctx)
   local active = ImGui.IsItemActive(ctx)
   local dl = ImGui.GetWindowDrawList(ctx)
-  local c_bg = color(ImGui, 0.045, 0.050, 0.052, 1)
-  local c_grid = color(ImGui, 0.50, 0.56, 0.56, 0.14)
-  local c_line = color(ImGui, 0.90, 0.72, 0.32, enabled[selected] and 1 or 0.45)
-  local c_fill = color(ImGui, 0.90, 0.72, 0.32, enabled[selected] and 0.15 or 0.06)
-  local c_point = color(ImGui, 0.94, 0.88, 0.64, 1)
-  local c_selected = color(ImGui, 1.00, 0.96, 0.42, 1)
-  local c_edge = color(ImGui, 0.55, 0.60, 0.58, 0.35)
+  local c_bg = color(ImGui, 0.040, 0.043, 0.046, 1)
+  local c_grid = color(ImGui, 0.56, 0.59, 0.60, 0.13)
+  local c_line = color(ImGui, 0.66, 0.70, 0.72, enabled[selected] and 1 or 0.46)
+  local c_fill = color(ImGui, 0.66, 0.70, 0.72, enabled[selected] and 0.13 or 0.05)
+  local c_point = color(ImGui, 0.70, 0.74, 0.76, 1)
+  local c_selected = color(ImGui, 0.90, 0.93, 0.94, 1)
+  local c_handle_edge = color(ImGui, 0.08, 0.09, 0.10, 1)
+  local c_edge = color(ImGui, 0.32, 0.34, 0.36, 0.68)
   ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, c_bg)
   ImGui.DrawList_AddRect(dl, x0, y0, x1, y1, c_edge)
   for i = 1, 7 do
@@ -414,7 +422,8 @@ function M.draw(ImGui, ctx, defs, points, enabled, selected, selected_point, cur
   for index, point in ipairs(p) do
     local px = M.lerp(x0, x1, point.x)
     local py = M.lerp(y1, y0, point.y)
-    ImGui.DrawList_AddCircleFilled(dl, px, py, index == selected_point and 6.5 or 4.8, index == selected_point and c_selected or c_point)
+    draw_square_handle(ImGui, dl, px, py, index == selected_point and 12.0 or 9.0,
+      index == selected_point and c_selected or c_point, c_handle_edge, index == selected_point and 1.5 or 1.0)
   end
 
   local mx, my = ImGui.GetMousePos(ctx)

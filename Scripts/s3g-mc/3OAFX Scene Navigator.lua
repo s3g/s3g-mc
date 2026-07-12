@@ -21,6 +21,17 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+do
+  local _s3g_theme_path = ({ reaper.get_action_context() })[2]
+  if not _s3g_theme_path or _s3g_theme_path == "" then
+    _s3g_theme_path = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
+  end
+  local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
+  package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+end
+
 
 local ORDER_LABELS = { "1OA / 4ch", "2OA / 9ch", "3OA / 16ch" }
 local MODE_LABELS = { "Blend field", "Nearest field" }
@@ -817,8 +828,9 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    local footer_h = 58
-    local control_h = math.max(300, ImGui.GetWindowHeight(ctx) - footer_h)
+    local footer_h = 68
+    local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+    local control_h = math.max(300, avail_h - footer_h)
     if ImGui.BeginChild(ctx, "##scene_navigator_controls", 0, control_h) then
     ImGui.Text(ctx, "Selected 3OAFX scene nodes: " .. tostring(#entries))
     ImGui.TextColored(ctx, COLORS.muted, "Each selected item is a movable soundfield node; the path is the listener trajectory.")
@@ -894,6 +906,7 @@ local function loop()
     if ImGui.Button(ctx, "Render", 110, 30) then render() end
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Cancel", 110, 30) then open = false end
+    ImGui.Dummy(ctx, 1, 10)
     ImGui.End(ctx)
   end
   persist()

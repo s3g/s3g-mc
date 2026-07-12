@@ -18,6 +18,17 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+do
+  local _s3g_theme_path = ({ reaper.get_action_context() })[2]
+  if not _s3g_theme_path or _s3g_theme_path == "" then
+    _s3g_theme_path = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
+  end
+  local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
+  package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+end
+
 
 local TITLE = "Lattice Synth Render"
 local FX_NAME = "s3g MC Lattice Synth Engine"
@@ -458,8 +469,9 @@ local function loop()
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
     local settings = make_settings()
-    local footer_h = 54
-    local control_h = math.max(280, ImGui.GetWindowHeight(ctx) - footer_h)
+    local footer_h = 64
+    local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+    local control_h = math.max(280, avail_h - footer_h)
     if ImGui.BeginChild(ctx, "##lattice_synth_render_controls", 0, control_h) then
     draw_preview(settings)
     ImGui.SetNextItemWidth(ctx, 130)
@@ -525,6 +537,7 @@ local function loop()
     if ImGui.Button(ctx, "Render", 100, 28) then should_render = true end
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Close", 100, 28) then open = false end
+    ImGui.Dummy(ctx, 1, 10)
   end
   ImGui.End(ctx)
   if should_render then

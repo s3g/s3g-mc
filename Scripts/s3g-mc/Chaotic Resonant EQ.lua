@@ -8,7 +8,13 @@
 
 local script_path=({reaper.get_action_context()})[2]; local script_dir=script_path:match("^(.*[/\\])") or ""; local mc=dofile(script_dir.."Multichannel Library.lua"); local nr=dofile(script_dir.."NumPy Render Library.lua")
 if not reaper.APIExists("ImGui_GetVersion") then reaper.MB("ReaImGui is not installed.","Chaotic Resonant EQ",0) return end
-package.path=reaper.ImGui_GetBuiltinPath().."/?.lua"; local ImGui=require("imgui")("0.10"); local EXT="s3g_mc_chaotic_resonant_eq_v1"
+package.path=reaper.ImGui_GetBuiltinPath().."/?.lua"; local ImGui=require("imgui")("0.10")
+do
+  package.path = script_dir .. "?.lua;" .. package.path
+  local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+end
+local EXT="s3g_mc_chaotic_resonant_eq_v1"
 local entries=nr.selected_entries(); local entry=entries[1]; if not entry then mc.show_error("Select one WAV-backed media item.") return end
 local function getn(k,d)return tonumber(reaper.GetExtState(EXT,k))or d end; local function getb(k,d)local v=reaper.GetExtState(EXT,k);if v==""then return d end;return v~="0"end; local function set(k,v)reaper.SetExtState(EXT,k,type(v)=="boolean"and(v and"1"or"0")or tostring(v),true)end
 local s={bands=getn("bands",12),low_freq=getn("low_freq",90),high_freq=getn("high_freq",6000),q=getn("q",18),feedback=getn("feedback",0.18),chaos=getn("chaos",0.25),wet=getn("wet",0.55),drive=getn("drive",1.2),normalize=getb("normalize",true),normalize_db=getn("normalize_db",-9),seed=getn("seed",1)}
