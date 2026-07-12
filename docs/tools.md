@@ -37,16 +37,16 @@ The [Utilities](utilities.md) pages cover the browser-based companion tools for
 Automation Score breakpoint lanes, image scores, IR room sketches, and Spatial
 Score automation JSON.
 
-Current package snapshot: the browser exposes 120 user-facing tools/controllers,
+Current package snapshot: the browser exposes 121 user-facing tools/controllers,
 plus the Package Browser. Of those, 50 are Python/NumPy-backed offline
-processes, 26 load, control, or render included JSFX, and 44 are native
+processes, 26 load, control, or render included JSFX, and 45 are native
 Lua/ReaImGui REAPER actions. The repository also ships 24 underlying JSFX
 engine/effect files. The Lua folder includes helper libraries and support
 dialogs that are not shown as Package Browser entries.
 
 Package Browser group counts:
 
-- Channel Mixing / Automation: 7
+- Channel Mixing / Automation: 8
 - MIDI Composition: 8
 - Procedural Synthesis: 6
 - Offline Synthesis / IR: 10
@@ -113,6 +113,10 @@ Package Browser group counts:
 - `Transaural Crosstalk Canceller`: stereo loudspeaker playback processor with
   feedforward and matrix-inverse crosstalk cancellation modes, speaker
   geometry, low protection, stereo preservation, and safety gain controls.
+- `Vertical Timeline Navigator`: ReaImGui companion view that draws time
+  top-to-bottom and tracks left-to-right for navigating items, markers,
+  regions, edit cursor, time selection, item moves, mouse scroll, and mouse
+  zoom.
 
 ## MIDI Composition
 

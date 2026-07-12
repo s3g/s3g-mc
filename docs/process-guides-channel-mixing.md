@@ -23,6 +23,8 @@ toc:
     href: "#focused-fx-automation-capture"
   - title: Snapshot Surface
     href: "#snapshot-surface"
+  - title: Vertical Timeline Navigator
+    href: "#vertical-timeline-navigator"
   - title: MC to Stereo Autogain
     href: "#mc-to-stereo-autogain"
   - title: Transaural Crosstalk Canceller
@@ -314,6 +316,36 @@ control track with the `s3g Snapshot Surface Cursor` JSFX. Its `Cursor X` and
 `Cursor Y` parameters can be automated in REAPER. Enable `Follow cursor FX` and
 `Apply while dragging cursor` when those automation lanes should drive the
 surface during playback.
+
+
+## Vertical Timeline Navigator
+
+Use `Vertical Timeline Navigator` as a companion view when a top-to-bottom time
+display makes a project easier to read. Tracks are arranged left-to-right, and
+time runs vertically. The view shows media items, markers, regions, edit cursor,
+play cursor, and the current time selection.
+
+This script does not replace REAPER's arrange view or change project layout. It
+provides a second navigation surface for reading structure, selecting items,
+moving the edit cursor, and drawing a time selection. Click an item to select it
+and move the cursor to its start. Drag an item vertically to move it in time,
+or horizontally across the visible track columns to move it to another track.
+Click empty timeline space to move the edit cursor. Drag empty timeline space
+to create a time selection.
+
+`Fit Project` scales the whole project into the available vertical space.
+`Fit Selection` focuses the current time selection. `Follow play` keeps the
+play cursor near the center of the visible range during playback. `Seconds /
+pixel`, `View start`, `Visible tracks`, and `First track` provide manual view
+control for larger sessions.
+
+Mouse gestures:
+
+- Wheel scrolls through time.
+- `Cmd`/`Ctrl` + wheel zooms around the mouse position.
+- Right-drag pans the view through time and tracks.
+- `Shift` + wheel pages through tracks.
+- Horizontal wheel input also pages through tracks when available.
 
 
 
