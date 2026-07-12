@@ -107,8 +107,9 @@ Package Browser group counts:
   The JSFX declares only stereo outputs; in multichannel listening chains, set
   its plugin I/O to zero unmapped output channels.
 - `Snapshot Surface`: captures track and FX states as named Voronoi regions,
-  stores them in the REAPER project, and interpolates between snapshots with a
-  manual cursor or automatable `s3g Snapshot Surface Cursor` JSFX.
+  stores them in the REAPER project, generates randomized variants from the
+  captured target set, and interpolates between snapshots with a manual cursor
+  or automatable `s3g Snapshot Surface Cursor` JSFX.
 - `Transaural Crosstalk Canceller`: stereo loudspeaker playback processor with
   feedforward and matrix-inverse crosstalk cancellation modes, speaker
   geometry, low protection, stereo preservation, and safety gain controls.

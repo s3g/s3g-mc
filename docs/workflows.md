@@ -89,7 +89,7 @@ changing the mixer or plugin state. The cursor can be moved by hand or driven
 from the included `s3g Snapshot Surface Cursor` JSFX automation lanes.
 
 This workflow sits near Ross Bencina's
-<a href="https://www.audiomulch.com/tutorials/beginners-tutorial-4-using-the-metasurface" target="_blank" rel="noopener noreferrer">AudioMulch MetaSurface</a>
+<a href="http://www.audiomulch.com/help/metasurface" target="_blank" rel="noopener noreferrer">AudioMulch MetaSurface</a>
 idea and Max's
 <a href="https://docs.cycling74.com/reference/pattrstorage/" target="_blank" rel="noopener noreferrer">`pattrstorage`</a>
 preset interpolation, adapted here to ordinary REAPER tracks, FX parameters,

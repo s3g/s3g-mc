@@ -285,6 +285,25 @@ The first capture defines the target set. Choose a capture scope, then click
 use `Capture From Target Set` for additional snapshots. This avoids repeatedly
 reselecting tracks or refocusing plugin windows while building a surface.
 
+`Surface mode` separates layout from performance. In `Edit` mode, dragging a
+snapshot moves its region on the surface. In `Play` mode, dragging the surface
+moves the interpolation cursor and can audition the stored states.
+
+`Randomize Scope` holds the generative snapshot tools. `Randomize Snapshot`
+creates a new snapshot from the captured target set. `Mutate Selected` forks
+the selected snapshot into a related variation. `Spread` controls how many
+numeric targets are likely to move, and `Deviation` controls how far each moved
+target can drift. Boolean targets such as mute, solo, and FX enabled are
+excluded unless `Include mute/solo/enabled` is on.
+
+The lower panes show the `Snapshot List` and `Parameter Selection` side by
+side. Use the parameter tree to remove or restore individual parameters from
+the selected snapshot without changing the rest of the surface. Track and
+plugin groups have add/remove shortcuts, and the filter field narrows long
+parameter lists. If `Missing nearest target leaves value unchanged` is enabled,
+a parameter that is absent from the nearest snapshot is not recalled from a
+farther snapshot.
+
 Captured data is saved in the REAPER project with project extstate, so the
 surface reopens with the `.RPP`. Targets are resolved by track GUID plus FX and
 parameter index. Renaming tracks is fine; deleting tracks or changing the order

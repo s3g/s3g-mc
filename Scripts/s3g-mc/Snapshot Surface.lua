@@ -1,9 +1,9 @@
 -- @description Snapshot Surface
 -- @author s3g
--- @version 0.1
+-- @version 0.4
 -- @requires ReaImGui; JSFX: s3g Snapshot Surface Cursor
 -- @category Channel Mixing / Automation
--- @method Captures REAPER track and FX states as 2D surface snapshots, then interpolates the captured parameters by moving a cursor between snapshots.
+-- @method Captures REAPER track and FX states as 2D surface snapshots, then interpolates the captured parameters by moving a cursor between snapshots. Randomized snapshots can be generated from the captured target set for quick auditioning.
 -- @about
 --   A project-state interpolation surface for REAPER. Capture selected tracks,
 --   selected-track FX, the focused FX, or a bounded project scope as surface
@@ -36,6 +36,7 @@ end
 local ctx = ImGui.CreateContext(TITLE)
 local open = true
 local snapshots = {}
+local target_registry = { targets = {}, order = {} }
 local cursor = { x = 0.5, y = 0.5 }
 local selected_snapshot = nil
 local status = "Capture a snapshot to begin."
@@ -57,6 +58,14 @@ local dragging_snapshot = nil
 local snapshot_drag_dx = 0
 local snapshot_drag_dy = 0
 local snapshot_position_dirty = false
+local random_spread = 0.70
+local random_deviation = 0.25
+local random_apply = true
+local random_include_bools = false
+local random_source_index = 1
+local missing_targets_hold = true
+local target_filter = ""
+local surface_mode = 2
 
 local SCOPES = {
   "Selected tracks + FX",
@@ -66,8 +75,17 @@ local SCOPES = {
   "Selected track controls only",
 }
 
+local RANDOM_SOURCES = {
+  "Current target values",
+  "Selected snapshot",
+}
+
+local SURFACE_MODES = { "Edit", "Play" }
+
 local TYPE_NUMBER = "number"
 local TYPE_BOOL = "bool"
+local apply_surface
+local push_cursor_to_linked_fx
 
 local COLORS = {
   bg = ImGui.ColorConvertDouble4ToU32(0.035, 0.038, 0.041, 1),
@@ -128,6 +146,7 @@ end
 local function save_state()
   local state = {
     snapshots = snapshots,
+    target_registry = target_registry,
     cursor = cursor,
     settings = {
       scope_index = scope_index,
@@ -140,6 +159,14 @@ local function save_state()
       max_project_tracks = max_project_tracks,
       max_fx_per_track = max_fx_per_track,
       max_params_per_fx = max_params_per_fx,
+      random_spread = random_spread,
+      random_deviation = random_deviation,
+      random_apply = random_apply,
+      random_include_bools = random_include_bools,
+      random_source_index = random_source_index,
+      missing_targets_hold = missing_targets_hold,
+      target_filter = target_filter,
+      surface_mode = surface_mode,
     }
   }
   reaper.SetProjExtState(PROJECT, EXT, "state", serialize(state))
@@ -153,6 +180,9 @@ local function load_state()
   local ok, state = pcall(chunk)
   if not ok or type(state) ~= "table" then return end
   snapshots = type(state.snapshots) == "table" and state.snapshots or {}
+  target_registry = type(state.target_registry) == "table" and state.target_registry or target_registry
+  target_registry.targets = type(target_registry.targets) == "table" and target_registry.targets or {}
+  target_registry.order = type(target_registry.order) == "table" and target_registry.order or {}
   cursor = type(state.cursor) == "table" and state.cursor or cursor
   cursor.x = clamp(tonumber(cursor.x) or 0.5, 0, 1)
   cursor.y = clamp(tonumber(cursor.y) or 0.5, 0, 1)
@@ -167,6 +197,14 @@ local function load_state()
   max_project_tracks = clamp(math.floor(tonumber(settings.max_project_tracks) or max_project_tracks), 1, 256)
   max_fx_per_track = clamp(math.floor(tonumber(settings.max_fx_per_track) or max_fx_per_track), 0, 64)
   max_params_per_fx = clamp(math.floor(tonumber(settings.max_params_per_fx) or max_params_per_fx), 1, 2048)
+  random_spread = clamp(tonumber(settings.random_spread) or random_spread, 0, 1)
+  random_deviation = clamp(tonumber(settings.random_deviation) or random_deviation, 0, 1)
+  random_apply = settings.random_apply ~= false
+  random_include_bools = settings.random_include_bools == true
+  random_source_index = clamp(math.floor(tonumber(settings.random_source_index) or random_source_index), 1, #RANDOM_SOURCES)
+  missing_targets_hold = settings.missing_targets_hold ~= false
+  target_filter = tostring(settings.target_filter or "")
+  surface_mode = clamp(math.floor(tonumber(settings.surface_mode) or surface_mode), 1, #SURFACE_MODES)
   status = string.format("Loaded %d snapshot(s) from project.", #snapshots)
 end
 
@@ -287,9 +325,37 @@ local function linked_cursor_label()
   return string.format("Cursor FX: %s / %s", track_name(track), ok and fx_name or CURSOR_FX_NAME)
 end
 
+local function register_target_template(target)
+  if not target or not target.id then return end
+  target_registry.targets = target_registry.targets or {}
+  target_registry.order = target_registry.order or {}
+  if not target_registry.targets[target.id] then
+    target_registry.order[#target_registry.order + 1] = target.id
+  end
+  local template = {}
+  for key, item in pairs(target) do template[key] = item end
+  target_registry.targets[target.id] = template
+end
+
 local function add_target(snapshot, target)
+  register_target_template(target)
+  if snapshot.targets[target.id] then
+    snapshot.targets[target.id] = target
+    return
+  end
   snapshot.targets[target.id] = target
   snapshot.order[#snapshot.order + 1] = target.id
+end
+
+local function remove_target(snapshot, target_id)
+  if not snapshot or not snapshot.targets or not snapshot.targets[target_id] then return false end
+  snapshot.targets[target_id] = nil
+  local order = {}
+  for _, id in ipairs(snapshot.order or {}) do
+    if id ~= target_id then order[#order + 1] = id end
+  end
+  snapshot.order = order
+  return true
 end
 
 local function capture_track_controls(snapshot, track)
@@ -387,11 +453,21 @@ end
 local function target_templates()
   local seen = {}
   local templates = {}
+  target_registry.targets = target_registry.targets or {}
+  target_registry.order = target_registry.order or {}
+  for _, id in ipairs(target_registry.order) do
+    local target = target_registry.targets[id]
+    if target and not seen[id] then
+      seen[id] = true
+      templates[#templates + 1] = target
+    end
+  end
   for _, snapshot in ipairs(snapshots) do
     for _, id in ipairs(snapshot.order or {}) do
       local target = snapshot.targets and snapshot.targets[id]
       if target and not seen[id] then
         seen[id] = true
+        register_target_template(target)
         templates[#templates + 1] = target
       end
     end
@@ -527,6 +603,179 @@ local function capture_from_target_set()
   save_state()
 end
 
+local function copy_target(template, value)
+  local target = {}
+  for key, item in pairs(template) do target[key] = item end
+  target.value = value
+  return target
+end
+
+local function amp_to_db(value)
+  value = math.max(0.000001, tonumber(value) or 0)
+  return 20 * math.log(value) / math.log(10)
+end
+
+local function db_to_amp(db)
+  return 10 ^ ((tonumber(db) or 0) / 20)
+end
+
+local function random_signed()
+  -- Triangular distribution: small nudges are more common than extremes.
+  return (math.random() + math.random()) - 1
+end
+
+local function source_value_for_template(template)
+  if random_source_index == 2 and selected_snapshot and snapshots[selected_snapshot] then
+    local source = snapshots[selected_snapshot].targets and snapshots[selected_snapshot].targets[template.id]
+    if source and source.value ~= nil then return source.value end
+  end
+  local current = read_target_current_value(template)
+  if current ~= nil then return current end
+  return template.value
+end
+
+local function randomized_value(template)
+  local base = tonumber(source_value_for_template(template)) or tonumber(template.value) or 0
+  if math.random() > random_spread then return base, false end
+  if template.value_type == TYPE_BOOL then
+    if not random_include_bools then return base, false end
+    return base >= 0.5 and 0 or 1, true
+  end
+  local deviation = clamp(random_deviation, 0, 1)
+  local moved = false
+  local value = base
+  if template.kind == "track_vol" then
+    local db = amp_to_db(base)
+    value = db_to_amp(clamp(db + random_signed() * deviation * 24.0, -60.0, 12.0))
+    moved = true
+  elseif template.kind == "track_pan" then
+    value = clamp(base + random_signed() * deviation * 1.25, -1, 1)
+    moved = true
+  elseif template.kind == "fx_param" then
+    value = clamp(base + random_signed() * deviation, 0, 1)
+    moved = true
+  else
+    value = base
+  end
+  return value, moved
+end
+
+local function randomized_snapshot_from_target_set()
+  local templates = target_templates()
+  if #templates == 0 then
+    status = "Capture one scoped snapshot first to define the target set."
+    return
+  end
+  math.randomseed(math.floor(reaper.time_precise() * 1000000) % 2147483647)
+  local snapshot = {
+    name = capture_name ~= "" and capture_name or ("Random " .. tostring(#snapshots + 1)),
+    x = cursor.x,
+    y = cursor.y,
+    scope = "Randomized target set",
+    targets = {},
+    order = {},
+    created = os.date("%Y-%m-%d %H:%M:%S"),
+  }
+  local moved = 0
+  local skipped = 0
+  for _, template in ipairs(templates) do
+    local value, did_move = randomized_value(template)
+    if value == nil then
+      skipped = skipped + 1
+    else
+      add_target(snapshot, copy_target(template, value))
+      if did_move then moved = moved + 1 end
+    end
+  end
+  if #snapshot.order == 0 then
+    status = "No targets were available for randomization."
+    return
+  end
+  snapshots[#snapshots + 1] = snapshot
+  selected_snapshot = #snapshots
+  capture_name = ""
+  save_state()
+  if random_apply then apply_surface() end
+  status = string.format("Randomized %s: %d target(s), %d moved, %d skipped.", snapshot.name, #snapshot.order, moved, skipped)
+end
+
+local function mutate_selected_snapshot()
+  if not selected_snapshot or not snapshots[selected_snapshot] then
+    status = "Select a snapshot to mutate."
+    return
+  end
+  local source = snapshots[selected_snapshot]
+  math.randomseed(math.floor(reaper.time_precise() * 1000000) % 2147483647)
+  local snapshot = {
+    name = (source.name or "Snapshot") .. " mut",
+    x = clamp((source.x or 0.5) + random_signed() * 0.08, 0, 1),
+    y = clamp((source.y or 0.5) + random_signed() * 0.08, 0, 1),
+    scope = "Mutation of " .. (source.name or tostring(selected_snapshot)),
+    targets = {},
+    order = {},
+    created = os.date("%Y-%m-%d %H:%M:%S"),
+  }
+  local moved = 0
+  local saved_random_source_index = random_source_index
+  random_source_index = 2
+  for _, id in ipairs(source.order or {}) do
+    local target = source.targets and source.targets[id]
+    if target then
+      local value, did_move = randomized_value(target)
+      add_target(snapshot, copy_target(target, value))
+      if did_move then moved = moved + 1 end
+    end
+  end
+  random_source_index = saved_random_source_index
+  if #snapshot.order == 0 then
+    status = "Selected snapshot has no targets to mutate."
+    return
+  end
+  snapshots[#snapshots + 1] = snapshot
+  selected_snapshot = #snapshots
+  cursor.x, cursor.y = snapshot.x, snapshot.y
+  push_cursor_to_linked_fx()
+  save_state()
+  if random_apply then apply_surface() end
+  status = string.format("Mutated %s: %d target(s), %d moved.", snapshot.name, #snapshot.order, moved)
+end
+
+local function split_label(label)
+  local parts = {}
+  for part in tostring(label or ""):gmatch("[^/]+") do
+    local clean = part:gsub("^%s+", ""):gsub("%s+$", "")
+    if clean ~= "" then parts[#parts + 1] = clean end
+  end
+  return parts
+end
+
+local function target_matches_filter(template)
+  if target_filter == "" then return true end
+  return tostring(template.label or template.id or ""):lower():find(target_filter:lower(), 1, true) ~= nil
+end
+
+local function add_missing_targets(snapshot)
+  local added = 0
+  for _, template in ipairs(target_templates()) do
+    if not snapshot.targets[template.id] then
+      local value = read_target_current_value(template)
+      if value == nil then value = template.value end
+      add_target(snapshot, copy_target(template, value))
+      added = added + 1
+    end
+  end
+  save_state()
+  status = string.format("Added %d missing target(s) to %s.", added, snapshot.name or "snapshot")
+end
+
+local function remove_all_targets(snapshot)
+  local count = #(snapshot.order or {})
+  snapshot.targets = {}
+  snapshot.order = {}
+  save_state()
+  status = string.format("Removed %d target(s) from %s.", count, snapshot.name or "snapshot")
+end
+
 local function nearest_snapshot_for(target_id)
   local best, best_d = nil, math.huge
   for _, snapshot in ipairs(snapshots) do
@@ -543,7 +792,25 @@ local function nearest_snapshot_for(target_id)
   return best
 end
 
+local function nearest_snapshot_any()
+  local best, best_d = nil, math.huge
+  for _, snapshot in ipairs(snapshots) do
+    local dx = cursor.x - (snapshot.x or 0.5)
+    local dy = cursor.y - (snapshot.y or 0.5)
+    local d = dx * dx + dy * dy
+    if d < best_d then
+      best = snapshot
+      best_d = d
+    end
+  end
+  return best
+end
+
 local function interpolated_target(target_id)
+  if missing_targets_hold then
+    local nearest = nearest_snapshot_any()
+    if nearest and (not nearest.targets or not nearest.targets[target_id]) then return nil end
+  end
   local sum = 0
   local weight_sum = 0
   local template = nil
@@ -605,7 +872,7 @@ local function apply_target(target)
   return true
 end
 
-local function apply_surface(make_undo)
+function apply_surface(make_undo)
   if #snapshots == 0 then
     status = "No snapshots to apply."
     return
@@ -647,7 +914,7 @@ local function follow_linked_cursor_fx()
   if moved and auto_apply then auto_apply_surface() end
 end
 
-local function push_cursor_to_linked_fx()
+function push_cursor_to_linked_fx()
   local track, fx = linked_cursor_fx()
   if not track then return end
   reaper.TrackFX_SetParamNormalized(track, fx, 0, cursor.x)
@@ -664,6 +931,7 @@ end
 
 local function clear_snapshots()
   snapshots = {}
+  target_registry = { targets = {}, order = {} }
   selected_snapshot = nil
   status = "Cleared snapshots."
   save_state()
@@ -800,13 +1068,15 @@ local function draw_surface(width, height)
     ImGui.DrawList_AddLine(dl, gx, y0, gx, y1, COLORS.grid, 1)
     ImGui.DrawList_AddLine(dl, x0, gy, x1, gy, COLORS.grid, 1)
   end
+  local mode_text = surface_mode == 1 and "EDIT / SNAPSHOT PLACEMENT" or "PLAY / INTERPOLATION"
+  ImGui.DrawList_AddText(dl, x0 + 12, y0 + 10, COLORS.muted, mode_text)
 
   local mx, my = ImGui.GetMousePos(ctx)
   local surface_hovered = ImGui.IsItemHovered(ctx)
   local surface_w = math.max(1, x1 - x0)
   local surface_h = math.max(1, y1 - y0)
 
-  if surface_hovered and ImGui.IsMouseClicked(ctx, 0) then
+  if surface_hovered and ImGui.IsMouseClicked(ctx, 0) and surface_mode == 1 then
     local best, best_d = nil, 999999
     for index, snapshot in ipairs(snapshots) do
       local sx = x0 + surface_w * (snapshot.x or 0.5)
@@ -825,12 +1095,12 @@ local function draw_surface(width, height)
     end
   end
 
-  if dragging_snapshot and snapshots[dragging_snapshot] and ImGui.IsMouseDown(ctx, 0) then
+  if dragging_snapshot and snapshots[dragging_snapshot] and ImGui.IsMouseDown(ctx, 0) and surface_mode == 1 then
     local snapshot = snapshots[dragging_snapshot]
     snapshot.x = clamp((mx - x0) / surface_w + snapshot_drag_dx, 0, 1)
     snapshot.y = clamp((my - y0) / surface_h + snapshot_drag_dy, 0, 1)
     snapshot_position_dirty = true
-  elseif surface_hovered and ImGui.IsMouseDown(ctx, 0) then
+  elseif surface_hovered and ImGui.IsMouseDown(ctx, 0) and surface_mode == 2 then
     cursor.x = clamp((mx - x0) / surface_w, 0, 1)
     cursor.y = clamp((my - y0) / surface_h, 0, 1)
     push_cursor_to_linked_fx()
@@ -892,10 +1162,121 @@ local function draw_snapshot_list()
       local label = string.format("%02d  %s  (%d targets)", index, snapshot.name or "Snapshot", #(snapshot.order or {}))
       if ImGui.Selectable(ctx, label, selected_snapshot == index) then
         selected_snapshot = index
-        cursor.x = snapshot.x or cursor.x
-        cursor.y = snapshot.y or cursor.y
-        push_cursor_to_linked_fx()
+        if surface_mode == 2 then
+          cursor.x = snapshot.x or cursor.x
+          cursor.y = snapshot.y or cursor.y
+          push_cursor_to_linked_fx()
+          if auto_apply then auto_apply_surface() end
+        end
       end
+    end
+  end
+  ImGui.EndChild(ctx)
+end
+
+local function draw_target_selection_tree(snapshot, list_h)
+  if not snapshot then return end
+  local changed_filter
+  changed_filter, target_filter = ImGui.InputText(ctx, "Target filter", target_filter)
+  if changed_filter then save_state() end
+  local missing_changed
+  missing_changed, missing_targets_hold = ImGui.Checkbox(ctx, "Missing nearest target leaves value unchanged", missing_targets_hold)
+  if missing_changed then save_state() end
+  if ImGui.Button(ctx, "Add Missing", 100, 24) then add_missing_targets(snapshot) end
+  ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, "Remove All", 100, 24) then remove_all_targets(snapshot) end
+  local templates = target_templates()
+  if #templates == 0 then
+    ImGui.TextColored(ctx, COLORS.muted, "Capture a scope before editing targets.")
+    return
+  end
+
+  local tree = {}
+  local track_order = {}
+  for _, template in ipairs(templates) do
+    if target_matches_filter(template) then
+      local parts = split_label(template.label or template.id)
+      local track = parts[1] or "Targets"
+      local device = #parts >= 3 and parts[2] or "Track controls"
+      local param = parts[#parts] or template.id
+      if not tree[track] then
+        tree[track] = { devices = {}, order = {} }
+        track_order[#track_order + 1] = track
+      end
+      if not tree[track].devices[device] then
+        tree[track].devices[device] = { targets = {}, order = {} }
+        tree[track].order[#tree[track].order + 1] = device
+      end
+      tree[track].devices[device].targets[#tree[track].devices[device].targets + 1] = { template = template, param = param }
+    end
+  end
+
+  list_h = list_h or 210
+  if ImGui.BeginChild(ctx, "##snapshot_target_tree", 0, list_h) then
+    for ti, track in ipairs(track_order) do
+      local track_node = tree[track]
+      if ImGui.CollapsingHeader(ctx, track .. "##target_track_" .. tostring(ti), nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        for di, device in ipairs(track_node.order) do
+          local device_node = track_node.devices[device]
+          ImGui.TextColored(ctx, COLORS.muted, device)
+          ImGui.SameLine(ctx)
+          if ImGui.SmallButton(ctx, "add##" .. tostring(ti) .. "_" .. tostring(di)) then
+            local added = 0
+            for _, entry in ipairs(device_node.targets) do
+              local template = entry.template
+              if not snapshot.targets[template.id] then
+                local value = read_target_current_value(template)
+                if value == nil then value = template.value end
+                add_target(snapshot, copy_target(template, value))
+                added = added + 1
+              end
+            end
+            save_state()
+            status = string.format("Added %d target(s) to %s.", added, snapshot.name or "snapshot")
+          end
+          ImGui.SameLine(ctx)
+          if ImGui.SmallButton(ctx, "remove##" .. tostring(ti) .. "_" .. tostring(di)) then
+            local removed = 0
+            for _, entry in ipairs(device_node.targets) do
+              if remove_target(snapshot, entry.template.id) then removed = removed + 1 end
+            end
+            save_state()
+            status = string.format("Removed %d target(s) from %s.", removed, snapshot.name or "snapshot")
+          end
+          for _, entry in ipairs(device_node.targets) do
+            local template = entry.template
+            local checked = snapshot.targets and snapshot.targets[template.id] ~= nil
+            local toggled, new_checked = ImGui.Checkbox(ctx, entry.param .. "##target_" .. template.id, checked)
+            if toggled then
+              if new_checked then
+                local value = read_target_current_value(template)
+                if value == nil then value = template.value end
+                add_target(snapshot, copy_target(template, value))
+                status = "Added target: " .. tostring(template.label or template.id)
+              else
+                remove_target(snapshot, template.id)
+                status = "Removed target: " .. tostring(template.label or template.id)
+              end
+              save_state()
+            end
+          end
+          ImGui.Separator(ctx)
+        end
+      end
+    end
+  end
+  ImGui.EndChild(ctx)
+end
+
+local function draw_parameter_selection_panel(width, height)
+  local visible = ImGui.BeginChild(ctx, "##parameter_selection_panel", width, height)
+  if visible then
+    ImGui.Text(ctx, "Parameter Selection")
+    ImGui.Separator(ctx)
+    if selected_snapshot and snapshots[selected_snapshot] then
+      draw_target_selection_tree(snapshots[selected_snapshot], math.max(80, height - 96))
+    else
+      ImGui.TextColored(ctx, COLORS.muted, "Select a snapshot to edit its target list.")
     end
   end
   ImGui.EndChild(ctx)
@@ -904,6 +1285,13 @@ end
 local function draw_toolbox(height)
   local side_visible = ImGui.BeginChild(ctx, "##snapshot_surface_side", 330, height)
   if side_visible then
+    surface_mode = draw_combo("Surface mode", surface_mode, SURFACE_MODES)
+    if ImGui.Button(ctx, "Edit", 72, 24) then surface_mode = 1; save_state() end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Play", 72, 24) then surface_mode = 2; dragging_snapshot = nil; save_state() end
+    ImGui.SameLine(ctx)
+    ImGui.TextColored(ctx, COLORS.muted, SURFACE_MODES[surface_mode] or "")
+    ImGui.Separator(ctx)
     scope_index = draw_combo("Capture scope", scope_index, SCOPES)
     _, capture_name = ImGui.InputText(ctx, "Name", capture_name)
     if ImGui.Button(ctx, "Capture From Scope", 160, 28) then capture_snapshot() end
@@ -916,6 +1304,24 @@ local function draw_toolbox(height)
     local focus_changed
     focus_changed, interpolation_power = ImGui.SliderDouble(ctx, "Interpolation focus", interpolation_power, 0.25, 8.0, "%.2f")
     if focus_changed then push_cursor_to_linked_fx() end
+    if ImGui.CollapsingHeader(ctx, "Randomize Scope", ImGui.TreeNodeFlags_DefaultOpen) then
+      random_source_index = draw_combo("Random source", random_source_index, RANDOM_SOURCES)
+      _, random_spread = ImGui.SliderDouble(ctx, "Spread", random_spread, 0.0, 1.0, "%.2f")
+      _, random_deviation = ImGui.SliderDouble(ctx, "Deviation", random_deviation, 0.0, 1.0, "%.2f")
+      _, random_apply = ImGui.Checkbox(ctx, "Apply after randomize", random_apply)
+      _, random_include_bools = ImGui.Checkbox(ctx, "Include mute/solo/enabled", random_include_bools)
+      if ImGui.Button(ctx, "Randomize Snapshot", 190, 28) then randomized_snapshot_from_target_set() end
+      ImGui.SameLine(ctx)
+      if selected_snapshot and snapshots[selected_snapshot] then
+        if ImGui.Button(ctx, "Mutate Selected", 122, 28) then mutate_selected_snapshot() end
+      else
+        ImGui.BeginDisabled(ctx)
+        ImGui.Button(ctx, "Mutate Selected", 122, 28)
+        ImGui.EndDisabled(ctx)
+      end
+      ImGui.TextColored(ctx, COLORS.muted, "Spread selects how many targets move.")
+      ImGui.TextColored(ctx, COLORS.muted, "Deviation sets the movement range.")
+    end
     if ImGui.CollapsingHeader(ctx, "Cursor Automation", ImGui.TreeNodeFlags_DefaultOpen) then
       _, follow_cursor_fx = ImGui.Checkbox(ctx, "Follow cursor FX", follow_cursor_fx)
       if ImGui.Button(ctx, "Create / Link Cursor FX", 180, 26) then create_or_link_cursor_fx() end
@@ -925,8 +1331,11 @@ local function draw_toolbox(height)
     end
     ImGui.Separator(ctx)
     ImGui.Text(ctx, string.format("Cursor %.3f / %.3f", cursor.x, cursor.y))
-    ImGui.TextColored(ctx, COLORS.muted, "Left-drag empty surface: move cursor")
-    ImGui.TextColored(ctx, COLORS.muted, "Left-drag snapshot: move region")
+    if surface_mode == 1 then
+      ImGui.TextColored(ctx, COLORS.muted, "Edit: left-drag snapshots to place regions")
+    else
+      ImGui.TextColored(ctx, COLORS.muted, "Play: left-drag surface to move cursor")
+    end
     ImGui.TextColored(ctx, COLORS.muted, "Right-click snapshot: select + audition")
     ImGui.Text(ctx, string.format("Stored targets: %d", count_target_set()))
     ImGui.TextColored(ctx, COLORS.muted, "Linked/VCA targets follow REAPER")
@@ -951,6 +1360,7 @@ local function draw_toolbox(height)
       end
       ImGui.SameLine(ctx)
       if ImGui.Button(ctx, "Delete", 70, 26) then delete_snapshot(selected_snapshot) end
+      ImGui.TextColored(ctx, COLORS.muted, "Edit this snapshot's targets in the lower parameter pane.")
     end
   end
   ImGui.EndChild(ctx)
@@ -976,9 +1386,15 @@ local function loop()
         draw_surface(left_w, surface_h)
         ImGui.Separator(ctx)
         local _, after_surface_h = ImGui.GetContentRegionAvail(ctx)
-        ImGui.BeginChild(ctx, "##snapshot_list_area", 0, math.max(80, after_surface_h - 24))
+        local lower_h = math.max(110, after_surface_h - 24)
+        local snapshot_w = math.max(250, math.min(360, left_w * 0.38))
+        ImGui.BeginChild(ctx, "##snapshot_list_area", snapshot_w, lower_h)
+        ImGui.Text(ctx, "Snapshot List")
+        ImGui.Separator(ctx)
         draw_snapshot_list()
         ImGui.EndChild(ctx)
+        ImGui.SameLine(ctx)
+        draw_parameter_selection_panel(math.max(260, left_w - snapshot_w - 12), lower_h)
         ImGui.TextColored(ctx, COLORS.muted, status)
       end
       ImGui.EndChild(ctx)

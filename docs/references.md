@@ -178,8 +178,8 @@ Live page available as of access date.</p>
 
 <div class="bibliography">
 
-<p class="bib-entry">Bencina, Ross. n.d. "Beginner's Tutorial 4: Using the Metasurface." <em>AudioMulch</em>. Accessed July 12, 2026.
-<a href="https://www.audiomulch.com/tutorials/beginners-tutorial-4-using-the-metasurface" target="_blank" rel="noopener noreferrer">https://www.audiomulch.com/tutorials/beginners-tutorial-4-using-the-metasurface</a>.</p>
+<p class="bib-entry">Bencina, Ross. n.d. "Metasurface." <em>AudioMulch Help</em>. Accessed July 12, 2026.
+<a href="http://www.audiomulch.com/help/metasurface" target="_blank" rel="noopener noreferrer">http://www.audiomulch.com/help/metasurface</a>.</p>
 
 <p class="bib-entry">Bregman, Albert S. 1990. <em>Auditory Scene Analysis: The Perceptual Organization of Sound</em>. Cambridge, MA: MIT Press.</p>
 
