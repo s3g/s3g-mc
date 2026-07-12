@@ -212,6 +212,31 @@ local function item_display_name(item)
   return "item"
 end
 
+local function item_channel_count(item)
+  local take = reaper.GetActiveTake(item)
+  if not take then return 0 end
+  local source = reaper.GetMediaItemTake_Source(take)
+  if not source or not reaper.GetMediaSourceNumChannels then return 0 end
+  local ok, channels = pcall(reaper.GetMediaSourceNumChannels, source)
+  if ok and tonumber(channels) then return math.max(0, math.floor(channels)) end
+  return 0
+end
+
+local function draw_item_channels(dl, item, ix0, iy0, ix1, iy1)
+  local channels = item_channel_count(item)
+  if channels <= 1 or iy1 - iy0 < 9 or ix1 - ix0 < 12 then return end
+  local visible_lanes = math.min(channels, 16)
+  local line_color = rgba(0.02, 0.025, 0.025, channels > 16 and 0.22 or 0.28)
+  for ch = 1, visible_lanes - 1 do
+    local x = ix0 + (ix1 - ix0) * ch / visible_lanes
+    ImGui.DrawList_AddLine(dl, x, iy0 + 2, x, iy1 - 2, line_color, 1)
+  end
+  if iy1 - iy0 > 18 and ix1 - ix0 > 42 then
+    local label = tostring(channels) .. "ch"
+    ImGui.DrawList_AddText(dl, ix1 - 32, iy1 - 15, rgba(0.04, 0.045, 0.045, 0.78), label)
+  end
+end
+
 local function fit_project(canvas_h)
   local length = project_length()
   view_start = 0
@@ -337,6 +362,45 @@ local function smooth_play_position(actual_pos, playing)
   end
   play_visual_time = now
   return play_visual_pos
+end
+
+local function transport_state_label()
+  local state = reaper.GetPlayState()
+  if state >= 4 then return "recording", reaper.GetPlayPosition() end
+  if (state % 2) == 1 then return "playing", reaper.GetPlayPosition() end
+  if state >= 2 then return "paused", reaper.GetPlayPosition() end
+  return "stopped", reaper.GetCursorPosition()
+end
+
+local function draw_transport()
+  local state_label, display_pos = transport_state_label()
+  if ImGui.Button(ctx, "|<##transport_start", 34, 24) then
+    reaper.Main_OnCommand(40042, 0) -- Transport: Go to start of project
+    status = "Transport: start"
+  end
+  ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, "Stop##transport_stop", 48, 24) then
+    reaper.OnStopButton()
+    status = "Transport: stop"
+  end
+  ImGui.SameLine(ctx)
+  local play_label = ((reaper.GetPlayState() % 2) == 1) and "Pause" or "Play"
+  if ImGui.Button(ctx, play_label .. "##transport_play_pause", 58, 24) then
+    if (reaper.GetPlayState() % 2) == 1 then
+      reaper.Main_OnCommand(1008, 0) -- Transport: Pause
+      status = "Transport: pause"
+    else
+      reaper.OnPlayButton()
+      status = "Transport: play"
+    end
+  end
+  ImGui.SameLine(ctx)
+  if ImGui.Button(ctx, "Cursor##transport_center_cursor", 64, 24) then
+    view_start = math.max(0, reaper.GetCursorPosition() - 6 * seconds_per_pixel * 84)
+    status = "View centered near edit cursor"
+  end
+  ImGui.SameLine(ctx)
+  ImGui.TextColored(ctx, COLORS.muted, string.format("%s  %s", state_label, time_to_string(display_pos)))
 end
 
 local function draw_timeline(canvas_w, canvas_h)
@@ -479,6 +543,7 @@ local function draw_timeline(canvas_w, canvas_h)
         local fill = item_fill_color(item, track, selected)
         ImGui.DrawList_AddRectFilled(dl, ix0, iy0, ix1, iy1, fill)
         ImGui.DrawList_AddRectFilled(dl, ix0, iy0, ix1, math.min(iy1, iy0 + 3), item_accent_color(item, track, selected))
+        draw_item_channels(dl, item, ix0, iy0 + 3, ix1, iy1)
         ImGui.DrawList_AddRect(dl, ix0, iy0, ix1, iy1, selected and COLORS.text or COLORS.edge, 0, 0, selected and 1.6 or 1)
         if iy1 - iy0 > 16 then
           local name = item_display_name(item)
@@ -656,6 +721,8 @@ local function loop()
       local play_pos = play_visual_pos or reaper.GetPlayPosition()
       view_start = clamp(play_pos - (avail_h * seconds_per_pixel * 0.45), 0, math.max(0, project_len - 1))
     end
+
+    draw_transport()
 
     if ImGui.Button(ctx, "Fit Project", 92, 24) then
       local _, avail_h = ImGui.GetContentRegionAvail(ctx)
