@@ -323,10 +323,10 @@ surface during playback.
 Use `Vertical Timeline Navigator` as a companion view when a top-to-bottom time
 display makes a project easier to read. Tracks are arranged left-to-right, and
 time runs vertically. The view shows media items, markers, regions, edit cursor,
-play cursor, a linked transport strip, and the current time selection. Media
-items inherit muted REAPER item/track colors when available, and multichannel
-items draw internal channel subdivisions across the item width with a
-channel-count label.
+play cursor, a linked transport strip, a minimap overview, and the current time
+selection. Media items inherit muted REAPER item/track colors when available,
+and multichannel items draw internal channel subdivisions across the item width
+with a channel-count label.
 
 This script does not replace REAPER's arrange view or change project layout. It
 provides a second navigation surface for reading structure, selecting items,
@@ -336,6 +336,12 @@ or horizontally across the visible track columns to move it to another track.
 Click empty timeline space to move the edit cursor. Drag empty timeline space
 to create a time selection.
 
+Use `Add Marker` to create a project marker at the edit cursor. Use `Add
+Region` to create a project region from the current time selection. Click a
+marker or region in the vertical view to select it; drag it vertically to move
+it in time. When a marker or region is selected, edit its name in the name
+field and click `Save Name`.
+
 `Fit Project` scales the whole project into the available vertical space.
 `Fit Selection` focuses the current time selection. `Follow play` keeps the
 play cursor near the center of the visible range during playback. `Seconds /
@@ -343,12 +349,19 @@ pixel`, `View start`, `Visible tracks`, and `First track` provide manual view
 control for larger sessions. Use `First track` for predictable side-to-side
 movement through large track sets.
 
+`Snap` applies to item moves, marker/region moves, cursor placement, and time
+selection drawing. It uses REAPER grid snapping, then nearby marker/region
+edges and item edges when they are close to the edited time. `Track filter`
+switches the column set between all tracks and selected tracks. Choosing all
+tracks expands `Visible tracks` to the maximum available count, up to the
+script's display limit. The minimap on the right shows the whole project and
+can be clicked or dragged to move the vertical viewport.
+
 Mouse gestures:
 
 - Wheel scrolls through time.
 - `Cmd`/`Ctrl` + wheel zooms around the mouse position.
 - `Shift` + wheel pages through tracks.
-- Horizontal wheel input also pages through tracks when available.
 
 
 
