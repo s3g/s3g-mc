@@ -21,6 +21,8 @@ toc:
     href: "#128ch-node-track-mixer"
   - title: Focused FX Automation Capture
     href: "#focused-fx-automation-capture"
+  - title: Patch Routing View
+    href: "#patch-routing-view"
   - title: Snapshot Surface
     href: "#snapshot-surface"
   - title: Vertical Timeline Navigator
@@ -316,6 +318,52 @@ control track with the `s3g Snapshot Surface Cursor` JSFX. Its `Cursor X` and
 `Cursor Y` parameters can be automated in REAPER. Enable `Follow cursor FX` and
 `Apply while dragging cursor` when those automation lanes should drive the
 surface during playback.
+
+## Patch Routing View
+
+Use `Patch Routing View` when a project is easier to read as a bottom-up patch
+canvas than as a track list. Tracks appear as draggable nodes with channel
+count, FX count, send/receive count, and master-send state. Folder, send, and
+master connections are drawn as patch cords flowing upward toward buses and
+master destinations, so buses, submixes, and multichannel paths can be checked
+without opening REAPER's routing matrix. Child tracks inside folders draw to
+their parent folder rather than drawing separate master-send wires.
+
+In `View mode`, click a node to select the track in REAPER. Shift-click toggles
+nodes into a multi-selection, and dragging from blank canvas space creates a
+selection window. After selecting multiple nodes, drag any selected node to move
+the group together. Double-click a track node to open its FX chain. Drag nodes
+to arrange the canvas; manual positions are stored between runs. Use `Auto
+Arrange` to rebuild a clean bottom-up layout with folder children below their
+parent tracks. Use `Reset View` to restore pan and zoom. `Small` restores the
+default window size, and `Large` opens a bigger centered view without taking
+over the full display. The display toggles show or hide sends, folder
+relationships, master-send paths, selected tracks, or `MC only`, which filters
+the canvas to tracks with more than two channels.
+`Folder lanes` arranges tracks into vertical lanes by folder depth, so child
+tracks appear in deeper columns while preserving track order within each lane.
+`Wires front` changes whether patch cords draw in front of or behind the track
+nodes. `Connected` shows only tracks with a visible routing relationship, and
+`Labels hover` keeps wire labels hidden until a wire is selected or hovered.
+Use `Collapse` and `Expand` for all-folder overviews, or select a folder node
+and use `Collapse children` in the inspector to hide only that folder's
+children. Collapsed folders show compact child markers at the bottom of the
+folder node. The minimap in the upper-right corner shows the whole patch and
+can be clicked to recenter the canvas.
+
+In `Edit mode`, drag from a track node's top send band to another track node's
+bottom receive band to create a send. If the send already exists, the script
+selects the existing wire instead of creating a duplicate. Select a send from
+the canvas or inspector to adjust its level, mute state, source channel range,
+destination channel range, send mode, or to remove it. The node inspector also
+includes track mute, track solo, master-send control for non-child tracks, and
+FX-chain access. This makes the view useful as a routing audit and as a
+compact send editor, especially in sessions with folder buses, multichannel
+tracks, or several send/return structures.
+
+Send wires can also be selected directly on the canvas by clicking the wire.
+The inspector includes a small color key for send/receive, folder-parent, and
+master-send wiring.
 
 
 ## Vertical Timeline Navigator

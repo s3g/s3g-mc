@@ -167,7 +167,7 @@ function M.install(ImGui)
     local font_pushed = font and M.push_font(ImGui, ctx, font) or false
     local stack = M.push(ImGui, ctx)
     local results = { original_begin(ctx, ...) }
-    if results[1] then
+    if results[1] ~= nil then
       local stacks = stacks_by_ctx[ctx]
       if not stacks then
         stacks = {}
@@ -175,8 +175,8 @@ function M.install(ImGui)
       end
       stacks[#stacks + 1] = { style = stack, font_pushed = font_pushed }
     else
-      M.pop(ImGui, ctx, stack)
       M.pop_font(ImGui, ctx, font_pushed)
+      M.pop(ImGui, ctx, stack)
     end
     return unpack_fn(results)
   end

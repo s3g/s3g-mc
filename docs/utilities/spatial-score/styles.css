@@ -101,7 +101,8 @@ h2 {
   padding: 0 6px 0 8px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 6px;
   background: var(--panel-2);
   border-bottom: 1px solid var(--line-soft);
   font-size: 11px;
@@ -113,24 +114,18 @@ h2 {
   user-select: none;
 }
 
-h2::after {
+h2::before {
   content: "-";
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  margin-left: 8px;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
   border: 1px solid var(--line-soft);
   background: var(--field);
   color: var(--muted);
   font-weight: 400;
-}
-
-h2:hover::after,
-h2:focus-visible::after {
-  border-color: var(--accent);
-  color: var(--text);
 }
 
 .panel section.collapsed {
@@ -142,7 +137,7 @@ h2:focus-visible::after {
   border-bottom: 0;
 }
 
-.panel section.collapsed h2::after {
+.panel section.collapsed h2::before {
   content: "+";
 }
 
@@ -563,12 +558,6 @@ select {
   margin: -6px -6px 6px;
   padding: 0 5px 0 6px;
   font-size: 10px;
-}
-
-.panel h2::after {
-  width: 15px;
-  height: 15px;
-  margin-left: 6px;
 }
 
 .panel label {

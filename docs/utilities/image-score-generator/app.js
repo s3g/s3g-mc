@@ -1500,12 +1500,17 @@ document.querySelectorAll("#layerButtons button").forEach((button) => {
 
 document.querySelectorAll(".collapsible > h2").forEach((heading) => {
   const section = heading.parentElement;
+  const button = heading.querySelector(".section-toggle");
   heading.tabIndex = 0;
   heading.setAttribute("role", "button");
   heading.setAttribute("aria-expanded", "true");
   const toggle = () => {
-    section.classList.toggle("collapsed");
-    heading.setAttribute("aria-expanded", section.classList.contains("collapsed") ? "false" : "true");
+    const collapsed = section.classList.toggle("collapsed");
+    heading.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    if (button) {
+      button.textContent = collapsed ? "+" : "-";
+      button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    }
   };
   heading.addEventListener("pointerdown", (event) => {
     event.preventDefault();

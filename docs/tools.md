@@ -46,7 +46,7 @@ dialogs that are not shown as Package Browser entries.
 
 Package Browser group counts:
 
-- Channel Mixing / Automation: 8
+- Channel Mixing / Automation: 9
 - MIDI Composition: 8
 - Procedural Synthesis: 6
 - Offline Synthesis / IR: 10
@@ -106,6 +106,10 @@ Package Browser group counts:
   rotation, weighting, 3D projection attenuation, autogain, and output trim.
   The JSFX declares only stereo outputs; in multichannel listening chains, set
   its plugin I/O to zero unmapped output channels.
+- `Patch Routing View`: ReaImGui bottom-up patch-canvas view of REAPER track
+  routing, with draggable track nodes, folder/send/master patch cords, channel
+  counts, FX state, wire selection, send editing, per-folder collapse, minimap
+  navigation, and a node inspector.
 - `Snapshot Surface`: captures track and FX states as named Voronoi regions,
   stores them in the REAPER project, generates randomized variants from the
   captured target set, and interpolates between snapshots with a manual cursor

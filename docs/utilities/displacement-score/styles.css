@@ -92,7 +92,8 @@ h2 {
   padding: 0 6px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 6px;
   border-bottom: 1px solid #252c2c;
   background: var(--panel2);
   color: var(--cyan);
@@ -102,14 +103,14 @@ h2 {
   user-select: none;
 }
 
-h2::after {
+h2::before {
   content: "-";
-  width: 15px;
-  height: 15px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 6px;
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
   border: 1px solid #252c2c;
   background: #090c0c;
   color: var(--muted);
@@ -125,7 +126,7 @@ h2::after {
   border-bottom: 0;
 }
 
-.panel section.collapsed h2::after {
+.panel section.collapsed h2::before {
   content: "+";
 }
 
