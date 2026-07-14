@@ -352,10 +352,12 @@ folder node. The minimap in the upper-right corner shows the whole patch and
 can be clicked to recenter the canvas.
 
 In `Edit mode`, drag from a track node's top send band to another track node's
-bottom receive band to create a send. If the send already exists, the script
-selects the existing wire instead of creating a duplicate. Select a send from
-the canvas or inspector to adjust its level, mute state, source channel range,
-destination channel range, send mode, or to remove it. The node inspector also
+bottom receive band to create a send. The reverse gesture also works: drag
+from a receive band to another track's send band to create the same connection.
+If the send already exists, the script selects the existing wire instead of
+creating a duplicate. Select a send from the canvas or inspector to adjust its
+level, mute state, source channel range, destination channel range, send mode,
+or to remove it. The node inspector also
 includes track mute, track solo, master-send control for non-child tracks, and
 FX-chain access. This makes the view useful as a routing audit and as a
 compact send editor, especially in sessions with folder buses, multichannel

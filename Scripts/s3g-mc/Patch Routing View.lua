@@ -94,7 +94,7 @@ local collapse_folder_children = getb("collapse_folder_children", false)
 local collapsed_folders = {}
 local labels_hover_only = getb("labels_hover_only", false)
 local wires_front = getb("wires_front", false)
-local edit_mode = getb("edit_mode", false)
+local edit_mode = getb("edit_mode", true)
 local window_size_mode = math.floor(getn("window_size_mode", 1))
 local pending_window_size_mode = nil
 local search_text = reaper.GetExtState(EXT, "search_text") or ""
@@ -706,8 +706,10 @@ local function draw_node(dl, node, ox, oy)
   local selected = selected_node_key == node.guid or selected_node_keys[node.guid]
   local fill = node.master and COLORS.node_bus or COLORS.node
   if selected then fill = COLORS.node_sel end
+  if node.solo and not selected then fill = rgba(0.130, 0.125, 0.075, 0.96) end
   if node.muted and not selected then fill = rgba(0.070, 0.074, 0.078, 0.68) end
   local accent = node.master and COLORS.master or track_color(node.track, 0.92, COLORS.edge)
+  if node.solo then accent = rgba(0.95, 0.78, 0.32, 0.95) end
   if node.muted then accent = rgba(0.25, 0.27, 0.28, 0.80) end
   ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, fill)
   ImGui.DrawList_AddRect(dl, x0, y0, x1, y1, selected and COLORS.text or COLORS.edge, 0, 0, selected and 2.2 or 1.2)
@@ -718,6 +720,23 @@ local function draw_node(dl, node, ox, oy)
   local pin = math.max(4, 4 * zoom)
   ImGui.DrawList_AddRectFilled(dl, in_x - pin, in_y - pin, in_x + pin, in_y + pin, COLORS.pin)
   ImGui.DrawList_AddRectFilled(dl, out_x - pin, out_y - pin, out_x + pin, out_y + pin, COLORS.pin)
+
+  if zoom > 0.42 and not node.master then
+    local badge_w = math.max(18, 18 * zoom)
+    local badge_h = math.max(15, 15 * zoom)
+    local bx = x1 - 9 * zoom - badge_w
+    local by = y0 + 8 * zoom
+    local function badge(label, color, text_color)
+      ImGui.DrawList_AddRectFilled(dl, bx, by, bx + badge_w, by + badge_h, color)
+      ImGui.DrawList_AddRect(dl, bx, by, bx + badge_w, by + badge_h, rgba(0.02, 0.02, 0.02, 0.55), 0, 0, 1)
+      if zoom > 0.58 then
+        ImGui.DrawList_AddText(dl, bx + 5 * zoom, by + 1 * zoom, text_color or COLORS.text, label)
+      end
+      bx = bx - badge_w - 4 * zoom
+    end
+    if node.muted then badge("M", rgba(0.55, 0.17, 0.14, 0.92), rgba(1.0, 0.82, 0.76, 1)) end
+    if node.solo then badge("S", rgba(0.88, 0.63, 0.20, 0.94), rgba(0.08, 0.07, 0.04, 1)) end
+  end
 
   if zoom > 0.48 then
     local tx = x0 + 12 * zoom
@@ -835,14 +854,14 @@ local function distance(x1, y1, x2, y2)
   return math.sqrt(dx * dx + dy * dy)
 end
 
-local function hit_output_pin(nodes, mx, my, ox, oy)
+local function hit_output_pin(nodes, mx, my, ox, oy, pin_only)
   for i = #nodes, 1, -1 do
     local node = nodes[i]
     if node.track then
       local x0, y0, x1 = node_rect(node, ox, oy)
       local px, py = node_output(node, ox, oy)
       local band_h = math.max(18, 20 * zoom)
-      if mx >= x0 and mx <= x1 and my >= y0 - band_h * 0.5 and my <= y0 + band_h then return node end
+      if not pin_only and mx >= x0 and mx <= x1 and my >= y0 - band_h * 0.5 and my <= y0 + band_h then return node end
       if distance(mx, my, px, py) <= math.max(14, 12 * zoom) then return node end
     end
   end
@@ -923,7 +942,8 @@ local function draw_minimap(dl, nodes, canvas_x0, canvas_y0, canvas_x1, canvas_y
     local nx1, ny1 = map_point((node.x or 0) + w, (node.y or 0) + h)
     local selected = selected_node_key == node.guid or selected_node_keys[node.guid]
     local color = selected and COLORS.node_sel or (node.master and COLORS.master or track_color(node.track, 0.68, rgba(0.42, 0.45, 0.46, 0.70)))
-    if node.muted then color = rgba(0.25, 0.27, 0.28, 0.70) end
+    if node.solo then color = rgba(0.88, 0.63, 0.20, 0.82) end
+    if node.muted then color = rgba(0.42, 0.14, 0.12, 0.78) end
     ImGui.DrawList_AddRectFilled(dl, nx0, ny0, nx1, ny1, color)
   end
 
@@ -971,6 +991,13 @@ local function draw_canvas(nodes, connections)
       local nx0, ny0, nx1 = node_rect(send_node, x0, y0)
       ImGui.DrawList_AddRectFilled(dl, nx0, ny0 - 4 * zoom, nx1, ny0 + 16 * zoom, rgba(0.94, 0.50, 0.34, 0.16))
       status = "Send band: drag upward to a receive band."
+    else
+      local receive_node = hit_input_pin(nodes, mx, my, x0, y0, nil)
+      if receive_node then
+        local nx0, _, nx1, ny1 = node_rect(receive_node, x0, y0)
+        ImGui.DrawList_AddRectFilled(dl, nx0, ny1 - 18 * zoom, nx1, ny1 + 4 * zoom, rgba(0.94, 0.50, 0.34, 0.16))
+        status = "Receive band: drag downward to a send band."
+      end
     end
   end
   hovered_connection_key = nil
@@ -985,15 +1012,31 @@ local function draw_canvas(nodes, connections)
     end
   end
   if patch_drag then
-    local sx, sy = node_output(patch_drag.source, x0, y0)
+    local sx, sy
+    if patch_drag.kind == "receive" then
+      sx, sy = node_input(patch_drag.dest, x0, y0)
+    else
+      sx, sy = node_output(patch_drag.source, x0, y0)
+    end
     bezier(dl, sx, sy, mx, my, COLORS.warn, 2.4)
-    local target = hit_input_pin(nodes, mx, my, x0, y0, patch_drag.source)
+    local target = patch_drag.kind == "receive"
+      and hit_output_pin(nodes, mx, my, x0, y0, false)
+      or hit_input_pin(nodes, mx, my, x0, y0, patch_drag.source)
     if target then
-      local tx, ty = node_input(target, x0, y0)
+      local tx, ty
+      if patch_drag.kind == "receive" then
+        tx, ty = node_output(target, x0, y0)
+      else
+        tx, ty = node_input(target, x0, y0)
+      end
       local halo = math.max(10, 10 * zoom)
       local pin = math.max(4, 4 * zoom)
-      local nx0, _, nx1, ny1 = node_rect(target, x0, y0)
-      ImGui.DrawList_AddRectFilled(dl, nx0, ny1 - 18 * zoom, nx1, ny1 + 4 * zoom, rgba(0.94, 0.50, 0.34, 0.18))
+      local nx0, ny0, nx1, ny1 = node_rect(target, x0, y0)
+      if patch_drag.kind == "receive" then
+        ImGui.DrawList_AddRectFilled(dl, nx0, ny0 - 4 * zoom, nx1, ny0 + 16 * zoom, rgba(0.94, 0.50, 0.34, 0.18))
+      else
+        ImGui.DrawList_AddRectFilled(dl, nx0, ny1 - 18 * zoom, nx1, ny1 + 4 * zoom, rgba(0.94, 0.50, 0.34, 0.18))
+      end
       ImGui.DrawList_AddRectFilled(dl, tx - halo, ty - halo, tx + halo, ty + halo, rgba(0.94, 0.50, 0.34, 0.28))
       ImGui.DrawList_AddRectFilled(dl, tx - pin, ty - pin, tx + pin, ty + pin, COLORS.warn)
     end
@@ -1021,12 +1064,17 @@ local function draw_canvas(nodes, connections)
 
   if hovered and not minimap_hovered and ImGui.IsMouseClicked(ctx, 0) then
     local shift_down = shift_is_down()
-    local output_node = (edit_mode and not shift_down) and hit_output_pin(nodes, mx, my, x0, y0) or nil
+    local output_node = (edit_mode and not shift_down) and hit_output_pin(nodes, mx, my, x0, y0, false) or nil
+    local input_node = (edit_mode and not shift_down and not output_node) and hit_input_pin(nodes, mx, my, x0, y0, nil) or nil
     local node = hit_node(nodes, mx, my, x0, y0)
     if output_node then
-      patch_drag = { source = output_node }
+      patch_drag = { kind = "send", source = output_node }
       selected_node_key = output_node.guid
       status = "Drag from send band to a receive band to create a send."
+    elseif input_node then
+      patch_drag = { kind = "receive", dest = input_node }
+      selected_node_key = input_node.guid
+      status = "Drag from receive band to a send band to create a send."
     elseif hovered_connection_key then
       selected_connection_key = hovered_connection_key
       status = "Selected wire. Use inspector to edit or remove the send."
@@ -1068,8 +1116,12 @@ local function draw_canvas(nodes, connections)
   end
 
   if patch_drag and ImGui.IsMouseReleased(ctx, 0) then
-    local target = hit_input_pin(nodes, mx, my, x0, y0, patch_drag.source)
-    if target then
+    local target = patch_drag.kind == "receive"
+      and hit_output_pin(nodes, mx, my, x0, y0, false)
+      or hit_input_pin(nodes, mx, my, x0, y0, patch_drag.source)
+    if target and patch_drag.kind == "receive" then
+      create_track_send(target, patch_drag.dest)
+    elseif target then
       create_track_send(patch_drag.source, target)
     else
       status = "Send creation cancelled."
@@ -1139,7 +1191,7 @@ local function draw_canvas(nodes, connections)
   end
 
   if zoom > 0.55 then
-    local help = edit_mode and "Edit: drag send band to receive band. Shift-click toggles nodes. Blank drag selects."
+    local help = edit_mode and "Edit: drag send > receive or receive > send. Shift-click toggles. Blank drag selects."
       or "View: drag nodes. Shift-click toggles. Blank drag selects. Right-drag pans. Wheel zooms."
     ImGui.DrawList_AddText(dl, x0 + 10, y1 - 22, COLORS.muted, help)
   end
@@ -1287,7 +1339,7 @@ local function draw_inspector(node, connections, entries)
   end
   if not node then
     ImGui.TextColored(ctx, COLORS.muted, "Select a node.")
-    ImGui.TextWrapped(ctx, edit_mode and "Edit mode: drag from an output pin to another track's input pin to create a send." or "View mode: select tracks, inspect routing, and arrange nodes without changing routing.")
+    ImGui.TextWrapped(ctx, edit_mode and "Edit mode: drag send to receive, or receive to send, to create a track send." or "View mode: select tracks, inspect routing, and arrange nodes without changing routing.")
     ImGui.Spacing(ctx)
     ImGui.Separator(ctx)
     draw_wire_key()
@@ -1492,7 +1544,7 @@ local function loop()
     local changed_edit
     changed_edit, edit_mode = ImGui.Checkbox(ctx, "Edit mode", edit_mode)
     if changed_edit then
-      status = edit_mode and "Edit mode: drag from send band to receive band to create sends." or "View mode. Routing edits disabled."
+      status = edit_mode and "Edit mode: drag send to receive, or receive to send, to create sends." or "View mode. Routing edits disabled."
       patch_drag = nil
     end
     ImGui.SameLine(ctx)
