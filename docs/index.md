@@ -64,8 +64,15 @@ Many of these tools are inspired by or extend existing computer music practices,
 
 ## Related Projects
 
-[`s3g-dsp`](https://github.com/s3g/s3g-dsp) is a sibling project for native
-macOS CLAP plugins that can be used alongside `s3g-mc` or independently.
+[`s3g-dsp`](https://github.com/s3g/s3g-dsp) is a sibling project for macOS
+CLAP plugins that can be used alongside `s3g-mc` or independently.
+
+Some realtime ideas that began as JSFX/ReaImGui tools in `s3g-mc` now have
+newer CLAP versions in `s3g-dsp`. The `s3g-mc` versions remain part of this
+package because they are functional, useful for existing sessions, and closely
+integrated with REAPER actions and automation workflows. For newer projects
+that benefit from the more developed plugin interfaces, higher channel counts,
+or saved plugin state, check whether a matching `s3g-dsp` CLAP plugin exists.
 
 [`s3g-rnbo-clap`](https://github.com/s3g/s3g-rnbo-clap) is a separate
 experimental wrapper for RNBO/Max-generated C++ exports in the same CLAP
