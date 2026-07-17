@@ -1118,8 +1118,7 @@ end
 local function draw_source_controls(track, fx)
   local changed
   changed, selected_source = ui_theme.slider_row(ImGui, ctx, "Selected source", selected_source, 1, 8, nil, true)
-  ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "RESET DISTANCES") then reset_source_distances(track, fx) end
+  if ui_theme.action_row(ImGui, ctx, "RESET DISTANCES") then reset_source_distances(track, fx) end
   local base_label = "S" .. tostring(selected_source)
   local shape = shape_combo(track, fx, selected_source)
   local triangle = shape == 6 or shape == 9 or shape == 10 or shape == 11
@@ -1149,9 +1148,9 @@ local function draw_source_controls(track, fx)
 end
 
 local function draw_source_mixer(track, fx)
-  if ImGui.Button(ctx, "CLEAR MUTES") then clear_mutes(track, fx) end
-  ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "CLEAR SOLOS") then clear_solos(track, fx) end
+  local clear_action = ui_theme.button_row(ImGui, ctx, { { "CLEAR MUTES", 112 }, { "CLEAR SOLOS", 112 } })
+  if clear_action == 1 then clear_mutes(track, fx) end
+  if clear_action == 2 then clear_solos(track, fx) end
 
   for source = 1, 8 do
     local label = "S" .. tostring(source)
@@ -1162,8 +1161,7 @@ local function draw_source_mixer(track, fx)
     toggle_param(track, fx, "M##mix" .. tostring(source), source_control_param(source, 1), mix_writes)
     ImGui.SameLine(ctx)
     toggle_param(track, fx, "S##mix" .. tostring(source), source_control_param(source, 2), mix_writes)
-    ImGui.SameLine(ctx)
-    slider_double(track, fx, "Gain##mix" .. tostring(source), source_control_param(source, 0), -60, 24, "%.1f dB", mix_writes)
+    slider_double(track, fx, label .. " gain##mix" .. tostring(source), source_control_param(source, 0), -60, 24, "%.1f dB", mix_writes)
   end
 end
 

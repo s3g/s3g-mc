@@ -554,10 +554,10 @@ local function row_metrics(ImGui, ctx, width)
   local avail = width or ImGui.GetContentRegionAvail(ctx)
   if type(avail) ~= "number" then avail = 220 end
   avail = math.max(220, avail)
-  local left_pad = 0
+  local left_pad = 12
   local x = outer_x + left_pad
   local content_avail = math.max(180, avail - left_pad)
-  local label_w = 82
+  local label_w = 96
   local value_w = 76
   local control_x = x + label_w
   local control_w = math.max(52, content_avail - label_w - value_w - 8)
