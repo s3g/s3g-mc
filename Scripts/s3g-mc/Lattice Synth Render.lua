@@ -25,10 +25,12 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
 
+local theme = require("s3g-mc ImGui Theme")
 
 local TITLE = "Lattice Synth Render"
 local FX_NAME = "s3g MC Lattice Synth Engine"
@@ -104,10 +106,29 @@ local function get_time_defaults()
   return reaper.GetCursorPosition(), 20.0
 end
 
-local function combo(label, labels, value, width)
-  ImGui.SetNextItemWidth(ctx, width or 170)
-  local changed, next_value = ImGui.Combo(ctx, label, value - 1, table.concat(labels, "\0") .. "\0")
-  return changed, next_value + 1
+local function combo(label, labels, value)
+  return theme.combo_row(ImGui, ctx, label, labels, value)
+end
+
+local function input_double_row(label, value, step, step_fast, format, width)
+  if theme.input_double_row then
+    return theme.input_double_row(ImGui, ctx, label, value, step, step_fast, format)
+  end
+  local palette = theme.palette(ImGui)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" then avail = 220 end
+  avail = math.max(220, avail)
+  local control_x = x + 82
+  local control_w = math.max(52, avail - 82 - 76 - 8)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, palette.label, tostring(label or ""):upper())
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  local changed, next_value = ImGui.InputDouble(ctx, "##input_" .. tostring(label or ""), value, step or 0.1, step_fast or 1.0, format or "%.3f")
+  ImGui.SetCursorScreenPos(ctx, x, y)
+  ImGui.Dummy(ctx, avail, 22)
+  ImGui.SetCursorScreenPos(ctx, x, y + 22)
+  return changed, next_value
 end
 
 local function add_named_jsfx(track, name)
@@ -472,71 +493,66 @@ local function loop()
     local footer_h = 64
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(280, avail_h - footer_h)
+    local panel_stack = theme.push_soft_panel(ImGui, ctx)
     if ImGui.BeginChild(ctx, "##lattice_synth_render_controls", 0, control_h) then
     draw_preview(settings)
-    ImGui.SetNextItemWidth(ctx, 130)
-    _, start_pos = ImGui.InputDouble(ctx, "Start time", start_pos, 0.1, 1.0, "%.3f")
-    ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 130)
-    _, duration = ImGui.InputDouble(ctx, "Duration", duration, 1.0, 10.0, "%.3f")
+    _, start_pos = input_double_row("Start time", start_pos, 0.1, 1.0, "%.3f")
+    _, duration = input_double_row("Duration", duration, 1.0, 10.0, "%.3f")
     duration = math.max(0.1, duration)
-    _, channel_index = combo("Output channels", CH_NAMES, channel_index, 130)
-    ImGui.SameLine(ctx)
-    _, template = combo("Gesture template", TEMPLATES, template, 190)
-    ImGui.SameLine(ctx)
-    _, rhythm = combo("Rhythm", RHYTHMS, rhythm, 180)
-    _, root = combo("Root", ROOTS, root, 90)
-    ImGui.SameLine(ctx)
-    _, scale = combo("Scale", SCALES, scale, 170)
-    ImGui.SameLine(ctx)
-    _, pitch_mode = combo("Synth pitch mode", PITCH_MODES, pitch_mode, 190)
+    _, channel_index = combo("Output channels", CH_NAMES, channel_index)
+    _, template = combo("Gesture template", TEMPLATES, template)
+    _, rhythm = combo("Rhythm", RHYTHMS, rhythm)
+    _, root = combo("Root", ROOTS, root)
+    _, scale = combo("Scale", SCALES, scale)
+    _, pitch_mode = combo("Synth pitch mode", PITCH_MODES, pitch_mode)
     ImGui.Separator(ctx)
-    _, rows = ImGui.SliderInt(ctx, "Rows", rows, 3, 12)
-    _, cols = ImGui.SliderInt(ctx, "Columns", cols, 3, 12)
-    _, layers = ImGui.SliderInt(ctx, "Layers", layers, 1, 8)
+    _, rows = theme.slider_int(ImGui, ctx, "Rows", rows, 3, 12)
+    _, cols = theme.slider_int(ImGui, ctx, "Columns", cols, 3, 12)
+    _, layers = theme.slider_int(ImGui, ctx, "Layers", layers, 1, 8)
     ingress_row, ingress_col = math.min(ingress_row, rows), math.min(ingress_col, cols)
     egress_row, egress_col = math.min(egress_row, rows), math.min(egress_col, cols)
-    _, ingress_row = ImGui.SliderInt(ctx, "Ingress row", ingress_row, 1, rows)
-    _, ingress_col = ImGui.SliderInt(ctx, "Ingress column", ingress_col, 1, cols)
-    _, egress_row = ImGui.SliderInt(ctx, "Egress row", egress_row, 1, rows)
-    _, egress_col = ImGui.SliderInt(ctx, "Egress column", egress_col, 1, cols)
+    _, ingress_row = theme.slider_int(ImGui, ctx, "Ingress row", ingress_row, 1, rows)
+    _, ingress_col = theme.slider_int(ImGui, ctx, "Ingress column", ingress_col, 1, cols)
+    _, egress_row = theme.slider_int(ImGui, ctx, "Egress row", egress_row, 1, rows)
+    _, egress_col = theme.slider_int(ImGui, ctx, "Egress column", egress_col, 1, cols)
     ImGui.Separator(ctx)
-    _, events = ImGui.SliderInt(ctx, "Events", events, 4, 512)
+    _, events = theme.slider_int(ImGui, ctx, "Events", events, 4, 512)
     pulses = math.min(pulses, events)
-    _, pulses = ImGui.SliderInt(ctx, "Euclidean pulses", pulses, 0, events)
-    _, rotate = ImGui.SliderInt(ctx, "Euclidean rotate", rotate, -events, events)
-    _, density = ImGui.SliderDouble(ctx, "Density", density, 0, 1, "%.3f")
-    _, mutation = ImGui.SliderDouble(ctx, "Gesture mutation", mutation, 0, 1, "%.3f")
-    _, gesture_pos = ImGui.SliderDouble(ctx, "Synth gesture position", gesture_pos, 0, 1, "%.3f")
-    _, note_len = ImGui.SliderDouble(ctx, "Note length", note_len, 0.05, 1.5, "%.2f")
-    _, velocity = ImGui.SliderInt(ctx, "Velocity", velocity, 1, 127)
-    _, octave = ImGui.SliderInt(ctx, "Base octave", octave, 0, 8)
-    _, register_span = ImGui.SliderInt(ctx, "Register span", register_span, 1, 6)
-    _, pitch_span = ImGui.SliderInt(ctx, "Pitch span degrees", pitch_span, 4, 64)
+    _, pulses = theme.slider_int(ImGui, ctx, "Euclidean pulses", pulses, 0, events)
+    _, rotate = theme.slider_int(ImGui, ctx, "Euclidean rotate", rotate, -events, events)
+    _, density = theme.slider_double(ImGui, ctx, "Density", density, 0, 1, "%.3f")
+    _, mutation = theme.slider_double(ImGui, ctx, "Gesture mutation", mutation, 0, 1, "%.3f")
+    _, gesture_pos = theme.slider_double(ImGui, ctx, "Synth gesture position", gesture_pos, 0, 1, "%.3f")
+    _, note_len = theme.slider_double(ImGui, ctx, "Note length", note_len, 0.05, 1.5, "%.2f")
+    _, velocity = theme.slider_int(ImGui, ctx, "Velocity", velocity, 1, 127)
+    _, octave = theme.slider_int(ImGui, ctx, "Base octave", octave, 0, 8)
+    _, register_span = theme.slider_int(ImGui, ctx, "Register span", register_span, 1, 6)
+    _, pitch_span = theme.slider_int(ImGui, ctx, "Pitch span degrees", pitch_span, 4, 64)
     ImGui.Separator(ctx)
-    _, resonance = ImGui.SliderDouble(ctx, "Resonance", resonance, 0, 1, "%.3f")
-    _, damping = ImGui.SliderDouble(ctx, "Damping", damping, 0, 1, "%.3f")
-    _, brightness = ImGui.SliderDouble(ctx, "Brightness", brightness, 0, 1, "%.3f")
-    _, divider = ImGui.SliderDouble(ctx, "Divider shadow", divider, 0, 1, "%.3f")
-    _, feedback = ImGui.SliderDouble(ctx, "Feedback drive", feedback, 0, 1, "%.3f")
-    _, spread = ImGui.SliderDouble(ctx, "Channel spread", spread, 0, 1, "%.3f")
-    _, base_freq = ImGui.SliderDouble(ctx, "Base frequency", base_freq, 20, 4000, "%.1f Hz")
-    _, gain_db = ImGui.SliderDouble(ctx, "Output gain", gain_db, -60, 0, "%.1f dB")
-    _, vel_excitation = ImGui.SliderDouble(ctx, "Velocity to excitation", vel_excitation, 0, 1, "%.3f")
-    _, vel_brightness = ImGui.SliderDouble(ctx, "Velocity to brightness", vel_brightness, 0, 1, "%.3f")
-    _, gate = ImGui.SliderDouble(ctx, "Note gate depth", gate, 0, 1, "%.3f")
-    _, focus_width = ImGui.SliderDouble(ctx, "Focus width", focus_width, 0.02, 1, "%.3f")
+    _, resonance = theme.slider_double(ImGui, ctx, "Resonance", resonance, 0, 1, "%.3f")
+    _, damping = theme.slider_double(ImGui, ctx, "Damping", damping, 0, 1, "%.3f")
+    _, brightness = theme.slider_double(ImGui, ctx, "Brightness", brightness, 0, 1, "%.3f")
+    _, divider = theme.slider_double(ImGui, ctx, "Divider shadow", divider, 0, 1, "%.3f")
+    _, feedback = theme.slider_double(ImGui, ctx, "Feedback drive", feedback, 0, 1, "%.3f")
+    _, spread = theme.slider_double(ImGui, ctx, "Channel spread", spread, 0, 1, "%.3f")
+    _, base_freq = theme.slider_double(ImGui, ctx, "Base frequency", base_freq, 20, 4000, "%.1f Hz")
+    _, gain_db = theme.slider_double(ImGui, ctx, "Output gain", gain_db, -60, 0, "%.1f dB")
+    _, vel_excitation = theme.slider_double(ImGui, ctx, "Velocity to excitation", vel_excitation, 0, 1, "%.3f")
+    _, vel_brightness = theme.slider_double(ImGui, ctx, "Velocity to brightness", vel_brightness, 0, 1, "%.3f")
+    _, gate = theme.slider_double(ImGui, ctx, "Note gate depth", gate, 0, 1, "%.3f")
+    _, focus_width = theme.slider_double(ImGui, ctx, "Focus width", focus_width, 0.02, 1, "%.3f")
     ImGui.Separator(ctx)
-    _, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
-    if normalize then _, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -36, -3, "%.1f") end
-    _, insert_gain = ImGui.SliderDouble(ctx, "Inserted item gain", insert_gain, 0.05, 1, "%.2f")
-    _, seed = ImGui.InputInt(ctx, "Seed", seed)
-    if ImGui.Button(ctx, "New Seed", 100, 28) then seed = seed + 1 end
+    _, normalize = ImGui.Checkbox(ctx, "PEAK NORMALIZE", normalize)
+    if normalize then _, normalize_db = theme.slider_double(ImGui, ctx, "Normalize peak dB", normalize_db, -36, -3, "%.1f") end
+    _, insert_gain = theme.slider_double(ImGui, ctx, "Inserted item gain", insert_gain, 0.05, 1, "%.2f")
+    _, seed = theme.input_int_row(ImGui, ctx, "Seed", seed, 1, 10)
+    if ImGui.Button(ctx, "NEW SEED", 100, 28) then seed = seed + 1 end
     ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "Render", 100, 28) then should_render = true end
+    theme.pop_soft_panel(ImGui, ctx, panel_stack)
+    if ImGui.Button(ctx, "RENDER", 100, 28) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Close", 100, 28) then open = false end
+    if ImGui.Button(ctx, "CLOSE", 100, 28) then open = false end
     ImGui.Dummy(ctx, 1, 10)
   end
   ImGui.End(ctx)

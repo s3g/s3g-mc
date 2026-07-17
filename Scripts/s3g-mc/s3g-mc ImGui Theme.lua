@@ -176,6 +176,155 @@ local SLIDER_ABBR = {
   ["DISTANCE CENTER"] = "D CTR",
   ["DISTANCE RANGE"] = "D RNG",
   ["TEAR / JUMP CHANCE"] = "TEAR",
+  ["VISIBLE CHANNELS"] = "VISIBLE",
+  ["INPUT CHANNELS"] = "INPUT",
+  ["SOURCE CHANNELS"] = "SRC CH",
+  ["OUTPUT CHANNELS"] = "OUT CH",
+  ["MATRIX FIRST CHANNEL"] = "MATRIX",
+  ["INPUT START CHANNEL"] = "IN CH",
+  ["SOURCE START"] = "SRC ST",
+  ["SOURCE COUNT"] = "SRC CT",
+  ["DEST START"] = "DST ST",
+  ["DEST COUNT"] = "DST CT",
+  ["CHANNEL ROTATE"] = "ROTATE",
+  ["NODE COUNT"] = "NODES",
+  ["CURSOR INFLUENCE"] = "INFL",
+  ["STACK POSITION"] = "STACK",
+  ["CURSOR RADIUS"] = "RADIUS",
+  ["GLOBAL RADIUS"] = "RADIUS",
+  ["CURSOR FOCUS"] = "FOCUS",
+  ["GLOBAL FOCUS"] = "FOCUS",
+  ["CURSOR GATE"] = "GATE",
+  ["SPREAD / WIDTH"] = "WIDTH",
+  ["LAYOUT WEIGHTING"] = "WEIGHT",
+  ["3D ATTENUATION"] = "3D ATT",
+  ["AMBISONIC ORDER"] = "ORDER",
+  ["BASS MONO BELOW HZ"] = "BASS",
+  ["EVENT DENSITY"] = "DENS",
+  ["EVENTS"] = "EVENTS",
+  ["FREEZE/TRACE AMOUNT"] = "AMOUNT",
+  ["GHOST SMOOTHING BINS"] = "GHOST",
+  ["HIGHER-ORDER WEIGHT"] = "HOA",
+  ["MAX SEGMENT MS"] = "MAX",
+  ["MIN SEGMENT MS"] = "MIN",
+  ["MODE"] = "MODE",
+  ["OUTPUT DURATION SEC"] = "DUR",
+  ["OVERLAP BUILD"] = "OVERLAP",
+  ["SOURCE FORMAT"] = "FORMAT",
+  ["SOURCE OBJECT SPREAD"] = "SPREAD",
+  ["SPATIAL OCCUPATION"] = "OCCUPY",
+  ["STEREO SUM/DIFFERENCE EXPANSION"] = "STEREO",
+  ["SOFT LIMIT BEFORE NORMALIZE"] = "LIMIT",
+  ["TRACE WIDTH"] = "TRACE",
+  ["W WEIGHT"] = "W",
+  ["YAW END DEG"] = "YAW E",
+  ["YAW START DEG"] = "YAW S",
+  ["CENTER AMOUNT"] = "CENTER",
+  ["DC PROTECT"] = "DC",
+  ["DIRECTIONAL COHERENCE"] = "COHER",
+  ["EXPANSION MODE"] = "MODE",
+  ["FIELD SMOOTHING"] = "FIELD",
+  ["FFT OVERLAP"] = "OVERLAP",
+  ["FREQUENCY SMOOTHING BINS"] = "FREQ",
+  ["FRONT WEIGHT"] = "FRONT",
+  ["HEIGHT AMOUNT"] = "HEIGHT",
+  ["OBJECT / FIELD CROSSFADE"] = "XFADE",
+  ["OBJECT BIAS"] = "OBJECT",
+  ["OUTPUT ORDER"] = "ORDER",
+  ["OUTPUT"] = "OUTPUT",
+  ["REAR AMOUNT"] = "REAR",
+  ["SOURCE SPREAD"] = "SPREAD",
+  ["SPECTRAL CONTRAST"] = "CONTRAST",
+  ["STEREO WIDTH"] = "WIDTH",
+  ["SIDE AMOUNT"] = "SIDE",
+  ["TEMPORAL SMOOTHING"] = "TEMP",
+  ["TRANSIENT WEIGHT"] = "TRANS",
+  ["AED TRAJECTORY"] = "AED",
+  ["SOURCE CHANNEL MODE"] = "SRC",
+  ["TRIGGER DENSITY"] = "DENS",
+  ["TRIGGER CHANCE"] = "CHANCE",
+  ["VOICE ROTATION"] = "VOICE",
+  ["GRAIN DURATION MS"] = "GRAIN",
+  ["MINIMUM GRAIN MS"] = "MIN",
+  ["DURATION VARIATION"] = "VAR",
+  ["SOURCE SPRAY MS"] = "SPRAY",
+  ["SOURCE POSITION"] = "SRC POS",
+  ["POSITION QUANTIZE"] = "QUANT",
+  ["TRANSPOSE SEMITONES"] = "TRANS",
+  ["PITCH SPREAD SEMITONES"] = "PITCH",
+  ["REVERSE CHANCE"] = "REV",
+  ["WINDOW MORPH"] = "WINDOW",
+  ["RATE DRIFT"] = "DRIFT",
+  ["AZIMUTH WIDTH"] = "AZ W",
+  ["ELEVATION WIDTH"] = "EL W",
+  ["DISTANCE MOTION"] = "D MOT",
+  ["TRIM"] = "TRIM",
+  ["PRE-GAIN DB"] = "GAIN",
+  ["PEAK NORMALIZE"] = "PEAK",
+  ["NORMALIZE DB"] = "NORM",
+  ["SEED"] = "SEED",
+  ["PULSAR STREAMS"] = "STREAMS",
+  ["TRAIN CURVE"] = "CURVE",
+  ["PULSE MASK"] = "MASK",
+  ["FUNDAMENTAL START HZ"] = "FUND S",
+  ["FUNDAMENTAL END HZ"] = "FUND E",
+  ["FORMANT START HZ"] = "FORM S",
+  ["FORMANT END HZ"] = "FORM E",
+  ["FORMANT SCATTER"] = "SCATTER",
+  ["TRAIN DRIFT"] = "DRIFT",
+  ["PULSARET"] = "PULSE",
+  ["PULSARET ENVELOPE"] = "ENV",
+  ["EDGE / CUTOFF SOFTNESS"] = "EDGE",
+  ["STOCHASTIC PROBABILITY"] = "PROB",
+  ["BURST ON"] = "ON",
+  ["BURST OFF"] = "OFF",
+  ["AZIMUTH START DEG"] = "AZ S",
+  ["AZIMUTH END DEG"] = "AZ E",
+  ["ELEVATION DEG"] = "EL",
+  ["STREAM SPATIAL SPREAD"] = "SPREAD",
+  ["PER-PULSE CHANNEL MASK"] = "MASK",
+  ["SOURCE POOL"] = "POOL",
+  ["NON-AMBISONIC SOURCE SPREAD"] = "SPREAD",
+  ["GRAIN RATE"] = "RATE",
+  ["STREAMS"] = "STREAMS",
+  ["ASYNCHRONICITY"] = "ASYNC",
+  ["INTERMITTENCY"] = "INTER",
+  ["DURATION JITTER"] = "JITTER",
+  ["ENVELOPE SHAPE"] = "ENV",
+  ["PLAYBACK RATE"] = "RATE",
+  ["PLAYBACK JITTER OCT"] = "JITTER",
+  ["SCAN BEGIN"] = "SCAN S",
+  ["SCAN RANGE"] = "RANGE",
+  ["SCAN SPEED"] = "SPEED",
+  ["PER-GRAIN YAW SCATTER"] = "SCATTER",
+  ["HIGHER-ORDER BLUR"] = "BLUR",
+  ["PROFILE STATISTIC"] = "PROFILE",
+  ["REDUCTION AMOUNT"] = "AMOUNT",
+  ["CARVE AMOUNT"] = "CARVE",
+  ["MATCH AMOUNT"] = "MATCH",
+  ["EXTRACTION AMOUNT"] = "EXTRACT",
+  ["SPECTRAL FLOOR"] = "FLOOR",
+  ["HOLE FLOOR"] = "FLOOR",
+  ["SOURCE FLOOR"] = "FLOOR",
+  ["LOW-BIN PROTECTION"] = "PROTECT",
+  ["PROFILE SENSITIVITY"] = "SENSE",
+  ["CARVE SENSITIVITY"] = "SENSE",
+  ["REFERENCE SENSITIVITY"] = "SENSE",
+  ["AMBIANCE SENSITIVITY"] = "SENSE",
+  ["FREQUENCY SMOOTHING BINS"] = "FREQ",
+  ["FFT SIZE"] = "FFT",
+  ["OVERLAP"] = "OVERLAP",
+  ["PEAK NORMALIZE OUTPUT"] = "PEAK",
+  ["NORMALIZE PEAK DB"] = "NORM",
+  ["ADAPT MIXED-ORDER KERNELS"] = "ADAPT",
+  ["MAX KERNEL WINDOW SEC"] = "WINDOW",
+  ["KERNEL FADE MS"] = "FADE",
+  ["NORMALIZE EACH KERNEL WINDOW"] = "K NORM",
+  ["WET PRE-GAIN DB"] = "GAIN",
+  ["WET LEVEL"] = "WET",
+  ["DRY LEVEL"] = "DRY",
+  ["MAX TAIL SEC"] = "TAIL",
+  ["RANDOM SEED"] = "SEED",
 }
 
 local MAX_SLIDER_LABEL_CHARS = 8
@@ -218,6 +367,29 @@ local function display_slider_value(value, format, integer)
   return string.format("%.3f", value)
 end
 
+local function row_metrics(ImGui, ctx, width)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = width or ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" then avail = 220 end
+  avail = math.max(220, avail)
+  local label_w = 82
+  local value_w = 76
+  local control_x = x + label_w
+  local control_w = math.max(52, avail - label_w - value_w - 8)
+  local value_x = control_x + control_w + 8
+  return {
+    x = x,
+    y = y,
+    avail = avail,
+    label_w = label_w,
+    value_w = value_w,
+    control_x = control_x,
+    control_w = control_w,
+    value_x = value_x,
+    h = 22,
+  }
+end
+
 local function push_borderless_frame(ImGui, ctx)
   local vars = 0
   if ImGui.StyleVar_FrameBorderSize then
@@ -231,28 +403,27 @@ local function pop_borderless_frame(ImGui, ctx, vars)
   if vars and vars > 0 then ImGui.PopStyleVar(ctx, vars) end
 end
 
-function M.slider_row(ImGui, ctx, label, value, min_value, max_value, format, integer, width)
-  local x, y = ImGui.GetCursorScreenPos(ctx)
-  local avail = width or ImGui.GetContentRegionAvail(ctx)
-  if type(avail) ~= "number" or avail < 220 then
-    if integer then return ImGui.SliderInt(ctx, label, math.floor(value + 0.5), min_value, max_value) end
-    return ImGui.SliderDouble(ctx, label, value, min_value, max_value, format or "%.3f")
-  end
+local function finish_row(ImGui, ctx, row)
+  ImGui.SetCursorScreenPos(ctx, row.x, row.y)
+  ImGui.Dummy(ctx, row.avail, row.h)
+  ImGui.SetCursorScreenPos(ctx, row.x, row.y + row.h)
+end
 
+function M.slider_row(ImGui, ctx, label, value, min_value, max_value, format, integer, width)
+  local row = row_metrics(ImGui, ctx, width)
+  local x, y = row.x, row.y
   local p = M.palette(ImGui)
-  local h = 22
-  local label_w = 82
-  local value_w = 76
-  local track_x = x + label_w
-  local track_w = math.max(52, avail - label_w - value_w - 8)
-  local value_x = track_x + track_w + 8
+  local h = row.h
+  local track_x = row.control_x
+  local track_w = row.control_w
+  local value_x = row.value_x
   local track_y = y + 6
   local track_h = 8
   local norm = 0
   if max_value ~= min_value then norm = clamp((value - min_value) / (max_value - min_value), 0, 1) end
 
   local id = string.format("##s3g_slider_%s_%d_%d", tostring(label or ""), math.floor(x + 0.5), math.floor(y + 0.5))
-  ImGui.InvisibleButton(ctx, id, avail, h)
+  ImGui.InvisibleButton(ctx, id, row.avail, h)
   local hovered = ImGui.IsItemHovered(ctx)
   local active = ImGui.IsItemActive(ctx)
   local changed = false
@@ -291,66 +462,87 @@ end
 
 function M.combo_row(ImGui, ctx, label, labels, value, width)
   labels = labels or {}
-  width = width or 160
-  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local row = row_metrics(ImGui, ctx)
+  local x, y = row.x, row.y
   local p = M.palette(ImGui)
-  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 3, p.label, slider_label(label))
-  ImGui.SetCursorScreenPos(ctx, x + 82, y)
-  ImGui.SetNextItemWidth(ctx, width)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
+  ImGui.SetCursorScreenPos(ctx, row.control_x, y)
+  ImGui.SetNextItemWidth(ctx, row.control_w)
   local border_vars = push_borderless_frame(ImGui, ctx)
   local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), (value or 1) - 1, table.concat(labels, "\0") .. "\0")
   pop_borderless_frame(ImGui, ctx, border_vars)
-  ImGui.SetCursorScreenPos(ctx, x, y + 24)
-  ImGui.Dummy(ctx, 1, 1)
+  finish_row(ImGui, ctx, row)
   return changed, next_value + 1
 end
 
 function M.combo_action_row(ImGui, ctx, label, labels, value, width, button_label, button_width)
   labels = labels or {}
-  width = width or 160
   button_width = button_width or 88
-  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local row = row_metrics(ImGui, ctx)
+  local x, y = row.x, row.y
   local p = M.palette(ImGui)
-  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 3, p.label, slider_label(label))
-  ImGui.SetCursorScreenPos(ctx, x + 82, y)
-  ImGui.SetNextItemWidth(ctx, width)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
+  ImGui.SetCursorScreenPos(ctx, row.control_x, y)
+  ImGui.SetNextItemWidth(ctx, math.max(52, row.control_w - button_width - 8))
   local border_vars = push_borderless_frame(ImGui, ctx)
   local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), (value or 1) - 1, table.concat(labels, "\0") .. "\0")
   pop_borderless_frame(ImGui, ctx, border_vars)
   ImGui.SameLine(ctx)
   local pressed = ImGui.Button(ctx, tostring(button_label or "APPLY"), button_width, 24)
-  ImGui.SetCursorScreenPos(ctx, x, y + 26)
-  ImGui.Dummy(ctx, 1, 1)
+  finish_row(ImGui, ctx, row)
   return changed, next_value + 1, pressed
 end
 
 function M.input_int_row(ImGui, ctx, label, value, step, step_fast, width)
-  width = width or 110
-  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local row = row_metrics(ImGui, ctx)
+  local x, y = row.x, row.y
   local p = M.palette(ImGui)
-  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 3, p.label, slider_label(label))
-  ImGui.SetCursorScreenPos(ctx, x + 82, y)
-  ImGui.SetNextItemWidth(ctx, width)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
+  ImGui.SetCursorScreenPos(ctx, row.control_x, y)
+  ImGui.SetNextItemWidth(ctx, row.control_w)
   local border_vars = push_borderless_frame(ImGui, ctx)
   local changed, next_value = ImGui.InputInt(ctx, "##input_" .. tostring(label or ""), value, step or 1, step_fast or 10)
   pop_borderless_frame(ImGui, ctx, border_vars)
-  ImGui.SetCursorScreenPos(ctx, x, y + 24)
-  ImGui.Dummy(ctx, 1, 1)
+  finish_row(ImGui, ctx, row)
+  return changed, next_value
+end
+
+function M.input_double_row(ImGui, ctx, label, value, step, step_fast, format, width)
+  local row = row_metrics(ImGui, ctx)
+  local x, y = row.x, row.y
+  local p = M.palette(ImGui)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
+  ImGui.SetCursorScreenPos(ctx, row.control_x, y)
+  ImGui.SetNextItemWidth(ctx, row.control_w)
+  local border_vars = push_borderless_frame(ImGui, ctx)
+  local changed, next_value = ImGui.InputDouble(ctx, "##input_" .. tostring(label or ""), value, step or 0.1, step_fast or 1.0, format or "%.3f")
+  pop_borderless_frame(ImGui, ctx, border_vars)
+  finish_row(ImGui, ctx, row)
   return changed, next_value
 end
 
 function M.input_text_row(ImGui, ctx, label, value, width)
-  width = width or 220
-  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local row = row_metrics(ImGui, ctx)
+  local x, y = row.x, row.y
   local p = M.palette(ImGui)
-  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 3, p.label, slider_label(label))
-  ImGui.SetCursorScreenPos(ctx, x + 82, y)
-  ImGui.SetNextItemWidth(ctx, width)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
+  ImGui.SetCursorScreenPos(ctx, row.control_x, y)
+  ImGui.SetNextItemWidth(ctx, row.control_w)
   local border_vars = push_borderless_frame(ImGui, ctx)
   local changed, next_value = ImGui.InputText(ctx, "##input_" .. tostring(label or ""), value or "")
   pop_borderless_frame(ImGui, ctx, border_vars)
-  ImGui.SetCursorScreenPos(ctx, x, y + 24)
-  ImGui.Dummy(ctx, 1, 1)
+  finish_row(ImGui, ctx, row)
+  return changed, next_value
+end
+
+function M.checkbox_row(ImGui, ctx, label, value, width)
+  local row = row_metrics(ImGui, ctx, width)
+  local x, y = row.x, row.y
+  local p = M.palette(ImGui)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
+  ImGui.SetCursorScreenPos(ctx, row.control_x, y)
+  local changed, next_value = ImGui.Checkbox(ctx, "##check_" .. tostring(label or ""), value)
+  finish_row(ImGui, ctx, row)
   return changed, next_value
 end
 
@@ -422,6 +614,26 @@ function M.pop_soft_panel(ImGui, ctx, stack)
   if not stack then return end
   if stack.colors and stack.colors > 0 then ImGui.PopStyleColor(ctx, stack.colors) end
   if stack.vars and stack.vars > 0 then ImGui.PopStyleVar(ctx, stack.vars) end
+end
+
+function M.begin_section(ImGui, ctx, title, height)
+  local stack = M.push_soft_panel(ImGui, ctx)
+  local p = M.palette(ImGui)
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local w = ImGui.GetContentRegionAvail(ctx)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + height, p.panel_soft)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + 2, p.active)
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
+  M.text(ImGui, ctx, tostring(title or ""):upper())
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
+  return x, y, height, stack
+end
+
+function M.finish_section(ImGui, ctx, x, y, height, stack)
+  M.pop_soft_panel(ImGui, ctx, stack)
+  ImGui.SetCursorScreenPos(ctx, x, y + height)
+  ImGui.Dummy(ctx, 1, 10)
 end
 
 function M.push_panel(ImGui, ctx)

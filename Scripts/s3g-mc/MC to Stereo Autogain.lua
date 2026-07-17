@@ -620,11 +620,11 @@ local function loop()
   if visible then
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     if not track then
-      ImGui.Text(ctx, "No selected track.")
+      theme.muted(ImGui, ctx, "NO SELECTED TRACK.")
     else
       local _, track_name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
       local track_ch = get_track_channels(track)
-      ImGui.Text(ctx, "Selected track: " .. (track_name ~= "" and track_name or "(unnamed)"))
+      theme.muted(ImGui, ctx, "TARGET: " .. (track_name ~= "" and track_name or "(UNNAMED)"))
       ImGui.SameLine(ctx)
       if ImGui.Button(ctx, "LOAD / REPAIR JSFX") then maybe_load(track, true) end
       ImGui.SameLine(ctx)
@@ -653,11 +653,11 @@ local function loop()
           slider_param(track, fx, "3D attenuation", PARAM.attenuation, 0, 100, "%.0f%%")
           combo_param(track, fx, "Autogain", PARAM.autogain, AUTOGAIN)
           ImGui.Spacing(ctx)
-          if ImGui.Button(ctx, "-6 dB") then set_param(track, fx, PARAM.output_gain, -6) end
+          if ImGui.Button(ctx, "-6 DB") then set_param(track, fx, PARAM.output_gain, -6) end
           ImGui.SameLine(ctx)
           if ImGui.Button(ctx, "UNITY") then set_param(track, fx, PARAM.output_gain, 0) end
           ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "+3 dB") then set_param(track, fx, PARAM.output_gain, 3) end
+          if ImGui.Button(ctx, "+3 DB") then set_param(track, fx, PARAM.output_gain, 3) end
           ImGui.EndChild(ctx)
           theme.pop_soft_panel(ImGui, ctx, panel_stack)
         ImGui.EndGroup(ctx)

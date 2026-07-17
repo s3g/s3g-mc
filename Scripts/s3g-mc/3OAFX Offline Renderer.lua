@@ -98,15 +98,8 @@ local function set_value(key, value)
 end
 
 local function draw_combo(label, index, names)
-  if ImGui.BeginCombo(ctx, label, names[index] or "") then
-    for i, name in ipairs(names) do
-      local selected = i == index
-      if ImGui.Selectable(ctx, name, selected) then index = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return index
+  local _, next_index = theme.combo_row(ImGui, ctx, label, names, index)
+  return next_index
 end
 
 local function order_index_for_channels(channels)
@@ -496,62 +489,60 @@ function main()
       local _, avail_h = ImGui.GetContentRegionAvail(ctx)
       local control_h = math.max(300, (avail_h or 1060) - 44)
       if ImGui.BeginChild(ctx, "##3oafx_offline_controls", 0, control_h) then
-      ImGui.Text(ctx, "Source: " .. entry.name .. "  (" .. tostring(entry.channels) .. " ch)")
-      ImGui.Text(ctx, "Input convention: ACN/SN3D ambisonics")
-      if ImGui.CollapsingHeader(ctx, "Render Setup", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+      theme.muted(ImGui, ctx, "Source: " .. entry.name .. "  (" .. tostring(entry.channels) .. " ch)")
+      theme.muted(ImGui, ctx, "Input convention: ACN/SN3D ambisonics")
+      local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Render Setup", 73)
         settings.order_index = draw_combo("Ambisonic order", settings.order_index, ORDER_NAMES)
         local needed = order_channels(settings.order_index)
         if entry.channels < needed then
-          ImGui.TextColored(ctx, COLOR_WARN, "Selected item does not have enough channels for this order.")
+          theme.status(ImGui, ctx, "Selected item does not have enough channels for this order.", "warn")
         end
-      end
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
       local changed
-      if ImGui.CollapsingHeader(ctx, "Focus And Effect", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Focus / Effect", effect_uses_feedback(settings.effect_index) and 246 or 202)
         settings.effect_index = draw_combo("Effect region", settings.effect_index, EFFECT_NAMES)
-        changed, settings.azimuth = ImGui.SliderDouble(ctx, "Azimuth", settings.azimuth, -180.0, 180.0, "%.1f deg")
-        changed, settings.elevation = ImGui.SliderDouble(ctx, "Elevation", settings.elevation, -90.0, 90.0, "%.1f deg")
-        changed, settings.focus_width = ImGui.SliderDouble(ctx, "Focus width", settings.focus_width, 2.0, 140.0, "%.1f deg")
-        changed, settings.focus_sharpness = ImGui.SliderDouble(ctx, "Focus sharpness", settings.focus_sharpness, 0.0, 1.0, "%.2f")
-        changed, settings.effect_gain = ImGui.SliderDouble(ctx, "Effect amount / gain", settings.effect_gain, 0.0, 2.5, "%.2f")
+        changed, settings.azimuth = theme.slider_double(ImGui, ctx, "Azimuth", settings.azimuth, -180.0, 180.0, "%.1f deg")
+        changed, settings.elevation = theme.slider_double(ImGui, ctx, "Elevation", settings.elevation, -90.0, 90.0, "%.1f deg")
+        changed, settings.focus_width = theme.slider_double(ImGui, ctx, "Focus width", settings.focus_width, 2.0, 140.0, "%.1f deg")
+        changed, settings.focus_sharpness = theme.slider_double(ImGui, ctx, "Focus sharpness", settings.focus_sharpness, 0.0, 1.0, "%.2f")
+        changed, settings.effect_gain = theme.slider_double(ImGui, ctx, "Effect amount / gain", settings.effect_gain, 0.0, 2.5, "%.2f")
         local pmin, pmax, pfmt = effect_param_range(settings.effect_index)
         settings.effect_param = clamp(settings.effect_param, pmin, pmax)
-        changed, settings.effect_param = ImGui.SliderDouble(ctx, effect_param_label(settings.effect_index), settings.effect_param, pmin, pmax, pfmt)
+        changed, settings.effect_param = theme.slider_double(ImGui, ctx, effect_param_label(settings.effect_index), settings.effect_param, pmin, pmax, pfmt)
         if effect_uses_feedback(settings.effect_index) then
-          changed, settings.feedback = ImGui.SliderDouble(ctx, "Feedback", settings.feedback, 0.0, 0.92, "%.2f")
-          changed, settings.damp = ImGui.SliderDouble(ctx, "Damping / smoothing", settings.damp, 0.0, 0.98, "%.2f")
+          changed, settings.feedback = theme.slider_double(ImGui, ctx, "Feedback", settings.feedback, 0.0, 0.92, "%.2f")
+          changed, settings.damp = theme.slider_double(ImGui, ctx, "Damping / smoothing", settings.damp, 0.0, 0.98, "%.2f")
         end
-      end
-      if ImGui.CollapsingHeader(ctx, "Wet Dry Mix", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-        changed, settings.wet = ImGui.SliderDouble(ctx, "Wet amount", settings.wet, 0.0, 2.0, "%.2f")
-        changed, settings.dry_level = ImGui.SliderDouble(ctx, "Dry level", settings.dry_level, 0.0, 1.5, "%.2f")
-        changed, settings.move_wet_on_array = ImGui.Checkbox(ctx, "Move wet across virtual speaker array", settings.move_wet_on_array)
-        changed, settings.dry_attenuation = ImGui.SliderDouble(ctx, "Dry remaining at focus", settings.dry_attenuation, 0.0, 1.0, "%.2f")
-        changed, settings.amplitude = ImGui.SliderDouble(ctx, "Output amp", settings.amplitude, 0.0, 1.5, "%.2f")
-      end
-      if ImGui.CollapsingHeader(ctx, "Output", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-        changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Wet / Dry", 158)
+        changed, settings.wet = theme.slider_double(ImGui, ctx, "Wet amount", settings.wet, 0.0, 2.0, "%.2f")
+        changed, settings.dry_level = theme.slider_double(ImGui, ctx, "Dry level", settings.dry_level, 0.0, 1.5, "%.2f")
+        changed, settings.move_wet_on_array = theme.checkbox_row(ImGui, ctx, "Move wet across virtual speaker array", settings.move_wet_on_array)
+        changed, settings.dry_attenuation = theme.slider_double(ImGui, ctx, "Dry remaining at focus", settings.dry_attenuation, 0.0, 1.0, "%.2f")
+        changed, settings.amplitude = theme.slider_double(ImGui, ctx, "Output amp", settings.amplitude, 0.0, 1.5, "%.2f")
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Output", settings.normalize and 123 or 98)
+        changed, settings.normalize = theme.checkbox_row(ImGui, ctx, "Peak normalize", settings.normalize)
         if settings.normalize then
-          changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -36.0, -1.0, "%.1f")
+          changed, settings.normalize_db = theme.slider_double(ImGui, ctx, "Normalize dB", settings.normalize_db, -36.0, -1.0, "%.1f")
         end
-        changed, settings.dc_protect = ImGui.Checkbox(ctx, "DC protect", settings.dc_protect)
-        ImGui.SameLine(ctx)
-        changed, settings.soft_limit = ImGui.Checkbox(ctx, "Soft limit", settings.soft_limit)
-      end
-      ImGui.Separator(ctx)
-      ImGui.Text(ctx, "Dry remaining at focus sets how much dry signal stays under the moving effect mask before re-encoding.")
-      if ImGui.CollapsingHeader(ctx, "Preview", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-        draw_preview(settings, env_points, env_enabled, entry)
-      end
-      ImGui.Separator(ctx)
-      if ImGui.CollapsingHeader(ctx, "Breakpoint Envelopes", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-        selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
-          selected_env_point, settings, env_opts)
-      end
+        changed, settings.dc_protect = theme.checkbox_row(ImGui, ctx, "DC protect", settings.dc_protect)
+        changed, settings.soft_limit = theme.checkbox_row(ImGui, ctx, "Soft limit", settings.soft_limit)
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      theme.muted(ImGui, ctx, "Dry remaining at focus sets how much dry signal stays under the moving effect mask before re-encoding.")
+      theme.section_label(ImGui, ctx, "PREVIEW")
+      draw_preview(settings, env_points, env_enabled, entry)
+      theme.section_label(ImGui, ctx, "BREAKPOINTS")
+      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
+        selected_env_point, settings, env_opts)
         ImGui.EndChild(ctx)
       end
-      if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
+      if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
+      if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
       ImGui.End(ctx)
     end
     theme.pop_font(ImGui, ctx, font_pushed)

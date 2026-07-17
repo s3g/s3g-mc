@@ -76,15 +76,8 @@ end
   end
 
   local function combo(ctx, label, index, names)
-    if ImGui.BeginCombo(ctx, label, names[index] or "") then
-      for i, name in ipairs(names) do
-        local selected = i == index
-        if ImGui.Selectable(ctx, name, selected) then index = i end
-        if selected then ImGui.SetItemDefaultFocus(ctx) end
-      end
-      ImGui.EndCombo(ctx)
-    end
-    return index
+    local changed, next_index = ui_theme.combo_row(ImGui, ctx, label, names, index)
+    return changed and next_index or index
   end
 
   local function is_wav(path)
@@ -254,44 +247,46 @@ end
     visible, open = ImGui.Begin(ctx, TITLE, open)
     if visible then
       local validation = validate(source, profile, settings)
-      ImGui.Text(ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
-      ImGui.Text(ctx, (config.profile_label or "Profile") .. ": " .. profile.name .. "  (" .. tostring(profile.channels) .. " ch)")
+      ui_theme.muted(ImGui, ctx, "SOURCE: " .. source.name .. "  (" .. tostring(source.channels) .. " CH)")
+      ui_theme.muted(ImGui, ctx, (config.profile_label or "Profile"):upper() .. ": " .. profile.name .. "  (" .. tostring(profile.channels) .. " CH)")
       ImGui.Spacing(ctx)
       draw_flow(ctx, source, profile, settings)
       ImGui.Spacing(ctx)
 
+      local panel = ui_theme.push_soft_panel(ImGui, ctx)
       settings.channel_index = combo(ctx, "Channel mode", settings.channel_index, CHANNEL_NAMES)
       settings.profile_index = combo(ctx, "Profile statistic", settings.profile_index, PROFILE_NAMES)
       local changed
-      changed, settings.reduction_amount = ImGui.SliderDouble(ctx, config.amount_label or "Amount", settings.reduction_amount, 0.0, 1.0, "%.2f")
-      changed, settings.spectral_floor = ImGui.SliderDouble(ctx, config.floor_label or "Spectral floor", settings.spectral_floor, 0.0, 0.75, "%.2f")
-      changed, settings.profile_sensitivity = ImGui.SliderDouble(ctx, config.sensitivity_label or "Profile sensitivity", settings.profile_sensitivity, 0.25, 4.0, "%.2f")
-      changed, settings.frequency_smoothing_bins = ImGui.SliderInt(ctx, "Frequency smoothing bins", math.floor(settings.frequency_smoothing_bins), 0, 24)
-      changed, settings.temporal_smoothing = ImGui.SliderDouble(ctx, "Temporal smoothing", settings.temporal_smoothing, 0.0, 0.95, "%.2f")
+      changed, settings.reduction_amount = ui_theme.slider_double(ImGui, ctx, config.amount_label or "Amount", settings.reduction_amount, 0.0, 1.0, "%.2f")
+      changed, settings.spectral_floor = ui_theme.slider_double(ImGui, ctx, config.floor_label or "Spectral floor", settings.spectral_floor, 0.0, 0.75, "%.2f")
+      changed, settings.profile_sensitivity = ui_theme.slider_double(ImGui, ctx, config.sensitivity_label or "Profile sensitivity", settings.profile_sensitivity, 0.25, 4.0, "%.2f")
+      changed, settings.frequency_smoothing_bins = ui_theme.slider_int(ImGui, ctx, "Frequency smoothing bins", math.floor(settings.frequency_smoothing_bins), 0, 24)
+      changed, settings.temporal_smoothing = ui_theme.slider_double(ImGui, ctx, "Temporal smoothing", settings.temporal_smoothing, 0.0, 0.95, "%.2f")
       settings.fft_index = combo(ctx, "FFT size", settings.fft_index, FFT_NAMES)
-      changed, settings.overlap = ImGui.SliderInt(ctx, "Overlap", math.floor(settings.overlap), 2, 8)
+      changed, settings.overlap = ui_theme.slider_int(ImGui, ctx, "Overlap", math.floor(settings.overlap), 2, 8)
       settings.overlap = clamp(math.floor(settings.overlap), 2, 8)
-      changed, settings.dc_protect = ImGui.Checkbox(ctx, "DC protect", settings.dc_protect)
-      changed, settings.soft_limit = ImGui.Checkbox(ctx, "Soft limit before normalize", settings.soft_limit)
-      changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize output", settings.normalize)
+      changed, settings.dc_protect = ui_theme.checkbox_row(ImGui, ctx, "DC protect", settings.dc_protect)
+      changed, settings.soft_limit = ui_theme.checkbox_row(ImGui, ctx, "Soft limit before normalize", settings.soft_limit)
+      changed, settings.normalize = ui_theme.checkbox_row(ImGui, ctx, "Peak normalize output", settings.normalize)
       if settings.normalize then
-        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+        changed, settings.normalize_db = ui_theme.slider_double(ImGui, ctx, "Normalize peak dB", settings.normalize_db, -24.0, 0.0, "%.1f")
       end
+      ui_theme.pop_soft_panel(ImGui, ctx, panel)
 
       ImGui.Spacing(ctx)
       ImGui.Separator(ctx)
-      ImGui.Text(ctx, "Output channels: " .. tostring(source.channels))
-      ImGui.Text(ctx, "Source file: " .. basename(source.filename))
-      ImGui.Text(ctx, (config.profile_label or "Profile") .. " file: " .. basename(profile.filename))
+      ui_theme.muted(ImGui, ctx, "OUTPUT CHANNELS: " .. tostring(source.channels))
+      ui_theme.muted(ImGui, ctx, "SOURCE FILE: " .. basename(source.filename))
+      ui_theme.muted(ImGui, ctx, (config.profile_label or "Profile"):upper() .. " FILE: " .. basename(profile.filename))
       if validation then
-        if ui_theme and ui_theme.status then ui_theme.status(ImGui, ctx, validation, "warn") else ImGui.Text(ctx, validation) end
+        ui_theme.status(ImGui, ctx, validation, "warn")
       else
-        ImGui.Text(ctx, "Renders offline from WAV media with NumPy.")
+        ui_theme.muted(ImGui, ctx, "RENDERS OFFLINE FROM WAV MEDIA WITH NUMPY.")
       end
       ImGui.Spacing(ctx)
-      if ImGui.Button(ctx, "Render", 104, 28) and not validation then should_render = true end
+      if ImGui.Button(ctx, "RENDER", 104, 28) and not validation then should_render = true end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Cancel", 104, 28) then open = false end
+      if ImGui.Button(ctx, "CANCEL", 104, 28) then open = false end
       ImGui.End(ctx)
     end
 

@@ -23,6 +23,7 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
 
 
 local FFT_NAMES = { [1] = "1024", [2] = "2048", [3] = "4096", [4] = "8192" }
@@ -51,24 +52,26 @@ local function loop()
   if visible then
     local carrier = swap and entries[2] or entries[1]
     local modulator = swap and entries[1] or entries[2]
-    ImGui.Text(ctx, "Carrier: " .. carrier.name .. " (" .. tostring(carrier.channels) .. " ch)")
-    ImGui.Text(ctx, "Modulator: " .. modulator.name .. " (" .. tostring(modulator.channels) .. " ch)")
-    if ImGui.Button(ctx, "Swap carrier / modulator") then swap = not swap end
-    ImGui.Spacing(ctx)
+    theme.muted(ImGui, ctx, "Carrier: " .. carrier.name .. " (" .. tostring(carrier.channels) .. " ch)")
+    theme.muted(ImGui, ctx, "Modulator: " .. modulator.name .. " (" .. tostring(modulator.channels) .. " ch)")
+    if ImGui.Button(ctx, "SWAP", 92, 26) then swap = not swap end
     local changed
+    local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Cross Synthesis", 198)
     changed, fft_index = sol.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
-    changed, amount = ImGui.SliderDouble(ctx, "Modulator amount", amount, 0, 1, "%.3f")
-    changed, mix = ImGui.SliderDouble(ctx, "Wet mix", mix, 0, 1, "%.3f")
-    changed, smooth_bins = ImGui.SliderInt(ctx, "Envelope smoothing bins", smooth_bins, 1, 96)
-    changed, contrast = ImGui.SliderDouble(ctx, "Envelope contrast", contrast, 0.1, 3.0, "%.2f")
-    changed, floor = ImGui.SliderDouble(ctx, "Envelope floor", floor, 0.001, 0.5, "%.3f")
-    changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
-    if normalize then changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f") end
-    ImGui.Separator(ctx)
-    ImGui.Text(ctx, "Carrier keeps phase/timing; modulator supplies spectral contour.")
-    if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
+    changed, amount = sol.draw_slider(ImGui, ctx, "Modulator amount", amount, 0, 1, "%.3f", false)
+    changed, mix = sol.draw_slider(ImGui, ctx, "Wet mix", mix, 0, 1, "%.3f", false)
+    changed, smooth_bins = sol.draw_slider_int(ImGui, ctx, "Envelope smoothing bins", smooth_bins, 1, 96)
+    changed, contrast = sol.draw_slider(ImGui, ctx, "Envelope contrast", contrast, 0.1, 3.0, "%.2f", false)
+    changed, floor = sol.draw_slider(ImGui, ctx, "Envelope floor", floor, 0.001, 0.5, "%.3f", false)
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Output", normalize and 98 or 73)
+    changed, normalize = sol.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
+    if normalize then changed, normalize_db = sol.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false) end
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    theme.muted(ImGui, ctx, "Carrier keeps phase/timing; modulator supplies spectral contour.")
+    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
     ImGui.End(ctx)
   end
   if should_render then

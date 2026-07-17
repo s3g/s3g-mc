@@ -62,6 +62,10 @@ check \
   'CollapsingHeader\(ctx, "[A-Z][a-z]'
 
 check \
+  'fixed buttons should use all-CAPS visible labels' \
+  'ImGui\.(SmallButton|Button)\(ctx, "[^"#]*[a-z][^"#]*(##|")'
+
+check \
   'old visible labels on combo/input fallbacks; fallback widgets must also use hidden IDs' \
   'ImGui\.(Combo|InputInt|InputDouble|InputText)\(ctx, label'
 

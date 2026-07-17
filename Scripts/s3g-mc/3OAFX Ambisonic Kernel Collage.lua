@@ -82,15 +82,8 @@ local function set_value(key, value)
 end
 
 local function combo(ctx, label, index, names)
-  if ImGui.BeginCombo(ctx, label, names[index] or "") then
-    for i, name in ipairs(names) do
-      local selected = i == index
-      if ImGui.Selectable(ctx, name, selected) then index = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return index
+  local _, next_index = theme.combo_row(ImGui, ctx, label, names, index)
+  return next_index
 end
 
 local function order_index_for_channels(channels)
@@ -514,75 +507,82 @@ local function main()
       local _, avail_h = ImGui.GetContentRegionAvail(ctx)
       local control_h = math.max(280, avail_h - footer_h)
       if ImGui.BeginChild(ctx, "##kernel_collage_controls", 0, control_h) then
-      ImGui.Text(ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
-      ImGui.Text(ctx, "Kernel recordings: " .. tostring(#kernels))
+      theme.muted(ImGui, ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
+      theme.muted(ImGui, ctx, "Kernel recordings: " .. tostring(#kernels))
       ImGui.Spacing(ctx)
       draw_flow(ctx, settings, #kernels)
       ImGui.Spacing(ctx)
       draw_direction_map(ctx, settings, #kernels)
       ImGui.Spacing(ctx)
       local changed
+      local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Routing", settings.assignment_index == 5 and 224 or 199)
       settings.order_index = combo(ctx, "Ambisonic order", settings.order_index, ORDER_NAMES)
       settings.layer_index = combo(ctx, "Direction layer", settings.layer_index, LAYER_NAMES)
       if settings.layer_index == 2 and settings.order_index > 1 then
-        ImGui.Text(ctx, "Uses four tetrahedral first-order microphone directions as a sparse higher-order layer.")
+        theme.muted(ImGui, ctx, "Uses four tetrahedral first-order microphone directions as a sparse higher-order layer.")
       elseif settings.layer_index == 3 and settings.order_index == 1 then
         theme.status(ImGui, ctx, "1OA practical mode uses a 6-direction axial layer; spatial resolution remains first-order.", "amber")
       elseif settings.layer_index == 3 then
-        ImGui.Text(ctx, "Uses eight cube-corner directions for 2OA/3OA.")
+        theme.muted(ImGui, ctx, "Uses eight cube-corner directions for 2OA/3OA.")
       end
       settings.assignment_index = combo(ctx, "Kernel assignment", settings.assignment_index, ASSIGNMENT_NAMES)
       if settings.assignment_index == 3 then
         theme.status(ImGui, ctx, "Dense mode can get large quickly: directions x kernels x channels.", "amber")
       elseif settings.assignment_index == 4 then
-        ImGui.Text(ctx, "Extra kernels are ignored; missing direction kernels are silent.")
+        theme.muted(ImGui, ctx, "Extra kernels are ignored; missing direction kernels are silent.")
       elseif settings.assignment_index == 5 then
-        ImGui.Text(ctx, "Each direction blends nearby kernel positions rather than using a single kernel.")
-        changed, settings.region_width_deg = ImGui.SliderDouble(ctx, "Region width deg", settings.region_width_deg, 12.0, 180.0, "%.1f")
+        theme.muted(ImGui, ctx, "Each direction blends nearby kernel positions rather than using a single kernel.")
+        changed, settings.region_width_deg = theme.slider_double(ImGui, ctx, "Region width deg", settings.region_width_deg, 12.0, 180.0, "%.1f")
       end
       settings.tail_index = combo(ctx, "Output length", settings.tail_index, TAIL_NAMES)
-      ImGui.Spacing(ctx)
-      changed, settings.adapt_mixed_order_kernels = ImGui.Checkbox(ctx, "Adapt mixed-order kernels", settings.adapt_mixed_order_kernels)
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Kernels", settings.adapt_mixed_order_kernels and 180 or 158)
+      changed, settings.adapt_mixed_order_kernels = theme.checkbox_row(ImGui, ctx, "Adapt mixed-order kernels", settings.adapt_mixed_order_kernels)
       if settings.adapt_mixed_order_kernels then
-        ImGui.Text(ctx, "1OA/2OA/3OA kernels are adapted to the selected output order.")
+        theme.muted(ImGui, ctx, "1OA/2OA/3OA kernels are adapted to the selected output order.")
       end
-      changed, settings.max_kernel_seconds = ImGui.SliderDouble(ctx, "Max kernel window sec", settings.max_kernel_seconds, 0.05, 30.0, "%.2f")
-      changed, settings.kernel_fade_ms = ImGui.SliderDouble(ctx, "Kernel fade ms", settings.kernel_fade_ms, 0.0, 500.0, "%.1f")
-      changed, settings.kernel_normalize = ImGui.Checkbox(ctx, "Normalize each kernel window", settings.kernel_normalize)
-      changed, settings.wet_gain_db = ImGui.SliderDouble(ctx, "Wet pre-gain dB", settings.wet_gain_db, -48.0, 0.0, "%.1f")
-      changed, settings.wet_level = ImGui.SliderDouble(ctx, "Wet level", settings.wet_level, 0.0, 2.0, "%.2f")
-      changed, settings.dry_level = ImGui.SliderDouble(ctx, "Dry level", settings.dry_level, 0.0, 1.5, "%.2f")
+      changed, settings.max_kernel_seconds = theme.slider_double(ImGui, ctx, "Max kernel window sec", settings.max_kernel_seconds, 0.05, 30.0, "%.2f")
+      changed, settings.kernel_fade_ms = theme.slider_double(ImGui, ctx, "Kernel fade ms", settings.kernel_fade_ms, 0.0, 500.0, "%.1f")
+      changed, settings.kernel_normalize = theme.checkbox_row(ImGui, ctx, "Normalize each kernel window", settings.kernel_normalize)
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Mix / Output", settings.normalize and 246 or 221)
+      changed, settings.wet_gain_db = theme.slider_double(ImGui, ctx, "Wet pre-gain dB", settings.wet_gain_db, -48.0, 0.0, "%.1f")
+      changed, settings.wet_level = theme.slider_double(ImGui, ctx, "Wet level", settings.wet_level, 0.0, 2.0, "%.2f")
+      changed, settings.dry_level = theme.slider_double(ImGui, ctx, "Dry level", settings.dry_level, 0.0, 1.5, "%.2f")
       if settings.tail_index == 1 then
-        changed, settings.max_tail_seconds = ImGui.SliderDouble(ctx, "Max tail sec", settings.max_tail_seconds, 0.0, 60.0, "%.1f")
+        changed, settings.max_tail_seconds = theme.slider_double(ImGui, ctx, "Max tail sec", settings.max_tail_seconds, 0.0, 60.0, "%.1f")
       end
       if settings.assignment_index == 2 then
-        changed, settings.seed = ImGui.SliderDouble(ctx, "Random seed", settings.seed, 1, 9999, "%.0f")
+        changed, settings.seed = theme.slider_double(ImGui, ctx, "Random seed", settings.seed, 1, 9999, "%.0f")
       end
-      changed, settings.dc_protect = ImGui.Checkbox(ctx, "DC protect", settings.dc_protect)
-      changed, settings.soft_limit = ImGui.Checkbox(ctx, "Soft limit before normalize", settings.soft_limit)
-      changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize output", settings.normalize)
+      changed, settings.dc_protect = theme.checkbox_row(ImGui, ctx, "DC protect", settings.dc_protect)
+      changed, settings.soft_limit = theme.checkbox_row(ImGui, ctx, "Soft limit before normalize", settings.soft_limit)
+      changed, settings.normalize = theme.checkbox_row(ImGui, ctx, "Peak normalize output", settings.normalize)
       if settings.normalize then
-        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+        changed, settings.normalize_db = theme.slider_double(ImGui, ctx, "Normalize peak dB", settings.normalize_db, -24.0, 0.0, "%.1f")
       end
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
       ImGui.Spacing(ctx)
-      ImGui.Separator(ctx)
-      ImGui.Text(ctx, "Virtual directions: " .. tostring(direction_count_for(settings)))
+      theme.muted(ImGui, ctx, "Virtual directions: " .. tostring(direction_count_for(settings)))
       if settings.adapt_mixed_order_kernels then
-        ImGui.Text(ctx, "Kernel channels: 1OA / 4ch minimum; adapted to output order")
+        theme.muted(ImGui, ctx, "Kernel channels: 1OA / 4ch minimum; adapted to output order")
       else
-        ImGui.Text(ctx, "Required channels per item: " .. tostring(order_channels(settings.order_index)))
+        theme.muted(ImGui, ctx, "Required channels per item: " .. tostring(order_channels(settings.order_index)))
       end
       if validation then
-        theme.status(ImGui, ctx, validation, "danger")
+        theme.status(ImGui, ctx, validation, "warn")
       else
-        ImGui.Text(ctx, "Renders offline from WAV media with NumPy.")
+        theme.muted(ImGui, ctx, "Renders offline from WAV media with NumPy.")
       end
       ImGui.Spacing(ctx)
       ImGui.EndChild(ctx)
       end
-      if ImGui.Button(ctx, "Render", 104, 28) and not validation then should_render = true end
+      if ImGui.Button(ctx, "RENDER", 104, 28) and not validation then should_render = true end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Cancel", 104, 28) then open = false end
+      if ImGui.Button(ctx, "CANCEL", 104, 28) then open = false end
       ImGui.Dummy(ctx, 1, 10)
       ImGui.End(ctx)
     end

@@ -23,6 +23,7 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
 
 
 local FFT_NAMES = { [1] = "1024", [2] = "2048", [3] = "4096", [4] = "8192" }
@@ -51,18 +52,21 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, "Spectral Spatializer", open)
   if visible then
-    ImGui.Text(ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
+    theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
     local changed
+    local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Spatialize", 123)
     changed, fft_index = sol.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
     changed, ch_index = sol.draw_combo(ImGui, ctx, "Output channels", ch_index, CH_NAMES, 1, #CH_VALUES)
-    changed, spread = ImGui.SliderDouble(ctx, "Bin spread", spread, 0.25, 6.0, "%.2f")
-    changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
-    if normalize then changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f") end
-    ImGui.Separator(ctx)
-    ImGui.Text(ctx, "Low-to-high frequency bins are distributed across output channels.")
-    if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
+    changed, spread = sol.draw_slider(ImGui, ctx, "Bin spread", spread, 0.25, 6.0, "%.2f", false)
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Output", normalize and 98 or 73)
+    changed, normalize = sol.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
+    if normalize then changed, normalize_db = sol.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false) end
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    theme.muted(ImGui, ctx, "Low-to-high frequency bins are distributed across output channels.")
+    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
     ImGui.End(ctx)
   end
   if should_render then

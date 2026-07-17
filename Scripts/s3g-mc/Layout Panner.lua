@@ -149,11 +149,7 @@ local CANVAS = {
 }
 
 local function muted_text(value)
-  if ui_theme and ui_theme.muted then
-    ui_theme.muted(ImGui, ctx, value)
-  else
-    ImGui.Text(ctx, value)
-  end
+  ui_theme.muted(ImGui, ctx, value)
 end
 
 local PARAM = {
@@ -356,11 +352,7 @@ end
 local function slider_double(track, fx, label, param, lo, hi, fmt, write_enabled)
   local value = get_param(track, fx, param, lo)
   local changed, new_value
-  if ui_theme and ui_theme.slider_row then
-    changed, new_value = ui_theme.slider_row(ImGui, ctx, label, value, lo, hi, fmt or "%.2f", false)
-  else
-    changed, new_value = ImGui.SliderDouble(ctx, label, value, lo, hi, fmt or "%.2f")
-  end
+  changed, new_value = ui_theme.slider_row(ImGui, ctx, label, value, lo, hi, fmt or "%.2f", false)
   if changed then set_param(track, fx, param, new_value, write_enabled) end
   return new_value
 end
@@ -636,7 +628,7 @@ end
 
 local function draw_camera_controls()
   ImGui.BeginGroup(ctx)
-  ImGui.Text(ctx, "Camera")
+  muted_text("CAMERA")
   nudge_camera("up##cam", 68, 24, function() view_pitch_deg = clamp(view_pitch_deg + 4, -180, 180) end)
   nudge_camera("left##cam", 32, 24, function() view_yaw_deg = view_yaw_deg - 4 end)
   ImGui.SameLine(ctx)
@@ -751,29 +743,25 @@ end
 
 local function layout_combo(track, fx)
   local current = layout_index(track, fx)
-  if ImGui.BeginCombo(ctx, "Speaker layout", LAYOUTS[current].name) then
-    for index, layout in ipairs(LAYOUTS) do
-      local selected = index == current
-      if ImGui.Selectable(ctx, layout.name .. " (" .. tostring(layout.channels) .. "ch)", selected) then
-        set_spatial_param(track, fx, PARAM.layout, index - 1)
-        reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", track_channels_for_layout(layout))
-        current = index
-      end
-    end
-    ImGui.EndCombo(ctx)
+  local labels = {}
+  for index, layout in ipairs(LAYOUTS) do
+    labels[index] = layout.name .. " (" .. tostring(layout.channels) .. "CH)"
+  end
+  local changed, next_index = ui_theme.combo_row(ImGui, ctx, "Layout", labels, current)
+  if changed then
+    current = next_index
+    local layout = LAYOUTS[current]
+    set_spatial_param(track, fx, PARAM.layout, current - 1)
+    reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", track_channels_for_layout(layout))
   end
   return current
 end
 
 local function draw_source_controls(track, fx)
   local changed
-  if ui_theme and ui_theme.slider_row then
-    changed, selected_source = ui_theme.slider_row(ImGui, ctx, "Selected source", selected_source, 1, 8, nil, true)
-  else
-    changed, selected_source = ImGui.SliderInt(ctx, "Selected source", selected_source, 1, 8)
-  end
+  changed, selected_source = ui_theme.slider_row(ImGui, ctx, "Selected source", selected_source, 1, 8, nil, true)
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Reset distances") then reset_source_distances(track, fx) end
+  if ImGui.Button(ctx, "RESET DISTANCES") then reset_source_distances(track, fx) end
   local base_label = "S" .. tostring(selected_source)
   slider_double(track, fx, base_label .. " azimuth (deg)", source_param(selected_source, 0), -360, 360, "%.1f", spatial_writes)
   slider_double(track, fx, base_label .. " elevation (deg)", source_param(selected_source, 1), -90, 90, "%.1f", spatial_writes)
@@ -785,9 +773,9 @@ local function draw_source_controls(track, fx)
 end
 
 local function draw_source_mixer(track, fx)
-  if ImGui.Button(ctx, "Clear mutes") then clear_mutes(track, fx) end
+  if ImGui.Button(ctx, "CLEAR MUTES") then clear_mutes(track, fx) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Clear solos") then clear_solos(track, fx) end
+  if ImGui.Button(ctx, "CLEAR SOLOS") then clear_solos(track, fx) end
   for source = 1, 8 do
     local label = "S" .. tostring(source)
     if ImGui.Button(ctx, label .. "##select" .. tostring(source)) then selected_source = source end
@@ -808,15 +796,15 @@ local function loop()
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     local fx = find_fx(track)
     if not track then
-      ImGui.Text(ctx, "Select the target track.")
+      muted_text("SELECT THE TARGET TRACK.")
     else
       local _, name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
-      ImGui.Text(ctx, "Selected track: " .. (name ~= "" and name or "(unnamed)"))
+      muted_text("TARGET: " .. (name ~= "" and name or "(UNNAMED)"))
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Repair JSFX") then fx = maybe_load(track, true) end
+      if ImGui.Button(ctx, "REPAIR JSFX") then fx = maybe_load(track, true) end
       if fx < 0 then fx = maybe_load(track, false) end
       if fx < 0 then
-        ImGui.Text(ctx, load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " is not on the selected track."))
+        muted_text(load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " IS NOT ON THE SELECTED TRACK."))
       else
         sync_track_channels(track, fx)
         draw_layout(track, fx)
@@ -826,36 +814,35 @@ local function loop()
         if toolbox_header("AUTOMATION", ImGui.TreeNodeFlags_DefaultOpen) then
           local changed
           local mode_name = automation_mode_name(track)
-          ImGui.Text(ctx, "Track automation: " .. mode_name)
+          muted_text("TRACK AUTOMATION: " .. mode_name:upper())
           ImGui.SameLine(ctx)
           local write_mode = mode_name == "Write"
           local mode_label = write_mode and "Set Trim/Read + safe" or "Set Write + GUI"
-          if ImGui.Button(ctx, mode_label) then
+          if ImGui.Button(ctx, mode_label:upper()) then
             set_track_write_mode(track, not write_mode)
           end
           local spatial_label = write_mode and "Write spatial" or "Control spatial"
           local mix_label = write_mode and "Write mix" or "Control mix"
-          changed, spatial_writes = ImGui.Checkbox(ctx, spatial_label, spatial_writes)
+          changed, spatial_writes = ui_theme.checkbox_row(ImGui, ctx, spatial_label, spatial_writes)
           if changed then reaper.SetExtState(EXT, "spatial_writes", spatial_writes and "1" or "0", true) end
-          ImGui.SameLine(ctx)
-          changed, mix_writes = ImGui.Checkbox(ctx, mix_label, mix_writes)
+          changed, mix_writes = ui_theme.checkbox_row(ImGui, ctx, mix_label, mix_writes)
           if changed then reaper.SetExtState(EXT, "mix_writes", mix_writes and "1" or "0", true) end
           ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "Show selected position lanes") then
+          if ImGui.Button(ctx, "SHOW SELECTED POSITION LANES") then
             automation_status = "Shown/armed " .. tostring(show_arm_source_spatial(track, fx, selected_source)) ..
               " position envelopes for S" .. tostring(selected_source)
           end
           ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "Hide selected") then
+          if ImGui.Button(ctx, "HIDE SELECTED") then
             automation_status = "Hidden " .. tostring(hide_source_spatial(track, fx, selected_source)) ..
               " position lanes for S" .. tostring(selected_source)
           end
           ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "Show all position lanes") then
+          if ImGui.Button(ctx, "SHOW ALL POSITION LANES") then
             automation_status = "Shown/armed " .. tostring(show_arm_all_source_spatial(track, fx)) .. " source position envelopes"
           end
           ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "Hide all") then
+          if ImGui.Button(ctx, "HIDE ALL") then
             automation_status = "Hidden " .. tostring(hide_all_source_spatial(track, fx)) .. " source position lanes"
           end
           muted_text(
@@ -890,26 +877,10 @@ local function loop()
           ImGui.SameLine(ctx)
           if ImGui.Button(ctx, "FRONT") then reset_camera(0, -90) end
           local changed
-          if ui_theme and ui_theme.slider_row then
-            changed, view_yaw_deg = ui_theme.slider_row(ImGui, ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg", false)
-          else
-            changed, view_yaw_deg = ImGui.SliderDouble(ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg")
-          end
-          if ui_theme and ui_theme.slider_row then
-            changed, view_pitch_deg = ui_theme.slider_row(ImGui, ctx, "Pitch", view_pitch_deg, -180, 180, "%.0f deg", false)
-          else
-            changed, view_pitch_deg = ImGui.SliderDouble(ctx, "Pitch", view_pitch_deg, -180, 180, "%.0f deg")
-          end
-          if ui_theme and ui_theme.slider_row then
-            changed, view_roll_deg = ui_theme.slider_row(ImGui, ctx, "Roll", view_roll_deg, -180, 180, "%.0f deg", false)
-          else
-            changed, view_roll_deg = ImGui.SliderDouble(ctx, "Roll", view_roll_deg, -180, 180, "%.0f deg")
-          end
-          if ui_theme and ui_theme.slider_row then
-            changed, view_zoom = ui_theme.slider_row(ImGui, ctx, "Zoom", view_zoom, 0.45, 2.5, "%.2f", false)
-          else
-            changed, view_zoom = ImGui.SliderDouble(ctx, "Zoom", view_zoom, 0.45, 2.5, "%.2f")
-          end
+          changed, view_yaw_deg = ui_theme.slider_row(ImGui, ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg", false)
+          changed, view_pitch_deg = ui_theme.slider_row(ImGui, ctx, "Pitch", view_pitch_deg, -180, 180, "%.0f deg", false)
+          changed, view_roll_deg = ui_theme.slider_row(ImGui, ctx, "Roll", view_roll_deg, -180, 180, "%.0f deg", false)
+          changed, view_zoom = ui_theme.slider_row(ImGui, ctx, "Zoom", view_zoom, 0.45, 2.5, "%.2f", false)
         end
         end
         ImGui.EndChild(ctx)

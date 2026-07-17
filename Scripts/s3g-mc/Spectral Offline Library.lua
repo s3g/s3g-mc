@@ -5,6 +5,147 @@ local M = {}
 
 local mc = dofile((debug.getinfo(1, "S").source:match("^@(.+[/\\])") or "") .. "Multichannel Library.lua")
 local DEFAULT_INSERT_GAIN = 0.5
+local ROW_H = 25
+local LABEL_W = 86
+local CONTROL_GAP = 8
+local VALUE_W = 76
+
+local LABEL_ABBR = {
+  ["ACCUMULATE AMOUNT"] = "AMOUNT",
+  ["ALGORITHM"] = "ALG",
+  ["AMPLITUDE THRESHOLD"] = "THRESH",
+  ["AZIMUTH CENTER"] = "AZ CTR",
+  ["AZIMUTH MOTION"] = "AZ MOT",
+  ["BIN SPREAD"] = "SPREAD",
+  ["BANDS"] = "BANDS",
+  ["BLUR AMOUNT"] = "BLUR",
+  ["CARRIER FREEZE POSITION"] = "CAR POS",
+  ["DENSITY"] = "DENS",
+  ["DURATION (SEC)"] = "DUR",
+  ["ENVELOPE FLOOR"] = "FLOOR",
+  ["ENVELOPE CONTRAST"] = "CONTRAST",
+  ["ENVELOPE SMOOTHING BINS"] = "SMOOTH",
+  ["FEEDBACK"] = "FDBK",
+  ["FORMANT AMOUNT"] = "AMOUNT",
+  ["FORMANT CONTRAST"] = "CONTRAST",
+  ["FORMANT SMOOTHING BINS"] = "SMOOTH",
+  ["EXPANSION"] = "EXPAND",
+  ["FFT SIZE"] = "FFT",
+  ["FREEZE AMOUNT"] = "AMOUNT",
+  ["FREEZE MODE"] = "MODE",
+  ["FREEZE POSITION"] = "POS",
+  ["HOLD CLOCK FRAMES"] = "HOLD",
+  ["MEMORY DECAY"] = "DECAY",
+  ["MODULATOR AMOUNT"] = "AMOUNT",
+  ["CHANNEL MODE"] = "MODE",
+  ["CHAOTIC DETUNE"] = "CHAOS",
+  ["DISTRIBUTION"] = "DIST",
+  ["DRIVE"] = "DRIVE",
+  ["ENVELOPE AMOUNT"] = "AMOUNT",
+  ["GLOBAL SPACING"] = "GLOBAL",
+  ["HIGH FREQUENCY"] = "HIGH",
+  ["IMPULSE GAIN"] = "GAIN",
+  ["IMPULSE PROFILE"] = "PROFILE",
+  ["IMPULSES"] = "COUNT",
+  ["LOW FREQUENCY"] = "LOW",
+  ["MODULATOR FREEZE POSITION"] = "MOD POS",
+  ["MORPH MODE"] = "MODE",
+  ["MORPH POSITION"] = "MORPH",
+  ["NORMALIZE PEAK DB"] = "NORM DB",
+  ["OUTPUT CHANNELS"] = "OUT CH",
+  ["OUTPUT LENGTH"] = "LENGTH",
+  ["PARTIAL COUNT"] = "PARTIAL",
+  ["PEAK NORMALIZE"] = "PEAK",
+  ["PRE-NORMALIZE GAIN DB"] = "GAIN",
+  ["PROFILE FREQUENCY"] = "FREQ",
+  ["PROFILE VARIATION"] = "VAR",
+  ["PROFILE WIDTH"] = "WIDTH",
+  ["RANDOM SEED"] = "SEED",
+  ["RANDOM WALK JUMP"] = "JUMP",
+  ["RESONANCE Q"] = "Q",
+  ["SAFE ENVELOPE MODE"] = "SAFE",
+  ["SAFE DISTANCE"] = "SAFE",
+  ["SEED"] = "SEED",
+  ["SMEAR AMOUNT"] = "SMEAR",
+  ["SOURCE BLUR"] = "BLUR",
+  ["SPECTRAL FLOOR"] = "FLOOR",
+  ["SPECTRAL SMOOTHING BINS"] = "SMOOTH",
+  ["KEEP PROBABILITY"] = "PROB",
+  ["THRESHOLD"] = "THRESH",
+  ["TRACE AMOUNT"] = "AMOUNT",
+  ["TIME BLUR FRAMES"] = "FRAMES",
+  ["TIMING VARIATION"] = "JITTER",
+  ["START TIME"] = "START",
+  ["TRACE MODE"] = "MODE",
+  ["WET MIX"] = "MIX",
+}
+
+local function clamp(value, lo, hi)
+  if value < lo then return lo end
+  if value > hi then return hi end
+  return value
+end
+
+local function theme_module()
+  local cached = package.loaded["s3g-mc ImGui Theme"]
+  if cached then return cached end
+  local ok, theme = pcall(require, "s3g-mc ImGui Theme")
+  if ok then return theme end
+  return nil
+end
+
+local function palette(ImGui)
+  local theme = theme_module()
+  if theme and theme.palette then return theme.palette(ImGui) end
+  local function color(r, g, b, a)
+    if ImGui and ImGui.ColorConvertDouble4ToU32 then
+      return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
+    end
+    return 0xffffffff
+  end
+  return {
+    panel_soft = color(0.145, 0.145, 0.145, 1.0),
+    frame = color(0.074, 0.074, 0.074, 1.0),
+    frame_hover = color(0.145, 0.145, 0.145, 1.0),
+    frame_active = color(0.195, 0.195, 0.195, 1.0),
+    active = color(0.720, 0.720, 0.720, 1.0),
+    active_hover = color(0.790, 0.790, 0.790, 1.0),
+    fill = color(0.498, 0.498, 0.498, 1.0),
+    label = color(0.659, 0.659, 0.659, 1.0),
+    value = color(0.572, 0.572, 0.572, 1.0),
+    muted = color(0.560, 0.560, 0.560, 1.0),
+  }
+end
+
+local function clean_label(label)
+  return tostring(label or ""):gsub("##.*$", ""):upper():gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function row_label(label)
+  local upper = clean_label(label)
+  return LABEL_ABBR[upper] or upper
+end
+
+local function row_layout(ImGui, ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" then avail = 360 end
+  avail = math.max(220, avail)
+  local control_x = x + LABEL_W
+  local control_w = math.max(52, avail - LABEL_W - VALUE_W - CONTROL_GAP)
+  local value_x = control_x + control_w + CONTROL_GAP
+  return x, y, avail, control_x, control_w, value_x
+end
+
+local function finish_row(ImGui, ctx, x, y, avail)
+  ImGui.SetCursorScreenPos(ctx, x, y)
+  ImGui.Dummy(ctx, avail, ROW_H)
+  ImGui.SetCursorScreenPos(ctx, x, y + ROW_H)
+end
+
+local function draw_label(ImGui, ctx, x, y, label)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, palette(ImGui).label, row_label(label))
+end
 
 function M.shell_quote(path)
   return "'" .. tostring(path):gsub("'", "'\\''") .. "'"
@@ -125,8 +266,12 @@ function M.find_python(script_dir)
 end
 
 function M.draw_combo(ImGui, ctx, label, value, names, first_index, last_index)
+  local x, y, avail, control_x, control_w = row_layout(ImGui, ctx)
+  draw_label(ImGui, ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
   local changed = false
-  if ImGui.BeginCombo(ctx, label, names[value] or "") then
+  if ImGui.BeginCombo(ctx, "##" .. tostring(label or ""), names[value] or "") then
     for index = first_index, last_index do
       local selected = value == index
       if ImGui.Selectable(ctx, names[index], selected) then
@@ -137,7 +282,108 @@ function M.draw_combo(ImGui, ctx, label, value, names, first_index, last_index)
     end
     ImGui.EndCombo(ctx)
   end
+  finish_row(ImGui, ctx, x, y, avail)
   return changed, value
+end
+
+function M.draw_checkbox(ImGui, ctx, label, value)
+  local x, y, avail, control_x = row_layout(ImGui, ctx)
+  draw_label(ImGui, ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  local changed, next_value = ImGui.Checkbox(ctx, "##" .. tostring(label or ""), value)
+  finish_row(ImGui, ctx, x, y, avail)
+  return changed, next_value
+end
+
+local function value_text(value, fmt, integer)
+  if integer then return tostring(math.floor(value + 0.5)) end
+  if fmt and fmt ~= "" then return string.format(fmt, value) end
+  return string.format("%.3f", value)
+end
+
+function M.draw_slider(ImGui, ctx, label, value, lo, hi, fmt, integer)
+  local x, y, avail, control_x, control_w, value_x = row_layout(ImGui, ctx)
+  local p = palette(ImGui)
+  local slider_w = control_w
+  local norm = hi ~= lo and clamp((value - lo) / (hi - lo), 0, 1) or 0
+  local id = string.format("##spectral_slider_%s_%d_%d", tostring(label or ""), math.floor(x + 0.5), math.floor(y + 0.5))
+  ImGui.InvisibleButton(ctx, id, avail, ROW_H)
+  local hovered = ImGui.IsItemHovered(ctx)
+  local active = ImGui.IsItemActive(ctx)
+  local changed = false
+  if (hovered or active) and ImGui.IsMouseDown(ctx, 0) then
+    local mx = ImGui.GetMousePos(ctx)
+    local next_norm = clamp((mx - control_x) / math.max(1, slider_w), 0, 1)
+    local next_value = lo + (hi - lo) * next_norm
+    if integer then next_value = math.floor(next_value + 0.5) end
+    if math.abs(next_value - value) > (integer and 0 or 0.0000001) then
+      value = next_value
+      norm = next_norm
+      changed = true
+    end
+  end
+  local dl = ImGui.GetWindowDrawList(ctx)
+  local track_y = y + 6
+  local track_h = 8
+  ImGui.DrawList_AddText(dl, x, y + 2, p.label, row_label(label))
+  ImGui.DrawList_AddRectFilled(dl, control_x, track_y, control_x + slider_w, track_y + track_h,
+    active and p.frame_active or (hovered and p.frame_hover or p.frame))
+  ImGui.DrawList_AddRectFilled(dl, control_x + 1, track_y + 1, control_x + math.max(2, slider_w * norm), track_y + track_h - 1, p.fill)
+  local hx = clamp(control_x + slider_w * norm - 1.5, control_x + 1, control_x + slider_w - 4)
+  ImGui.DrawList_AddRectFilled(dl, hx, track_y - 2, hx + 3, track_y + track_h + 2, active and p.active_hover or p.active)
+  ImGui.DrawList_AddText(dl, value_x, y + 2, p.value, value_text(value, fmt, integer))
+  finish_row(ImGui, ctx, x, y, avail)
+  return changed, value
+end
+
+function M.draw_slider_int(ImGui, ctx, label, value, lo, hi)
+  return M.draw_slider(ImGui, ctx, label, value, lo, hi, nil, true)
+end
+
+function M.draw_input_double(ImGui, ctx, label, value, step, step_fast, fmt)
+  local x, y, avail, control_x, control_w = row_layout(ImGui, ctx)
+  draw_label(ImGui, ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  local changed, next_value = ImGui.InputDouble(ctx, "##" .. tostring(label or ""), value, step or 0.1, step_fast or 1.0, fmt or "%.3f")
+  finish_row(ImGui, ctx, x, y, avail)
+  return changed, next_value
+end
+
+function M.draw_input_int(ImGui, ctx, label, value, step, step_fast)
+  local x, y, avail, control_x, control_w = row_layout(ImGui, ctx)
+  draw_label(ImGui, ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  local changed, next_value = ImGui.InputInt(ctx, "##" .. tostring(label or ""), math.floor(value), step or 1, step_fast or 10)
+  finish_row(ImGui, ctx, x, y, avail)
+  return changed, next_value
+end
+
+function M.begin_section(ImGui, ctx, label, height)
+  local theme = theme_module()
+  local stack = theme and theme.push_soft_panel and theme.push_soft_panel(ImGui, ctx) or nil
+  local p = palette(ImGui)
+  local dl = ImGui.GetWindowDrawList(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local w = ImGui.GetContentRegionAvail(ctx)
+  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + height, p.panel_soft)
+  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + 2, p.active)
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
+  if theme and theme.text then
+    theme.text(ImGui, ctx, clean_label(label))
+  else
+    ImGui.TextColored(ctx, p.label, clean_label(label))
+  end
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
+  return x, y, height, stack
+end
+
+function M.finish_section(ImGui, ctx, x, y, height, stack)
+  local theme = theme_module()
+  if theme and theme.pop_soft_panel then theme.pop_soft_panel(ImGui, ctx, stack) end
+  ImGui.SetCursorScreenPos(ctx, x, y + height)
+  ImGui.Dummy(ctx, 1, 10)
 end
 
 function M.insert_output_item(path, label, position, channel_count)

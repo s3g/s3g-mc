@@ -24,9 +24,11 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
 
 
 local FX_NAME = "s3g MC Carto Synth Engine"
@@ -547,20 +549,31 @@ local function render_texture(settings)
   end
 end
 
+local ctx
+
 local function combo(ctx, label, names, value)
-  local changed = false
-  if ImGui.BeginCombo(ctx, label, names[value] or names[1] or "") then
-    for index, name in ipairs(names) do
-      local selected = index == value
-      if ImGui.Selectable(ctx, name, selected) then
-        value = index
-        changed = true
-      end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
+  return theme.combo_row(ImGui, ctx, label, names, value)
+end
+
+local function input_double_row(label, value, step, step_fast, format, width)
+  if theme.input_double_row then
+    return theme.input_double_row(ImGui, ctx, label, value, step, step_fast, format)
   end
-  return changed, value
+  local palette = theme.palette(ImGui)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" then avail = 220 end
+  avail = math.max(220, avail)
+  local control_x = x + 82
+  local control_w = math.max(52, avail - 82 - 76 - 8)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, palette.label, tostring(label or ""):upper())
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  local changed, next_value = ImGui.InputDouble(ctx, "##input_" .. tostring(label or ""), value, step or 0.1, step_fast or 1.0, format or "%.3f")
+  ImGui.SetCursorScreenPos(ctx, x, y)
+  ImGui.Dummy(ctx, avail, 22)
+  ImGui.SetCursorScreenPos(ctx, x, y + 22)
+  return changed, next_value
 end
 
 local function current_value_for_key(values, key)
@@ -1015,7 +1028,7 @@ local function draw_route_overview(ctx, route_points, route_enabled, selected_ro
 end
 
 local start_pos, duration, from_time_selection = get_time_defaults()
-local ctx = ImGui.CreateContext("Carto Synth Render")
+ctx = ImGui.CreateContext("Carto Synth Render")
 math.randomseed(math.floor(((reaper.time_precise and reaper.time_precise()) or os.clock()) * 1000000))
 local open = true
 local channel_index = 4 -- 8ch
@@ -1193,119 +1206,105 @@ local function loop()
     local changed
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(260, (avail_h or route_compact_window_h) - 44)
+    local panel_stack = theme.push_soft_panel(ImGui, ctx)
     if ImGui.BeginChild(ctx, "##carto_controls", 0, control_h) then
     local values = carto_values()
     selected_route, selected_route_point = draw_route_overview(ctx, route_points, route_enabled, selected_route,
       selected_route_point, values)
     ImGui.Separator(ctx)
-    ImGui.SetNextItemWidth(ctx, 135)
-    changed, start_pos = ImGui.InputDouble(ctx, "Start time", start_pos, 0.1, 1.0, "%.3f")
-    ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 135)
-    changed, duration = ImGui.InputDouble(ctx, "Duration", duration, 1.0, 10.0, "%.3f")
+    changed, start_pos = input_double_row("Start time", start_pos, 0.1, 1.0, "%.3f")
+    changed, duration = input_double_row("Duration", duration, 1.0, 10.0, "%.3f")
     duration = math.max(0.1, duration)
-    ImGui.SetNextItemWidth(ctx, 135)
     changed, channel_index = combo(ctx, "Output channels", CH_NAMES, channel_index)
-    ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 180)
     changed, algorithm = combo(ctx, "Algorithm", ALGO_NAMES, algorithm)
-    ImGui.SetNextItemWidth(ctx, 180)
     changed, form = combo(ctx, "Map preset", FORM_NAMES, form)
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Load preset") then
+    if ImGui.Button(ctx, "LOAD PRESET") then
       apply_route_preset(route_points, route_enabled, form, carto_values())
       selected_route_point = nil
     end
-    ImGui.SetNextItemWidth(ctx, 120)
-    changed, random_point_count = ImGui.SliderInt(ctx, "Random points", random_point_count, 4, MAX_ROUTE_POINTS)
-    ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 120)
-    changed, random_amount = ImGui.SliderDouble(ctx, "Amount", random_amount, 0, 1, "%.2f")
-    ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 120)
-    changed, random_smooth = ImGui.SliderDouble(ctx, "Smooth", random_smooth, 0, 1, "%.2f")
-    ImGui.SetNextItemWidth(ctx, 160)
-    changed, random_dispersion = ImGui.SliderDouble(ctx, "Dispersion", random_dispersion, 0, 1, "%.2f")
-    if ImGui.Button(ctx, "Randomize selected") then
+    changed, random_point_count = theme.slider_int(ImGui, ctx, "Random points", random_point_count, 4, MAX_ROUTE_POINTS)
+    changed, random_amount = theme.slider_double(ImGui, ctx, "Amount", random_amount, 0, 1, "%.2f")
+    changed, random_smooth = theme.slider_double(ImGui, ctx, "Smooth", random_smooth, 0, 1, "%.2f")
+    changed, random_dispersion = theme.slider_double(ImGui, ctx, "Dispersion", random_dispersion, 0, 1, "%.2f")
+    if ImGui.Button(ctx, "RANDOMIZE SELECTED") then
       randomize_route_set(route_points, route_enabled, carto_values(), selected_route, "selected",
         random_amount, random_point_count, random_smooth, random_dispersion)
       selected_route_point = nil
     end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Randomize all") then
+    if ImGui.Button(ctx, "RANDOMIZE ALL") then
       randomize_route_set(route_points, route_enabled, carto_values(), selected_route, "all",
         random_amount, random_point_count, random_smooth, random_dispersion)
       selected_route_point = nil
     end
     ImGui.Separator(ctx)
-    changed, rate = ImGui.SliderDouble(ctx, "Rate", rate, 0, 1, "%.3f")
-    changed, base_freq = ImGui.SliderDouble(ctx, "Base frequency", base_freq, 20, 4000, "%.1f Hz")
-    changed, density = ImGui.SliderDouble(ctx, "Density / chaos", density, 0, 1, "%.3f")
-    changed, brightness = ImGui.SliderDouble(ctx, "Brightness", brightness, 0, 1, "%.3f")
-    changed, decay = ImGui.SliderDouble(ctx, "Decay / sustain", decay, 0, 1, "%.3f")
+    changed, rate = theme.slider_double(ImGui, ctx, "Rate", rate, 0, 1, "%.3f")
+    changed, base_freq = theme.slider_double(ImGui, ctx, "Base frequency", base_freq, 20, 4000, "%.1f Hz")
+    changed, density = theme.slider_double(ImGui, ctx, "Density / chaos", density, 0, 1, "%.3f")
+    changed, brightness = theme.slider_double(ImGui, ctx, "Brightness", brightness, 0, 1, "%.3f")
+    changed, decay = theme.slider_double(ImGui, ctx, "Decay / sustain", decay, 0, 1, "%.3f")
     ImGui.Separator(ctx)
-    changed, spread = ImGui.SliderDouble(ctx, "Field spread", spread, 0, 1, "%.3f")
-    changed, correlation = ImGui.SliderDouble(ctx, "Channel correlation", correlation, 0, 1, "%.3f")
-    changed, drift = ImGui.SliderDouble(ctx, "Drift", drift, 0, 1, "%.3f")
-    changed, crush = ImGui.SliderDouble(ctx, "Crush / decimate", crush, 0, 1, "%.3f")
+    changed, spread = theme.slider_double(ImGui, ctx, "Field spread", spread, 0, 1, "%.3f")
+    changed, correlation = theme.slider_double(ImGui, ctx, "Channel correlation", correlation, 0, 1, "%.3f")
+    changed, drift = theme.slider_double(ImGui, ctx, "Drift", drift, 0, 1, "%.3f")
+    changed, crush = theme.slider_double(ImGui, ctx, "Crush / decimate", crush, 0, 1, "%.3f")
     ImGui.Separator(ctx)
-    local route_editor_open = ImGui.CollapsingHeader(ctx, "Detailed Route Editor")
+    local route_editor_open = theme.toolbox_header(ImGui, ctx, "DETAILED ROUTE EDITOR")
     if route_editor_open ~= route_editor_was_open then
       resize_current_window(route_editor_open and route_expanded_window_h or route_compact_window_h)
     end
     route_editor_was_open = route_editor_open
     if route_editor_open then
-      ImGui.SetNextItemWidth(ctx, 180)
       local route_changed
       route_changed, selected_route = combo(ctx, "Edit route", ROUTE_NAMES, selected_route)
       if route_changed then selected_route_point = nil end
-      ImGui.SameLine(ctx)
-      changed, route_enabled[selected_route] = ImGui.Checkbox(ctx, "Active", route_enabled[selected_route])
+      changed, route_enabled[selected_route] = ImGui.Checkbox(ctx, "ACTIVE", route_enabled[selected_route])
       local selected_def = ROUTE_DEFS[selected_route]
       selected_route_point = draw_route_editor(ctx, route_points[selected_route], selected_def, selected_route_point,
         route_enabled[selected_route])
       local current_norm = selected_def and route_norm(selected_def, current_value_for_key(carto_values(), selected_def.key)) or 0.5
-      if ImGui.Button(ctx, "Flat") then set_route_shape(route_points[selected_route], "flat", current_norm) selected_route_point = nil end
+      if ImGui.Button(ctx, "FLAT") then set_route_shape(route_points[selected_route], "flat", current_norm) selected_route_point = nil end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Rise") then set_route_shape(route_points[selected_route], "rise", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      if ImGui.Button(ctx, "RISE") then set_route_shape(route_points[selected_route], "rise", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Fall") then set_route_shape(route_points[selected_route], "fall", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      if ImGui.Button(ctx, "FALL") then set_route_shape(route_points[selected_route], "fall", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Ridge") then set_route_shape(route_points[selected_route], "ridge", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      if ImGui.Button(ctx, "RIDGE") then set_route_shape(route_points[selected_route], "ridge", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Valley") then set_route_shape(route_points[selected_route], "valley", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      if ImGui.Button(ctx, "VALLEY") then set_route_shape(route_points[selected_route], "valley", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Terrace") then set_route_shape(route_points[selected_route], "terrace", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      if ImGui.Button(ctx, "TERRACE") then set_route_shape(route_points[selected_route], "terrace", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Switchback") then set_route_shape(route_points[selected_route], "switchback", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
+      if ImGui.Button(ctx, "SWITCHBACK") then set_route_shape(route_points[selected_route], "switchback", current_norm) route_enabled[selected_route] = true selected_route_point = nil end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Add") and #route_points[selected_route] < MAX_ROUTE_POINTS then
+      if ImGui.Button(ctx, "ADD") and #route_points[selected_route] < MAX_ROUTE_POINTS then
         route_points[selected_route][#route_points[selected_route] + 1] = { x = 0.5, y = current_norm }
         selected_route_point = #route_points[selected_route]
         route_enabled[selected_route] = true
         sort_route_points(route_points[selected_route])
       end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Delete") and selected_route_point and selected_route_point > 1 and selected_route_point < #route_points[selected_route] then
+      if ImGui.Button(ctx, "DELETE") and selected_route_point and selected_route_point > 1 and selected_route_point < #route_points[selected_route] then
         table.remove(route_points[selected_route], selected_route_point)
         selected_route_point = nil
         sort_route_points(route_points[selected_route])
       end
     end
     ImGui.Separator(ctx)
-    changed, gain_db = ImGui.SliderDouble(ctx, "Print gain", gain_db, -60, 0, "%.1f dB")
-    changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
+    changed, gain_db = theme.slider_double(ImGui, ctx, "Print gain", gain_db, -60, 0, "%.1f dB")
+    changed, normalize = ImGui.Checkbox(ctx, "PEAK NORMALIZE", normalize)
     if normalize then
-      changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -36, -3, "%.1f")
+      changed, normalize_db = theme.slider_double(ImGui, ctx, "Normalize peak dB", normalize_db, -36, -3, "%.1f")
     end
-    changed, insert_gain = ImGui.SliderDouble(ctx, "Inserted track gain", insert_gain, 0.05, 1.0, "%.2f")
-    changed, seed = ImGui.SliderInt(ctx, "Seed", seed, 1, 9999)
+    changed, insert_gain = theme.slider_double(ImGui, ctx, "Inserted track gain", insert_gain, 0.05, 1.0, "%.2f")
+    changed, seed = theme.slider_int(ImGui, ctx, "Seed", seed, 1, 9999)
       ImGui.EndChild(ctx)
     end
+    theme.pop_soft_panel(ImGui, ctx, panel_stack)
     ImGui.Separator(ctx)
-    if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
+    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
     ImGui.End(ctx)
   end
 

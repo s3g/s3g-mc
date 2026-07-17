@@ -99,15 +99,8 @@ local function set_value(key, value)
 end
 
 local function combo(ctx, label, index, names)
-  if ImGui.BeginCombo(ctx, label, names[index] or "") then
-    for i, name in ipairs(names) do
-      local selected = i == index
-      if ImGui.Selectable(ctx, name, selected) then index = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return index
+  local _, next_index = ui_theme.combo_row(ImGui, ctx, label, names, index)
+  return next_index
 end
 
 local function apply_material(settings)
@@ -430,72 +423,81 @@ local function main()
       local _, avail_h = ImGui.GetContentRegionAvail(ctx)
       local control_h = math.max(260, avail_h - footer_h)
       if ImGui.BeginChild(ctx, "##synthetic_ir_bank_controls", 0, control_h) then
+      local sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Routing", 98)
       settings.order_index = combo(ctx, "Ambisonic order", settings.order_index, ORDER_NAMES)
       settings.output_mode_index = combo(ctx, "Output format", settings.output_mode_index, OUTPUT_MODE_NAMES)
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
       if settings.order_index == 1 then
-        ImGui.Text(ctx, "First order uses the four-direction P-format / tetrahedral bank.")
+        ui_theme.muted(ImGui, ctx, "First order uses the four-direction P-format / tetrahedral bank.")
       else
-        ImGui.Text(ctx, "Higher-order bank uses 8 directions: 2OA stacked = 72ch, 3OA stacked = 128ch.")
+        ui_theme.muted(ImGui, ctx, "Higher-order bank uses 8 directions: 2OA stacked = 72ch, 3OA stacked = 128ch.")
       end
       ImGui.Spacing(ctx)
       draw_ir_preview(ctx, settings)
       ImGui.Spacing(ctx)
-      if ImGui.Button(ctx, "Load Room Sketch JSON", 180, 26) then choose_room_sketch(settings) end
-      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "LOAD ROOM SKETCH JSON", 190, 26) then choose_room_sketch(settings) end
       if settings.sketch_path and settings.sketch_path ~= "" then
-        ImGui.Text(ctx, basename(settings.sketch_path))
+        ui_theme.muted(ImGui, ctx, basename(settings.sketch_path))
       else
-        if ui_theme and ui_theme.muted then ui_theme.muted(ImGui, ctx, "optional browser sketch") else ImGui.Text(ctx, "optional browser sketch") end
+        ui_theme.muted(ImGui, ctx, "optional browser sketch")
       end
       if settings.sketch_path and settings.sketch_path ~= "" then
-        if ui_theme and ui_theme.muted then ui_theme.muted(ImGui, ctx, "Imported sketches can add polygon room metadata, chamber timing, and exterior leak.") else ImGui.Text(ctx, "Imported sketches can add polygon room metadata, chamber timing, and exterior leak.") end
+        ui_theme.muted(ImGui, ctx, "Imported sketches can add polygon room metadata, chamber timing, and exterior leak.")
       end
       ImGui.Spacing(ctx)
       local old_material = settings.material_index
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Material", 98)
       settings.material_index = combo(ctx, "Material preset", settings.material_index, MATERIAL_NAMES)
       if settings.material_index ~= old_material then apply_material(settings) end
       local material = MATERIALS[settings.material_index]
-      if material then ImGui.Text(ctx, material.label) end
-      ImGui.Spacing(ctx)
+      if material then ui_theme.muted(ImGui, ctx, material.label) end
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
       local changed
-      changed, settings.room_x = ImGui.SliderDouble(ctx, "Room length m", settings.room_x, 1.0, 80.0, "%.1f")
-      changed, settings.room_y = ImGui.SliderDouble(ctx, "Room width m", settings.room_y, 1.0, 80.0, "%.1f")
-      changed, settings.room_z = ImGui.SliderDouble(ctx, "Room height m", settings.room_z, 1.0, 30.0, "%.1f")
-      changed, settings.source_distance = ImGui.SliderDouble(ctx, "Source distance m", settings.source_distance, 0.25, 30.0, "%.2f")
-      changed, settings.pre_delay_ms = ImGui.SliderDouble(ctx, "Pre-delay ms", settings.pre_delay_ms, 0.0, 120.0, "%.1f")
-      changed, settings.absorption = ImGui.SliderDouble(ctx, "Surface absorption", settings.absorption, 0.03, 0.95, "%.2f")
-      changed, settings.scattering = ImGui.SliderDouble(ctx, "Wall scattering", settings.scattering, 0.0, 1.0, "%.2f")
-      changed, settings.auto_decay = ImGui.Checkbox(ctx, "Estimate decay from room/material", settings.auto_decay)
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Room", 202)
+      changed, settings.room_x = ui_theme.slider_double(ImGui, ctx, "Room length m", settings.room_x, 1.0, 80.0, "%.1f")
+      changed, settings.room_y = ui_theme.slider_double(ImGui, ctx, "Room width m", settings.room_y, 1.0, 80.0, "%.1f")
+      changed, settings.room_z = ui_theme.slider_double(ImGui, ctx, "Room height m", settings.room_z, 1.0, 30.0, "%.1f")
+      changed, settings.source_distance = ui_theme.slider_double(ImGui, ctx, "Source distance m", settings.source_distance, 0.25, 30.0, "%.2f")
+      changed, settings.pre_delay_ms = ui_theme.slider_double(ImGui, ctx, "Pre-delay ms", settings.pre_delay_ms, 0.0, 120.0, "%.1f")
+      changed, settings.absorption = ui_theme.slider_double(ImGui, ctx, "Surface absorption", settings.absorption, 0.03, 0.95, "%.2f")
+      changed, settings.scattering = ui_theme.slider_double(ImGui, ctx, "Wall scattering", settings.scattering, 0.0, 1.0, "%.2f")
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Reverb", settings.auto_decay and 202 or 224)
+      changed, settings.auto_decay = ui_theme.checkbox_row(ImGui, ctx, "Estimate decay from room/material", settings.auto_decay)
       if settings.auto_decay then
-        ImGui.Text(ctx, string.format("Estimated decay: %.2f sec", estimated_rt60(settings)))
+        ui_theme.muted(ImGui, ctx, string.format("Estimated decay: %.2f sec", estimated_rt60(settings)))
       else
-        changed, settings.decay = ImGui.SliderDouble(ctx, "Manual decay sec", settings.decay, 0.05, 8.0, "%.2f")
+        changed, settings.decay = ui_theme.slider_double(ImGui, ctx, "Manual decay sec", settings.decay, 0.05, 8.0, "%.2f")
       end
-      changed, settings.duration = ImGui.SliderDouble(ctx, "IR duration sec", settings.duration, 0.05, 8.0, "%.2f")
-      changed, settings.spread_deg = ImGui.SliderDouble(ctx, "Directional spread deg", settings.spread_deg, 0.0, 120.0, "%.1f")
-      changed, settings.direct_gain = ImGui.SliderDouble(ctx, "Direct gain", settings.direct_gain, 0.0, 2.0, "%.2f")
-      changed, settings.early_reflections = ImGui.SliderDouble(ctx, "Early reflections per IR", settings.early_reflections, 0, 80, "%.0f")
-      changed, settings.diffuse_taps = ImGui.SliderDouble(ctx, "Late diffuse taps per IR", settings.diffuse_taps, 0, 1200, "%.0f")
-      changed, settings.tail_soften = ImGui.SliderDouble(ctx, "Air / tail damping", settings.tail_soften, 0.0, 1.0, "%.2f")
-      changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize each IR dB", settings.normalize_db, -24.0, 0.0, "%.1f")
-      changed, settings.seed = ImGui.SliderDouble(ctx, "Seed", settings.seed, 1, 9999, "%.0f")
-      changed, settings.insert_items = ImGui.Checkbox(ctx, "Insert generated IR items", settings.insert_items)
+      changed, settings.duration = ui_theme.slider_double(ImGui, ctx, "IR duration sec", settings.duration, 0.05, 8.0, "%.2f")
+      changed, settings.spread_deg = ui_theme.slider_double(ImGui, ctx, "Directional spread deg", settings.spread_deg, 0.0, 120.0, "%.1f")
+      changed, settings.direct_gain = ui_theme.slider_double(ImGui, ctx, "Direct gain", settings.direct_gain, 0.0, 2.0, "%.2f")
+      changed, settings.early_reflections = ui_theme.slider_double(ImGui, ctx, "Early reflections per IR", settings.early_reflections, 0, 80, "%.0f")
+      changed, settings.diffuse_taps = ui_theme.slider_double(ImGui, ctx, "Late diffuse taps per IR", settings.diffuse_taps, 0, 1200, "%.0f")
+      changed, settings.tail_soften = ui_theme.slider_double(ImGui, ctx, "Air / tail damping", settings.tail_soften, 0.0, 1.0, "%.2f")
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Output", 114)
+      changed, settings.normalize_db = ui_theme.slider_double(ImGui, ctx, "Normalize each IR dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+      changed, settings.seed = ui_theme.slider_double(ImGui, ctx, "Seed", settings.seed, 1, 9999, "%.0f")
+      changed, settings.insert_items = ui_theme.checkbox_row(ImGui, ctx, "Insert generated IR items", settings.insert_items)
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
       ImGui.Spacing(ctx)
-      ImGui.Separator(ctx)
-      ImGui.Text(ctx, "IR files to create: " .. tostring(direction_count(settings.order_index)))
-      ImGui.Text(ctx, "Channels per IR: " .. tostring(order_channels(settings.order_index)))
+      ui_theme.muted(ImGui, ctx, "IR files to create: " .. tostring(direction_count(settings.order_index)))
+      ui_theme.muted(ImGui, ctx, "Channels per IR: " .. tostring(order_channels(settings.order_index)))
       if settings.output_mode_index == 2 then
         local stacked_channels = stacked_channel_count(settings)
-        ImGui.Text(ctx, "Stacked bank channels: " .. tostring(stacked_channels))
+        ui_theme.muted(ImGui, ctx, "Stacked bank channels: " .. tostring(stacked_channels))
         if stacked_channels > mc.MAX_REAPER_TRACK_CHANNELS then
-          ImGui.Text(ctx, "Stacked bank exceeds REAPER's 128-channel track limit; use separate ambisonic WAVs.")
+          ui_theme.status(ImGui, ctx, "Stacked bank exceeds REAPER's 128-channel track limit; use separate ambisonic WAVs.", "warn")
         end
       end
-      ImGui.Text(ctx, "Use these as the IR selection for 3OAFX Offline Ambisonic Convolve.")
+      ui_theme.muted(ImGui, ctx, "Use these as the IR selection for 3OAFX Offline Ambisonic Convolve.")
       ImGui.Spacing(ctx)
       ImGui.EndChild(ctx)
       end
-      if ImGui.Button(ctx, "Render IR Bank", 128, 28) then
+      if ImGui.Button(ctx, "RENDER IR BANK", 148, 28) then
         if settings.output_mode_index == 2 and stacked_channel_count(settings) > mc.MAX_REAPER_TRACK_CHANNELS then
           mc.show_error("This stacked bank would need " .. tostring(stacked_channel_count(settings)) .. " channels. REAPER tracks are limited to 128 channels, so use separate ambisonic WAVs for this order/layout.")
         else
@@ -503,7 +505,7 @@ local function main()
         end
       end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Cancel", 104, 28) then open = false end
+      if ImGui.Button(ctx, "CANCEL", 104, 28) then open = false end
       ImGui.Dummy(ctx, 1, 10)
       ImGui.End(ctx)
     end

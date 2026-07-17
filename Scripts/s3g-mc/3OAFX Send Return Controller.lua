@@ -27,6 +27,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local theme
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -35,7 +36,10 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme then
+    theme = _s3g_theme
+    if _s3g_theme.install then _s3g_theme.install(ImGui) end
+  end
 end
 
 
@@ -284,14 +288,14 @@ end
 
 local function slider(track, fx, label, param, lo, hi, fmt)
   local value = get_param(track, fx, param, lo)
-  local changed, new_value = ImGui.SliderDouble(ctx, label, value, lo, hi, fmt or "%.2f")
+  local changed, new_value = theme.slider_double(ImGui, ctx, label, value, lo, hi, fmt or "%.2f")
   if changed then set_param(track, fx, param, new_value) end
   return changed, new_value
 end
 
 local function checkbox_param(track, fx, label, param)
   local enabled = get_param(track, fx, param, 0) >= 0.5
-  local changed, new_value = ImGui.Checkbox(ctx, label, enabled)
+  local changed, new_value = theme.checkbox_row(ImGui, ctx, label, enabled)
   if changed then set_param(track, fx, param, new_value and 1 or 0) end
   return new_value
 end
@@ -612,28 +616,26 @@ local function draw_linked_direction(track, send_fx, ret_fx)
   local ret_el = get_param(track, ret_fx, PARAM.ret.el, send_el)
 
   local changed
-  changed, link_send_return = ImGui.Checkbox(ctx, "Lock send and return az/el", link_send_return)
-  ImGui.SameLine(ctx)
-  changed, link_mask_shape = ImGui.Checkbox(ctx, "Lock mask shape", link_mask_shape)
-  ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Copy send -> return") then
+  changed, link_send_return = theme.checkbox_row(ImGui, ctx, "Lock send and return az/el", link_send_return)
+  changed, link_mask_shape = theme.checkbox_row(ImGui, ctx, "Lock mask shape", link_mask_shape)
+  if ImGui.Button(ctx, "COPY SEND -> RETURN") then
     set_param(track, ret_fx, PARAM.ret.az, send_az)
     set_param(track, ret_fx, PARAM.ret.el, send_el)
     sync_return_shape_to_send(track, send_fx, ret_fx)
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Copy return -> send") then
+  if ImGui.Button(ctx, "COPY RETURN -> SEND") then
     set_param(track, send_fx, PARAM.send.az, ret_az)
     set_param(track, send_fx, PARAM.send.el, ret_el)
     sync_send_shape_to_return(track, send_fx, ret_fx)
   end
 
   if link_send_return then
-    ImGui.Text(ctx, "Drag in the speaker map above to set linked azimuth/elevation.")
+    theme.muted(ImGui, ctx, "Drag in the speaker map above to set linked azimuth/elevation.")
     local az = send_az
     local el = send_el
-    local changed_az, new_az = ImGui.SliderDouble(ctx, "Linked azimuth (+L / -R)", az, -179.9, 179.9, "%.1f deg")
-    local changed_el, new_el = ImGui.SliderDouble(ctx, "Linked elevation", el, -90, 90, "%.1f deg")
+    local changed_az, new_az = theme.slider_double(ImGui, ctx, "Linked azimuth (+L / -R)", az, -179.9, 179.9, "%.1f deg")
+    local changed_el, new_el = theme.slider_double(ImGui, ctx, "Linked elevation", el, -90, 90, "%.1f deg")
     if changed_az then
       set_param(track, send_fx, PARAM.send.az, new_az)
       set_param(track, ret_fx, PARAM.ret.az, new_az)
@@ -645,14 +647,14 @@ local function draw_linked_direction(track, send_fx, ret_fx)
     if math.abs(ret_az - send_az) > 0.0001 then set_param(track, ret_fx, PARAM.ret.az, send_az) end
     if math.abs(ret_el - send_el) > 0.0001 then set_param(track, ret_fx, PARAM.ret.el, send_el) end
   else
-    if ImGui.Button(ctx, active_direction == "send" and "Editing Send" or "Edit Send") then
+    if ImGui.Button(ctx, active_direction == "send" and "EDITING SEND" or "EDIT SEND") then
       active_direction = "send"
     end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, active_direction == "return" and "Editing Return" or "Edit Return") then
+    if ImGui.Button(ctx, active_direction == "return" and "EDITING RETURN" or "EDIT RETURN") then
       active_direction = "return"
     end
-    ImGui.Text(ctx, "Click or drag in the speaker map above to set the active target.")
+    theme.muted(ImGui, ctx, "Click or drag in the speaker map above to set the active target.")
     slider(track, send_fx, "Send azimuth (+L / -R)", PARAM.send.az, -179.9, 179.9, "%.1f deg")
     slider(track, send_fx, "Send elevation", PARAM.send.el, -90, 90, "%.1f deg")
     slider(track, ret_fx, "Return azimuth (+L / -R)", PARAM.ret.az, -179.9, 179.9, "%.1f deg")
@@ -661,29 +663,29 @@ local function draw_linked_direction(track, send_fx, ret_fx)
 end
 
 local function draw_view_controls()
-  if ImGui.Button(ctx, "3/4 view") then
+  if ImGui.Button(ctx, "3/4 VIEW") then
     view_yaw_deg = -35
     view_pitch_deg = 55
     view_roll_deg = 0
     view_zoom = 1.0
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Top") then
+  if ImGui.Button(ctx, "TOP") then
     view_yaw_deg = 0
     view_pitch_deg = 90
     view_roll_deg = 0
     view_zoom = 1.0
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Side") then
+  if ImGui.Button(ctx, "SIDE") then
     view_yaw_deg = 0
     view_pitch_deg = 0
     view_roll_deg = 0
     view_zoom = 1.0
   end
   local changed
-  changed, view_yaw_deg = ImGui.SliderDouble(ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg")
-  changed, view_pitch_deg = ImGui.SliderDouble(ctx, "Pitch", view_pitch_deg, -90, 90, "%.0f deg")
+  changed, view_yaw_deg = theme.slider_double(ImGui, ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg")
+  changed, view_pitch_deg = theme.slider_double(ImGui, ctx, "Pitch", view_pitch_deg, -90, 90, "%.0f deg")
 end
 
 local function draw_controls(track, send_fx, ret_fx, mix_fx)
@@ -714,7 +716,7 @@ local function draw_controls(track, send_fx, ret_fx, mix_fx)
 
   if ImGui.CollapsingHeader(ctx, "Return Mask", nil, ImGui.TreeNodeFlags_DefaultOpen) then
     if link_mask_shape then
-      ImGui.Text(ctx, string.format("Shape locked: width %.3f   focus %.3f   rear %.3f",
+      theme.muted(ImGui, ctx, string.format("Shape locked: width %.3f   focus %.3f   rear %.3f",
         get_param(track, ret_fx, PARAM.ret.width, 0),
         get_param(track, ret_fx, PARAM.ret.focus, 0),
         get_param(track, ret_fx, PARAM.ret.rear, 0)))
@@ -729,7 +731,7 @@ local function draw_controls(track, send_fx, ret_fx, mix_fx)
     slider(track, ret_fx, "Return energy comp", PARAM.ret.comp, 0, 1, "%.3f")
     slider(track, ret_fx, "Return mask gamma", PARAM.ret.gamma, 0.25, 4, "%.3f")
     checkbox_param(track, ret_fx, "Re-place wet through return mask", PARAM.ret.route)
-    ImGui.Text(ctx, "Return emits wet 1-24, dry thru 25-48, and return mask 49-72.")
+    theme.muted(ImGui, ctx, "Return emits wet 1-24, dry thru 25-48, and return mask 49-72.")
     checkbox_param(track, ret_fx, "Write return mask 49-72", PARAM.ret.monitor)
   end
 
@@ -755,36 +757,36 @@ local function loop()
   if visible then
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     if not track then
-      ImGui.Text(ctx, "Select the track that contains the HOA FX chain.")
+      theme.muted(ImGui, ctx, "Select the track that contains the HOA FX chain.")
     else
       local _, name = reaper.GetTrackName(track)
       local nchan = math.floor(reaper.GetMediaTrackInfo_Value(track, "I_NCHAN") + 0.5)
       local send_fx = find_fx(track, SEND_NAME)
       local ret_fx = find_fx(track, RETURN_NAME)
       local mix_fx = find_fx(track, MIXER_NAME)
-      ImGui.Text(ctx, "Selected track: " .. (name ~= "" and name or "(unnamed)") .. string.format("   %d channels", nchan))
+      theme.muted(ImGui, ctx, "Selected track: " .. (name ~= "" and name or "(unnamed)") .. string.format("   %d channels", nchan))
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Load/repair JSFX") then
+      if ImGui.Button(ctx, "LOAD/REPAIR JSFX") then
         maybe_load_chain(track)
         send_fx = find_fx(track, SEND_NAME)
         ret_fx = find_fx(track, RETURN_NAME)
         mix_fx = find_fx(track, MIXER_NAME)
       end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Pin inserts 1-24") then
+      if ImGui.Button(ctx, "PIN INSERTS 1-24") then
         pin_inserts_to_wet_bank(track, send_fx, ret_fx)
       end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Set track to 72ch") then
+      if ImGui.Button(ctx, "SET TRACK TO 72CH") then
         reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", 72)
       end
 
       if nchan < 72 then
-        ImGui.TextColored(ctx, COLORS.warn, "Track is below 72 channels; mask monitor and mixer sidechain channels may not be available.")
+        theme.status(ImGui, ctx, "Track is below 72 channels; mask monitor and mixer sidechain channels may not be available.", "warn")
       end
 
       if send_fx < 0 or ret_fx < 0 or mix_fx < 0 then
-        ImGui.Text(ctx, "Missing one or more 3OA JSFX. Use Load/repair JSFX.")
+        theme.status(ImGui, ctx, "Missing one or more 3OA JSFX. Use Load/repair JSFX.", "warn")
       else
         draw_direction_map(track, send_fx, ret_fx)
         draw_controls(track, send_fx, ret_fx, mix_fx)

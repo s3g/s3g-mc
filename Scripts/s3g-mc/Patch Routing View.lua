@@ -244,13 +244,8 @@ local function db_label(vol)
 end
 
 local function combo_index(label, value, names)
-  if ImGui.BeginCombo(ctx, label, names[value] or names[1] or "") then
-    for i, name in ipairs(names) do
-      local selected = i == value
-      if ImGui.Selectable(ctx, name, selected) then value = i end
-    end
-    ImGui.EndCombo(ctx)
-  end
+  local changed, next_value = theme.combo_row(ImGui, ctx, label, names, value, 150)
+  if changed then return next_value or value end
   return value
 end
 
@@ -269,14 +264,14 @@ local function send_mode_name(value)
 end
 
 local function send_mode_combo(label, value)
-  local current = send_mode_name(value)
-  if ImGui.BeginCombo(ctx, label, current) then
-    for _, mode in ipairs(SEND_MODES) do
-      local selected = math.floor(value or 0) == mode.value
-      if ImGui.Selectable(ctx, mode.name, selected) then value = mode.value end
-    end
-    ImGui.EndCombo(ctx)
+  local names = {}
+  local current = 1
+  for i, mode in ipairs(SEND_MODES) do
+    names[i] = mode.name
+    if math.floor(value or 0) == mode.value then current = i end
   end
+  local changed, next_value = theme.combo_row(ImGui, ctx, label, names, current, 150)
+  if changed and SEND_MODES[next_value] then return SEND_MODES[next_value].value end
   return value
 end
 
@@ -1202,11 +1197,11 @@ end
 
 local function draw_send_editor(connection)
   if not (connection and connection.kind == "send") then return end
-  ImGui.Text(ctx, "Selected Send")
+  theme.section_label(ImGui, ctx, "SELECTED SEND")
   theme.muted(ImGui, ctx, connection.source.name .. " > " .. connection.dest.name)
   ImGui.Separator(ctx)
 
-  local changed, vol = ImGui.SliderDouble(ctx, "Level##selected_send_level", connection.vol or 1, 0.0, 2.0, "%.3f")
+  local changed, vol = theme.slider_double(ImGui, ctx, "Level##selected_send_level", connection.vol or 1, 0.0, 2.0, "%.3f", 250)
   if changed then
     reaper.SetTrackSendInfo_Value(connection.source.track, 0, connection.send_index, "D_VOL", vol)
     status = "Send level: " .. db_label(vol)
@@ -1215,13 +1210,12 @@ local function draw_send_editor(connection)
   theme.muted(ImGui, ctx, db_label(vol))
 
   local mute = connection.mute or false
-  changed, mute = ImGui.Checkbox(ctx, "Mute send##selected_send_mute", mute)
+  changed, mute = ImGui.Checkbox(ctx, "MUTE SEND##selected_send_mute", mute)
   if changed then
     reaper.SetTrackSendInfo_Value(connection.source.track, 0, connection.send_index, "B_MUTE", mute and 1 or 0)
     status = mute and "Muted selected send." or "Unmuted selected send."
   end
 
-  ImGui.SetNextItemWidth(ctx, 132)
   local new_mode = send_mode_combo("Mode##selected_send_mode", connection.mode or 0)
   if new_mode ~= (connection.mode or 0) then
     reaper.SetTrackSendInfo_Value(connection.source.track, 0, connection.send_index, "I_SENDMODE", new_mode)
@@ -1234,26 +1228,26 @@ local function draw_send_editor(connection)
   dst_start, dst_count = clamp_channel_range(dst_start, dst_count, connection.dest.channels or 2)
 
   ImGui.Spacing(ctx)
-  ImGui.Text(ctx, "Channel Map")
-  changed, src_start = ImGui.SliderInt(ctx, "Source start##selected_send_src_start", src_start, 1, math.max(1, connection.source.channels or 2))
+  theme.section_label(ImGui, ctx, "CHANNEL MAP")
+  changed, src_start = theme.slider_int(ImGui, ctx, "Source start##selected_send_src_start", src_start, 1, math.max(1, connection.source.channels or 2), 250)
   if changed then
     src_start, src_count = clamp_channel_range(src_start, src_count, connection.source.channels or 2)
     reaper.SetTrackSendInfo_Value(connection.source.track, 0, connection.send_index, "I_SRCCHAN", channel_flag(src_start, src_count))
     status = "Updated send source channels."
   end
-  changed, src_count = ImGui.SliderInt(ctx, "Source count##selected_send_src_count", src_count, 1, math.max(1, (connection.source.channels or 2) - src_start + 1))
+  changed, src_count = theme.slider_int(ImGui, ctx, "Source count##selected_send_src_count", src_count, 1, math.max(1, (connection.source.channels or 2) - src_start + 1), 250)
   if changed then
     src_start, src_count = clamp_channel_range(src_start, src_count, connection.source.channels or 2)
     reaper.SetTrackSendInfo_Value(connection.source.track, 0, connection.send_index, "I_SRCCHAN", channel_flag(src_start, src_count))
     status = "Updated send source channels."
   end
-  changed, dst_start = ImGui.SliderInt(ctx, "Dest start##selected_send_dst_start", dst_start, 1, math.max(1, connection.dest.channels or 2))
+  changed, dst_start = theme.slider_int(ImGui, ctx, "Dest start##selected_send_dst_start", dst_start, 1, math.max(1, connection.dest.channels or 2), 250)
   if changed then
     dst_start, dst_count = clamp_channel_range(dst_start, dst_count, connection.dest.channels or 2)
     reaper.SetTrackSendInfo_Value(connection.source.track, 0, connection.send_index, "I_DSTCHAN", channel_flag(dst_start, dst_count))
     status = "Updated send destination channels."
   end
-  changed, dst_count = ImGui.SliderInt(ctx, "Dest count##selected_send_dst_count", dst_count, 1, math.max(1, (connection.dest.channels or 2) - dst_start + 1))
+  changed, dst_count = theme.slider_int(ImGui, ctx, "Dest count##selected_send_dst_count", dst_count, 1, math.max(1, (connection.dest.channels or 2) - dst_start + 1), 250)
   if changed then
     dst_start, dst_count = clamp_channel_range(dst_start, dst_count, connection.dest.channels or 2)
     reaper.SetTrackSendInfo_Value(connection.source.track, 0, connection.send_index, "I_DSTCHAN", channel_flag(dst_start, dst_count))
@@ -1261,7 +1255,7 @@ local function draw_send_editor(connection)
   end
 
   ImGui.Spacing(ctx)
-  if ImGui.Button(ctx, "Remove Send", 112, 24) then
+  if ImGui.Button(ctx, "REMOVE SEND", 112, 24) then
     remove_track_send(connection)
   end
 end
@@ -1303,7 +1297,7 @@ local function set_master_send(node, enabled)
 end
 
 local function draw_wire_key()
-  ImGui.Text(ctx, "Wire Colors")
+  theme.section_label(ImGui, ctx, "WIRE COLORS")
   local dl = ImGui.GetWindowDrawList(ctx)
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local function key_line(offset_y, color, label)
@@ -1317,7 +1311,7 @@ local function draw_wire_key()
 end
 
 local function draw_inspector(node, connections, entries)
-  ImGui.Text(ctx, "Inspector")
+  theme.section_label(ImGui, ctx, "INSPECTOR")
   ImGui.Separator(ctx)
   local selected_send = find_connection(connections, selected_connection_key)
   if selected_send then
@@ -1333,39 +1327,39 @@ local function draw_inspector(node, connections, entries)
     draw_wire_key()
     return
   end
-  ImGui.Text(ctx, node.name)
+  theme.muted(ImGui, ctx, node.name:upper())
   theme.muted(ImGui, ctx, node.master and "Master track" or ("Track " .. tostring(node.index)))
   ImGui.Separator(ctx)
-  ImGui.Text(ctx, string.format("Channels: %d", node.channels or 2))
-    ImGui.Text(ctx, string.format("FX: %d", node.fx_count or 0))
+  theme.muted(ImGui, ctx, string.format("CHANNELS: %d", node.channels or 2))
+    theme.muted(ImGui, ctx, string.format("FX: %d", node.fx_count or 0))
   local children = child_entries_for(node, entries)
   if not node.master then
-    ImGui.Text(ctx, string.format("Sends: %d", node.send_count or 0))
-    ImGui.Text(ctx, string.format("Receives: %d", node.recv_count or 0))
-    if #children > 0 then ImGui.Text(ctx, string.format("Children: %d", #children)) end
+    theme.muted(ImGui, ctx, string.format("SENDS: %d", node.send_count or 0))
+    theme.muted(ImGui, ctx, string.format("RECEIVES: %d", node.recv_count or 0))
+    if #children > 0 then theme.muted(ImGui, ctx, string.format("CHILDREN: %d", #children)) end
     if node.parent then
-      ImGui.Text(ctx, "Parent folder: " .. node_label(node.parent, 18))
+      theme.muted(ImGui, ctx, "PARENT FOLDER: " .. node_label(node.parent, 18))
     else
-      ImGui.Text(ctx, node.master_send and "Master send: on" or "Master send: off")
+      theme.muted(ImGui, ctx, node.master_send and "MASTER SEND: ON" or "MASTER SEND: OFF")
     end
-    local changed_mute, muted = ImGui.Checkbox(ctx, "Mute track##selected_track_mute", node.muted or false)
+    local changed_mute, muted = ImGui.Checkbox(ctx, "MUTE TRACK##selected_track_mute", node.muted or false)
     if changed_mute then set_track_mute(node, muted) end
-    local changed_solo, solo = ImGui.Checkbox(ctx, "Solo track##selected_track_solo", node.solo or false)
+    local changed_solo, solo = ImGui.Checkbox(ctx, "SOLO TRACK##selected_track_solo", node.solo or false)
     if changed_solo then set_track_solo(node, solo) end
     if #children > 0 then
       local collapsed = is_folder_collapsed(node)
       local changed_collapse
-      changed_collapse, collapsed = ImGui.Checkbox(ctx, "Collapse children##selected_folder_collapse", collapsed)
+      changed_collapse, collapsed = ImGui.Checkbox(ctx, "COLLAPSE CHILDREN##selected_folder_collapse", collapsed)
       if changed_collapse then
         set_folder_collapsed(node, collapsed)
         status = collapsed and ("Collapsed children for " .. node.name) or ("Expanded children for " .. node.name)
       end
     end
     if not node.parent then
-      local changed_master, master_enabled = ImGui.Checkbox(ctx, "Master send##selected_track_master_send", node.master_send or false)
+      local changed_master, master_enabled = ImGui.Checkbox(ctx, "MASTER SEND##selected_track_master_send", node.master_send or false)
       if changed_master then set_master_send(node, master_enabled) end
     end
-    if ImGui.Button(ctx, "FX Chain", 88, 24) then
+    if ImGui.Button(ctx, "FX CHAIN", 88, 24) then
       select_track(node)
       reaper.Main_OnCommand(40291, 0)
     end
@@ -1375,13 +1369,13 @@ local function draw_inspector(node, connections, entries)
   draw_wire_key()
 
   ImGui.Spacing(ctx)
-  if (node.parent or #children > 0) and ImGui.CollapsingHeader(ctx, "Folder", ImGui.TreeNodeFlags_DefaultOpen or 32) then
+  if (node.parent or #children > 0) and theme.toolbox_header(ImGui, ctx, "FOLDER", ImGui.TreeNodeFlags_DefaultOpen or 32) then
     if node.parent then
-      ImGui.Text(ctx, "Parent")
+      theme.muted(ImGui, ctx, "PARENT")
       theme.muted(ImGui, ctx, "  " .. node_label(node.parent, 24))
     end
     if #children > 0 then
-      ImGui.Text(ctx, "Children")
+      theme.muted(ImGui, ctx, "CHILDREN")
       for _, child in ipairs(children) do
         theme.muted(ImGui, ctx, "  " .. node_label(child, 24))
       end
@@ -1389,7 +1383,7 @@ local function draw_inspector(node, connections, entries)
   end
 
   ImGui.Spacing(ctx)
-  if ImGui.CollapsingHeader(ctx, "Connections", ImGui.TreeNodeFlags_DefaultOpen or 32) then
+  if theme.toolbox_header(ImGui, ctx, "CONNECTIONS", ImGui.TreeNodeFlags_DefaultOpen or 32) then
     for _, c in ipairs(connections) do
       if c.source == node or c.dest == node then
         local arrow = c.source == node and ">" or "<"
@@ -1400,7 +1394,7 @@ local function draw_inspector(node, connections, entries)
         if c.kind == "send" then
           theme.muted(ImGui, ctx, "  " .. (c.label or ""))
           ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "Select##" .. c.key, 58, 22) then
+          if ImGui.Button(ctx, "SELECT##" .. c.key, 58, 22) then
             selected_connection_key = c.key
             status = "Selected send: " .. c.source.name .. " > " .. c.dest.name
           end
@@ -1410,16 +1404,16 @@ local function draw_inspector(node, connections, entries)
   end
 
   ImGui.Spacing(ctx)
-  if ImGui.CollapsingHeader(ctx, "Project Summary", ImGui.TreeNodeFlags_DefaultOpen or 32) then
+  if theme.toolbox_header(ImGui, ctx, "PROJECT SUMMARY", ImGui.TreeNodeFlags_DefaultOpen or 32) then
     local multichannel = 0
     local sends = 0
     for _, entry in ipairs(entries) do
       if entry.channels > 2 then multichannel = multichannel + 1 end
       sends = sends + (entry.send_count or 0)
     end
-    ImGui.Text(ctx, string.format("Tracks: %d", #entries))
-    ImGui.Text(ctx, string.format("Multichannel tracks: %d", multichannel))
-    ImGui.Text(ctx, string.format("Sends: %d", sends))
+    theme.muted(ImGui, ctx, string.format("TRACKS: %d", #entries))
+    theme.muted(ImGui, ctx, string.format("MULTICHANNEL TRACKS: %d", multichannel))
+    theme.muted(ImGui, ctx, string.format("SENDS: %d", sends))
   end
 end
 
@@ -1518,86 +1512,91 @@ local function loop()
       end
     end
 
-    ImGui.Text(ctx, "Patch Routing View")
-    ImGui.SameLine(ctx)
-    theme.muted(ImGui, ctx, status)
+    local toolbar_panel = theme.push_soft_panel(ImGui, ctx)
+    if ImGui.BeginChild(ctx, "##patch_toolbar_tool_area", 0, 62, 0) then
+      theme.muted(ImGui, ctx, "PATCH ROUTING VIEW")
+      ImGui.SameLine(ctx)
+      theme.muted(ImGui, ctx, status)
 
-    ImGui.SetNextItemWidth(ctx, 160)
-    local changed_search
-    changed_search, search_text = ImGui.InputText(ctx, "Search", search_text)
-    if changed_search then status = search_text ~= "" and ("Search: " .. search_text) or "Search cleared." end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Focus", 54, 24) then focus_search_node(nodes) end
-    ImGui.SameLine(ctx)
-    local changed_edit
-    changed_edit, edit_mode = ImGui.Checkbox(ctx, "Edit mode", edit_mode)
-    if changed_edit then
-      status = edit_mode and "Edit mode: drag send to receive, or receive to send, to create sends." or "View mode. Routing edits disabled."
-      patch_drag = nil
-    end
-    ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 132)
-    local old_mode = view_mode
-    view_mode = combo_index("Layout", view_mode, VIEW_MODES)
-    if view_mode ~= old_mode then status = "Layout: " .. (VIEW_MODES[view_mode] or "") end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Auto Arrange", 104, 24) then auto_arrange() end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Reset View", 82, 24) then pan_x, pan_y, zoom = 24, 24, 1.0 end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Small", 60, 24) then
-      window_size_mode = 1
-      pending_window_size_mode = 1
-      status = "Window size: small."
-    end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Large", 60, 24) then
-      window_size_mode = 2
-      pending_window_size_mode = 2
-      status = "Window size: large."
-    end
+      ImGui.SetNextItemWidth(ctx, 160)
+      local changed_search
+      changed_search, search_text = ImGui.InputText(ctx, "Search", search_text)
+      if changed_search then status = search_text ~= "" and ("Search: " .. search_text) or "Search cleared." end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "FOCUS", 54, 24) then focus_search_node(nodes) end
+      ImGui.SameLine(ctx)
+      local changed_edit
+      changed_edit, edit_mode = ImGui.Checkbox(ctx, "EDIT MODE", edit_mode)
+      if changed_edit then
+        status = edit_mode and "Edit mode: drag send to receive, or receive to send, to create sends." or "View mode. Routing edits disabled."
+        patch_drag = nil
+      end
+      ImGui.SameLine(ctx)
+      local old_mode = view_mode
+      view_mode = combo_index("Layout", view_mode, VIEW_MODES)
+      if view_mode ~= old_mode then status = "Layout: " .. (VIEW_MODES[view_mode] or "") end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "AUTO ARRANGE", 104, 24) then auto_arrange() end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "RESET VIEW", 82, 24) then pan_x, pan_y, zoom = 24, 24, 1.0 end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "SMALL", 60, 24) then
+        window_size_mode = 1
+        pending_window_size_mode = 1
+        status = "Window size: small."
+      end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "LARGE", 60, 24) then
+        window_size_mode = 2
+        pending_window_size_mode = 2
+        status = "Window size: large."
+      end
 
-    _, show_sends = ImGui.Checkbox(ctx, "Sends", show_sends)
-    ImGui.SameLine(ctx)
-    local changed_wires
-    changed_wires, wires_front = ImGui.Checkbox(ctx, "Wires front", wires_front)
-    if changed_wires then
-      status = wires_front and "Wires draw in front of nodes." or "Wires draw behind nodes."
+      _, show_sends = ImGui.Checkbox(ctx, "SENDS", show_sends)
+      ImGui.SameLine(ctx)
+      local changed_wires
+      changed_wires, wires_front = ImGui.Checkbox(ctx, "WIRES FRONT", wires_front)
+      if changed_wires then
+        status = wires_front and "Wires draw in front of nodes." or "Wires draw behind nodes."
+      end
+      ImGui.SameLine(ctx)
+      _, show_folders = ImGui.Checkbox(ctx, "FOLDERS", show_folders)
+      ImGui.SameLine(ctx)
+      _, labels_hover_only = ImGui.Checkbox(ctx, "LABELS HOVER", labels_hover_only)
+      ImGui.SameLine(ctx)
+      _, show_master = ImGui.Checkbox(ctx, "MASTER", show_master)
+      ImGui.SameLine(ctx)
+      _, show_selected_only = ImGui.Checkbox(ctx, "SELECTED", show_selected_only)
+      ImGui.SameLine(ctx)
+      _, show_connected_only = ImGui.Checkbox(ctx, "CONNECTED", show_connected_only)
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "COLLAPSE", 86, 22) then set_all_folders_collapsed(entries, true) end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "EXPAND", 76, 22) then set_all_folders_collapsed(entries, false) end
+      ImGui.SameLine(ctx)
+      local changed_mc
+      changed_mc, show_multichannel_only = ImGui.Checkbox(ctx, "MC ONLY", show_multichannel_only)
+      if changed_mc then
+        status = show_multichannel_only and "MC only: showing tracks with more than two channels." or "MC only disabled: showing stereo and multichannel tracks."
+      end
     end
-    ImGui.SameLine(ctx)
-    _, show_folders = ImGui.Checkbox(ctx, "Folders", show_folders)
-    ImGui.SameLine(ctx)
-    _, labels_hover_only = ImGui.Checkbox(ctx, "Labels hover", labels_hover_only)
-    ImGui.SameLine(ctx)
-    _, show_master = ImGui.Checkbox(ctx, "Master", show_master)
-    ImGui.SameLine(ctx)
-    _, show_selected_only = ImGui.Checkbox(ctx, "Selected", show_selected_only)
-    ImGui.SameLine(ctx)
-    _, show_connected_only = ImGui.Checkbox(ctx, "Connected", show_connected_only)
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Collapse", 86, 22) then set_all_folders_collapsed(entries, true) end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Expand", 76, 22) then set_all_folders_collapsed(entries, false) end
-    ImGui.SameLine(ctx)
-    local changed_mc
-    changed_mc, show_multichannel_only = ImGui.Checkbox(ctx, "MC only", show_multichannel_only)
-    if changed_mc then
-      status = show_multichannel_only and "MC only: showing tracks with more than two channels." or "MC only disabled: showing stereo and multichannel tracks."
-    end
+    ImGui.EndChild(ctx)
+    theme.pop_soft_panel(ImGui, ctx, toolbar_panel)
 
-    ImGui.Separator(ctx)
+    ImGui.Spacing(ctx)
     local inspector_w = 284
     local avail_w, avail_h = ImGui.GetContentRegionAvail(ctx)
-    local child_flags = ImGui.ChildFlags_Borders or 1
-    if ImGui.BeginChild(ctx, "##patch_canvas_child", math.max(360, avail_w - inspector_w - 8), avail_h, child_flags) then
+    if ImGui.BeginChild(ctx, "##patch_canvas_child", math.max(360, avail_w - inspector_w - 8), avail_h, 0) then
       draw_canvas(nodes, connections)
     end
     ImGui.EndChild(ctx)
     ImGui.SameLine(ctx)
-    if ImGui.BeginChild(ctx, "##patch_inspector", inspector_w, avail_h, child_flags) then
+    local panel_stack = theme.push_soft_panel(ImGui, ctx)
+    if ImGui.BeginChild(ctx, "##patch_inspector", inspector_w, avail_h, 0) then
       draw_inspector(selected_node(nodes), connections, entries)
     end
     ImGui.EndChild(ctx)
+    theme.pop_soft_panel(ImGui, ctx, panel_stack)
 
     persist()
   end

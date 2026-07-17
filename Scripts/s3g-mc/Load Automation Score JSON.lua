@@ -14,6 +14,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local theme = nil
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -22,7 +23,7 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui); theme = _s3g_theme end
 end
 
 local ctx
@@ -457,9 +458,9 @@ local function draw_assignment_row(i, lane, a)
   ImGui.PushID(ctx, i)
   ImGui.TableNextRow(ctx)
   ImGui.TableSetColumnIndex(ctx, 0)
-  ImGui.Text(ctx, tostring(i))
+  theme.muted(ImGui, ctx, tostring(i))
   ImGui.TableSetColumnIndex(ctx, 1)
-  ImGui.Text(ctx, a.lane_name)
+  theme.muted(ImGui, ctx, a.lane_name)
   ImGui.TableSetColumnIndex(ctx, 2)
   ImGui.SetNextItemWidth(ctx, 150)
   a.target = combo(ctx, "##target", a.target, TARGET_TYPES)
@@ -512,8 +513,8 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, script_name, open)
   if visible then
-    ImGui.Text(ctx, "JSON: " .. (path:match("[^/\\]+$") or path))
-    ImGui.Text(ctx, string.format("Enabled lanes: %d | Duration: %.2f sec | Selected target tracks: %d", #lanes, duration, #tracks))
+    theme.muted(ImGui, ctx, "JSON: " .. (path:match("[^/\\]+$") or path))
+    theme.muted(ImGui, ctx, string.format("ENABLED LANES: %d | DURATION: %.2f SEC | SELECTED TARGET TRACKS: %d", #lanes, duration, #tracks))
     ImGui.Separator(ctx)
 
     local changed
@@ -522,20 +523,20 @@ local function loop()
     duration = math.max(0.001, duration)
     ImGui.SetNextItemWidth(ctx, 180)
     write_mode = combo(ctx, "Write mode", write_mode, WRITE_MODES)
-    changed, use_samples = ImGui.Checkbox(ctx, "Use sampled points from JSON", use_samples)
-    changed, write_markers = ImGui.Checkbox(ctx, "Write section markers to project", write_markers)
+    changed, use_samples = theme.checkbox_row(ImGui, ctx, "Use sampled points from JSON", use_samples)
+    changed, write_markers = theme.checkbox_row(ImGui, ctx, "Write section markers to project", write_markers)
     if #sections > 0 then
       ImGui.SameLine(ctx)
       disabled_text(tostring(#sections) .. " marker(s)")
     end
 
-    if ImGui.Button(ctx, "Refresh Tracks", 118, 24) then refresh_tracks() end
+    if ImGui.Button(ctx, "REFRESH TRACKS", 118, 24) then refresh_tracks() end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Auto Volume Across Tracks", 180, 24) then assign_volume_cycle() end
+    if ImGui.Button(ctx, "AUTO VOLUME ACROSS TRACKS", 180, 24) then assign_volume_cycle() end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Auto FX Sequential", 150, 24) then assign_fx_sequential() end
+    if ImGui.Button(ctx, "AUTO FX SEQUENTIAL", 150, 24) then assign_fx_sequential() end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Skip All", 80, 24) then
+    if ImGui.Button(ctx, "SKIP ALL", 80, 24) then
       for _, a in ipairs(assignments) do a.target = TARGET_SKIP end
     end
 
@@ -562,9 +563,9 @@ local function loop()
     ImGui.Separator(ctx)
     ImGui.TextWrapped(ctx, "Track volume lanes use dB scaling before writing REAPER envelope values. FX parameter lanes write normalized parameter values.")
     ImGui.TextColored(ctx, 0xBBBBBBFF, status)
-    if ImGui.Button(ctx, "Write Automation", 150, 30) then write_requested = true end
+    if ImGui.Button(ctx, "WRITE AUTOMATION", 150, 30) then write_requested = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 100, 30) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 100, 30) then open = false end
     ImGui.End(ctx)
   end
 

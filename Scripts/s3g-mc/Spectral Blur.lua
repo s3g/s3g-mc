@@ -23,6 +23,7 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
 
 
 local FFT_NAMES = { [1] = "1024", [2] = "2048", [3] = "4096", [4] = "8192" }
@@ -49,21 +50,24 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, "Spectral Blur", open)
   if visible then
-    ImGui.Text(ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
+    theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
     local changed
+    local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Blur", 198)
     changed, fft_index = sol.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
-    changed, amount = ImGui.SliderDouble(ctx, "Blur amount", amount, 0, 1, "%.3f")
-    changed, mix = ImGui.SliderDouble(ctx, "Wet mix", mix, 0, 1, "%.3f")
-    changed, radius = ImGui.SliderInt(ctx, "Time blur frames", radius, 1, 96)
-    changed, expand = ImGui.SliderDouble(ctx, "Expansion", expand, 1.0, 8.0, "%.2fx")
-    changed, safe = ImGui.Checkbox(ctx, "Safe envelope mode", safe)
-    changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
-    if normalize then changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f") end
-    ImGui.Separator(ctx)
-    ImGui.Text(ctx, "Smears spectral magnitude over neighboring frames.")
-    if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
+    changed, amount = sol.draw_slider(ImGui, ctx, "Blur amount", amount, 0, 1, "%.3f", false)
+    changed, mix = sol.draw_slider(ImGui, ctx, "Wet mix", mix, 0, 1, "%.3f", false)
+    changed, radius = sol.draw_slider_int(ImGui, ctx, "Time blur frames", radius, 1, 96)
+    changed, expand = sol.draw_slider(ImGui, ctx, "Expansion", expand, 1.0, 8.0, "%.2fx", false)
+    changed, safe = sol.draw_checkbox(ImGui, ctx, "Safe envelope mode", safe)
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Output", normalize and 98 or 73)
+    changed, normalize = sol.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
+    if normalize then changed, normalize_db = sol.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false) end
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    theme.muted(ImGui, ctx, "Smears spectral magnitude over neighboring frames.")
+    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
     ImGui.End(ctx)
   end
   if should_render then

@@ -30,6 +30,7 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
 
 local EXT = "s3g_mc_foafx_object_field_split_v1"
 
@@ -71,15 +72,7 @@ local function set_value(key, value)
 end
 
 local function combo(ctx, label, index, names)
-  if ImGui.BeginCombo(ctx, label, names[index] or "") then
-    for i, name in ipairs(names) do
-      local selected = i == index
-      if ImGui.Selectable(ctx, name, selected) then index = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return index
+  return select(2, theme.combo_row(ImGui, ctx, label, names, index))
 end
 
 local function order_index_for_channels(channels)
@@ -277,32 +270,36 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    ImGui.Text(ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
+    theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
     draw_preview(ctx, settings)
+    local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Routing", 98)
     settings.order_index = combo(ctx, "Ambisonic order", settings.order_index, ORDER_NAMES)
     settings.output_index = combo(ctx, "Output", settings.output_index, OUTPUT_NAMES)
-    ImGui.Separator(ctx)
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
     local changed
-    changed, settings.object_bias = ImGui.SliderDouble(ctx, "Object bias", settings.object_bias, 0.0, 1.0, "%.2f")
-    changed, settings.transient_weight = ImGui.SliderDouble(ctx, "Transient weight", settings.transient_weight, 0.0, 1.0, "%.2f")
-    changed, settings.coherence_weight = ImGui.SliderDouble(ctx, "Directional coherence", settings.coherence_weight, 0.0, 1.0, "%.2f")
-    changed, settings.contrast_weight = ImGui.SliderDouble(ctx, "Spectral contrast", settings.contrast_weight, 0.0, 1.0, "%.2f")
-    changed, settings.field_smoothing = ImGui.SliderDouble(ctx, "Field smoothing", settings.field_smoothing, 0.0, 0.98, "%.2f")
-    changed, settings.crossfade = ImGui.SliderDouble(ctx, "Object / field crossfade", settings.crossfade, 0.0, 0.75, "%.2f")
-    changed, settings.frequency_smoothing_bins = ImGui.SliderDouble(ctx, "Frequency smoothing bins", settings.frequency_smoothing_bins, 0, 24, "%.0f")
-    changed, settings.temporal_smoothing = ImGui.SliderDouble(ctx, "Temporal smoothing", settings.temporal_smoothing, 0.0, 0.98, "%.2f")
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Object / Field", 248)
+    changed, settings.object_bias = theme.slider_double(ImGui, ctx, "Object bias", settings.object_bias, 0.0, 1.0, "%.2f")
+    changed, settings.transient_weight = theme.slider_double(ImGui, ctx, "Transient weight", settings.transient_weight, 0.0, 1.0, "%.2f")
+    changed, settings.coherence_weight = theme.slider_double(ImGui, ctx, "Directional coherence", settings.coherence_weight, 0.0, 1.0, "%.2f")
+    changed, settings.contrast_weight = theme.slider_double(ImGui, ctx, "Spectral contrast", settings.contrast_weight, 0.0, 1.0, "%.2f")
+    changed, settings.field_smoothing = theme.slider_double(ImGui, ctx, "Field smoothing", settings.field_smoothing, 0.0, 0.98, "%.2f")
+    changed, settings.crossfade = theme.slider_double(ImGui, ctx, "Object / field crossfade", settings.crossfade, 0.0, 0.75, "%.2f")
+    changed, settings.frequency_smoothing_bins = theme.slider_double(ImGui, ctx, "Frequency smoothing bins", settings.frequency_smoothing_bins, 0, 24, "%.0f")
+    changed, settings.temporal_smoothing = theme.slider_double(ImGui, ctx, "Temporal smoothing", settings.temporal_smoothing, 0.0, 0.98, "%.2f")
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Analysis / Output", settings.normalize and 173 or 148)
     settings.fft_index = combo(ctx, "FFT size", settings.fft_index, FFT_NAMES)
-    changed, settings.overlap = ImGui.SliderDouble(ctx, "FFT overlap", settings.overlap, 2, 8, "%.0f")
-    changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize each output", settings.normalize)
+    changed, settings.overlap = theme.slider_double(ImGui, ctx, "FFT overlap", settings.overlap, 2, 8, "%.0f")
+    changed, settings.normalize = theme.checkbox_row(ImGui, ctx, "Peak normalize", settings.normalize)
     if settings.normalize then
-      changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+      changed, settings.normalize_db = theme.slider_double(ImGui, ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
     end
-    changed, settings.dc_protect = ImGui.Checkbox(ctx, "DC protect", settings.dc_protect)
-    ImGui.Separator(ctx)
-    ImGui.TextWrapped(ctx, "Automatic mode: object-like material is estimated from transient energy, directional concentration, and local spectral contrast. Field-like material is the smoother diffuse remainder.")
-    if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
+    changed, settings.dc_protect = theme.checkbox_row(ImGui, ctx, "DC protect", settings.dc_protect)
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    theme.muted(ImGui, ctx, "Object material is estimated from transient energy, concentration, and spectral contrast.")
+    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
     ImGui.End(ctx)
   end
   persist()

@@ -29,6 +29,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 
@@ -82,6 +84,130 @@ local function clamp(value, lo, hi)
   return value
 end
 
+local ROW_H = 25
+local LABEL_W = 86
+local CONTROL_GAP = 8
+local VALUE_W = 76
+local LABEL_ABBR = {
+  ["RENDER DURATION SEC"] = "DUR",
+  ["OUTPUT CHANNELS"] = "OUT CH",
+  ["FFT SIZE"] = "FFT",
+  ["HOP SAMPLES"] = "HOP",
+  ["TRACES PER FRAME"] = "TRACES",
+  ["TRACE LENGTH MS"] = "LEN",
+  ["ANALYSIS FLOOR DB"] = "FLOOR",
+  ["PITCH SCALE"] = "PITCH",
+  ["TRACE BEHAVIOR"] = "MODE",
+  ["TRACKING TOLERANCE CENTS"] = "TOL",
+  ["MIN LINKED FRAMES"] = "MIN",
+  ["TRACE GAIN"] = "GAIN",
+  ["MAGNITUDE CURVE"] = "CURVE",
+  ["FREQUENCY DRIFT"] = "DRIFT",
+  ["SPATIAL WIDTH"] = "WIDTH",
+  ["CLARITY PROTECT"] = "CLARITY",
+  ["LOW CUT / MIN PARTIAL HZ"] = "LOWCUT",
+  ["SOFT LIMIT PEAKS"] = "LIMIT",
+  ["PEAK NORMALIZE"] = "PEAK",
+  ["NORMALIZE DB"] = "NORM DB",
+  ["INSERTED TRACK GAIN"] = "INSERT",
+}
+
+local function row_label_text(label)
+  local upper = tostring(label or ""):upper()
+  return LABEL_ABBR[upper] or upper
+end
+
+local function row_layout(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" then avail = 600 end
+  local control_x = x + LABEL_W
+  local control_w = math.max(120, avail - LABEL_W - CONTROL_GAP)
+  return x, y, control_x, control_w
+end
+
+local function row_label(ctx, x, y, label)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 4, THEME.label, row_label_text(label))
+end
+
+local function finish_row(ctx, x, y)
+  ImGui.SetCursorScreenPos(ctx, x, y + ROW_H)
+end
+
+local function draw_custom_slider(ctx, label, value, lo, hi, fmt, integer)
+  local x, y, control_x, control_w = row_layout(ctx)
+  local slider_w = math.max(80, control_w - VALUE_W - CONTROL_GAP)
+  local value_x = control_x + slider_w + CONTROL_GAP
+  local track_y = y + 8
+  local track_h = 8
+  local norm = hi ~= lo and clamp((value - lo) / (hi - lo), 0, 1) or 0
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.InvisibleButton(ctx, "##" .. label, slider_w, ROW_H)
+  local hovered = ImGui.IsItemHovered(ctx)
+  local active = ImGui.IsItemActive(ctx)
+  local changed = false
+  if (hovered or active) and ImGui.IsMouseDown(ctx, 0) then
+    local mx = ImGui.GetMousePos(ctx)
+    local next_norm = clamp((mx - control_x) / slider_w, 0, 1)
+    local next_value = lo + (hi - lo) * next_norm
+    if integer then next_value = math.floor(next_value + 0.5) end
+    if math.abs(next_value - value) > (integer and 0 or 0.0000001) then
+      value = next_value
+      norm = next_norm
+      changed = true
+    end
+  end
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local frame = active and THEME.frame_active or (hovered and THEME.frame_hover or THEME.frame)
+  local fill = active and THEME.active or THEME.fill
+  local handle = active and THEME.active_hover or THEME.active
+  ImGui.DrawList_AddRectFilled(draw, control_x, track_y, control_x + slider_w, track_y + track_h, frame)
+  ImGui.DrawList_AddRectFilled(draw, control_x + 1, track_y + 1, control_x + math.max(2, slider_w * norm), track_y + track_h - 1, fill)
+  local hx = clamp(control_x + slider_w * norm - 1.5, control_x + 1, control_x + slider_w - 4)
+  ImGui.DrawList_AddRectFilled(draw, hx, track_y - 2, hx + 3, track_y + track_h + 2, handle)
+  ImGui.DrawList_AddText(draw, value_x, y + 4, THEME.value, integer and tostring(math.floor(value + 0.5)) or string.format(fmt or "%.3f", value))
+  finish_row(ctx, x, y)
+  return changed, value
+end
+
+local function draw_int_input(ctx, label, value)
+  local x, y, control_x, control_w = row_layout(ctx)
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  local changed, next_value = ImGui.InputInt(ctx, "##" .. label, math.floor(value))
+  finish_row(ctx, x, y)
+  return changed, next_value
+end
+
+local function draw_checkbox(ctx, label, value)
+  local x, y, control_x = row_layout(ctx)
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y + 2)
+  local changed, next_value = ImGui.Checkbox(ctx, "##" .. label, value)
+  finish_row(ctx, x, y)
+  return changed, next_value
+end
+
+local function section(ctx, label, height)
+  local stack = theme.push_soft_panel(ImGui, ctx)
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local w = ImGui.GetContentRegionAvail(ctx)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + height, THEME.panel_soft)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + 2, THEME.active)
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
+  theme.text(ImGui, ctx, label:upper())
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
+  return x, y, height, stack
+end
+
+local function finish_section(ctx, x, y, height, stack)
+  theme.pop_soft_panel(ImGui, ctx, stack)
+  ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
+end
+
 local function valid_output_channels(value, fallback)
   value = math.floor(tonumber(value) or 0)
   fallback = math.floor(tonumber(fallback) or 2)
@@ -97,7 +223,11 @@ local function combo_value(ctx, label, value, values)
   for index, candidate in ipairs(values) do
     if candidate == value then current = index break end
   end
-  if ImGui.BeginCombo(ctx, label, tostring(values[current])) then
+  local x, y, control_x, control_w = row_layout(ctx)
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  if ImGui.BeginCombo(ctx, "##" .. label, tostring(values[current])) then
     for index, candidate in ipairs(values) do
       local selected = index == current
       if ImGui.Selectable(ctx, tostring(candidate), selected) then
@@ -108,6 +238,7 @@ local function combo_value(ctx, label, value, values)
     end
     ImGui.EndCombo(ctx)
   end
+  finish_row(ctx, x, y)
   return value
 end
 
@@ -116,7 +247,11 @@ local function combo_behavior(ctx, label, value)
   for index, behavior in ipairs(TRACE_BEHAVIORS) do
     if behavior.value == value then current = index break end
   end
-  if ImGui.BeginCombo(ctx, label, TRACE_BEHAVIORS[current].label) then
+  local x, y, control_x, control_w = row_layout(ctx)
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  if ImGui.BeginCombo(ctx, "##" .. label, TRACE_BEHAVIORS[current].label) then
     for index, behavior in ipairs(TRACE_BEHAVIORS) do
       local selected = index == current
       if ImGui.Selectable(ctx, behavior.label, selected) then
@@ -127,6 +262,7 @@ local function combo_behavior(ctx, label, value)
     end
     ImGui.EndCombo(ctx)
   end
+  finish_row(ctx, x, y)
   return value
 end
 
@@ -254,38 +390,44 @@ local function main()
       local _, avail_h = ImGui.GetContentRegionAvail(ctx)
       local control_h = math.max(260, (avail_h or env_opts.compact_window_h) - 44)
       if ImGui.BeginChild(ctx, "##partial_trace_controls", 0, control_h) then
-      ImGui.Text(ctx, "Source: " .. (entry.name or entry.filename))
+      theme.muted(ImGui, ctx, "Source: " .. (entry.name or entry.filename))
       local changed
-      changed, settings.duration = ImGui.SliderDouble(ctx, "Render duration sec", settings.duration, 0.1, 300.0, "%.2f")
+      ImGui.Spacing(ctx)
+      local sx, sy, sh, stack = section(ctx, "Analysis", 252)
+      changed, settings.duration = draw_custom_slider(ctx, "Render duration sec", settings.duration, 0.1, 300.0, "%.2f", false)
       settings.channels = combo_value(ctx, "Output channels", math.floor(settings.channels), OUTPUT_CHANNELS)
       settings.fft_size = combo_value(ctx, "FFT size", math.floor(settings.fft_size), FFT_SIZES)
-      changed, settings.hop = ImGui.SliderInt(ctx, "Hop samples", math.floor(settings.hop), 64, math.floor(settings.fft_size))
-      changed, settings.partials_per_frame = ImGui.SliderInt(ctx, "Traces per frame", math.floor(settings.partials_per_frame), 1, 64)
-      changed, settings.density = ImGui.SliderDouble(ctx, "Density", settings.density, 0.0, 1.0, "%.2f")
-      changed, settings.partial_ms = ImGui.SliderDouble(ctx, "Trace length ms", settings.partial_ms, 20.0, 1200.0, "%.1f")
-      changed, settings.floor_db = ImGui.SliderDouble(ctx, "Analysis floor dB", settings.floor_db, -96.0, -12.0, "%.1f")
-      changed, settings.pitch_scale = ImGui.SliderDouble(ctx, "Pitch scale", settings.pitch_scale, 0.125, 4.0, "%.3f")
+      changed, settings.hop = draw_custom_slider(ctx, "Hop samples", math.floor(settings.hop), 64, math.floor(settings.fft_size), nil, true)
+      changed, settings.partials_per_frame = draw_custom_slider(ctx, "Traces per frame", math.floor(settings.partials_per_frame), 1, 64, nil, true)
+      changed, settings.density = draw_custom_slider(ctx, "Density", settings.density, 0.0, 1.0, "%.2f", false)
+      changed, settings.partial_ms = draw_custom_slider(ctx, "Trace length ms", settings.partial_ms, 20.0, 1200.0, "%.1f", false)
+      changed, settings.floor_db = draw_custom_slider(ctx, "Analysis floor dB", settings.floor_db, -96.0, -12.0, "%.1f", false)
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Trace", settings.trace_behavior == "linked" and 252 or 200)
+      changed, settings.pitch_scale = draw_custom_slider(ctx, "Pitch scale", settings.pitch_scale, 0.125, 4.0, "%.3f", false)
       settings.trace_behavior = combo_behavior(ctx, "Trace behavior", settings.trace_behavior)
       if settings.trace_behavior == "linked" then
-        changed, settings.track_tolerance_cents = ImGui.SliderDouble(ctx, "Tracking tolerance cents", settings.track_tolerance_cents, 15.0, 400.0, "%.1f")
-        changed, settings.min_track_frames = ImGui.SliderInt(ctx, "Min linked frames", math.floor(settings.min_track_frames), 2, 24)
+        changed, settings.track_tolerance_cents = draw_custom_slider(ctx, "Tracking tolerance cents", settings.track_tolerance_cents, 15.0, 400.0, "%.1f", false)
+        changed, settings.min_track_frames = draw_custom_slider(ctx, "Min linked frames", math.floor(settings.min_track_frames), 2, 24, nil, true)
       end
-      changed, settings.trace_gain = ImGui.SliderDouble(ctx, "Trace gain", settings.trace_gain, 0.05, 4.0, "%.2f")
-      changed, settings.brightness = ImGui.SliderDouble(ctx, "Magnitude curve", settings.brightness, 0.35, 3.0, "%.2f")
-      changed, settings.drift = ImGui.SliderDouble(ctx, "Frequency drift", settings.drift, 0.0, 0.18, "%.3f")
-      changed, settings.spatial_width = ImGui.SliderDouble(ctx, "Spatial width", settings.spatial_width, 0.05, 6.0, "%.2f")
-      ImGui.Separator(ctx)
-      changed, settings.clarity_protect = ImGui.Checkbox(ctx, "Clarity protect", settings.clarity_protect)
+      changed, settings.trace_gain = draw_custom_slider(ctx, "Trace gain", settings.trace_gain, 0.05, 4.0, "%.2f", false)
+      changed, settings.brightness = draw_custom_slider(ctx, "Magnitude curve", settings.brightness, 0.35, 3.0, "%.2f", false)
+      changed, settings.drift = draw_custom_slider(ctx, "Frequency drift", settings.drift, 0.0, 0.18, "%.3f", false)
+      changed, settings.spatial_width = draw_custom_slider(ctx, "Spatial width", settings.spatial_width, 0.05, 6.0, "%.2f", false)
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Output", settings.clarity_protect and (settings.normalize and 200 or 174) or (settings.normalize and 148 or 122))
+      changed, settings.clarity_protect = draw_checkbox(ctx, "Clarity protect", settings.clarity_protect)
       if settings.clarity_protect then
-        changed, settings.low_cut_hz = ImGui.SliderDouble(ctx, "Low cut / min partial Hz", settings.low_cut_hz, 0.0, 180.0, "%.1f")
-        changed, settings.soft_limit = ImGui.Checkbox(ctx, "Soft limit peaks", settings.soft_limit)
+        changed, settings.low_cut_hz = draw_custom_slider(ctx, "Low cut / min partial Hz", settings.low_cut_hz, 0.0, 180.0, "%.1f", false)
+        changed, settings.soft_limit = draw_checkbox(ctx, "Soft limit peaks", settings.soft_limit)
       end
-      changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
+      changed, settings.normalize = draw_checkbox(ctx, "Peak normalize", settings.normalize)
       if settings.normalize then
-        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -36.0, -3.0, "%.1f")
+        changed, settings.normalize_db = draw_custom_slider(ctx, "Normalize dB", settings.normalize_db, -36.0, -3.0, "%.1f", false)
       end
-      changed, settings.insert_gain = ImGui.SliderDouble(ctx, "Inserted track gain", settings.insert_gain, 0.05, 1.0, "%.2f")
-      changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
+      changed, settings.insert_gain = draw_custom_slider(ctx, "Inserted track gain", settings.insert_gain, 0.05, 1.0, "%.2f", false)
+      changed, settings.seed = draw_int_input(ctx, "Seed", settings.seed)
+      finish_section(ctx, sx, sy, sh, stack)
       settings.channels = valid_output_channels(settings.channels, default_channels)
       settings.hop = clamp(math.floor(settings.hop), 16, math.floor(settings.fft_size))
       settings.min_track_frames = clamp(math.floor(settings.min_track_frames), 2, 64)
@@ -294,9 +436,9 @@ local function main()
         selected_env_point, settings, env_opts)
         ImGui.EndChild(ctx)
       end
-      if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
+      if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
+      if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
       ImGui.End(ctx)
     end
     if should_render then

@@ -171,8 +171,80 @@ function M.add_to_manifest(manifest, defs, points, enabled)
   end
 end
 
+local ROW_H = 25
+local LABEL_W = 86
+local CONTROL_GAP = 8
+local VALUE_W = 76
+
+local LABEL_ABBR = {
+  ["ACTIVE ENVELOPE"] = "ACTIVE",
+  ["ENVELOPE"] = "ENV",
+  ["RANDOM POINTS"] = "POINTS",
+  ["RANDOM AMOUNT"] = "AMOUNT",
+  ["RANDOM DISPERSION"] = "DISP",
+  ["SMOOTH RANDOM"] = "SMOOTH",
+}
+
+local function theme_module()
+  local cached = package.loaded["s3g-mc ImGui Theme"]
+  if cached then return cached end
+  local ok, theme = pcall(require, "s3g-mc ImGui Theme")
+  if ok then return theme end
+  return nil
+end
+
+local function palette(ImGui)
+  local theme = theme_module()
+  if theme and theme.palette then return theme.palette(ImGui) end
+  return {
+    panel_soft = color(ImGui, 0.145, 0.145, 0.145, 1.0),
+    frame = color(ImGui, 0.074, 0.074, 0.074, 1.0),
+    frame_hover = color(ImGui, 0.145, 0.145, 0.145, 1.0),
+    frame_active = color(ImGui, 0.195, 0.195, 0.195, 1.0),
+    active = color(ImGui, 0.720, 0.720, 0.720, 1.0),
+    active_hover = color(ImGui, 0.790, 0.790, 0.790, 1.0),
+    fill = color(ImGui, 0.498, 0.498, 0.498, 1.0),
+    label = color(ImGui, 0.659, 0.659, 0.659, 1.0),
+    text = color(ImGui, 0.788, 0.788, 0.788, 1.0),
+    value = color(ImGui, 0.572, 0.572, 0.572, 1.0),
+    muted = color(ImGui, 0.560, 0.560, 0.560, 1.0),
+  }
+end
+
+local function clean_label(label)
+  return tostring(label or ""):gsub("##.*$", ""):upper():gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function row_label(label)
+  label = clean_label(label)
+  return LABEL_ABBR[label] or label
+end
+
+local function row_layout(ImGui, ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = math.max(220, ImGui.GetContentRegionAvail(ctx))
+  local control_x = x + LABEL_W
+  local control_w = math.max(52, avail - LABEL_W - VALUE_W - CONTROL_GAP)
+  local value_x = control_x + control_w + CONTROL_GAP
+  return x, y, avail, control_x, control_w, value_x
+end
+
+local function finish_row(ImGui, ctx, x, y, avail)
+  ImGui.SetCursorScreenPos(ctx, x, y)
+  ImGui.Dummy(ctx, avail, ROW_H)
+  ImGui.SetCursorScreenPos(ctx, x, y + ROW_H)
+end
+
+local function draw_row_label(ImGui, ctx, x, y, label)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, palette(ImGui).label, row_label(label))
+end
+
 local function draw_combo(ImGui, ctx, label, current, names)
-  if ImGui.BeginCombo(ctx, label, names[current] or "") then
+  local x, y, avail, control_x, control_w = row_layout(ImGui, ctx)
+  draw_row_label(ImGui, ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  if ImGui.BeginCombo(ctx, "##" .. tostring(label or ""), names[current] or "") then
     for index, name in ipairs(names) do
       local selected = index == current
       if ImGui.Selectable(ctx, name, selected) then current = index end
@@ -180,7 +252,85 @@ local function draw_combo(ImGui, ctx, label, current, names)
     end
     ImGui.EndCombo(ctx)
   end
+  finish_row(ImGui, ctx, x, y, avail)
   return current
+end
+
+local function draw_checkbox(ImGui, ctx, label, value)
+  local x, y, avail, control_x = row_layout(ImGui, ctx)
+  draw_row_label(ImGui, ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  local changed, next_value = ImGui.Checkbox(ctx, "##" .. tostring(label or ""), value)
+  finish_row(ImGui, ctx, x, y, avail)
+  return changed, next_value
+end
+
+local function format_value(value, fmt, integer)
+  if integer then return tostring(math.floor(value + 0.5)) end
+  return string.format(fmt or "%.3f", value)
+end
+
+local function draw_slider(ImGui, ctx, label, value, min_value, max_value, fmt, integer)
+  local x, y, avail, control_x, control_w, value_x = row_layout(ImGui, ctx)
+  local p = palette(ImGui)
+  local norm = 0
+  if max_value ~= min_value then norm = M.clamp((value - min_value) / (max_value - min_value), 0, 1) end
+  local id = string.format("##breakpoint_slider_%s_%d_%d", tostring(label or ""), math.floor(x + 0.5), math.floor(y + 0.5))
+  ImGui.InvisibleButton(ctx, id, avail, ROW_H)
+  local hovered = ImGui.IsItemHovered(ctx)
+  local active = ImGui.IsItemActive(ctx)
+  local changed = false
+  if (hovered or active) and ImGui.IsMouseDown(ctx, 0) then
+    local mx = ImGui.GetMousePos(ctx)
+    local next_norm = M.clamp((mx - control_x) / math.max(1, control_w), 0, 1)
+    local next_value = min_value + (max_value - min_value) * next_norm
+    if integer then next_value = math.floor(next_value + 0.5) end
+    if math.abs(next_value - value) > (integer and 0 or 0.0000001) then
+      value = next_value
+      norm = next_norm
+      changed = true
+    end
+  end
+
+  local dl = ImGui.GetWindowDrawList(ctx)
+  local track_y = y + 6
+  local track_h = 8
+  ImGui.DrawList_AddText(dl, x, y + 2, p.label, row_label(label))
+  ImGui.DrawList_AddRectFilled(dl, control_x, track_y, control_x + control_w, track_y + track_h,
+    active and p.frame_active or (hovered and p.frame_hover or p.frame))
+  ImGui.DrawList_AddRectFilled(dl, control_x + 1, track_y + 1, control_x + math.max(2, control_w * norm), track_y + track_h - 1, p.fill)
+  local handle_x = M.clamp(control_x + control_w * norm - 1.5, control_x + 1, control_x + control_w - 4)
+  ImGui.DrawList_AddRectFilled(dl, handle_x, track_y - 2, handle_x + 3, track_y + track_h + 2,
+    active and p.active_hover or p.active)
+  ImGui.DrawList_AddText(dl, value_x, y + 2, p.value, format_value(value, fmt, integer))
+  finish_row(ImGui, ctx, x, y, avail)
+  return changed, value
+end
+
+local function begin_section(ImGui, ctx, label, height)
+  local theme = theme_module()
+  local stack = theme and theme.push_soft_panel and theme.push_soft_panel(ImGui, ctx) or nil
+  local p = palette(ImGui)
+  local dl = ImGui.GetWindowDrawList(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local w = ImGui.GetContentRegionAvail(ctx)
+  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + height, p.panel_soft)
+  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + 2, p.active)
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
+  if theme and theme.text then
+    theme.text(ImGui, ctx, clean_label(label))
+  else
+    ImGui.TextColored(ctx, p.label, clean_label(label))
+  end
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
+  return x, y, height, stack
+end
+
+local function finish_section(ImGui, ctx, x, y, height, stack)
+  local theme = theme_module()
+  if theme and theme.pop_soft_panel then theme.pop_soft_panel(ImGui, ctx, stack) end
+  ImGui.SetCursorScreenPos(ctx, x, y + height)
+  ImGui.Dummy(ctx, 1, 10)
 end
 
 local function draw_square_handle(ImGui, dl, cx, cy, size, fill, edge, thickness)
@@ -328,7 +478,7 @@ function M.draw(ImGui, ctx, defs, points, enabled, selected, selected_point, cur
   local editor_open = true
   if opts.collapse_editor then
     local was_open = opts._editor_was_open
-    editor_open = ImGui.CollapsingHeader(ctx, opts.editor_label or "Detailed Breakpoint Editor")
+    editor_open = ImGui.CollapsingHeader(ctx, clean_label(opts.editor_label or "Detailed Breakpoint Editor"))
     if was_open ~= nil and was_open ~= editor_open then
       local target_h = editor_open and opts.expanded_window_h or opts.compact_window_h
       local ok_get, get_window_size = pcall(function() return ImGui.GetWindowSize end)
@@ -346,39 +496,45 @@ function M.draw(ImGui, ctx, defs, points, enabled, selected, selected_point, cur
 
   local names = {}
   for index, def in ipairs(defs) do names[index] = def.label end
+
+  local sx, sy, sh, stack = begin_section(ImGui, ctx, "Editor", 98)
   selected = draw_combo(ImGui, ctx, "Envelope", selected, names)
   local def = defs[selected]
   local p = points[selected]
-  enabled[selected] = select(2, ImGui.Checkbox(ctx, "Active envelope", enabled[selected]))
+  enabled[selected] = select(2, draw_checkbox(ImGui, ctx, "Active envelope", enabled[selected]))
+  finish_section(ImGui, ctx, sx, sy, sh, stack)
 
   local base = M.norm(def, current_values[def.key] or def.default or def.min)
-  if ImGui.Button(ctx, "Flat") then M.set_shape(p, "flat", base) selected_point = nil end
+  sx, sy, sh, stack = begin_section(ImGui, ctx, "Shape", 95)
+  if ImGui.Button(ctx, "FLAT") then M.set_shape(p, "flat", base) selected_point = nil end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Rise") then M.set_shape(p, "rise", base) enabled[selected] = true selected_point = nil end
+  if ImGui.Button(ctx, "RISE") then M.set_shape(p, "rise", base) enabled[selected] = true selected_point = nil end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Fall") then M.set_shape(p, "fall", base) enabled[selected] = true selected_point = nil end
+  if ImGui.Button(ctx, "FALL") then M.set_shape(p, "fall", base) enabled[selected] = true selected_point = nil end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Ridge") then M.set_shape(p, "ridge", base) enabled[selected] = true selected_point = nil end
+  if ImGui.Button(ctx, "RIDGE") then M.set_shape(p, "ridge", base) enabled[selected] = true selected_point = nil end
+  if ImGui.Button(ctx, "VALLEY") then M.set_shape(p, "valley", base) enabled[selected] = true selected_point = nil end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Valley") then M.set_shape(p, "valley", base) enabled[selected] = true selected_point = nil end
+  if ImGui.Button(ctx, "TERRACE") then M.set_shape(p, "terrace", base) enabled[selected] = true selected_point = nil end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Terrace") then M.set_shape(p, "terrace", base) enabled[selected] = true selected_point = nil end
-  ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Switchback") then M.set_shape(p, "switchback", base) enabled[selected] = true selected_point = nil end
+  if ImGui.Button(ctx, "SWITCHBACK") then M.set_shape(p, "switchback", base) enabled[selected] = true selected_point = nil end
+  finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-  opts.random_count = select(2, ImGui.SliderInt(ctx, "Random points", math.floor(opts.random_count), 4, 32))
-  opts.random_amount = select(2, ImGui.SliderDouble(ctx, "Random amount", opts.random_amount, 0.0, 1.0, "%.2f"))
-  opts.random_dispersion = select(2, ImGui.SliderDouble(ctx, "Random dispersion", opts.random_dispersion, 0.0, 1.0, "%.2f"))
-  opts.random_smooth = select(2, ImGui.Checkbox(ctx, "Smooth random", opts.random_smooth))
-  if ImGui.Button(ctx, "Random selected") then
+  sx, sy, sh, stack = begin_section(ImGui, ctx, "Randomize", 173)
+  opts.random_count = select(2, draw_slider(ImGui, ctx, "Random points", math.floor(opts.random_count), 4, 32, nil, true))
+  opts.random_amount = select(2, draw_slider(ImGui, ctx, "Random amount", opts.random_amount, 0.0, 1.0, "%.2f", false))
+  opts.random_dispersion = select(2, draw_slider(ImGui, ctx, "Random dispersion", opts.random_dispersion, 0.0, 1.0, "%.2f", false))
+  opts.random_smooth = select(2, draw_checkbox(ImGui, ctx, "Smooth random", opts.random_smooth))
+  if ImGui.Button(ctx, "RANDOM SELECTED") then
     M.randomize_set(defs, points, enabled, current_values, "selected", selected, opts)
     selected_point = nil
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Random all") then
+  if ImGui.Button(ctx, "RANDOM ALL") then
     M.randomize_set(defs, points, enabled, current_values, "all", selected, opts)
     selected_point = nil
   end
+  finish_section(ImGui, ctx, sx, sy, sh, stack)
 
   local width = math.max(320, ImGui.GetContentRegionAvail(ctx) - 2)
   local height = opts.height or 150
@@ -456,14 +612,16 @@ function M.draw(ImGui, ctx, defs, points, enabled, selected, selected_point, cur
       M.sort(p)
     end
   end
-  if ImGui.Button(ctx, "Add point") and #p < 32 then
+
+  sx, sy, sh, stack = begin_section(ImGui, ctx, "Point", 86)
+  if ImGui.Button(ctx, "ADD POINT") and #p < 32 then
     p[#p + 1] = { x = 0.5, y = base }
     selected_point = #p
     enabled[selected] = true
     M.sort(p)
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Delete point") and selected_point and selected_point > 1 and selected_point < #p then
+  if ImGui.Button(ctx, "DELETE POINT") and selected_point and selected_point > 1 and selected_point < #p then
     table.remove(p, selected_point)
     selected_point = nil
     M.sort(p)
@@ -472,8 +630,9 @@ function M.draw(ImGui, ctx, defs, points, enabled, selected, selected_point, cur
   if selected_point and p[selected_point] then
     ImGui.SameLine(ctx)
     local point = p[selected_point]
-    ImGui.Text(ctx, string.format("t %.2f / " .. (def.fmt or "%.3f"), point.x, M.value(def, point.y)))
+    ImGui.TextColored(ctx, palette(ImGui).muted, string.format("T %.2f / " .. (def.fmt or "%.3f"), point.x, M.value(def, point.y)))
   end
+  finish_section(ImGui, ctx, sx, sy, sh, stack)
 
   return selected, selected_point
 end

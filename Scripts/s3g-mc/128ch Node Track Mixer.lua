@@ -843,13 +843,13 @@ local function draw_routing_overview(node_count, out_ch)
       ImGui.TableSetColumnIndex(ctx, 0)
       if ImGui.Selectable(ctx, string.format("N%d", n), selected_node == n) then selected_node = n end
       ImGui.TableSetColumnIndex(ctx, 1)
-      ImGui.Text(ctx, short_name(node_name(n), 30))
+      theme.muted(ImGui, ctx, short_name(node_name(n), 30))
       ImGui.TableSetColumnIndex(ctx, 2)
-      ImGui.Text(ctx, string.format("%d-%d", input_start, input_start + src_ch - 1))
+      theme.muted(ImGui, ctx, string.format("%d-%d", input_start, input_start + src_ch - 1))
       ImGui.TableSetColumnIndex(ctx, 3)
       theme.status(ImGui, ctx, LAYOUTS[src_layout + 1] or LAYOUTS[1], active and "text" or "muted")
       ImGui.TableSetColumnIndex(ctx, 4)
-      ImGui.Text(ctx, string.format("%d/%d", active_outputs, out_ch))
+      theme.muted(ImGui, ctx, string.format("%d/%d", active_outputs, out_ch))
       ImGui.TableSetColumnIndex(ctx, 5)
       draw_output_strip("##route_strip_" .. tostring(n), n, out_ch)
     end
@@ -896,9 +896,11 @@ local function loop()
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
     local _, bus_name = reaper.GetTrackName(bus, "")
-    ImGui.Text(ctx, bus_name ~= "" and bus_name or "Node Track Mixer bus")
+    theme.muted(ImGui, ctx, bus_name ~= "" and bus_name or "NODE TRACK MIXER BUS")
     theme.muted(ImGui, ctx, "Each source track is a channel-shape node; use spatial objects or stacked shapes for the mix bed.")
 
+    local tool_panel = theme.push_soft_panel(ImGui, ctx)
+    if ImGui.BeginChild(ctx, "##node_mixer_tool_area", 0, 0, 0) then
     local layout = math.floor(get_param(bus, fx, 0, 1) + 0.5)
     layout = combo_layout("Mix bed shape", layout)
     set_param(bus, fx, 0, layout)
@@ -921,7 +923,7 @@ local function loop()
 
     if theme.toolbox_header(ImGui, ctx, "AUTOMATION", ImGui.TreeNodeFlags_DefaultOpen) then
       local mode_name = automation_mode_name(bus)
-      ImGui.Text(ctx, "Track automation: " .. mode_name)
+      theme.muted(ImGui, ctx, "TRACK AUTOMATION: " .. mode_name:upper())
       ImGui.SameLine(ctx)
       local write_mode = mode_name == "Write"
       if ImGui.Button(ctx, write_mode and "SET TRIM/READ + SAFE" or "SET WRITE + GUI") then
@@ -1019,9 +1021,9 @@ local function loop()
     draw_view(layout, out_ch, node_count, mix_mode)
 
     if theme.toolbox_header(ImGui, ctx, "SELECTED NODE", ImGui.TreeNodeFlags_DefaultOpen) then
-      ImGui.Text(ctx, "Node " .. tostring(selected_node) .. ": " .. node_name(selected_node))
+      theme.muted(ImGui, ctx, "NODE " .. tostring(selected_node) .. ": " .. node_name(selected_node))
       local active = get_param(bus, fx, node_param(selected_node, 0), 1) >= 0.5
-      changed, active = ImGui.Checkbox(ctx, "ACTIVE", active)
+      changed, active = theme.checkbox_row(ImGui, ctx, "ACTIVE", active)
       if changed then set_param(bus, fx, node_param(selected_node, 0), active and 1 or 0) end
       local src_layout = math.floor(get_param(bus, fx, node_param(selected_node, 2), 0) + 0.5)
       src_layout = combo_layout("Node source shape", src_layout)
@@ -1063,6 +1065,9 @@ local function loop()
     draw_matrix(node_count, out_ch)
 
     if ImGui.Button(ctx, "CLOSE", 100, 28) then open = false end
+    end
+    ImGui.EndChild(ctx)
+    theme.pop_soft_panel(ImGui, ctx, tool_panel)
     ImGui.End(ctx)
   end
   if open then reaper.defer(loop) end

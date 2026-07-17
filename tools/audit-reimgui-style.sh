@@ -141,6 +141,11 @@ report_rg "INFO" \
   "standalone +/- buttons: ensure these are zoom/nudge controls, not fake collapse markers" \
   'Button\(ctx, "[+-]"'
 
+report_rg "WARN" \
+  "mixed-case visible button labels remain; fixed buttons should be all caps before any hidden ##id" \
+  'ImGui\.(SmallButton|Button)\(ctx, "[^"#]*[a-z][^"#]*(##|")' \
+  "s3g-mc Package Browser.lua"
+
 report_rg "INFO" \
   "camera/view labels: normalize TOP/SIDE/FRONT/3/4 wording and zoom placement by family" \
   '"3/4 view"|"3/4##|"top##|"Top"|"front##|"Front"|"Side"|"Zoom"'

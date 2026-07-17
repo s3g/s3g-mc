@@ -27,6 +27,9 @@ do
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
 
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
+
 
 local PROJECT = 0
 local FX_NAME = "s3g MC Channel Automation Mixer 128"
@@ -58,13 +61,13 @@ local db_input_editing = {}
 local COLOR_METER_BG = ImGui.ColorConvertDouble4ToU32(0.09, 0.095, 0.10, 1)
 local COLOR_METER_FILL = ImGui.ColorConvertDouble4ToU32(0.46, 0.86, 0.56, 1)
 local COLOR_METER_EDGE = ImGui.ColorConvertDouble4ToU32(0.30, 0.32, 0.34, 1)
-local COLOR_PANEL_BG = ImGui.ColorConvertDouble4ToU32(0.055, 0.060, 0.065, 1)
+local COLOR_PANEL_BG = THEME.panel
 local COLOR_CELL_OFF = ImGui.ColorConvertDouble4ToU32(0.13, 0.14, 0.15, 1)
 local COLOR_CELL_ON = ImGui.ColorConvertDouble4ToU32(0.46, 0.56, 0.50, 1)
 local COLOR_CELL_EDGE = ImGui.ColorConvertDouble4ToU32(0.29, 0.31, 0.33, 1)
-local COLOR_TEXT = ImGui.ColorConvertDouble4ToU32(0.78, 0.82, 0.84, 1)
-local COLOR_TEXT_DIM = ImGui.ColorConvertDouble4ToU32(0.48, 0.52, 0.54, 1)
-local COLOR_FADER_BG = ImGui.ColorConvertDouble4ToU32(0.10, 0.11, 0.12, 1)
+local COLOR_TEXT = THEME.text
+local COLOR_TEXT_DIM = THEME.value
+local COLOR_FADER_BG = THEME.frame
 local COLOR_FADER_FILL = ImGui.ColorConvertDouble4ToU32(0.24, 0.58, 0.66, 1)
 local COLOR_FADER_TICK = ImGui.ColorConvertDouble4ToU32(0.055, 0.060, 0.065, 0.82)
 local COLOR_UNITY_TICK = ImGui.ColorConvertDouble4ToU32(0.72, 0.76, 0.70, 0.92)
@@ -521,66 +524,66 @@ local function draw_channel_controls(track, fx, active_ch)
   local page_end = math.min(active_ch, page_start + page_size - 1)
   local visible_count = page_end - page_start + 1
 
-  ImGui.Text(ctx, string.format("Showing channels %d-%d of %d", page_start, page_end, active_ch))
+  theme.muted(ImGui, ctx, string.format("Showing channels %d-%d of %d", page_start, page_end, active_ch))
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, "<") then page_start = clamp(page_start - page_size, 1, active_ch) end
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, ">") then page_start = clamp(page_start + page_size, 1, math.max(1, active_ch - page_size + 1)) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Reset") then reset_range(track, fx, page_start, page_end, "__selected") end
+  if ImGui.Button(ctx, "RESET") then reset_range(track, fx, page_start, page_end, "__selected") end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Reset Active") then reset_range(track, fx, 1, active_ch) end
+  if ImGui.Button(ctx, "RESET ACTIVE") then reset_range(track, fx, 1, active_ch) end
 
   local changed
-  changed, page_size = ImGui.SliderInt(ctx, "Visible channels", page_size, 2, max_visible)
+  changed, page_size = theme.slider_int(ImGui, ctx, "Visible channels", page_size, 2, max_visible, 360)
   if changed then page_start = clamp(page_start, 1, math.max(1, active_ch - page_size + 1)) end
 
-  group_button("None", "none")
+  group_button("NONE", "none")
   ImGui.SameLine(ctx)
-  group_button("All", "all")
+  group_button("ALL", "all")
   ImGui.SameLine(ctx)
-  group_button("Odd", "odd")
+  group_button("ODD", "odd")
   ImGui.SameLine(ctx)
-  group_button("Even", "even")
+  group_button("EVEN", "even")
   ImGui.SameLine(ctx)
-  group_button("1st Half", "first_half")
+  group_button("1ST HALF", "first_half")
   ImGui.SameLine(ctx)
-  group_button("2nd Half", "second_half")
+  group_button("2ND HALF", "second_half")
   ImGui.SameLine(ctx)
-  group_button("Every 4", "every4")
+  group_button("EVERY 4", "every4")
   if has_manual_selection() then
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "*Clear Sel") then
+    if ImGui.Button(ctx, "CLEAR SEL") then
       manual_selected_channels = {}
       quick_group = "none"
     end
   end
 
-  if ImGui.Button(ctx, "Mute") then set_range(track, fx, page_start, page_end, FADER_MIN_DB, "__selected") end
+  if ImGui.Button(ctx, "MUTE") then set_range(track, fx, page_start, page_end, FADER_MIN_DB, "__selected") end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "-6 dB") then set_range(track, fx, page_start, page_end, -6, "__selected") end
+  if ImGui.Button(ctx, "-6 DB") then set_range(track, fx, page_start, page_end, -6, "__selected") end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "-12 dB") then set_range(track, fx, page_start, page_end, -12, "__selected") end
+  if ImGui.Button(ctx, "-12 DB") then set_range(track, fx, page_start, page_end, -12, "__selected") end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Unity") then set_range(track, fx, page_start, page_end, 0, "__selected") end
+  if ImGui.Button(ctx, "UNITY") then set_range(track, fx, page_start, page_end, 0, "__selected") end
 
-  if ImGui.Button(ctx, "Trim -3") then trim_range(track, fx, page_start, page_end, -3, "__selected") end
+  if ImGui.Button(ctx, "TRIM -3") then trim_range(track, fx, page_start, page_end, -3, "__selected") end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Trim -1") then trim_range(track, fx, page_start, page_end, -1, "__selected") end
+  if ImGui.Button(ctx, "TRIM -1") then trim_range(track, fx, page_start, page_end, -1, "__selected") end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Trim +1") then trim_range(track, fx, page_start, page_end, 1, "__selected") end
+  if ImGui.Button(ctx, "TRIM +1") then trim_range(track, fx, page_start, page_end, 1, "__selected") end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Trim +3") then trim_range(track, fx, page_start, page_end, 3, "__selected") end
+  if ImGui.Button(ctx, "TRIM +3") then trim_range(track, fx, page_start, page_end, 3, "__selected") end
 
-  if ImGui.Button(ctx, "Ramp Up") then shape_range(track, fx, page_start, page_end, "ramp_up", "__selected") end
+  if ImGui.Button(ctx, "RAMP UP") then shape_range(track, fx, page_start, page_end, "ramp_up", "__selected") end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Ramp Down") then shape_range(track, fx, page_start, page_end, "ramp_down", "__selected") end
+  if ImGui.Button(ctx, "RAMP DOWN") then shape_range(track, fx, page_start, page_end, "ramp_down", "__selected") end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Center High") then shape_range(track, fx, page_start, page_end, "center_high", "__selected") end
+  if ImGui.Button(ctx, "CENTER HIGH") then shape_range(track, fx, page_start, page_end, "center_high", "__selected") end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Edges High") then shape_range(track, fx, page_start, page_end, "edges_high", "__selected") end
+  if ImGui.Button(ctx, "EDGES HIGH") then shape_range(track, fx, page_start, page_end, "edges_high", "__selected") end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Alternate") then shape_range(track, fx, page_start, page_end, "alternate", "__selected") end
+  if ImGui.Button(ctx, "ALTERNATE") then shape_range(track, fx, page_start, page_end, "alternate", "__selected") end
 
   ImGui.Separator(ctx)
 
@@ -722,22 +725,22 @@ local function draw_channel_controls(track, fx, active_ch)
 end
 
 local function draw_pin_matrix(track, fx, active_ch)
-  if not ImGui.CollapsingHeader(ctx, "Pin matrix / remap", nil, ImGui.TreeNodeFlags_DefaultOpen) then return end
+  if not theme.toolbox_header(ImGui, ctx, "PIN MATRIX / REMAP", ImGui.TreeNodeFlags_DefaultOpen) then return end
 
   local pin_ch = math.min(active_ch, MAX_CH)
-  local side_name = pin_side == 0 and "Input pins" or "Output pins"
+  local side_name = pin_side == 0 and "INPUT PINS" or "OUTPUT PINS"
 
   if ImGui.Button(ctx, side_name) then pin_side = pin_side == 0 and 1 or 0 end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Identity I/O") then set_identity_pins(track, fx, active_ch) end
+  if ImGui.Button(ctx, "IDENTITY I/O") then set_identity_pins(track, fx, active_ch) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Clear side") then clear_pins(track, fx, pin_side, active_ch) end
+  if ImGui.Button(ctx, "CLEAR SIDE") then clear_pins(track, fx, pin_side, active_ch) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Rotate +1") then rotate_pins(track, fx, pin_side, active_ch, 1) end
+  if ImGui.Button(ctx, "ROTATE +1") then rotate_pins(track, fx, pin_side, active_ch, 1) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Rotate -1") then rotate_pins(track, fx, pin_side, active_ch, -1) end
+  if ImGui.Button(ctx, "ROTATE -1") then rotate_pins(track, fx, pin_side, active_ch, -1) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Reverse side") then reverse_pins(track, fx, pin_side, active_ch) end
+  if ImGui.Button(ctx, "REVERSE SIDE") then reverse_pins(track, fx, pin_side, active_ch) end
 
   matrix_start = clamp(matrix_start, 1, math.max(1, pin_ch - page_size + 1))
   matrix_dest_start = clamp(matrix_dest_start, 1, math.max(1, pin_ch - page_size + 1))
@@ -746,16 +749,16 @@ local function draw_pin_matrix(track, fx, active_ch)
   local matrix_rows = matrix_end - matrix_start + 1
   local matrix_cols = matrix_dest_end - matrix_dest_start + 1
 
-  ImGui.Text(ctx, string.format("%s: FX pins %d-%d to track channels %d-%d",
+  theme.muted(ImGui, ctx, string.format("%s: FX pins %d-%d to track channels %d-%d",
     side_name, matrix_start, matrix_end, matrix_dest_start, matrix_dest_end))
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, "<< FX##matrix_src") then matrix_start = clamp(matrix_start - page_size, 1, math.max(1, pin_ch - page_size + 1)) end
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, "FX >>##matrix_src") then matrix_start = clamp(matrix_start + page_size, 1, math.max(1, pin_ch - page_size + 1)) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "<< Ch##matrix_dst") then matrix_dest_start = clamp(matrix_dest_start - page_size, 1, math.max(1, pin_ch - page_size + 1)) end
+  if ImGui.Button(ctx, "<< CH##matrix_dst") then matrix_dest_start = clamp(matrix_dest_start - page_size, 1, math.max(1, pin_ch - page_size + 1)) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Ch >>##matrix_dst") then matrix_dest_start = clamp(matrix_dest_start + page_size, 1, math.max(1, pin_ch - page_size + 1)) end
+  if ImGui.Button(ctx, "CH >>##matrix_dst") then matrix_dest_start = clamp(matrix_dest_start + page_size, 1, math.max(1, pin_ch - page_size + 1)) end
 
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x0, y0 = ImGui.GetCursorScreenPos(ctx)
@@ -810,22 +813,34 @@ local function loop()
   if visible then
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     if not track then
-      ImGui.Text(ctx, "No selected track.")
+      theme.muted(ImGui, ctx, "NO SELECTED TRACK.")
     else
       local _, track_name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
       local active_ch = get_track_channels(track)
-      ImGui.Text(ctx, "Selected track: " .. (track_name ~= "" and track_name or "(unnamed)"))
+      theme.muted(ImGui, ctx, "TARGET: " .. (track_name ~= "" and track_name or "(UNNAMED)"))
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Load/repair JSFX") then maybe_load(track, active_ch, true) end
+      if ImGui.Button(ctx, "LOAD / REPAIR JSFX") then maybe_load(track, active_ch, true) end
       ImGui.SameLine(ctx)
-      ImGui.Text(ctx, string.format("%d track channels", active_ch))
+      theme.muted(ImGui, ctx, string.format("%d TRACK CHANNELS", active_ch))
 
       local fx = maybe_load(track, active_ch, false)
       if fx < 0 then
-        ImGui.Text(ctx, "Could not load JS: " .. FX_NAME)
+        theme.status(ImGui, ctx, "Could not load JS: " .. FX_NAME, "warn")
       else
-        draw_channel_controls(track, fx, active_ch)
-        draw_pin_matrix(track, fx, active_ch)
+        local channel_panel = theme.push_soft_panel(ImGui, ctx)
+        if ImGui.BeginChild(ctx, "##automation_channel_tool_area", 0, 392, 0) then
+          draw_channel_controls(track, fx, active_ch)
+        end
+        ImGui.EndChild(ctx)
+        theme.pop_soft_panel(ImGui, ctx, channel_panel)
+
+        ImGui.Spacing(ctx)
+        local matrix_panel = theme.push_soft_panel(ImGui, ctx)
+        if ImGui.BeginChild(ctx, "##automation_pin_tool_area", 0, 0, 0) then
+          draw_pin_matrix(track, fx, active_ch)
+        end
+        ImGui.EndChild(ctx)
+        theme.pop_soft_panel(ImGui, ctx, matrix_panel)
       end
     end
     ImGui.End(ctx)

@@ -72,6 +72,10 @@ check \
   '"3/4 view"|"Top"|"Front"|"top##cam"|"front##cam"'
 
 check \
+  'fixed buttons should use all-CAPS visible labels' \
+  'ImGui\.(SmallButton|Button)\(ctx, "[^"#]*[a-z][^"#]*(##|")'
+
+check \
   'diagram title strings must be CAPS in the upper-left canvas title position' \
   'DrawList_AddText\(draw_list, x0 \+ 14, y0 \+ 14, CANVAS\.text, "[^"]*[a-z][^"]*"\)'
 

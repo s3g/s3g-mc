@@ -29,6 +29,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 
 local TITLE = "Modal Terrain"
@@ -87,8 +89,133 @@ end
 
 local ctx = ImGui.CreateContext(TITLE)
 
+local ROW_H = 25
+local LABEL_W = 86
+local CONTROL_GAP = 8
+local VALUE_W = 76
+local LABEL_ABBR = {
+  ["FREQUENCY MODEL"] = "FREQ",
+  ["SPATIAL MODE"] = "SPACE",
+  ["RING CHANNELS"] = "RING",
+  ["DURATION SEC"] = "DUR",
+  ["MODE COUNT"] = "MODES",
+  ["EXCITATION EVENTS"] = "EVENTS",
+  ["MODES PER EVENT"] = "PER EVT",
+  ["BASE FREQUENCY"] = "BASE",
+  ["FREQUENCY SPREAD OCT"] = "SPREAD",
+  ["DECAY MS"] = "DECAY",
+  ["DAMPING SPREAD"] = "DAMP",
+  ["DETUNE / INSTABILITY"] = "DETUNE",
+  ["SPATIAL WIDTH"] = "WIDTH",
+  ["EXCITATION TONE"] = "TONE",
+  ["SOFT LIMIT BEFORE NORMALIZE"] = "LIMIT",
+  ["PEAK NORMALIZE"] = "PEAK",
+  ["NORMALIZE DB"] = "NORM DB",
+  ["INSERTED TRACK GAIN"] = "INSERT",
+}
+
+local function row_label_text(label)
+  local upper = tostring(label or ""):upper()
+  return LABEL_ABBR[upper] or upper
+end
+
+local function row_layout()
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" then avail = 580 end
+  local control_x = x + LABEL_W
+  local control_w = math.max(120, avail - LABEL_W - CONTROL_GAP)
+  return x, y, control_x, control_w
+end
+
+local function row_label(x, y, label)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 4, THEME.label, row_label_text(label))
+end
+
+local function finish_row(x, y)
+  ImGui.SetCursorScreenPos(ctx, x, y + ROW_H)
+end
+
+local function draw_custom_slider(label, value, lo, hi, fmt, integer)
+  local x, y, control_x, control_w = row_layout()
+  local slider_w = math.max(80, control_w - VALUE_W - CONTROL_GAP)
+  local value_x = control_x + slider_w + CONTROL_GAP
+  local track_y = y + 8
+  local track_h = 8
+  local norm = hi ~= lo and clamp((value - lo) / (hi - lo), 0, 1) or 0
+  row_label(x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.InvisibleButton(ctx, "##" .. label, slider_w, ROW_H)
+  local hovered = ImGui.IsItemHovered(ctx)
+  local active = ImGui.IsItemActive(ctx)
+  local changed = false
+  if (hovered or active) and ImGui.IsMouseDown(ctx, 0) then
+    local mx = ImGui.GetMousePos(ctx)
+    local next_norm = clamp((mx - control_x) / slider_w, 0, 1)
+    local next_value = lo + (hi - lo) * next_norm
+    if integer then next_value = math.floor(next_value + 0.5) end
+    if math.abs(next_value - value) > (integer and 0 or 0.0000001) then
+      value = next_value
+      norm = next_norm
+      changed = true
+    end
+  end
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local frame = active and THEME.frame_active or (hovered and THEME.frame_hover or THEME.frame)
+  local fill = active and THEME.active or THEME.fill
+  local handle = active and THEME.active_hover or THEME.active
+  ImGui.DrawList_AddRectFilled(draw, control_x, track_y, control_x + slider_w, track_y + track_h, frame)
+  ImGui.DrawList_AddRectFilled(draw, control_x + 1, track_y + 1, control_x + math.max(2, slider_w * norm), track_y + track_h - 1, fill)
+  local hx = clamp(control_x + slider_w * norm - 1.5, control_x + 1, control_x + slider_w - 4)
+  ImGui.DrawList_AddRectFilled(draw, hx, track_y - 2, hx + 3, track_y + track_h + 2, handle)
+  ImGui.DrawList_AddText(draw, value_x, y + 4, THEME.value, integer and tostring(math.floor(value + 0.5)) or string.format(fmt or "%.3f", value))
+  finish_row(x, y)
+  return changed, value
+end
+
+local function draw_int_input(label, value)
+  local x, y, control_x, control_w = row_layout()
+  row_label(x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  local changed, next_value = ImGui.InputInt(ctx, "##" .. label, math.floor(value))
+  finish_row(x, y)
+  return changed, next_value
+end
+
+local function draw_checkbox(label, value)
+  local x, y, control_x = row_layout()
+  row_label(x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y + 2)
+  local changed, next_value = ImGui.Checkbox(ctx, "##" .. label, value)
+  finish_row(x, y)
+  return changed, next_value
+end
+
+local function section(label, height)
+  local stack = theme.push_soft_panel(ImGui, ctx)
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local w = ImGui.GetContentRegionAvail(ctx)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + height, THEME.panel_soft)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + 2, THEME.active)
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
+  theme.text(ImGui, ctx, label:upper())
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
+  return x, y, height, stack
+end
+
+local function finish_section(x, y, height, stack)
+  theme.pop_soft_panel(ImGui, ctx, stack)
+  ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
+end
+
 local function combo(label, index, names)
-  if ImGui.BeginCombo(ctx, label, names[index] or "") then
+  local x, y, control_x, control_w = row_layout()
+  row_label(x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  if ImGui.BeginCombo(ctx, "##" .. label, names[index] or "") then
     for i, name in ipairs(names) do
       local selected = i == index
       if ImGui.Selectable(ctx, name, selected) then index = i end
@@ -96,6 +223,7 @@ local function combo(label, index, names)
     end
     ImGui.EndCombo(ctx)
   end
+  finish_row(x, y)
   return index
 end
 
@@ -283,41 +411,48 @@ local function loop()
     local control_h = math.max(280, (avail_h or env_opts.compact_window_h) - 44)
     if ImGui.BeginChild(ctx, "##modal_terrain_controls", 0, control_h) then
       draw_preview()
+      local sx, sy, sh, stack = section("Preset", 98)
       settings.preset = combo("Preset", settings.preset, PRESET_LABELS)
-      if ImGui.Button(ctx, "Apply preset", 112, 24) then apply_preset(settings.preset) end
-      ImGui.Separator(ctx)
+      if ImGui.Button(ctx, "APPLY PRESET", 112, 24) then apply_preset(settings.preset) end
+      finish_section(sx, sy, sh, stack)
+      sx, sy, sh, stack = section("Output / Models", OUTPUT_KEYS[settings.output_mode] == "ring" and 226 or 200)
       settings.output_mode = combo("Output", settings.output_mode, OUTPUT_LABELS)
       if OUTPUT_KEYS[settings.output_mode] == "ring" then
         local changed
-        changed, settings.channels = ImGui.SliderInt(ctx, "Ring channels", math.floor(settings.channels), 2, 128)
+        changed, settings.channels = draw_custom_slider("Ring channels", math.floor(settings.channels), 2, 128, nil, true)
       else
-        ImGui.Text(ctx, "Output channels: 16 (3OA ACN/SN3D)")
+        theme.muted(ImGui, ctx, "Output channels: 16 (3OA ACN/SN3D)")
       end
       settings.frequency_model = combo("Frequency model", settings.frequency_model, FREQ_LABELS)
       settings.exciter = combo("Exciter", settings.exciter, EXCITER_LABELS)
       settings.spatial_mode = combo("Spatial mode", settings.spatial_mode, SPATIAL_LABELS)
+      finish_section(sx, sy, sh, stack)
       local changed
-      changed, settings.duration = ImGui.SliderDouble(ctx, "Duration sec", settings.duration, 0.5, 600.0, "%.2f")
-      changed, settings.mode_count = ImGui.SliderInt(ctx, "Mode count", math.floor(settings.mode_count), 8, 4096)
-      changed, settings.events = ImGui.SliderInt(ctx, "Excitation events", math.floor(settings.events), 1, 6000)
-      changed, settings.modes_per_event = ImGui.SliderInt(ctx, "Modes per event", math.floor(settings.modes_per_event), 1, 96)
-      changed, settings.base_freq = ImGui.SliderDouble(ctx, "Base frequency", settings.base_freq, 12.0, 440.0, "%.1f")
-      changed, settings.spread_oct = ImGui.SliderDouble(ctx, "Frequency spread oct", settings.spread_oct, 0.1, 9.0, "%.2f")
-      changed, settings.decay_ms = ImGui.SliderDouble(ctx, "Decay ms", settings.decay_ms, 8.0, 12000.0, "%.1f")
-      changed, settings.damping_spread = ImGui.SliderDouble(ctx, "Damping spread", settings.damping_spread, 0.0, 1.0, "%.2f")
-      changed, settings.brightness = ImGui.SliderDouble(ctx, "Brightness", settings.brightness, 0.0, 1.5, "%.2f")
-      changed, settings.detune = ImGui.SliderDouble(ctx, "Detune / instability", settings.detune, 0.0, 1.0, "%.2f")
-      changed, settings.density = ImGui.SliderDouble(ctx, "Density", settings.density, 0.0, 1.0, "%.2f")
-      changed, settings.motion = ImGui.SliderDouble(ctx, "Motion", settings.motion, 0.0, 1.0, "%.2f")
-      changed, settings.spatial_width = ImGui.SliderDouble(ctx, "Spatial width", settings.spatial_width, 0.02, 8.0, "%.2f")
-      changed, settings.excitation_tone = ImGui.SliderDouble(ctx, "Excitation tone", settings.excitation_tone, 0.0, 1.0, "%.2f")
-      changed, settings.soft_limit = ImGui.Checkbox(ctx, "Soft limit before normalize", settings.soft_limit)
-      changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
+      sx, sy, sh, stack = section("Synthesis", 356)
+      changed, settings.duration = draw_custom_slider("Duration sec", settings.duration, 0.5, 600.0, "%.2f", false)
+      changed, settings.mode_count = draw_custom_slider("Mode count", math.floor(settings.mode_count), 8, 4096, nil, true)
+      changed, settings.events = draw_custom_slider("Excitation events", math.floor(settings.events), 1, 6000, nil, true)
+      changed, settings.modes_per_event = draw_custom_slider("Modes per event", math.floor(settings.modes_per_event), 1, 96, nil, true)
+      changed, settings.base_freq = draw_custom_slider("Base frequency", settings.base_freq, 12.0, 440.0, "%.1f", false)
+      changed, settings.spread_oct = draw_custom_slider("Frequency spread oct", settings.spread_oct, 0.1, 9.0, "%.2f", false)
+      changed, settings.decay_ms = draw_custom_slider("Decay ms", settings.decay_ms, 8.0, 12000.0, "%.1f", false)
+      changed, settings.damping_spread = draw_custom_slider("Damping spread", settings.damping_spread, 0.0, 1.0, "%.2f", false)
+      changed, settings.brightness = draw_custom_slider("Brightness", settings.brightness, 0.0, 1.5, "%.2f", false)
+      changed, settings.detune = draw_custom_slider("Detune / instability", settings.detune, 0.0, 1.0, "%.2f", false)
+      changed, settings.density = draw_custom_slider("Density", settings.density, 0.0, 1.0, "%.2f", false)
+      changed, settings.motion = draw_custom_slider("Motion", settings.motion, 0.0, 1.0, "%.2f", false)
+      changed, settings.spatial_width = draw_custom_slider("Spatial width", settings.spatial_width, 0.02, 8.0, "%.2f", false)
+      finish_section(sx, sy, sh, stack)
+      sx, sy, sh, stack = section("Output", settings.normalize and 174 or 148)
+      changed, settings.excitation_tone = draw_custom_slider("Excitation tone", settings.excitation_tone, 0.0, 1.0, "%.2f", false)
+      changed, settings.soft_limit = draw_checkbox("Soft limit before normalize", settings.soft_limit)
+      changed, settings.normalize = draw_checkbox("Peak normalize", settings.normalize)
       if settings.normalize then
-        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -36.0, -3.0, "%.1f")
+        changed, settings.normalize_db = draw_custom_slider("Normalize dB", settings.normalize_db, -36.0, -3.0, "%.1f", false)
       end
-      changed, settings.insert_gain = ImGui.SliderDouble(ctx, "Inserted track gain", settings.insert_gain, 0.05, 1.0, "%.2f")
-      changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
+      changed, settings.insert_gain = draw_custom_slider("Inserted track gain", settings.insert_gain, 0.05, 1.0, "%.2f", false)
+      changed, settings.seed = draw_int_input("Seed", settings.seed)
+      finish_section(sx, sy, sh, stack)
       settings.channels = clamp(math.floor(settings.channels), 2, 128)
       settings.mode_count = clamp(math.floor(settings.mode_count), 8, 4096)
       settings.events = clamp(math.floor(settings.events), 1, 6000)
@@ -326,9 +461,9 @@ local function loop()
       selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "Render", 104, 28) then should_render = true end
+    if ImGui.Button(ctx, "RENDER", 104, 28) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 104, 28) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 104, 28) then open = false end
     ImGui.End(ctx)
   end
   persist()

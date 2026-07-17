@@ -32,6 +32,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 
 local SLICE_EQUAL = 1
@@ -96,6 +98,104 @@ local function clamp(value, lo, hi)
   if value < lo then return lo end
   if value > hi then return hi end
   return value
+end
+
+local ROW_H = 25
+local LABEL_W = 86
+local CONTROL_GAP = 8
+local VALUE_W = 76
+
+local LABEL_ABBR = {
+  ["TARGET DURATION SEC"] = "DUR",
+  ["OUTPUT CHANNELS"] = "OUT CH",
+  ["SLICE SOURCE"] = "SLICE",
+  ["EQUAL SLICES PER ITEM"] = "COUNT",
+  ["SOURCE CHANNELS"] = "SOURCE",
+  ["SOURCE CHANNEL"] = "SRC CH",
+  ["ARRANGEMENT SHAPE"] = "SHAPE",
+  ["CHANNEL PATH"] = "PATH",
+  ["SMEAR WIDTH"] = "SMEAR",
+  ["CHANNEL MOTION"] = "MOTION",
+  ["STUTTER REPEATS"] = "REPEAT",
+  ["STUTTER GAP SEC"] = "GAP",
+  ["REPEATER COPIES"] = "COPIES",
+  ["REPEATER SPACING SEC"] = "SPACE",
+  ["REPEAT DECAY"] = "DECAY",
+  ["FADE SECONDS"] = "FADE",
+  ["ZERO-CROSS SEARCH"] = "ZERO",
+  ["SEED (0=RANDOM)"] = "SEED",
+  ["DENSITY CONTRAST"] = "DENS",
+}
+
+local function row_label_text(label)
+  local upper = tostring(label or ""):upper()
+  return LABEL_ABBR[upper] or upper
+end
+
+local function row_layout(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" then avail = 460 end
+  local control_x = x + LABEL_W
+  local control_w = math.max(120, avail - LABEL_W - CONTROL_GAP)
+  return x, y, control_x, control_w
+end
+
+local function row_label(ctx, x, y, label)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 4, THEME.label, row_label_text(label))
+end
+
+local function finish_row(ctx, x, y)
+  ImGui.SetCursorScreenPos(ctx, x, y + ROW_H)
+end
+
+local function draw_custom_slider(ctx, label, value, lo, hi, fmt, integer)
+  local x, y, control_x, control_w = row_layout(ctx)
+  local slider_w = math.max(80, control_w - VALUE_W - CONTROL_GAP)
+  local value_x = control_x + slider_w + CONTROL_GAP
+  local track_y = y + 8
+  local track_h = 8
+  local norm = hi ~= lo and clamp((value - lo) / (hi - lo), 0, 1) or 0
+
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.InvisibleButton(ctx, "##" .. label, slider_w, ROW_H)
+  local hovered = ImGui.IsItemHovered(ctx)
+  local active = ImGui.IsItemActive(ctx)
+  local changed = false
+  if (hovered or active) and ImGui.IsMouseDown(ctx, 0) then
+    local mx = ImGui.GetMousePos(ctx)
+    local next_norm = clamp((mx - control_x) / slider_w, 0, 1)
+    local next_value = lo + (hi - lo) * next_norm
+    if integer then next_value = math.floor(next_value + 0.5) end
+    if math.abs(next_value - value) > (integer and 0 or 0.0000001) then
+      value = next_value
+      norm = next_norm
+      changed = true
+    end
+  end
+
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local frame = active and THEME.frame_active or (hovered and THEME.frame_hover or THEME.frame)
+  local fill = active and THEME.active or THEME.fill
+  local handle = active and THEME.active_hover or THEME.active
+  ImGui.DrawList_AddRectFilled(draw, control_x, track_y, control_x + slider_w, track_y + track_h, frame)
+  ImGui.DrawList_AddRectFilled(draw, control_x + 1, track_y + 1, control_x + math.max(2, slider_w * norm), track_y + track_h - 1, fill)
+  local hx = clamp(control_x + slider_w * norm - 1.5, control_x + 1, control_x + slider_w - 4)
+  ImGui.DrawList_AddRectFilled(draw, hx, track_y - 2, hx + 3, track_y + track_h + 2, handle)
+  ImGui.DrawList_AddText(draw, value_x, y + 4, THEME.value, integer and tostring(math.floor(value + 0.5)) or string.format(fmt or "%.3f", value))
+  finish_row(ctx, x, y)
+  return changed, value
+end
+
+local function draw_int_input(ctx, label, value)
+  local x, y, control_x, control_w = row_layout(ctx)
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  local changed, next_value = ImGui.InputInt(ctx, "##" .. label, math.floor(value))
+  finish_row(ctx, x, y)
+  return changed, next_value
 end
 
 local function channel_walk(index, output_channels, mode)
@@ -176,7 +276,11 @@ end
 
 local function draw_combo(ctx, label, value, names, first_index, last_index)
   local changed = false
-  if ImGui.BeginCombo(ctx, label, names[value] or "") then
+  local x, y, control_x, control_w = row_layout(ctx)
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  if ImGui.BeginCombo(ctx, "##" .. label, names[value] or "") then
     for index = first_index, last_index do
       local selected = value == index
       if ImGui.Selectable(ctx, names[index], selected) then
@@ -187,7 +291,26 @@ local function draw_combo(ctx, label, value, names, first_index, last_index)
     end
     ImGui.EndCombo(ctx)
   end
+  finish_row(ctx, x, y)
   return changed, value
+end
+
+local function section(ctx, label, height)
+  local stack = theme.push_soft_panel(ImGui, ctx)
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local w = ImGui.GetContentRegionAvail(ctx)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + height, THEME.panel_soft)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + 2, THEME.active)
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
+  theme.text(ImGui, ctx, label:upper())
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
+  return x, y, height, stack
+end
+
+local function finish_section(ctx, x, y, height, stack)
+  theme.pop_soft_panel(ImGui, ctx, stack)
+  ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
 end
 
 local function sort_density_points(points)
@@ -349,23 +472,23 @@ local function draw_density_editor(ctx, points, selected_index)
     end
   end
 
-  if ImGui.Button(ctx, "Flat") then reset_density_points(points, "flat") selected_index = nil end
+  if ImGui.Button(ctx, "FLAT") then reset_density_points(points, "flat") selected_index = nil end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Build") then reset_density_points(points, "build") selected_index = nil end
+  if ImGui.Button(ctx, "BUILD") then reset_density_points(points, "build") selected_index = nil end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Thin") then reset_density_points(points, "thin") selected_index = nil end
+  if ImGui.Button(ctx, "THIN") then reset_density_points(points, "thin") selected_index = nil end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Arch") then reset_density_points(points, "arch") selected_index = nil end
+  if ImGui.Button(ctx, "ARCH") then reset_density_points(points, "arch") selected_index = nil end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Gaps") then reset_density_points(points, "gaps") selected_index = nil end
+  if ImGui.Button(ctx, "GAPS") then reset_density_points(points, "gaps") selected_index = nil end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Add") and #points < 12 then
+  if ImGui.Button(ctx, "ADD") and #points < 12 then
     points[#points + 1] = { x = 0.5, y = 0.5 }
     selected_index = #points
     sort_density_points(points)
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Delete") and selected_index and selected_index > 1 and selected_index < #points then
+  if ImGui.Button(ctx, "DELETE") and selected_index and selected_index > 1 and selected_index < #points then
     table.remove(points, selected_index)
     selected_index = nil
     sort_density_points(points)
@@ -374,10 +497,10 @@ local function draw_density_editor(ctx, points, selected_index)
   if selected_index then
     local point = points[selected_index]
     if point then
-      ImGui.Text(ctx, string.format("Point %d: %.2f time / %.2f density", selected_index, point.x, point.y))
+      theme.muted(ImGui, ctx, string.format("Point %d: %.2f time / %.2f density", selected_index, point.x, point.y))
     end
   else
-    ImGui.Text(ctx, "Drag points; endpoints keep time fixed.")
+    theme.muted(ImGui, ctx, "Drag points; endpoints keep time fixed.")
   end
 
   return selected_index
@@ -860,79 +983,79 @@ local function main()
       local _, avail_h = ImGui.GetContentRegionAvail(ctx)
       local control_h = math.max(260, avail_h - footer_h)
       if ImGui.BeginChild(ctx, "##scatter_slices_controls", 0, control_h) then
-      ImGui.Text(ctx, "Sources: " .. tostring(#sources) .. " selected audio item(s)")
-      ImGui.Text(ctx, "Combined source length: " .. string.format("%.3f sec", total_length))
+      theme.muted(ImGui, ctx, "Sources: " .. tostring(#sources) .. " selected audio item(s)")
+      theme.muted(ImGui, ctx, "Combined source length: " .. string.format("%.3f sec", total_length))
       ImGui.Spacing(ctx)
 
       local changed
-      if ImGui.CollapsingHeader(ctx, "Render Setup", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-        changed, target_duration = ImGui.SliderDouble(ctx, "Target duration sec", target_duration, 0.1, math.max(0.1, total_length * 4), "%.3f")
-        changed, output_channels = ImGui.SliderInt(ctx, "Output channels", output_channels, 2, mc.MAX_REAPER_TRACK_CHANNELS)
-      end
-      if ImGui.CollapsingHeader(ctx, "Slice Source", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+      local sx, sy, sh, stack = section(ctx, "Render Setup", 98)
+        changed, target_duration = draw_custom_slider(ctx, "Target duration sec", target_duration, 0.1, math.max(0.1, total_length * 4), "%.3f", false)
+        changed, output_channels = draw_custom_slider(ctx, "Output channels", output_channels, 2, mc.MAX_REAPER_TRACK_CHANNELS, nil, true)
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Slice Source", source_mode == SOURCE_ONE_CHANNEL and 174 or 148)
         changed, slice_mode = draw_combo(ctx, "Slice source", slice_mode, SLICE_NAMES, SLICE_EQUAL, SLICE_MARKERS)
         if slice_mode == SLICE_EQUAL then
-          changed, equal_count = ImGui.SliderInt(ctx, "Equal slices per item", equal_count, 2, 256)
+          changed, equal_count = draw_custom_slider(ctx, "Equal slices per item", equal_count, 2, 256, nil, true)
         else
-          ImGui.Text(ctx, "Uses project markers and active-take markers inside each item.")
+          theme.muted(ImGui, ctx, "Uses project markers and active-take markers inside each item.")
         end
         changed, source_mode = draw_combo(ctx, "Source channels", source_mode, SOURCE_NAMES, SOURCE_ALL_CHANNELS, SOURCE_ONE_CHANNEL)
         if source_mode == SOURCE_ONE_CHANNEL then
-          changed, one_channel = ImGui.SliderInt(ctx, "Source channel", one_channel, 1, max_channels)
+          changed, one_channel = draw_custom_slider(ctx, "Source channel", one_channel, 1, max_channels, nil, true)
         end
-      end
-      if ImGui.CollapsingHeader(ctx, "Arrangement", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Arrangement", arrange_mode == ARRANGE_STUTTER and 330 or (arrange_mode == ARRANGE_REPEATER and 330 or 252))
         changed, arrange_mode = draw_combo(ctx, "Arrangement", arrange_mode, ARRANGE_NAMES, ARRANGE_SCATTER, ARRANGE_REPEATER)
         changed, shape_mode = draw_combo(ctx, "Arrangement shape", shape_mode, SHAPE_NAMES, SHAPE_FREE, SHAPE_REVERSE_PULL)
         if arrange_mode ~= ARRANGE_SCATTER or channel_motion > 0 then
           changed, path_mode = draw_combo(ctx, "Channel path", path_mode, PATH_NAMES, PATH_CLOCKWISE, PATH_RANDOM)
         end
-        changed, spread_width = ImGui.SliderInt(ctx, "Smear width", spread_width, 1, math.min(output_channels, 32))
-        changed, channel_motion = ImGui.SliderDouble(ctx, "Channel motion", channel_motion, 0, 1, "%.2f")
+        changed, spread_width = draw_custom_slider(ctx, "Smear width", spread_width, 1, math.min(output_channels, 32), nil, true)
+        changed, channel_motion = draw_custom_slider(ctx, "Channel motion", channel_motion, 0, 1, "%.2f", false)
         if arrange_mode == ARRANGE_STUTTER then
-          changed, stutter_repeats = ImGui.SliderInt(ctx, "Stutter repeats", stutter_repeats, 1, 32)
-          changed, stutter_gap = ImGui.SliderDouble(ctx, "Stutter gap sec", stutter_gap, 0, 1, "%.3f")
-          changed, decay = ImGui.SliderDouble(ctx, "Repeat decay", decay, 0, 1, "%.2f")
+          changed, stutter_repeats = draw_custom_slider(ctx, "Stutter repeats", stutter_repeats, 1, 32, nil, true)
+          changed, stutter_gap = draw_custom_slider(ctx, "Stutter gap sec", stutter_gap, 0, 1, "%.3f", false)
+          changed, decay = draw_custom_slider(ctx, "Repeat decay", decay, 0, 1, "%.2f", false)
         elseif arrange_mode == ARRANGE_REPEATER then
-          changed, repeater_repeats = ImGui.SliderInt(ctx, "Repeater copies", repeater_repeats, 1, 32)
-          changed, repeater_spacing = ImGui.SliderDouble(ctx, "Repeater spacing sec", repeater_spacing, 0, 2, "%.3f")
-          changed, decay = ImGui.SliderDouble(ctx, "Repeat decay", decay, 0, 1, "%.2f")
+          changed, repeater_repeats = draw_custom_slider(ctx, "Repeater copies", repeater_repeats, 1, 32, nil, true)
+          changed, repeater_spacing = draw_custom_slider(ctx, "Repeater spacing sec", repeater_spacing, 0, 2, "%.3f", false)
+          changed, decay = draw_custom_slider(ctx, "Repeat decay", decay, 0, 1, "%.2f", false)
         end
-        changed, scatter = ImGui.SliderDouble(ctx, "Scatter", scatter, 0, 1, "%.2f")
-        changed, fade = ImGui.SliderDouble(ctx, "Fade seconds", fade, 0, 0.1, "%.4f")
-        changed, zero_window = ImGui.SliderDouble(ctx, "Zero-cross search", zero_window, 0, 0.02, "%.4f")
-        changed, seed = ImGui.InputInt(ctx, "Seed (0=random)", seed)
-      end
-      if ImGui.CollapsingHeader(ctx, "Density Envelope", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        changed, scatter = draw_custom_slider(ctx, "Scatter", scatter, 0, 1, "%.2f", false)
+        changed, fade = draw_custom_slider(ctx, "Fade seconds", fade, 0, 0.1, "%.4f", false)
+        changed, zero_window = draw_custom_slider(ctx, "Zero-cross search", zero_window, 0, 0.02, "%.4f", false)
+        changed, seed = draw_int_input(ctx, "Seed (0=random)", seed)
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Density Envelope", 268)
         ImGui.Spacing(ctx)
         selected_density_point = draw_density_editor(ctx, density_points, selected_density_point)
-        changed, density_contrast = ImGui.SliderDouble(ctx, "Density contrast", density_contrast, 0, 4, "%.2f")
-      end
+        changed, density_contrast = draw_custom_slider(ctx, "Density contrast", density_contrast, 0, 4, "%.2f", false)
+      finish_section(ctx, sx, sy, sh, stack)
 
       ImGui.Spacing(ctx)
       ImGui.Separator(ctx)
       ImGui.Spacing(ctx)
       if target_duration < total_length then
-        ImGui.Text(ctx, "Short target: slices overlap with gain compensation.")
+        theme.muted(ImGui, ctx, "Short target: slices overlap with gain compensation.")
       elseif arrange_mode == ARRANGE_STUTTER then
-        ImGui.Text(ctx, "Stutter: each slice prints short repeats along the channel path.")
+        theme.muted(ImGui, ctx, "Stutter: each slice prints short repeats along the channel path.")
       elseif arrange_mode == ARRANGE_REPEATER then
-        ImGui.Text(ctx, "Repeater: each slice leaves delayed decaying copies along the channel path.")
+        theme.muted(ImGui, ctx, "Repeater: each slice leaves delayed decaying copies along the channel path.")
       elseif shape_mode ~= SHAPE_FREE then
-        ImGui.Text(ctx, "Shape: " .. (SHAPE_NAMES[shape_mode] or "") .. " guides timing and channel placement.")
+        theme.muted(ImGui, ctx, "Shape: " .. (SHAPE_NAMES[shape_mode] or "") .. " guides timing and channel placement.")
       elseif channel_motion > 0 then
-        ImGui.Text(ctx, "Motion: staggered shadows imply movement between output channels.")
+        theme.muted(ImGui, ctx, "Motion: staggered shadows imply movement between output channels.")
       elseif spread_width > 1 then
-        ImGui.Text(ctx, "Smear: each slice spreads to neighboring output channels.")
+        theme.muted(ImGui, ctx, "Smear: each slice spreads to neighboring output channels.")
       else
-        ImGui.Text(ctx, "Long target: slices receive scattered gaps across the duration.")
+        theme.muted(ImGui, ctx, "Long target: slices receive scattered gaps across the duration.")
       end
       ImGui.EndChild(ctx)
       end
 
-      if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
+      if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+      if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
       ImGui.Dummy(ctx, 1, 10)
       ImGui.End(ctx)
     end

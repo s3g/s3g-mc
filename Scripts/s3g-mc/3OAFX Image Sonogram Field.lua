@@ -19,6 +19,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ui_theme
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -27,7 +28,10 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme then
+    ui_theme = _s3g_theme
+    if _s3g_theme.install then _s3g_theme.install(ImGui) end
+  end
 end
 
 local EXT = "s3g_mc_image_aed_sonogram_v1"
@@ -123,16 +127,8 @@ local function persist()
 end
 
 local function combo(label, value, items)
-  local current = items[value] or items[1]
-  if ImGui.BeginCombo(ctx, label, current) then
-    for i, item in ipairs(items) do
-      local selected = value == i
-      if ImGui.Selectable(ctx, item, selected) then value = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return value
+  local _, next_value = ui_theme.combo_row(ImGui, ctx, label, items, value)
+  return next_value
 end
 
 local function choose_png(title, current)
@@ -480,106 +476,110 @@ local function loop()
         draw_image_preview("amp", "Amplitude image preview", settings.amp_image_path, 150)
       end
       ImGui.Spacing(ctx)
-      ImGui.Text(ctx, "Color image")
-      ImGui.PushItemWidth(ctx, -120)
       local changed
-      changed, settings.image_path = ImGui.InputText(ctx, "##image_path", settings.image_path)
-      ImGui.PopItemWidth(ctx)
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Choose##image", 96, 24) then settings.image_path = choose_png("Choose color PNG", settings.image_path) end
+      local sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Images", settings.amp_source == #AMP_SOURCES and 180 or 136)
+      changed, settings.image_path = ui_theme.input_text_row(ImGui, ctx, "Color image", settings.image_path)
+      if ImGui.Button(ctx, "CHOOSE##image", 96, 24) then settings.image_path = choose_png("Choose color PNG", settings.image_path) end
       settings.amp_source = combo("Amplitude source", settings.amp_source, AMP_SOURCES)
       if settings.amp_source == #AMP_SOURCES then
-        ImGui.PushItemWidth(ctx, -120)
-        changed, settings.amp_image_path = ImGui.InputText(ctx, "##amp_image_path", settings.amp_image_path)
-        ImGui.PopItemWidth(ctx)
-        ImGui.SameLine(ctx)
-        if ImGui.Button(ctx, "Choose##amp", 96, 24) then settings.amp_image_path = choose_png("Choose amplitude PNG", settings.amp_image_path) end
+        changed, settings.amp_image_path = ui_theme.input_text_row(ImGui, ctx, "Amplitude image", settings.amp_image_path)
+        if ImGui.Button(ctx, "CHOOSE##amp", 96, 24) then settings.amp_image_path = choose_png("Choose amplitude PNG", settings.amp_image_path) end
       end
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Render", 224)
       settings.synth_mode = combo("Synthesis", settings.synth_mode, SYNTH_MODES)
       if settings.synth_mode == 5 then
         local source_text = #SELECTED_SOURCES > 0 and ("Grain sources: " .. tostring(#SELECTED_SOURCES) .. " selected item(s)") or "Grain sources: select one or more WAV-backed media items before rendering"
-        ImGui.TextColored(ctx, #SELECTED_SOURCES > 0 and COLORS.text or COLORS.hot, source_text)
+        if #SELECTED_SOURCES > 0 then ui_theme.muted(ImGui, ctx, source_text) else ui_theme.status(ImGui, ctx, source_text, "warn") end
       end
       settings.output_mode = combo("Output", settings.output_mode, OUTPUT_MODES)
       if settings.output_mode == 1 then
-        changed, settings.order = ImGui.SliderInt(ctx, "Ambisonic order", math.floor(settings.order), 1, 3)
+        changed, settings.order = ui_theme.slider_int(ImGui, ctx, "Ambisonic order", math.floor(settings.order), 1, 3)
       else
-        changed, settings.channels = ImGui.SliderInt(ctx, "Output channels", math.floor(settings.channels), 2, 64)
+        changed, settings.channels = ui_theme.slider_int(ImGui, ctx, "Output channels", math.floor(settings.channels), 2, 64)
       end
       settings.color_model = combo("Color model", settings.color_model, COLOR_MODELS)
       settings.elevation_mode = combo("Elevation", settings.elevation_mode, ELEVATION_MODES)
       if settings.amp_source == 3 or settings.amp_source == 4 then
         settings.elevation_source = combo("Elevation source", settings.elevation_source, ELEVATION_SOURCES)
         if settings.elevation_source == 2 then
-          changed, settings.uniform_elevation = ImGui.SliderDouble(ctx, "Uniform elevation", settings.uniform_elevation, -90, 90, "%.0f deg")
+          changed, settings.uniform_elevation = ui_theme.slider_double(ImGui, ctx, "Uniform elevation", settings.uniform_elevation, -90, 90, "%.0f deg")
         elseif settings.elevation_source == 3 then
-          changed, settings.uniform_elevation = ImGui.SliderDouble(ctx, "Elevation center", settings.uniform_elevation, -90, 90, "%.0f deg")
-          changed, settings.elevation_spread = ImGui.SliderDouble(ctx, "Elevation spread", settings.elevation_spread, 0, 180, "%.0f deg")
+          changed, settings.uniform_elevation = ui_theme.slider_double(ImGui, ctx, "Elevation center", settings.uniform_elevation, -90, 90, "%.0f deg")
+          changed, settings.elevation_spread = ui_theme.slider_double(ImGui, ctx, "Elevation spread", settings.elevation_spread, 0, 180, "%.0f deg")
         end
       end
       settings.freq_mode = combo("Frequency scale", settings.freq_mode, FREQ_MODES)
       local read_label = settings.transpose_read and "Read: vertical time / horizontal frequency" or "Read: horizontal time / vertical frequency"
-      if ImGui.Button(ctx, read_label, -1, 26) then
+      if ImGui.Button(ctx, read_label:upper(), -1, 26) then
         settings.transpose_read = not settings.transpose_read
       end
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      changed, settings.duration = ImGui.SliderDouble(ctx, "Duration", settings.duration, 0.5, 180, "%.2f sec")
-      changed, settings.columns = ImGui.SliderInt(ctx, "Time columns", math.floor(settings.columns), 32, 512)
-      changed, settings.rows = ImGui.SliderInt(ctx, "Frequency rows", math.floor(settings.rows), 16, 256)
-      changed, settings.max_bins = ImGui.SliderInt(ctx, "Max active rows per column", math.floor(settings.max_bins), 1, 256)
-      changed, settings.min_freq = ImGui.SliderDouble(ctx, "Min frequency", settings.min_freq, 20, 1000, "%.1f Hz")
-      changed, settings.max_freq = ImGui.SliderDouble(ctx, "Max frequency", settings.max_freq, 500, 18000, "%.1f Hz")
-      changed, settings.threshold = ImGui.SliderDouble(ctx, "Amplitude threshold", settings.threshold, 0, 0.95, "%.3f")
-      changed, settings.amp_gamma = ImGui.SliderDouble(ctx, "Amplitude curve", settings.amp_gamma, 0.2, 3, "%.2f")
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Image Grid", 246)
+      changed, settings.duration = ui_theme.slider_double(ImGui, ctx, "Duration", settings.duration, 0.5, 180, "%.2f sec")
+      changed, settings.columns = ui_theme.slider_int(ImGui, ctx, "Time columns", math.floor(settings.columns), 32, 512)
+      changed, settings.rows = ui_theme.slider_int(ImGui, ctx, "Frequency rows", math.floor(settings.rows), 16, 256)
+      changed, settings.max_bins = ui_theme.slider_int(ImGui, ctx, "Max active rows per column", math.floor(settings.max_bins), 1, 256)
+      changed, settings.min_freq = ui_theme.slider_double(ImGui, ctx, "Min frequency", settings.min_freq, 20, 1000, "%.1f Hz")
+      changed, settings.max_freq = ui_theme.slider_double(ImGui, ctx, "Max frequency", settings.max_freq, 500, 18000, "%.1f Hz")
+      changed, settings.threshold = ui_theme.slider_double(ImGui, ctx, "Amplitude threshold", settings.threshold, 0, 0.95, "%.3f")
+      changed, settings.amp_gamma = ui_theme.slider_double(ImGui, ctx, "Amplitude curve", settings.amp_gamma, 0.2, 3, "%.2f")
+      changed, settings.overlap = ui_theme.slider_double(ImGui, ctx, "Column overlap", settings.overlap, 0, 2, "%.2f")
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Synthesis", settings.synth_mode == 5 and 290 or 180)
       if settings.synth_mode == 1 then
-        changed, settings.noise_blend = ImGui.SliderDouble(ctx, "Hybrid noise blend", settings.noise_blend, 0, 1, "%.2f")
+        changed, settings.noise_blend = ui_theme.slider_double(ImGui, ctx, "Hybrid noise blend", settings.noise_blend, 0, 1, "%.2f")
       end
       if settings.synth_mode == 2 then
-        changed, settings.additive_smoothing = ImGui.SliderDouble(ctx, "Additive smoothing", settings.additive_smoothing, 0, 1, "%.2f")
-        changed, settings.additive_sustain = ImGui.SliderDouble(ctx, "Additive sustain", settings.additive_sustain, 0, 1, "%.2f")
-        changed, settings.additive_attack = ImGui.SliderDouble(ctx, "Additive attack", settings.additive_attack, 0, 1, "%.2f")
+        changed, settings.additive_smoothing = ui_theme.slider_double(ImGui, ctx, "Additive smoothing", settings.additive_smoothing, 0, 1, "%.2f")
+        changed, settings.additive_sustain = ui_theme.slider_double(ImGui, ctx, "Additive sustain", settings.additive_sustain, 0, 1, "%.2f")
+        changed, settings.additive_attack = ui_theme.slider_double(ImGui, ctx, "Additive attack", settings.additive_attack, 0, 1, "%.2f")
       end
       if settings.synth_mode == 3 then
-        changed, settings.spectral_blur = ImGui.SliderDouble(ctx, "Spectral blur", settings.spectral_blur, 0, 1, "%.2f")
-        changed, settings.spectral_band_width = ImGui.SliderDouble(ctx, "Spectral band width", settings.spectral_band_width, 0, 1, "%.2f")
-        changed, settings.spectral_inertia = ImGui.SliderDouble(ctx, "Spectral inertia", settings.spectral_inertia, 0, 1, "%.2f")
-        changed, settings.additive_attack = ImGui.SliderDouble(ctx, "Partial attack", settings.additive_attack, 0, 1, "%.2f")
+        changed, settings.spectral_blur = ui_theme.slider_double(ImGui, ctx, "Spectral blur", settings.spectral_blur, 0, 1, "%.2f")
+        changed, settings.spectral_band_width = ui_theme.slider_double(ImGui, ctx, "Spectral band width", settings.spectral_band_width, 0, 1, "%.2f")
+        changed, settings.spectral_inertia = ui_theme.slider_double(ImGui, ctx, "Spectral inertia", settings.spectral_inertia, 0, 1, "%.2f")
+        changed, settings.additive_attack = ui_theme.slider_double(ImGui, ctx, "Partial attack", settings.additive_attack, 0, 1, "%.2f")
       end
       if settings.synth_mode == 5 then
-        changed, settings.grain_ms = ImGui.SliderDouble(ctx, "Grain duration", settings.grain_ms, 8, 240, "%.1f ms")
-        changed, settings.grain_density = ImGui.SliderDouble(ctx, "Grain density", settings.grain_density, 0.05, 1, "%.2f")
-        changed, settings.grain_pitch_spread = ImGui.SliderDouble(ctx, "Grain pitch spread", settings.grain_pitch_spread, 0, 1, "%.2f oct")
-        changed, settings.grain_rate_depth = ImGui.SliderDouble(ctx, "Image pitch depth", settings.grain_rate_depth, 0, 2, "%.2f")
+        changed, settings.grain_ms = ui_theme.slider_double(ImGui, ctx, "Grain duration", settings.grain_ms, 8, 240, "%.1f ms")
+        changed, settings.grain_density = ui_theme.slider_double(ImGui, ctx, "Grain density", settings.grain_density, 0.05, 1, "%.2f")
+        changed, settings.grain_pitch_spread = ui_theme.slider_double(ImGui, ctx, "Grain pitch spread", settings.grain_pitch_spread, 0, 1, "%.2f oct")
+        changed, settings.grain_rate_depth = ui_theme.slider_double(ImGui, ctx, "Image pitch depth", settings.grain_rate_depth, 0, 2, "%.2f")
         settings.grain_source_mode = combo("Source item", settings.grain_source_mode, GRAIN_SOURCE_MODES)
         settings.grain_scan_mode = combo("Source scan", settings.grain_scan_mode, GRAIN_SCAN_MODES)
         if settings.grain_scan_mode == 5 then
-          changed, settings.grain_source_position = ImGui.SliderDouble(ctx, "Source position", settings.grain_source_position, 0, 1, "%.2f")
+          changed, settings.grain_source_position = ui_theme.slider_double(ImGui, ctx, "Source position", settings.grain_source_position, 0, 1, "%.2f")
         end
-        changed, settings.grain_source_jitter = ImGui.SliderDouble(ctx, "Source jitter", settings.grain_source_jitter, 0, 1, "%.2f")
+        changed, settings.grain_source_jitter = ui_theme.slider_double(ImGui, ctx, "Source jitter", settings.grain_source_jitter, 0, 1, "%.2f")
         settings.grain_channel_mode = combo("Source channel", settings.grain_channel_mode, GRAIN_CHANNEL_MODES)
-        changed, settings.grain_reverse = ImGui.SliderDouble(ctx, "Reverse chance", settings.grain_reverse, 0, 1, "%.2f")
-        changed, settings.grain_taper = ImGui.SliderDouble(ctx, "Grain taper", settings.grain_taper, 0, 1, "%.2f")
+        changed, settings.grain_reverse = ui_theme.slider_double(ImGui, ctx, "Reverse chance", settings.grain_reverse, 0, 1, "%.2f")
+        changed, settings.grain_taper = ui_theme.slider_double(ImGui, ctx, "Grain taper", settings.grain_taper, 0, 1, "%.2f")
       end
-      changed, settings.overlap = ImGui.SliderDouble(ctx, "Column overlap", settings.overlap, 0, 2, "%.2f")
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      changed, settings.azimuth_offset = ImGui.SliderDouble(ctx, "Azimuth offset", settings.azimuth_offset, -180, 180, "%.0f deg")
-      changed, settings.min_distance = ImGui.SliderDouble(ctx, "Min distance", settings.min_distance, 0, 2, "%.2f")
-      changed, settings.max_distance = ImGui.SliderDouble(ctx, "Max distance", settings.max_distance, 0, 3, "%.2f")
-      changed, settings.invert_distance = ImGui.Checkbox(ctx, "Invert distance", settings.invert_distance)
-      changed, settings.spatial_width = ImGui.SliderDouble(ctx, "Ring spatial width", settings.spatial_width, 0.05, 2, "%.2f")
-      changed, settings.drive = ImGui.SliderDouble(ctx, "Soft drive", settings.drive, 0.1, 3, "%.2f")
-      changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Spatial / Output", settings.normalize and 246 or 221)
+      changed, settings.azimuth_offset = ui_theme.slider_double(ImGui, ctx, "Azimuth offset", settings.azimuth_offset, -180, 180, "%.0f deg")
+      changed, settings.min_distance = ui_theme.slider_double(ImGui, ctx, "Min distance", settings.min_distance, 0, 2, "%.2f")
+      changed, settings.max_distance = ui_theme.slider_double(ImGui, ctx, "Max distance", settings.max_distance, 0, 3, "%.2f")
+      changed, settings.invert_distance = ui_theme.checkbox_row(ImGui, ctx, "Invert distance", settings.invert_distance)
+      changed, settings.spatial_width = ui_theme.slider_double(ImGui, ctx, "Ring spatial width", settings.spatial_width, 0.05, 2, "%.2f")
+      changed, settings.drive = ui_theme.slider_double(ImGui, ctx, "Soft drive", settings.drive, 0.1, 3, "%.2f")
+      changed, settings.normalize = ui_theme.checkbox_row(ImGui, ctx, "Peak normalize", settings.normalize)
       if settings.normalize then
-        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -36, 0, "%.1f")
+        changed, settings.normalize_db = ui_theme.slider_double(ImGui, ctx, "Normalize dB", settings.normalize_db, -36, 0, "%.1f")
       end
-      changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
-      ImGui.TextColored(ctx, COLORS.muted, "PNG only in this first version. Alpha amplitude uses the image alpha channel; edge contrast uses local structure.")
+      changed, settings.seed = ui_theme.input_int_row(ImGui, ctx, "Seed", math.floor(settings.seed))
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+      ui_theme.muted(ImGui, ctx, "PNG only in this first version. Alpha amplitude uses the image alpha channel; edge contrast uses local structure.")
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "Render", 110, 30) then run = true end
+    if ImGui.Button(ctx, "RENDER", 110, 30) then run = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 100, 30) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 100, 30) then open = false end
     ImGui.End(ctx)
   end
   persist()

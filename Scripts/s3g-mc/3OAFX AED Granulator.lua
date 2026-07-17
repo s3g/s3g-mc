@@ -15,6 +15,7 @@ local be = dofile(script_dir .. "Breakpoint Envelope Library.lua")
 if not reaper.APIExists("ImGui_GetVersion") then reaper.MB("ReaImGui is not installed.", "3OAFX AED Granulator", 0) return end
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local theme
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -23,7 +24,10 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme then
+    theme = _s3g_theme
+    if _s3g_theme.install then _s3g_theme.install(ImGui) end
+  end
 end
 
 
@@ -49,15 +53,8 @@ local function getb(k, d) local v = reaper.GetExtState(EXT, k); if v == "" then 
 local function set(k, v) reaper.SetExtState(EXT, k, type(v) == "boolean" and (v and "1" or "0") or tostring(v), true) end
 local function rgba(r, g, b, a) return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1) end
 local function combo(ctx, label, idx, names)
-  if ImGui.BeginCombo(ctx, label, names[idx] or "") then
-    for i, name in ipairs(names) do
-      local selected = i == idx
-      if ImGui.Selectable(ctx, name, selected) then idx = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return idx
+  local _, next_idx = theme.combo_row(ImGui, ctx, label, names, idx)
+  return next_idx
 end
 
 local entries = nr.selected_entries()
@@ -208,48 +205,60 @@ local function loop()
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(440, (avail_h or 820) - 44)
     if ImGui.BeginChild(ctx, "##aed_granulator_controls", 0, control_h) then
-      ImGui.Text(ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
-      ImGui.Text(ctx, "Output: 3OA ACN/SN3D (16 ch)")
+      local changed
+      theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
+      theme.muted(ImGui, ctx, "Output: 3OA ACN/SN3D (16 ch)")
+
+      local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Source", 98)
       settings.trajectory = combo(ctx, "AED trajectory", settings.trajectory, TRAJECTORY_LABELS)
       settings.source_mode = combo(ctx, "Source channel mode", settings.source_mode, SOURCE_MODE_LABELS)
-      local changed
-      changed, settings.duration = ImGui.SliderDouble(ctx, "Output duration sec", settings.duration, 0.25, 300.0, "%.2f")
-      changed, settings.density = ImGui.SliderDouble(ctx, "Trigger density", settings.density, 0.5, 240.0, "%.1f")
-      changed, settings.chance = ImGui.SliderDouble(ctx, "Trigger chance", settings.chance, 0.0, 1.0, "%.2f")
-      changed, settings.voices = ImGui.SliderInt(ctx, "Voice rotation", math.floor(settings.voices), 1, 32)
-      changed, settings.grain_ms = ImGui.SliderDouble(ctx, "Grain duration ms", settings.grain_ms, 4.0, 1000.0, "%.1f")
-      changed, settings.min_ms = ImGui.SliderDouble(ctx, "Minimum grain ms", settings.min_ms, 1.0, 80.0, "%.1f")
-      changed, settings.grain_jitter = ImGui.SliderDouble(ctx, "Duration variation", settings.grain_jitter, 0.0, 1.0, "%.2f")
-      changed, settings.spray_ms = ImGui.SliderDouble(ctx, "Source spray ms", settings.spray_ms, 0.0, 2000.0, "%.1f")
-      changed, settings.source_position = ImGui.SliderDouble(ctx, "Source position", settings.source_position, 0.0, 1.0, "%.3f")
-      changed, settings.position_quantize = ImGui.SliderInt(ctx, "Position quantize", math.floor(settings.position_quantize), 0, 64)
-      ImGui.Separator(ctx)
-      changed, settings.transpose_semi = ImGui.SliderDouble(ctx, "Transpose semitones", settings.transpose_semi, -36.0, 36.0, "%.1f")
-      changed, settings.pitch_spread_semi = ImGui.SliderDouble(ctx, "Pitch spread semitones", settings.pitch_spread_semi, 0.0, 48.0, "%.1f")
-      changed, settings.reverse_probability = ImGui.SliderDouble(ctx, "Reverse chance", settings.reverse_probability, 0.0, 1.0, "%.2f")
-      changed, settings.window_shape = ImGui.SliderDouble(ctx, "Window morph", settings.window_shape, 0.0, 1.0, "%.2f")
-      changed, settings.drift = ImGui.SliderDouble(ctx, "Rate drift", settings.drift, 0.0, 0.05, "%.4f")
-      ImGui.Separator(ctx)
-      changed, settings.az_center = ImGui.SliderDouble(ctx, "Azimuth center", settings.az_center, -180.0, 180.0, "%.1f")
-      changed, settings.az_width = ImGui.SliderDouble(ctx, "Azimuth width", settings.az_width, 0.0, 360.0, "%.1f")
-      changed, settings.el_center = ImGui.SliderDouble(ctx, "Elevation center", settings.el_center, -89.0, 89.0, "%.1f")
-      changed, settings.el_width = ImGui.SliderDouble(ctx, "Elevation width", settings.el_width, 0.0, 178.0, "%.1f")
-      changed, settings.distance = ImGui.SliderDouble(ctx, "Distance", settings.distance, 0.1, 4.0, "%.2f")
-      changed, settings.distance_depth = ImGui.SliderDouble(ctx, "Distance motion", settings.distance_depth, 0.0, 1.0, "%.2f")
-      ImGui.Separator(ctx)
-      changed, settings.trim = ImGui.SliderDouble(ctx, "Trim", settings.trim, 0.0, 2.0, "%.2f")
-      changed, settings.drive = ImGui.SliderDouble(ctx, "Drive", settings.drive, 0.0, 1.0, "%.2f")
-      changed, settings.gain_db = ImGui.SliderDouble(ctx, "Pre-gain dB", settings.gain_db, -36.0, 0.0, "%.1f")
-      changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
-      if settings.normalize then changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f") end
-      changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
-      ImGui.Separator(ctx)
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Grains", 268)
+      changed, settings.duration = theme.slider_double(ImGui, ctx, "Output duration sec", settings.duration, 0.25, 300.0, "%.2f")
+      changed, settings.density = theme.slider_double(ImGui, ctx, "Trigger density", settings.density, 0.5, 240.0, "%.1f")
+      changed, settings.chance = theme.slider_double(ImGui, ctx, "Trigger chance", settings.chance, 0.0, 1.0, "%.2f")
+      changed, settings.voices = theme.slider_int(ImGui, ctx, "Voice rotation", math.floor(settings.voices), 1, 32)
+      changed, settings.grain_ms = theme.slider_double(ImGui, ctx, "Grain duration ms", settings.grain_ms, 4.0, 1000.0, "%.1f")
+      changed, settings.min_ms = theme.slider_double(ImGui, ctx, "Minimum grain ms", settings.min_ms, 1.0, 80.0, "%.1f")
+      changed, settings.grain_jitter = theme.slider_double(ImGui, ctx, "Duration variation", settings.grain_jitter, 0.0, 1.0, "%.2f")
+      changed, settings.spray_ms = theme.slider_double(ImGui, ctx, "Source spray ms", settings.spray_ms, 0.0, 2000.0, "%.1f")
+      changed, settings.source_position = theme.slider_double(ImGui, ctx, "Source position", settings.source_position, 0.0, 1.0, "%.3f")
+      changed, settings.position_quantize = theme.slider_int(ImGui, ctx, "Position quantize", math.floor(settings.position_quantize), 0, 64)
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Pitch / Window", 158)
+      changed, settings.transpose_semi = theme.slider_double(ImGui, ctx, "Transpose semitones", settings.transpose_semi, -36.0, 36.0, "%.1f")
+      changed, settings.pitch_spread_semi = theme.slider_double(ImGui, ctx, "Pitch spread semitones", settings.pitch_spread_semi, 0.0, 48.0, "%.1f")
+      changed, settings.reverse_probability = theme.slider_double(ImGui, ctx, "Reverse chance", settings.reverse_probability, 0.0, 1.0, "%.2f")
+      changed, settings.window_shape = theme.slider_double(ImGui, ctx, "Window morph", settings.window_shape, 0.0, 1.0, "%.2f")
+      changed, settings.drift = theme.slider_double(ImGui, ctx, "Rate drift", settings.drift, 0.0, 0.05, "%.4f")
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Space", 180)
+      changed, settings.az_center = theme.slider_double(ImGui, ctx, "Azimuth center", settings.az_center, -180.0, 180.0, "%.1f")
+      changed, settings.az_width = theme.slider_double(ImGui, ctx, "Azimuth width", settings.az_width, 0.0, 360.0, "%.1f")
+      changed, settings.el_center = theme.slider_double(ImGui, ctx, "Elevation center", settings.el_center, -89.0, 89.0, "%.1f")
+      changed, settings.el_width = theme.slider_double(ImGui, ctx, "Elevation width", settings.el_width, 0.0, 178.0, "%.1f")
+      changed, settings.distance = theme.slider_double(ImGui, ctx, "Distance", settings.distance, 0.1, 4.0, "%.2f")
+      changed, settings.distance_depth = theme.slider_double(ImGui, ctx, "Distance motion", settings.distance_depth, 0.0, 1.0, "%.2f")
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Output", settings.normalize and 180 or 155)
+      changed, settings.trim = theme.slider_double(ImGui, ctx, "Trim", settings.trim, 0.0, 2.0, "%.2f")
+      changed, settings.drive = theme.slider_double(ImGui, ctx, "Drive", settings.drive, 0.0, 1.0, "%.2f")
+      changed, settings.gain_db = theme.slider_double(ImGui, ctx, "Pre-gain dB", settings.gain_db, -36.0, 0.0, "%.1f")
+      changed, settings.normalize = theme.checkbox_row(ImGui, ctx, "Peak normalize", settings.normalize)
+      if settings.normalize then changed, settings.normalize_db = theme.slider_double(ImGui, ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f") end
+      changed, settings.seed = theme.input_int_row(ImGui, ctx, "Seed", math.floor(settings.seed))
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
       selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
+    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
     ImGui.End(ctx)
   end
   persist()

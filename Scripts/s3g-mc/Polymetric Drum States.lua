@@ -178,7 +178,7 @@ end
 
 local function slider_beats(label, value, min_value, max_value, format)
   local changed
-  changed, value = ImGui.SliderDouble(ctx, label, value, min_value, max_value, format or "%.3f")
+  changed, value = ui_theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format or "%.3f")
   if changed then value = snap_beats(value, min_value, max_value) end
   return changed, value
 end
@@ -198,7 +198,7 @@ local function lane_bg_color(index)
 end
 
 local function muted_text(value)
-  if ui_theme and ui_theme.muted then ui_theme.muted(ImGui, ctx, value) else ImGui.Text(ctx, value) end
+  ui_theme.muted(ImGui, ctx, value)
 end
 
 local SLIDER_ABBR = {
@@ -256,8 +256,8 @@ local function custom_slider_row(label, value, min_value, max_value, format, int
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local avail = ImGui.GetContentRegionAvail(ctx)
   if type(avail) ~= "number" or avail < 280 then
-    if integer then return ImGui.SliderInt(ctx, label, math.floor(value + 0.5), min_value, max_value) end
-    return ImGui.SliderDouble(ctx, label, value, min_value, max_value, format or "%.3f")
+    if integer then return ui_theme.slider_int(ImGui, ctx, label, math.floor(value + 0.5), min_value, max_value) end
+    return ui_theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format or "%.3f")
   end
 
   local h = 22
@@ -1173,7 +1173,7 @@ local function draw_state_editor()
       changed, st.pulses = custom_mini_slider("Pulses", st.pulses, 0, st.steps, nil, true, 108)
       ImGui.SameLine(ctx)
       changed, st.rotate = custom_mini_slider("Rotate", st.rotate, -st.steps, st.steps, nil, true, 108)
-      ImGui.Text(ctx, interval_vector(pattern_from_state(st)))
+      ui_theme.muted(ImGui, ctx, interval_vector(pattern_from_state(st)))
       local px, py = ImGui.GetCursorScreenPos(ctx)
       ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), px, py + 3, rgba(0.62, 0.62, 0.62, 1.0), slider_label("Pattern"))
       ImGui.SetCursorScreenPos(ctx, px + 42, py)

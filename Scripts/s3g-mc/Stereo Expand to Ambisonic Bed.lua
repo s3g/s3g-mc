@@ -59,15 +59,7 @@ local function order_channels(order_index)
 end
 
 local function combo(label, idx, labels)
-  if ImGui.BeginCombo(ctx, label, labels[idx] or "") then
-    for i, name in ipairs(labels) do
-      local selected = i == idx
-      if ImGui.Selectable(ctx, name, selected) then idx = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return idx
+  return select(2, theme.combo_row(ImGui, ctx, label, labels, idx))
 end
 
 local function color(r, g, b, a)
@@ -214,30 +206,33 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    ImGui.Text(ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
+    theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
     draw_preview()
+    local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Bed", 123)
     settings.mode = combo("Expansion mode", settings.mode, MODE_LABELS)
     settings.output_order = combo("Output order", settings.output_order, ORDER_LABELS)
-    ImGui.Separator(ctx)
     local changed
-    changed, settings.stereo_width = ImGui.SliderDouble(ctx, "Stereo width", settings.stereo_width, 0.0, 2.0, "%.2f")
-    changed, settings.center_amount = ImGui.SliderDouble(ctx, "Center amount", settings.center_amount, 0.0, 1.5, "%.2f")
-    changed, settings.front_weight = ImGui.SliderDouble(ctx, "Front weight", settings.front_weight, 0.0, 1.5, "%.2f")
-    changed, settings.side_amount = ImGui.SliderDouble(ctx, "Side amount", settings.side_amount, 0.0, 1.5, "%.2f")
-    changed, settings.rear_amount = ImGui.SliderDouble(ctx, "Rear amount", settings.rear_amount, 0.0, 1.5, "%.2f")
-    changed, settings.height_amount = ImGui.SliderDouble(ctx, "Height amount", settings.height_amount, 0.0, 1.0, "%.2f")
-    changed, settings.source_spread = ImGui.SliderDouble(ctx, "Source spread", settings.source_spread, 0.0, 1.0, "%.2f")
-    changed, settings.decorrelation = ImGui.SliderDouble(ctx, "Decorrelation", settings.decorrelation, 0.0, 1.0, "%.2f")
-    changed, settings.bass_mono_hz = ImGui.SliderDouble(ctx, "Bass mono below Hz", settings.bass_mono_hz, 0.0, 300.0, "%.0f")
-    changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
+    changed, settings.stereo_width = theme.slider_double(ImGui, ctx, "Stereo width", settings.stereo_width, 0.0, 2.0, "%.2f")
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Field Mix", settings.normalize and 298 or 273)
+    changed, settings.center_amount = theme.slider_double(ImGui, ctx, "Center amount", settings.center_amount, 0.0, 1.5, "%.2f")
+    changed, settings.front_weight = theme.slider_double(ImGui, ctx, "Front weight", settings.front_weight, 0.0, 1.5, "%.2f")
+    changed, settings.side_amount = theme.slider_double(ImGui, ctx, "Side amount", settings.side_amount, 0.0, 1.5, "%.2f")
+    changed, settings.rear_amount = theme.slider_double(ImGui, ctx, "Rear amount", settings.rear_amount, 0.0, 1.5, "%.2f")
+    changed, settings.height_amount = theme.slider_double(ImGui, ctx, "Height amount", settings.height_amount, 0.0, 1.0, "%.2f")
+    changed, settings.source_spread = theme.slider_double(ImGui, ctx, "Source spread", settings.source_spread, 0.0, 1.0, "%.2f")
+    changed, settings.decorrelation = theme.slider_double(ImGui, ctx, "Decorrelation", settings.decorrelation, 0.0, 1.0, "%.2f")
+    changed, settings.bass_mono_hz = theme.slider_double(ImGui, ctx, "Bass mono below Hz", settings.bass_mono_hz, 0.0, 300.0, "%.0f")
+    changed, settings.normalize = theme.checkbox_row(ImGui, ctx, "Peak normalize", settings.normalize)
     if settings.normalize then
-      changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+      changed, settings.normalize_db = theme.slider_double(ImGui, ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
     end
-    ImGui.Separator(ctx)
-    ImGui.TextWrapped(ctx, "Mono sources are treated as a center object. Stereo sources derive spatial cues from left/right plus mid/side material, then render a new ACN/SN3D ambisonic WAV.")
-    if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    theme.muted(ImGui, ctx, "Mono sources are center objects; stereo sources derive bed cues from L/R and M/S material.")
+    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
     ImGui.End(ctx)
   end
   persist()

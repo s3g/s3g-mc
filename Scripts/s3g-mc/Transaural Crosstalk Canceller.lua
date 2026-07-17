@@ -249,8 +249,7 @@ end
 
 local function slider_param(track, fx, label, param, min_value, max_value, fmt)
   local value = get_param(track, fx, param, min_value)
-  ImGui.SetNextItemWidth(ctx, 330)
-  local changed, new_value = ImGui.SliderDouble(ctx, label, value, min_value, max_value, fmt)
+  local changed, new_value = theme.slider_double(ImGui, ctx, label, value, min_value, max_value, fmt, 360)
   if changed then set_param(track, fx, param, new_value) end
   return new_value or value
 end
@@ -258,14 +257,9 @@ end
 local function option_buttons(track, fx, title, param, labels, columns)
   local norm = fx >= 0 and reaper.TrackFX_GetParamNormalized(track, fx, param) or 0
   local current = math.floor(norm * (#labels - 1) + 0.5) + 1
-  columns = columns or #labels
-  theme.muted(ImGui, ctx, title)
-  for index, label in ipairs(labels) do
-    if index > 1 and ((index - 1) % columns) ~= 0 then ImGui.SameLine(ctx) end
-    local shown = current == index and ("> " .. label) or label
-    if ImGui.Button(ctx, shown .. "##" .. title .. tostring(index)) then
-      reaper.TrackFX_SetParamNormalized(track, fx, param, (index - 1) / math.max(1, #labels - 1))
-    end
+  local changed, next_value = theme.combo_row(ImGui, ctx, title, labels, current, 210)
+  if changed then
+    reaper.TrackFX_SetParamNormalized(track, fx, param, ((next_value or current) - 1) / math.max(1, #labels - 1))
   end
 end
 
@@ -398,35 +392,37 @@ local function loop()
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     local fx = find_fx(track)
     if not track then
-      ImGui.Text(ctx, "Select the target stereo track.")
+      theme.muted(ImGui, ctx, "SELECT THE TARGET STEREO TRACK.")
     else
       local _, name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
-      ImGui.Text(ctx, "Selected track: " .. (name ~= "" and name or "(unnamed)"))
+      theme.muted(ImGui, ctx, "TARGET: " .. (name ~= "" and name or "(UNNAMED)"))
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Repair JSFX") then fx = maybe_load(track, true) end
+      if ImGui.Button(ctx, "REPAIR JSFX") then fx = maybe_load(track, true) end
       if fx < 0 then fx = maybe_load(track, false) end
       if fx < 0 then
-        ImGui.Text(ctx, load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " is not on the selected track."))
+        theme.muted(ImGui, ctx, load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " IS NOT ON THE SELECTED TRACK."))
       else
         resolve_param_indices(track, fx)
         if param_warning ~= "" then theme.status(ImGui, ctx, param_warning, "amber") end
         if not param_ready then
-          ImGui.Text(ctx, "Click Repair JSFX to replace the stale effect instance with the current version.")
+          theme.muted(ImGui, ctx, "CLICK REPAIR JSFX TO REPLACE THE STALE EFFECT INSTANCE.")
         else
           reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", math.max(2, reaper.GetMediaTrackInfo_Value(track, "I_NCHAN")))
           draw_visual(track, fx)
           draw_presets(track, fx)
-          if ImGui.CollapsingHeader(ctx, "Cancellation", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+          local tool_panel = theme.push_soft_panel(ImGui, ctx)
+          if ImGui.BeginChild(ctx, "##transaural_tool_area", 0, 0, 0) then
+          if theme.toolbox_header(ImGui, ctx, "CANCELLATION", ImGui.TreeNodeFlags_DefaultOpen) then
             option_buttons(track, fx, "Cancellation mode", PARAM.mode, MODES, 2)
             slider_param(track, fx, "Cancellation amount", PARAM.amount, 0, 140, "%.0f %%")
             slider_param(track, fx, "Stereo preserve", PARAM.center, 0, 100, "%.0f %%")
           end
-          if ImGui.CollapsingHeader(ctx, "Geometry", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+          if theme.toolbox_header(ImGui, ctx, "GEOMETRY", ImGui.TreeNodeFlags_DefaultOpen) then
             slider_param(track, fx, "Speaker half-angle", PARAM.angle, 10, 60, "%.1f deg")
             slider_param(track, fx, "Head width", PARAM.head, 12, 24, "%.1f cm")
             slider_param(track, fx, "Delay trim", PARAM.trim, -0.5, 0.5, "%.3f ms")
           end
-          if ImGui.CollapsingHeader(ctx, "Tone / Safety", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+          if theme.toolbox_header(ImGui, ctx, "TONE / SAFETY", ImGui.TreeNodeFlags_DefaultOpen) then
             slider_param(track, fx, "Cancel HF rolloff", PARAM.hf, 1000, 16000, "%.0f Hz")
             slider_param(track, fx, "Low protect", PARAM.low, 20, 500, "%.0f Hz")
             option_buttons(track, fx, "Safety limiter", PARAM.limiter, LIMITER, 2)
@@ -434,6 +430,9 @@ local function loop()
             slider_param(track, fx, "Output gain", PARAM.output, -24, 12, "%.1f dB")
           end
           theme.muted(ImGui, ctx, "Transaural processing is speaker/listener-position dependent; small geometry changes matter.")
+          end
+          ImGui.EndChild(ctx)
+          theme.pop_soft_panel(ImGui, ctx, tool_panel)
         end
       end
     end

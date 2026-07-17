@@ -28,6 +28,7 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
 
 
 local TITLE = "3OAFX Spatial Occupation Montage"
@@ -49,15 +50,7 @@ local function set_value(key, value)
   reaper.SetExtState(EXT, key, type(value) == "boolean" and (value and "1" or "0") or tostring(value), true)
 end
 local function combo(label, idx, labels)
-  if ImGui.BeginCombo(ctx, label, labels[idx] or "") then
-    for i, name in ipairs(labels) do
-      local selected = i == idx
-      if ImGui.Selectable(ctx, name, selected) then idx = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return idx
+  return select(2, theme.combo_row(ImGui, ctx, label, labels, idx))
 end
 local function order_index_for_channels(channels)
   if channels == 16 then return 3 end
@@ -255,38 +248,42 @@ local function loop()
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(260, avail_h - footer_h)
     if ImGui.BeginChild(ctx, "##spatial_occupation_controls", 0, control_h) then
-    ImGui.Text(ctx, "Selected sources: " .. tostring(#entries))
+    theme.muted(ImGui, ctx, "Selected sources: " .. tostring(#entries))
     for index, entry in ipairs(entries) do
-      if index <= 5 then ImGui.Text(ctx, "  " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)") end
+      if index <= 5 then theme.muted(ImGui, ctx, "  " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)") end
     end
-    if #entries > 5 then ImGui.Text(ctx, "  ...") end
+    if #entries > 5 then theme.muted(ImGui, ctx, "  ...") end
     draw_preview()
+    local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Routing", 98)
     settings.source_format = combo("Source format", settings.source_format, SOURCE_LABELS)
     settings.output_order = combo("Output order", settings.output_order, ORDER_LABELS)
-    ImGui.Separator(ctx)
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
     local changed
-    changed, settings.duration = ImGui.SliderDouble(ctx, "Output duration sec", settings.duration, 0.25, 600.0, "%.2f")
-    changed, settings.events = ImGui.SliderInt(ctx, "Events", math.floor(settings.events), 1, 20000)
-    changed, settings.min_segment_ms = ImGui.SliderDouble(ctx, "Min segment ms", settings.min_segment_ms, 5.0, 5000.0, "%.1f")
-    changed, settings.max_segment_ms = ImGui.SliderDouble(ctx, "Max segment ms", settings.max_segment_ms, settings.min_segment_ms, 30000.0, "%.1f")
-    changed, settings.density = ImGui.SliderDouble(ctx, "Event density", settings.density, 0.0, 1.0, "%.2f")
-    changed, settings.overlap = ImGui.SliderDouble(ctx, "Overlap build", settings.overlap, 0.0, 1.0, "%.2f")
-    changed, settings.source_spread = ImGui.SliderDouble(ctx, "Source object spread", settings.source_spread, 0.0, 1.0, "%.2f")
-    changed, settings.occupation = ImGui.SliderDouble(ctx, "Spatial occupation", settings.occupation, 0.0, 1.0, "%.2f")
-    changed, settings.motion = ImGui.SliderDouble(ctx, "Spatial motion", settings.motion, 0.0, 1.0, "%.2f")
-    changed, settings.stereo_expand = ImGui.Checkbox(ctx, "Stereo sum/difference expansion", settings.stereo_expand)
-    changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Montage", 273)
+    changed, settings.duration = theme.slider_double(ImGui, ctx, "Output duration sec", settings.duration, 0.25, 600.0, "%.2f")
+    changed, settings.events = theme.slider_int(ImGui, ctx, "Events", math.floor(settings.events), 1, 20000)
+    changed, settings.min_segment_ms = theme.slider_double(ImGui, ctx, "Min segment ms", settings.min_segment_ms, 5.0, 5000.0, "%.1f")
+    changed, settings.max_segment_ms = theme.slider_double(ImGui, ctx, "Max segment ms", settings.max_segment_ms, settings.min_segment_ms, 30000.0, "%.1f")
+    changed, settings.density = theme.slider_double(ImGui, ctx, "Event density", settings.density, 0.0, 1.0, "%.2f")
+    changed, settings.overlap = theme.slider_double(ImGui, ctx, "Overlap build", settings.overlap, 0.0, 1.0, "%.2f")
+    changed, settings.source_spread = theme.slider_double(ImGui, ctx, "Source object spread", settings.source_spread, 0.0, 1.0, "%.2f")
+    changed, settings.occupation = theme.slider_double(ImGui, ctx, "Spatial occupation", settings.occupation, 0.0, 1.0, "%.2f")
+    changed, settings.motion = theme.slider_double(ImGui, ctx, "Spatial motion", settings.motion, 0.0, 1.0, "%.2f")
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Output", settings.normalize and 148 or 123)
+    changed, settings.stereo_expand = theme.checkbox_row(ImGui, ctx, "Stereo sum/difference expansion", settings.stereo_expand)
+    changed, settings.normalize = theme.checkbox_row(ImGui, ctx, "Peak normalize", settings.normalize)
     if settings.normalize then
-      changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+      changed, settings.normalize_db = theme.slider_double(ImGui, ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
     end
-    changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
-    ImGui.Separator(ctx)
-    ImGui.TextWrapped(ctx, "Stereo expansion uses L/R plus mid/side-derived cues to seed front, rear, and side occupation before ACN/SN3D encoding.")
+    changed, settings.seed = theme.input_int_row(ImGui, ctx, "Seed", math.floor(settings.seed))
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    theme.muted(ImGui, ctx, "Stereo expansion seeds front, rear, and side occupation before ACN/SN3D encoding.")
     ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
+    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
     ImGui.Dummy(ctx, 1, 10)
     ImGui.End(ctx)
   end

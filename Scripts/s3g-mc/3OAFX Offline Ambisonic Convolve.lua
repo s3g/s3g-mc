@@ -25,6 +25,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ui_theme
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -33,7 +34,10 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme then
+    ui_theme = _s3g_theme
+    if _s3g_theme.install then _s3g_theme.install(ImGui) end
+  end
 end
 
 local WINDOW_OPEN_COND = ImGui.Cond_Appearing
@@ -81,15 +85,8 @@ local function set_value(key, value)
 end
 
 local function draw_combo(ctx, label, index, names)
-  if ImGui.BeginCombo(ctx, label, names[index] or "") then
-    for i, name in ipairs(names) do
-      local selected = i == index
-      if ImGui.Selectable(ctx, name, selected) then index = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return index
+  local _, next_index = ui_theme.combo_row(ImGui, ctx, label, names, index)
+  return next_index
 end
 
 local function order_index_for_channels(channels)
@@ -551,81 +548,93 @@ local function main()
       local _, avail_h = ImGui.GetContentRegionAvail(ctx)
       local control_h = math.max(280, avail_h - footer_h)
       if ImGui.BeginChild(ctx, "##ambisonic_convolve_controls", 0, control_h) then
-      ImGui.Text(ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
-      ImGui.Text(ctx, "IR items: " .. tostring(#irs))
-      ImGui.Text(ctx, "Output: " .. ORDER_NAMES[settings.order_index])
+      ui_theme.muted(ImGui, ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
+      ui_theme.muted(ImGui, ctx, "IR items: " .. tostring(#irs))
+      ui_theme.muted(ImGui, ctx, "Output: " .. ORDER_NAMES[settings.order_index])
       ImGui.Spacing(ctx)
       draw_flow_graphic(ctx, settings, #irs, stacked_bank, adapted_stacked, directions)
       ImGui.Spacing(ctx)
       draw_direction_map(ctx, settings, irs, stacked_bank, adapted_stacked, sparse_foa_bank)
       ImGui.Spacing(ctx)
+
+      local sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Routing", 123)
       settings.order_index = draw_combo(ctx, "Ambisonic order", settings.order_index, ORDER_NAMES)
       settings.method_index = draw_combo(ctx, "Convolution method", settings.method_index, METHOD_NAMES)
+      settings.tail_index = draw_combo(ctx, "Output length", settings.tail_index, TAIL_NAMES)
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
       if settings.method_index == 2 then
         if settings.order_index == 1 then
-          ImGui.Text(ctx, "First-order bank uses the four-direction P-format / tetrahedral method.")
+          ui_theme.muted(ImGui, ctx, "First-order bank uses the four-direction P-format / tetrahedral method.")
         elseif sparse_foa_bank then
-          ImGui.Text(ctx, "Sparse bank uses four P-format / tetrahedral directions.")
+          ui_theme.muted(ImGui, ctx, "Sparse bank uses four P-format / tetrahedral directions.")
         else
-          ImGui.Text(ctx, "Higher-order bank uses eight matched directions: 2OA stacked = 72ch, 3OA stacked = 128ch.")
+          ui_theme.muted(ImGui, ctx, "Higher-order bank uses eight matched directions: 2OA stacked = 72ch, 3OA stacked = 128ch.")
         end
       else
-        ImGui.Text(ctx, "Direct mode convolves one ambisonic source with one same-order ambisonic IR.")
+        ui_theme.muted(ImGui, ctx, "Direct mode convolves one ambisonic source with one same-order ambisonic IR.")
       end
-      settings.tail_index = draw_combo(ctx, "Output length", settings.tail_index, TAIL_NAMES)
-      ImGui.Spacing(ctx)
       local changed
-      changed, settings.dry_level = ImGui.SliderDouble(ctx, "Dry level", settings.dry_level, 0.0, 1.5, "%.2f")
-      changed, settings.wet_level = ImGui.SliderDouble(ctx, "Wet level", settings.wet_level, 0.0, 2.0, "%.2f")
-      changed, settings.wet_gain_db = ImGui.SliderDouble(ctx, "Wet pre-gain dB", settings.wet_gain_db, -36.0, 12.0, "%.1f")
-      changed, settings.ir_normalize = ImGui.Checkbox(ctx, "Normalize each IR before convolution", settings.ir_normalize)
+
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Mix", 136)
+      changed, settings.dry_level = ui_theme.slider_double(ImGui, ctx, "Dry level", settings.dry_level, 0.0, 1.5, "%.2f")
+      changed, settings.wet_level = ui_theme.slider_double(ImGui, ctx, "Wet level", settings.wet_level, 0.0, 2.0, "%.2f")
+      changed, settings.wet_gain_db = ui_theme.slider_double(ImGui, ctx, "Wet pre-gain dB", settings.wet_gain_db, -36.0, 12.0, "%.1f")
+      changed, settings.ir_normalize = ui_theme.checkbox_row(ImGui, ctx, "Normalize each IR before convolution", settings.ir_normalize)
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
       if settings.method_index == 2 and settings.order_index > 1 then
-        changed, settings.adapt_lower_order_ir = ImGui.Checkbox(ctx, "Adapt lower-order IRs to output order", settings.adapt_lower_order_ir)
+        sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Bank Adapt", settings.adapt_lower_order_ir and 123 or 73)
+        changed, settings.adapt_lower_order_ir = ui_theme.checkbox_row(ImGui, ctx, "Adapt lower-order IRs to output order", settings.adapt_lower_order_ir)
         if settings.adapt_lower_order_ir then
-          ImGui.Text(ctx, "Uses lower-order direction/energy to infer a higher-order encoded IR.")
-          changed, settings.allow_sparse_foa_bank = ImGui.Checkbox(ctx, "Allow sparse 4-direction FOA bank", settings.allow_sparse_foa_bank)
+          ui_theme.muted(ImGui, ctx, "Uses lower-order direction/energy to infer a higher-order encoded IR.")
+          changed, settings.allow_sparse_foa_bank = ui_theme.checkbox_row(ImGui, ctx, "Allow sparse 4-direction FOA bank", settings.allow_sparse_foa_bank)
           if settings.allow_sparse_foa_bank then
-            ImGui.Text(ctx, "Uses the four P-format / tetrahedral directions; other directions are absent.")
+            ui_theme.muted(ImGui, ctx, "Uses the four P-format / tetrahedral directions; other directions are absent.")
           end
         end
+        ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
       end
-      changed, settings.dc_protect = ImGui.Checkbox(ctx, "DC protect", settings.dc_protect)
-      changed, settings.soft_limit = ImGui.Checkbox(ctx, "Soft limit before normalize", settings.soft_limit)
-      changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize output", settings.normalize)
+
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Output", settings.normalize and 148 or 123)
+      changed, settings.dc_protect = ui_theme.checkbox_row(ImGui, ctx, "DC protect", settings.dc_protect)
+      changed, settings.soft_limit = ui_theme.checkbox_row(ImGui, ctx, "Soft limit before normalize", settings.soft_limit)
+      changed, settings.normalize = ui_theme.checkbox_row(ImGui, ctx, "Peak normalize output", settings.normalize)
       if settings.normalize then
-        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+        changed, settings.normalize_db = ui_theme.slider_double(ImGui, ctx, "Normalize peak dB", settings.normalize_db, -24.0, 0.0, "%.1f")
       end
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
       ImGui.Spacing(ctx)
-      ImGui.Separator(ctx)
-      ImGui.Text(ctx, "Required channels per ambisonic item: " .. tostring(needed))
+      ui_theme.muted(ImGui, ctx, "Required channels per ambisonic item: " .. tostring(needed))
       if settings.method_index == 1 then
-        ImGui.Text(ctx, "IR assignment: one same-order IR")
+        ui_theme.muted(ImGui, ctx, "IR assignment: one same-order IR")
       else
-        ImGui.Text(ctx, "Virtual directions: " .. tostring(directions))
+        ui_theme.muted(ImGui, ctx, "Virtual directions: " .. tostring(directions))
         if stacked_bank then
-          ImGui.Text(ctx, "IR assignment: stacked bank detected (" .. tostring(irs[1].channels) .. " channels)")
+          ui_theme.muted(ImGui, ctx, "IR assignment: stacked bank detected (" .. tostring(irs[1].channels) .. " channels)")
         elseif adapted_stacked then
-          ImGui.Text(ctx, "IR assignment: lower-order stacked bank detected (" .. tostring(irs[1].channels) .. " channels)")
+          ui_theme.muted(ImGui, ctx, "IR assignment: lower-order stacked bank detected (" .. tostring(irs[1].channels) .. " channels)")
         elseif #irs == directions then
-          ImGui.Text(ctx, "IR assignment: one selected IR per virtual direction")
+          ui_theme.muted(ImGui, ctx, "IR assignment: one selected IR per virtual direction")
         else
-          ImGui.TextColored(ctx, COLOR_ERROR, "IR assignment is not direction-matched.")
+          ui_theme.status(ImGui, ctx, "IR assignment is not direction-matched.", "warn")
         end
       end
       ImGui.Spacing(ctx)
       if validation then
-        ImGui.TextColored(ctx, COLOR_ERROR, validation)
+        ui_theme.status(ImGui, ctx, validation, "warn")
       else
-        ImGui.Text(ctx, "Renders offline from WAV media with NumPy.")
+        ui_theme.muted(ImGui, ctx, "Renders offline from WAV media with NumPy.")
       end
       ImGui.Spacing(ctx)
       ImGui.EndChild(ctx)
       end
-      if ImGui.Button(ctx, "Render", 104, 28) and not validation then
+      if ImGui.Button(ctx, "RENDER", 104, 28) and not validation then
         should_render = true
       end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Cancel", 104, 28) then open = false end
+      if ImGui.Button(ctx, "CANCEL", 104, 28) then open = false end
       ImGui.Dummy(ctx, 1, 10)
       ImGui.End(ctx)
     end

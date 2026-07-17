@@ -31,6 +31,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
+local sol_ui = dofile(script_dir .. "Spectral Offline Library.lua")
 
 
 local FFT_NAMES = {
@@ -647,31 +649,33 @@ local function main()
     if visible then
       local carrier = swap and entries[2] or entries[1]
       local shaper = swap and entries[1] or entries[2]
-      ImGui.Text(ctx, "Carrier: " .. carrier.name .. "  (" .. tostring(carrier.channels) .. " ch)")
-      ImGui.Text(ctx, "Shaper: " .. shaper.name .. "  (" .. tostring(shaper.channels) .. " ch)")
-      if ImGui.Button(ctx, "Swap carrier / shaper") then swap = not swap end
-      ImGui.Spacing(ctx)
+      theme.muted(ImGui, ctx, "Carrier: " .. carrier.name .. "  (" .. tostring(carrier.channels) .. " ch)")
+      theme.muted(ImGui, ctx, "Shaper: " .. shaper.name .. "  (" .. tostring(shaper.channels) .. " ch)")
+      if ImGui.Button(ctx, "SWAP", 92, 26) then swap = not swap end
       local changed
-      changed, algorithm_index = draw_combo(ctx, "Algorithm", algorithm_index, ALGORITHM_NAMES, 1, 2)
-      changed, fft_index = draw_combo(ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
-      changed, amount = ImGui.SliderDouble(ctx, algorithm_index == 2 and "Formant amount" or "Envelope amount", amount, 0, 1, "%.3f")
-      changed, mix = ImGui.SliderDouble(ctx, "Wet mix", mix, 0, 1, "%.3f")
-      changed, smooth_bins = ImGui.SliderInt(ctx, algorithm_index == 2 and "Formant smoothing bins" or "Envelope smoothing bins", smooth_bins, 1, 96)
-      changed, contrast = ImGui.SliderDouble(ctx, algorithm_index == 2 and "Formant contrast" or "Envelope contrast", contrast, 0.1, 3.0, "%.2f")
-      changed, floor = ImGui.SliderDouble(ctx, "Envelope floor", floor, 0.001, 0.5, "%.3f")
-      changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
+      local sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Shaper", 223)
+      changed, algorithm_index = sol_ui.draw_combo(ImGui, ctx, "Algorithm", algorithm_index, ALGORITHM_NAMES, 1, 2)
+      changed, fft_index = sol_ui.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
+      changed, amount = sol_ui.draw_slider(ImGui, ctx, algorithm_index == 2 and "Formant amount" or "Envelope amount", amount, 0, 1, "%.3f", false)
+      changed, mix = sol_ui.draw_slider(ImGui, ctx, "Wet mix", mix, 0, 1, "%.3f", false)
+      changed, smooth_bins = sol_ui.draw_slider_int(ImGui, ctx, algorithm_index == 2 and "Formant smoothing bins" or "Envelope smoothing bins", smooth_bins, 1, 96)
+      changed, contrast = sol_ui.draw_slider(ImGui, ctx, algorithm_index == 2 and "Formant contrast" or "Envelope contrast", contrast, 0.1, 3.0, "%.2f", false)
+      changed, floor = sol_ui.draw_slider(ImGui, ctx, "Envelope floor", floor, 0.001, 0.5, "%.3f", false)
+      sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Output", normalize and 98 or 73)
+      changed, normalize = sol_ui.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
       if normalize then
-        changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f")
+        changed, normalize_db = sol_ui.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false)
       end
-      ImGui.Separator(ctx)
+      sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
       if algorithm_index == 2 then
-        ImGui.Text(ctx, "Carrier keeps timing/phase/detail; shaper supplies broad formant contour.")
+        theme.muted(ImGui, ctx, "Carrier keeps timing/phase/detail; shaper supplies broad formant contour.")
       else
-        ImGui.Text(ctx, "Carrier keeps timing/phase; shaper supplies the spectral envelope.")
+        theme.muted(ImGui, ctx, "Carrier keeps timing/phase; shaper supplies the spectral envelope.")
       end
-      if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
+      if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+      if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
       ImGui.End(ctx)
     end
 

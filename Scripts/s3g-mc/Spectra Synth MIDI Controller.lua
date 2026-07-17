@@ -19,6 +19,7 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
@@ -127,24 +128,117 @@ local function set_param(param, value)
   reaper.TrackFX_SetParam(track, fx, param, value)
 end
 
+local ROW_H = 25
+local LABEL_W = 86
+local CONTROL_GAP = 8
+local VALUE_W = 76
+
+local LABEL_ABBR = {
+  ["OUTPUT CHANNELS"] = "OUT CH",
+  ["BASE FREQUENCY"] = "BASE",
+  ["OUTPUT GAIN"] = "OUT",
+  ["DENSITY / CHAOS"] = "DENS",
+  ["DECAY / SUSTAIN"] = "DECAY",
+  ["FIELD SPREAD"] = "SPREAD",
+  ["CHANNEL CORRELATION"] = "CORR",
+  ["MIDI CONTROL"] = "MIDI",
+  ["PITCH MODE"] = "PITCH",
+  ["CHANNEL FOCUS"] = "FOCUS",
+  ["VELOCITY TO DENSITY"] = "V DENS",
+  ["VELOCITY TO RATE"] = "V RATE",
+  ["VELOCITY TO GAIN"] = "V GAIN",
+  ["NOTE GATE DEPTH"] = "GATE",
+  ["FOCUS WIDTH"] = "WIDTH",
+  ["EXTRA CHANNEL OUTPUT"] = "EXTRA",
+}
+
+local function row_label_text(label)
+  local upper = tostring(label or ""):upper()
+  return LABEL_ABBR[upper] or upper
+end
+
+local function row_layout()
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" then avail = 360 end
+  local control_x = x + LABEL_W
+  local control_w = math.max(120, avail - LABEL_W - CONTROL_GAP)
+  return x, y, control_x, control_w
+end
+
+local function row_label(x, y, label)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 4, THEME.label, row_label_text(label))
+end
+
+local function finish_row(x, y)
+  ImGui.SetCursorScreenPos(ctx, x, y + ROW_H)
+end
+
+local function format_value(value, fmt, integer)
+  if integer then return tostring(math.floor(value + 0.5)) end
+  return string.format(fmt or "%.3f", value)
+end
+
+local function draw_custom_slider(label, value, lo, hi, fmt, integer)
+  local x, y, control_x, control_w = row_layout()
+  local slider_w = math.max(80, control_w - VALUE_W - CONTROL_GAP)
+  local value_x = control_x + slider_w + CONTROL_GAP
+  local track_y = y + 8
+  local track_h = 8
+  local norm = 0
+  if hi ~= lo then norm = clamp((value - lo) / (hi - lo), 0, 1) end
+
+  row_label(x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.InvisibleButton(ctx, "##" .. label, slider_w, ROW_H)
+  local hovered = ImGui.IsItemHovered(ctx)
+  local active = ImGui.IsItemActive(ctx)
+  local changed = false
+  if (hovered or active) and ImGui.IsMouseDown(ctx, 0) then
+    local mx = ImGui.GetMousePos(ctx)
+    local next_norm = clamp((mx - control_x) / slider_w, 0, 1)
+    local next_value = lo + (hi - lo) * next_norm
+    if integer then next_value = math.floor(next_value + 0.5) end
+    if math.abs(next_value - value) > (integer and 0 or 0.0000001) then
+      value = next_value
+      norm = next_norm
+      changed = true
+    end
+  end
+
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local frame = active and THEME.frame_active or (hovered and THEME.frame_hover or THEME.frame)
+  local fill = active and THEME.active or THEME.fill
+  local handle = active and THEME.active_hover or THEME.active
+  ImGui.DrawList_AddRectFilled(draw, control_x, track_y, control_x + slider_w, track_y + track_h, frame)
+  ImGui.DrawList_AddRectFilled(draw, control_x + 1, track_y + 1, control_x + math.max(2, slider_w * norm), track_y + track_h - 1, fill)
+  local hx = clamp(control_x + slider_w * norm - 1.5, control_x + 1, control_x + slider_w - 4)
+  ImGui.DrawList_AddRectFilled(draw, hx, track_y - 2, hx + 3, track_y + track_h + 2, handle)
+  ImGui.DrawList_AddText(draw, value_x, y + 4, THEME.value, format_value(value, fmt, integer))
+  finish_row(x, y)
+  return changed, value
+end
+
 local function draw_combo(label, labels, param)
   local current = clamp(math.floor(get_param(param) + 0.5) + 1, 1, #labels)
-  ImGui.SetNextItemWidth(ctx, 230)
-  local changed, next_index = ImGui.Combo(ctx, label, current, table.concat(labels, "\0") .. "\0")
+  local x, y, control_x, control_w = row_layout()
+  row_label(x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  local changed, next_index = ImGui.Combo(ctx, "##" .. label, current, table.concat(labels, "\0") .. "\0")
+  finish_row(x, y)
   if changed then set_param(param, next_index - 1) end
 end
 
 local function draw_slider(label, param, lo, hi, fmt)
   local value = get_param(param)
-  ImGui.SetNextItemWidth(ctx, 520)
-  local changed, next_value = ImGui.SliderDouble(ctx, label, value, lo, hi, fmt)
+  local changed, next_value = draw_custom_slider(label, value, lo, hi, fmt, false)
   if changed then set_param(param, next_value) end
 end
 
 local function draw_int_slider(label, param, lo, hi)
   local value = math.floor(get_param(param) + 0.5)
-  ImGui.SetNextItemWidth(ctx, 220)
-  local changed, next_value = ImGui.SliderInt(ctx, label, value, lo, hi)
+  local changed, next_value = draw_custom_slider(label, value, lo, hi, nil, true)
   if changed then set_param(param, next_value) end
 end
 
@@ -154,8 +248,12 @@ local function draw_channels()
   for i, ch in ipairs(CH_VALUES) do
     if ch == current_channels then index = i end
   end
-  ImGui.SetNextItemWidth(ctx, 120)
-  local changed, next_index = ImGui.Combo(ctx, "Output channels", index, table.concat(CH_NAMES, "\0") .. "\0")
+  local x, y, control_x, control_w = row_layout()
+  row_label(x, y, "Output channels")
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  local changed, next_index = ImGui.Combo(ctx, "##Output channels", index, table.concat(CH_NAMES, "\0") .. "\0")
+  finish_row(x, y)
   if changed then
     local channels = CH_VALUES[next_index]
     set_param(PARAM.channels, channels)
@@ -164,19 +262,20 @@ local function draw_channels()
 end
 
 local function section(label, height)
+  local stack = theme.push_soft_panel(ImGui, ctx)
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + height, STYLE.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + height, STYLE.edge)
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + height, THEME.panel_soft)
   ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + 2, THEME.active)
   ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
-  theme.text(ImGui, ctx, label)
+  theme.text(ImGui, ctx, label:upper())
   ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
-  return x, y, w, height
+  return x, y, w, height, stack
 end
 
-local function finish_section(x, y, h)
+local function finish_section(x, y, h, stack)
+  theme.pop_soft_panel(ImGui, ctx, stack)
   ImGui.SetCursorScreenPos(ctx, x, y + h + 10)
 end
 
@@ -191,27 +290,25 @@ local function loop()
     if not track or fx < 0 then
       theme.status(ImGui, ctx, status ~= "" and status or "Select a track and rescan JSFX if the engine is missing.", "warn")
     else
-      local x, y, _, h = section("Engine", 180)
+      local x, y, _, h, stack = section("Engine", 192)
       draw_channels()
-      ImGui.SameLine(ctx)
       draw_combo("Algorithm", ALGORITHMS, PARAM.algorithm)
       draw_slider("Rate", PARAM.rate, 0, 1, "%.3f")
       draw_slider("Base frequency", PARAM.base_freq, 20, 4000, "%.1f Hz")
       draw_slider("Output gain", PARAM.gain, -60, 0, "%.1f dB")
-      finish_section(x, y, h)
+      finish_section(x, y, h, stack)
 
-      x, y, _, h = section("Color / Field", 220)
+      x, y, _, h, stack = section("Color / Field", 220)
       draw_slider("Density / chaos", PARAM.density, 0, 1, "%.3f")
       draw_slider("Brightness", PARAM.brightness, 0, 1, "%.3f")
       draw_slider("Decay / sustain", PARAM.decay, 0, 1, "%.3f")
       draw_slider("Field spread", PARAM.spread, 0, 1, "%.3f")
       draw_slider("Channel correlation", PARAM.correlation, 0, 1, "%.3f")
       draw_slider("Drift", PARAM.drift, 0, 1, "%.3f")
-      finish_section(x, y, h)
+      finish_section(x, y, h, stack)
 
-      x, y, _, h = section("MIDI Response", 250)
+      x, y, _, h, stack = section("MIDI Response", 272)
       draw_combo("MIDI control", { "Off", "On" }, PARAM.midi)
-      ImGui.SameLine(ctx)
       draw_combo("Pitch mode", PITCH_MODES, PARAM.pitch)
       draw_combo("Channel focus", FOCUS_MODES, PARAM.focus)
       draw_slider("Velocity to density", PARAM.vel_density, 0, 1, "%.3f")
@@ -219,13 +316,11 @@ local function loop()
       draw_slider("Velocity to gain", PARAM.vel_gain, 0, 1, "%.3f")
       draw_slider("Note gate depth", PARAM.gate, 0, 1, "%.3f")
       draw_slider("Focus width", PARAM.focus_width, 0.02, 1, "%.3f")
-      finish_section(x, y, h)
+      finish_section(x, y, h, stack)
 
       draw_combo("Extra channel output", CLEAR_MODES, PARAM.clear)
-      ImGui.SameLine(ctx)
       draw_int_slider("Seed", PARAM.seed, 1, 9999)
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Show JSFX") then reaper.TrackFX_Show(track, fx, 3) end
+      if ImGui.Button(ctx, "SHOW JSFX") then reaper.TrackFX_Show(track, fx, 3) end
     end
   end
   ImGui.End(ctx)

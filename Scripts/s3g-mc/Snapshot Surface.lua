@@ -33,6 +33,9 @@ do
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
 
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
+
 local ctx = ImGui.CreateContext(TITLE)
 local open = true
 local snapshots = {}
@@ -938,14 +941,8 @@ local function clear_snapshots()
 end
 
 local function draw_combo(label, current, names)
-  if ImGui.BeginCombo(ctx, label, names[current] or "") then
-    for index, name in ipairs(names) do
-      local selected = index == current
-      if ImGui.Selectable(ctx, name, selected) then current = index end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
+  local changed, next_value = theme.combo_row(ImGui, ctx, label, names, current, 210)
+  if changed then return next_value or current end
   return current
 end
 
@@ -1180,14 +1177,14 @@ local function draw_target_selection_tree(snapshot, list_h)
   changed_filter, target_filter = ImGui.InputText(ctx, "Target filter", target_filter)
   if changed_filter then save_state() end
   local missing_changed
-  missing_changed, missing_targets_hold = ImGui.Checkbox(ctx, "Missing nearest target leaves value unchanged", missing_targets_hold)
+  missing_changed, missing_targets_hold = ImGui.Checkbox(ctx, "MISSING NEAREST TARGET LEAVES VALUE UNCHANGED", missing_targets_hold)
   if missing_changed then save_state() end
-  if ImGui.Button(ctx, "Add Missing", 100, 24) then add_missing_targets(snapshot) end
+  if ImGui.Button(ctx, "ADD MISSING", 100, 24) then add_missing_targets(snapshot) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Remove All", 100, 24) then remove_all_targets(snapshot) end
+  if ImGui.Button(ctx, "REMOVE ALL", 100, 24) then remove_all_targets(snapshot) end
   local templates = target_templates()
   if #templates == 0 then
-    ImGui.TextColored(ctx, COLORS.muted, "Capture a scope before editing targets.")
+    theme.muted(ImGui, ctx, "Capture a scope before editing targets.")
     return
   end
 
@@ -1215,12 +1212,12 @@ local function draw_target_selection_tree(snapshot, list_h)
   if ImGui.BeginChild(ctx, "##snapshot_target_tree", 0, list_h) then
     for ti, track in ipairs(track_order) do
       local track_node = tree[track]
-      if ImGui.CollapsingHeader(ctx, track .. "##target_track_" .. tostring(ti), nil, ImGui.TreeNodeFlags_DefaultOpen) then
+      if theme.toolbox_header(ImGui, ctx, track .. "##target_track_" .. tostring(ti), ImGui.TreeNodeFlags_DefaultOpen) then
         for di, device in ipairs(track_node.order) do
           local device_node = track_node.devices[device]
-          ImGui.TextColored(ctx, COLORS.muted, device)
+          theme.muted(ImGui, ctx, device)
           ImGui.SameLine(ctx)
-          if ImGui.SmallButton(ctx, "add##" .. tostring(ti) .. "_" .. tostring(di)) then
+          if ImGui.SmallButton(ctx, "ADD##" .. tostring(ti) .. "_" .. tostring(di)) then
             local added = 0
             for _, entry in ipairs(device_node.targets) do
               local template = entry.template
@@ -1235,7 +1232,7 @@ local function draw_target_selection_tree(snapshot, list_h)
             status = string.format("Added %d target(s) to %s.", added, snapshot.name or "snapshot")
           end
           ImGui.SameLine(ctx)
-          if ImGui.SmallButton(ctx, "remove##" .. tostring(ti) .. "_" .. tostring(di)) then
+          if ImGui.SmallButton(ctx, "REMOVE##" .. tostring(ti) .. "_" .. tostring(di)) then
             local removed = 0
             for _, entry in ipairs(device_node.targets) do
               if remove_target(snapshot, entry.template.id) then removed = removed + 1 end
@@ -1271,99 +1268,101 @@ end
 local function draw_parameter_selection_panel(width, height)
   local visible = ImGui.BeginChild(ctx, "##parameter_selection_panel", width, height)
   if visible then
-    ImGui.Text(ctx, "Parameter Selection")
+    theme.section_label(ImGui, ctx, "PARAMETER SELECTION")
     ImGui.Separator(ctx)
     if selected_snapshot and snapshots[selected_snapshot] then
       draw_target_selection_tree(snapshots[selected_snapshot], math.max(80, height - 96))
     else
-      ImGui.TextColored(ctx, COLORS.muted, "Select a snapshot to edit its target list.")
+      theme.muted(ImGui, ctx, "Select a snapshot to edit its target list.")
     end
   end
   ImGui.EndChild(ctx)
 end
 
 local function draw_toolbox(height)
-  local side_visible = ImGui.BeginChild(ctx, "##snapshot_surface_side", 330, height)
+  local panel = theme.push_soft_panel(ImGui, ctx)
+  local side_visible = ImGui.BeginChild(ctx, "##snapshot_surface_side", 330, height, 0)
   if side_visible then
     surface_mode = draw_combo("Surface mode", surface_mode, SURFACE_MODES)
-    if ImGui.Button(ctx, "Edit", 72, 24) then surface_mode = 1; save_state() end
+    if ImGui.Button(ctx, "EDIT", 72, 24) then surface_mode = 1; save_state() end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Play", 72, 24) then surface_mode = 2; dragging_snapshot = nil; save_state() end
+    if ImGui.Button(ctx, "PLAY", 72, 24) then surface_mode = 2; dragging_snapshot = nil; save_state() end
     ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, COLORS.muted, SURFACE_MODES[surface_mode] or "")
+    theme.muted(ImGui, ctx, SURFACE_MODES[surface_mode] or "")
     ImGui.Separator(ctx)
     scope_index = draw_combo("Capture scope", scope_index, SCOPES)
     _, capture_name = ImGui.InputText(ctx, "Name", capture_name)
-    if ImGui.Button(ctx, "Capture From Scope", 160, 28) then capture_snapshot() end
+    if ImGui.Button(ctx, "CAPTURE FROM SCOPE", 160, 28) then capture_snapshot() end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Apply", 70, 28) then apply_surface() end
-    if ImGui.Button(ctx, "Capture From Target Set", 230, 28) then capture_from_target_set() end
-    _, auto_apply = ImGui.Checkbox(ctx, "Apply while dragging cursor", auto_apply)
-    _, show_regions = ImGui.Checkbox(ctx, "Show surface regions", show_regions)
-    _, include_fx_enabled = ImGui.Checkbox(ctx, "Capture FX enabled state", include_fx_enabled)
+    if ImGui.Button(ctx, "APPLY", 70, 28) then apply_surface() end
+    if ImGui.Button(ctx, "CAPTURE FROM TARGET SET", 230, 28) then capture_from_target_set() end
+    _, auto_apply = ImGui.Checkbox(ctx, "APPLY WHILE DRAGGING CURSOR", auto_apply)
+    _, show_regions = ImGui.Checkbox(ctx, "SHOW SURFACE REGIONS", show_regions)
+    _, include_fx_enabled = ImGui.Checkbox(ctx, "CAPTURE FX ENABLED STATE", include_fx_enabled)
     local focus_changed
-    focus_changed, interpolation_power = ImGui.SliderDouble(ctx, "Interpolation focus", interpolation_power, 0.25, 8.0, "%.2f")
+    focus_changed, interpolation_power = theme.slider_double(ImGui, ctx, "Interpolation focus", interpolation_power, 0.25, 8.0, "%.2f", 300)
     if focus_changed then push_cursor_to_linked_fx() end
-    if ImGui.CollapsingHeader(ctx, "Randomize Scope", ImGui.TreeNodeFlags_DefaultOpen) then
+    if theme.toolbox_header(ImGui, ctx, "RANDOMIZE SCOPE", ImGui.TreeNodeFlags_DefaultOpen) then
       random_source_index = draw_combo("Random source", random_source_index, RANDOM_SOURCES)
-      _, random_spread = ImGui.SliderDouble(ctx, "Spread", random_spread, 0.0, 1.0, "%.2f")
-      _, random_deviation = ImGui.SliderDouble(ctx, "Deviation", random_deviation, 0.0, 1.0, "%.2f")
-      _, random_apply = ImGui.Checkbox(ctx, "Apply after randomize", random_apply)
-      _, random_include_bools = ImGui.Checkbox(ctx, "Include mute/solo/enabled", random_include_bools)
-      if ImGui.Button(ctx, "Randomize Snapshot", 190, 28) then randomized_snapshot_from_target_set() end
+      _, random_spread = theme.slider_double(ImGui, ctx, "Spread", random_spread, 0.0, 1.0, "%.2f", 300)
+      _, random_deviation = theme.slider_double(ImGui, ctx, "Deviation", random_deviation, 0.0, 1.0, "%.2f", 300)
+      _, random_apply = ImGui.Checkbox(ctx, "APPLY AFTER RANDOMIZE", random_apply)
+      _, random_include_bools = ImGui.Checkbox(ctx, "INCLUDE MUTE/SOLO/ENABLED", random_include_bools)
+      if ImGui.Button(ctx, "RANDOMIZE SNAPSHOT", 190, 28) then randomized_snapshot_from_target_set() end
       ImGui.SameLine(ctx)
       if selected_snapshot and snapshots[selected_snapshot] then
-        if ImGui.Button(ctx, "Mutate Selected", 122, 28) then mutate_selected_snapshot() end
+        if ImGui.Button(ctx, "MUTATE SELECTED", 122, 28) then mutate_selected_snapshot() end
       else
         ImGui.BeginDisabled(ctx)
-        ImGui.Button(ctx, "Mutate Selected", 122, 28)
+        ImGui.Button(ctx, "MUTATE SELECTED", 122, 28)
         ImGui.EndDisabled(ctx)
       end
-      ImGui.TextColored(ctx, COLORS.muted, "Spread selects how many targets move.")
-      ImGui.TextColored(ctx, COLORS.muted, "Deviation sets the movement range.")
+      theme.muted(ImGui, ctx, "Spread selects how many targets move.")
+      theme.muted(ImGui, ctx, "Deviation sets the movement range.")
     end
-    if ImGui.CollapsingHeader(ctx, "Cursor Automation", ImGui.TreeNodeFlags_DefaultOpen) then
-      _, follow_cursor_fx = ImGui.Checkbox(ctx, "Follow cursor FX", follow_cursor_fx)
-      if ImGui.Button(ctx, "Create / Link Cursor FX", 180, 26) then create_or_link_cursor_fx() end
+    if theme.toolbox_header(ImGui, ctx, "CURSOR AUTOMATION", ImGui.TreeNodeFlags_DefaultOpen) then
+      _, follow_cursor_fx = ImGui.Checkbox(ctx, "FOLLOW CURSOR FX", follow_cursor_fx)
+      if ImGui.Button(ctx, "CREATE / LINK CURSOR FX", 180, 26) then create_or_link_cursor_fx() end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Show / Arm X Y", 130, 26) then show_arm_cursor_envelopes() end
-      ImGui.TextColored(ctx, COLORS.muted, linked_cursor_label())
+      if ImGui.Button(ctx, "SHOW / ARM X Y", 130, 26) then show_arm_cursor_envelopes() end
+      theme.muted(ImGui, ctx, linked_cursor_label())
     end
     ImGui.Separator(ctx)
-    ImGui.Text(ctx, string.format("Cursor %.3f / %.3f", cursor.x, cursor.y))
+    theme.muted(ImGui, ctx, string.format("CURSOR %.3f / %.3f", cursor.x, cursor.y))
     if surface_mode == 1 then
-      ImGui.TextColored(ctx, COLORS.muted, "Edit: left-drag snapshots to place regions")
+      theme.muted(ImGui, ctx, "Edit: left-drag snapshots to place regions")
     else
-      ImGui.TextColored(ctx, COLORS.muted, "Play: left-drag surface to move cursor")
+      theme.muted(ImGui, ctx, "Play: left-drag surface to move cursor")
     end
-    ImGui.TextColored(ctx, COLORS.muted, "Right-click snapshot: select + audition")
-    ImGui.Text(ctx, string.format("Stored targets: %d", count_target_set()))
-    ImGui.TextColored(ctx, COLORS.muted, "Linked/VCA targets follow REAPER")
-    ImGui.TextColored(ctx, COLORS.muted, "routing and modulation.")
+    theme.muted(ImGui, ctx, "Right-click snapshot: select + audition")
+    theme.muted(ImGui, ctx, string.format("STORED TARGETS: %d", count_target_set()))
+    theme.muted(ImGui, ctx, "Linked/VCA targets follow REAPER")
+    theme.muted(ImGui, ctx, "routing and modulation.")
     ImGui.Separator(ctx)
-    if ImGui.CollapsingHeader(ctx, "Project Scope Limits") then
-      _, max_project_tracks = ImGui.SliderInt(ctx, "Max tracks", max_project_tracks, 1, 256)
-      _, max_fx_per_track = ImGui.SliderInt(ctx, "Max FX / track", max_fx_per_track, 0, 64)
-      _, max_params_per_fx = ImGui.SliderInt(ctx, "Max params / FX", max_params_per_fx, 1, 2048)
+    if theme.toolbox_header(ImGui, ctx, "PROJECT SCOPE LIMITS") then
+      _, max_project_tracks = theme.slider_int(ImGui, ctx, "Max tracks", max_project_tracks, 1, 256, 300)
+      _, max_fx_per_track = theme.slider_int(ImGui, ctx, "Max FX / track", max_fx_per_track, 0, 64, 300)
+      _, max_params_per_fx = theme.slider_int(ImGui, ctx, "Max params / FX", max_params_per_fx, 1, 2048, 300)
     end
     if selected_snapshot and snapshots[selected_snapshot] then
       local s = snapshots[selected_snapshot]
       ImGui.Separator(ctx)
-      ImGui.Text(ctx, "Selected Snapshot")
+      theme.section_label(ImGui, ctx, "SELECTED SNAPSHOT")
       local renamed
       renamed, s.name = ImGui.InputText(ctx, "Snapshot name", s.name or "")
       if renamed then save_state() end
-      ImGui.TextColored(ctx, COLORS.muted, s.scope or "")
-      if ImGui.Button(ctx, "Move Node To Cursor", 150, 26) then
+      theme.muted(ImGui, ctx, s.scope or "")
+      if ImGui.Button(ctx, "MOVE NODE TO CURSOR", 150, 26) then
         s.x, s.y = cursor.x, cursor.y
         save_state()
       end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Delete", 70, 26) then delete_snapshot(selected_snapshot) end
-      ImGui.TextColored(ctx, COLORS.muted, "Edit this snapshot's targets in the lower parameter pane.")
+      if ImGui.Button(ctx, "DELETE", 70, 26) then delete_snapshot(selected_snapshot) end
+      theme.muted(ImGui, ctx, "Edit this snapshot's targets in the lower parameter pane.")
     end
   end
   ImGui.EndChild(ctx)
+  theme.pop_soft_panel(ImGui, ctx, panel)
 end
 
 local function loop()
@@ -1388,27 +1387,36 @@ local function loop()
         local _, after_surface_h = ImGui.GetContentRegionAvail(ctx)
         local lower_h = math.max(110, after_surface_h - 24)
         local snapshot_w = math.max(250, math.min(360, left_w * 0.38))
-        ImGui.BeginChild(ctx, "##snapshot_list_area", snapshot_w, lower_h)
-        ImGui.Text(ctx, "Snapshot List")
+        local list_panel = theme.push_soft_panel(ImGui, ctx)
+        ImGui.BeginChild(ctx, "##snapshot_list_area", snapshot_w, lower_h, 0)
+        theme.section_label(ImGui, ctx, "SNAPSHOT LIST")
         ImGui.Separator(ctx)
         draw_snapshot_list()
         ImGui.EndChild(ctx)
+        theme.pop_soft_panel(ImGui, ctx, list_panel)
         ImGui.SameLine(ctx)
+        local param_panel = theme.push_soft_panel(ImGui, ctx)
         draw_parameter_selection_panel(math.max(260, left_w - snapshot_w - 12), lower_h)
-        ImGui.TextColored(ctx, COLORS.muted, status)
+        theme.pop_soft_panel(ImGui, ctx, param_panel)
+        theme.muted(ImGui, ctx, status)
       end
       ImGui.EndChild(ctx)
       ImGui.SameLine(ctx)
       draw_toolbox(body_h)
     end
     ImGui.EndChild(ctx)
-    if ImGui.Button(ctx, "Save", 92, 28) then save_state(); status = "Saved snapshots to project." end
+    local footer_panel = theme.push_soft_panel(ImGui, ctx)
+    if ImGui.BeginChild(ctx, "##snapshot_footer_tool_area", 0, footer_h - 4, 0) then
+    if ImGui.Button(ctx, "SAVE", 92, 28) then save_state(); status = "Saved snapshots to project." end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Reload", 92, 28) then load_state() end
+    if ImGui.Button(ctx, "RELOAD", 92, 28) then load_state() end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Clear", 92, 28) then clear_snapshots() end
+    if ImGui.Button(ctx, "CLEAR", 92, 28) then clear_snapshots() end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Close", 92, 28) then open = false end
+    if ImGui.Button(ctx, "CLOSE", 92, 28) then open = false end
+    end
+    ImGui.EndChild(ctx)
+    theme.pop_soft_panel(ImGui, ctx, footer_panel)
     ImGui.Dummy(ctx, 1, 10)
   end
   ImGui.End(ctx)

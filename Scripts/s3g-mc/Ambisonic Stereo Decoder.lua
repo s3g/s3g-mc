@@ -251,8 +251,7 @@ end
 
 local function slider_param(track, fx, label, param, min_value, max_value, fmt)
   local value = get_param(track, fx, param, min_value)
-  ImGui.SetNextItemWidth(ctx, 330)
-  local changed, new_value = ImGui.SliderDouble(ctx, label, value, min_value, max_value, fmt)
+  local changed, new_value = theme.slider_double(ImGui, ctx, label, value, min_value, max_value, fmt)
   if changed then set_param(track, fx, param, new_value) end
   return new_value or value
 end
@@ -394,7 +393,7 @@ end
 
 local function draw_camera_controls()
   ImGui.BeginGroup(ctx)
-  ImGui.Text(ctx, "Camera")
+  theme.muted(ImGui, ctx, "CAMERA")
   nudge_camera("up##ambstcam", 68, 24, function() view_pitch_deg = clamp(view_pitch_deg + 4, -180, 180) end)
   nudge_camera("left##ambstcam", 32, 24, function() view_yaw_deg = view_yaw_deg - 4 end)
   ImGui.SameLine(ctx)
@@ -404,8 +403,8 @@ local function draw_camera_controls()
   ImGui.SameLine(ctx)
   nudge_camera("+##ambstzoom", 32, 24, function() view_zoom = clamp(view_zoom + 0.025, 0.5, 2.2) end)
   if ImGui.Button(ctx, "3/4##ambstcam", 68, 24) then reset_camera(-35, -42) end
-  if ImGui.Button(ctx, "top##ambstcam", 68, 24) then reset_camera(0, 0) end
-  if ImGui.Button(ctx, "front##ambstcam", 68, 24) then reset_camera(0, -90) end
+  if ImGui.Button(ctx, "TOP##ambstcam", 68, 24) then reset_camera(0, 0) end
+  if ImGui.Button(ctx, "FRONT##ambstcam", 68, 24) then reset_camera(0, -90) end
   ImGui.EndGroup(ctx)
 end
 
@@ -457,7 +456,7 @@ local function draw_custom_weight_controls(track, fx)
   local order = math.floor(get_param(track, fx, PARAM.order, 2) + 0.5) + 1
   local mode = math.floor(get_param(track, fx, PARAM.weighting, 1) + 0.5)
   ImGui.Separator(ctx)
-  ImGui.Text(ctx, "Custom band weights")
+  theme.muted(ImGui, ctx, "CUSTOM BAND WEIGHTS")
   theme.muted(ImGui, ctx, mode == 3 and "Custom weighting is active" or "Move a slider to switch Decode weighting to Custom")
   local labels = { "W", "1st", "2nd", "3rd" }
   local params = { PARAM.custom_w, PARAM.custom_o1, PARAM.custom_o2, PARAM.custom_o3 }
@@ -471,7 +470,7 @@ local function draw_custom_weight_controls(track, fx)
     end
     if not active and ImGui.EndDisabled then ImGui.EndDisabled(ctx) end
   end
-  if ImGui.Button(ctx, "Flat##custom_weights") then
+  if ImGui.Button(ctx, "FLAT##custom_weights") then
     set_param(track, fx, PARAM.custom_w, 100)
     set_param(track, fx, PARAM.custom_o1, 100)
     set_param(track, fx, PARAM.custom_o2, 100)
@@ -479,7 +478,7 @@ local function draw_custom_weight_controls(track, fx)
     set_weighting_mode(track, fx, 3)
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Max-rE-ish##custom_weights") then
+  if ImGui.Button(ctx, "MAX-RE-ISH##custom_weights") then
     set_param(track, fx, PARAM.custom_w, 100)
     set_param(track, fx, PARAM.custom_o1, 100)
     set_param(track, fx, PARAM.custom_o2, 82)
@@ -628,15 +627,15 @@ local function loop()
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     local fx = find_fx(track)
     if not track then
-      ImGui.Text(ctx, "Select the target track.")
+      theme.muted(ImGui, ctx, "SELECT THE TARGET TRACK.")
     else
       local _, name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
-      ImGui.Text(ctx, "Selected track: " .. (name ~= "" and name or "(unnamed)"))
+      theme.muted(ImGui, ctx, "TARGET: " .. (name ~= "" and name or "(UNNAMED)"))
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Repair JSFX") then fx = maybe_load(track, true) end
+      if ImGui.Button(ctx, "REPAIR JSFX") then fx = maybe_load(track, true) end
       if fx < 0 then fx = maybe_load(track, false) end
       if fx < 0 then
-        ImGui.Text(ctx, load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " is not on the selected track."))
+        theme.muted(ImGui, ctx, load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " IS NOT ON THE SELECTED TRACK."))
       else
         resolve_param_indices(track, fx)
         if param_warning ~= "" then

@@ -27,6 +27,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
+local sol_ui = dofile(script_dir .. "Spectral Offline Library.lua")
 
 
 local EXTSTATE_SECTION = "s3g_mc_render_impulse_field"
@@ -395,35 +397,35 @@ local function loop()
   visible, open = ImGui.Begin(ctx, "Render MC Impulse Field", open)
   if visible then
     local changed
-    ImGui.SetNextItemWidth(ctx, 130)
-    changed, position = ImGui.InputDouble(ctx, "Start time", position, 0.1, 1.0, "%.3f")
-    ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 130)
-    changed, duration = ImGui.InputDouble(ctx, "Duration (sec)", duration, 0.5, 2.0, "%.3f")
+    local sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Timing", 123)
+    changed, position = sol_ui.draw_input_double(ImGui, ctx, "Start time", position, 0.1, 1.0, "%.3f")
+    changed, duration = sol_ui.draw_input_double(ImGui, ctx, "Duration (sec)", duration, 0.5, 2.0, "%.3f")
     duration = math.max(0.05, duration)
-    ImGui.Text(ctx, string.format("End %.3f sec", math.max(0, position) + duration))
+    theme.muted(ImGui, ctx, string.format("End %.3f sec", math.max(0, position) + duration))
+    sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-    ImGui.Separator(ctx)
-    changed, channels = ImGui.SliderInt(ctx, "Channels", channels, 1, 128)
-    changed, count = ImGui.SliderInt(ctx, "Impulses", count, 1, 512)
-    changed, safe_ms = ImGui.SliderDouble(ctx, "Safe distance", safe_ms, 0, 1000, "%.1f ms")
-    changed, global_safe = ImGui.Checkbox(ctx, "Global spacing", global_safe)
-    changed, rule = combo(ctx, "Distribution", RULE_NAMES, rule)
-    changed, jitter = ImGui.SliderDouble(ctx, "Timing variation", jitter, 0, 1, "%.2f")
+    sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Distribution", 198)
+    changed, channels = sol_ui.draw_slider_int(ImGui, ctx, "Channels", channels, 1, 128)
+    changed, count = sol_ui.draw_slider_int(ImGui, ctx, "Impulses", count, 1, 512)
+    changed, safe_ms = sol_ui.draw_slider(ImGui, ctx, "Safe distance", safe_ms, 0, 1000, "%.1f ms", false)
+    changed, global_safe = sol_ui.draw_checkbox(ImGui, ctx, "Global spacing", global_safe)
+    changed, rule = sol_ui.draw_combo(ImGui, ctx, "Distribution", rule, RULE_NAMES, 1, #RULE_NAMES)
+    changed, jitter = sol_ui.draw_slider(ImGui, ctx, "Timing variation", jitter, 0, 1, "%.2f", false)
+    sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-    ImGui.Separator(ctx)
-    changed, profile = combo(ctx, "Impulse profile", PROFILE_NAMES, profile)
-    changed, width_ms = ImGui.SliderDouble(ctx, "Profile width", width_ms, 0.02, 100, "%.2f ms")
-    changed, freq = ImGui.SliderDouble(ctx, "Profile frequency", freq, 20, 12000, "%.1f Hz")
-    changed, gain = ImGui.SliderDouble(ctx, "Impulse gain", gain, 0, 1, "%.2f")
-    changed, variation = ImGui.SliderDouble(ctx, "Profile variation", variation, 0, 1, "%.2f")
-    changed, normalize_db = ImGui.SliderDouble(ctx, "Peak normalize", normalize_db, -36, 0, "%.1f dB")
-    changed, seed = ImGui.SliderInt(ctx, "Seed", seed, 1, 9999)
+    sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Profile", 223)
+    changed, profile = sol_ui.draw_combo(ImGui, ctx, "Impulse profile", profile, PROFILE_NAMES, 1, #PROFILE_NAMES)
+    changed, width_ms = sol_ui.draw_slider(ImGui, ctx, "Profile width", width_ms, 0.02, 100, "%.2f ms", false)
+    changed, freq = sol_ui.draw_slider(ImGui, ctx, "Profile frequency", freq, 20, 12000, "%.1f Hz", false)
+    changed, gain = sol_ui.draw_slider(ImGui, ctx, "Impulse gain", gain, 0, 1, "%.2f", false)
+    changed, variation = sol_ui.draw_slider(ImGui, ctx, "Profile variation", variation, 0, 1, "%.2f", false)
+    changed, normalize_db = sol_ui.draw_slider(ImGui, ctx, "Peak normalize", normalize_db, -36, 0, "%.1f dB", false)
+    changed, seed = sol_ui.draw_slider_int(ImGui, ctx, "Seed", seed, 1, 9999)
+    sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-    ImGui.Separator(ctx)
-    if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
+    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
     ImGui.End(ctx)
   end
 

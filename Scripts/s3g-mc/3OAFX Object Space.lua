@@ -18,6 +18,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local theme
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -26,7 +27,10 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme then
+    theme = _s3g_theme
+    if _s3g_theme.install then _s3g_theme.install(ImGui) end
+  end
 end
 
 
@@ -67,15 +71,8 @@ local function order_channels(order_index)
 end
 
 local function combo(label, idx, labels)
-  if ImGui.BeginCombo(ctx, label, labels[idx] or "") then
-    for i, name in ipairs(labels) do
-      local selected = i == idx
-      if ImGui.Selectable(ctx, name, selected) then idx = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return idx
+  local _, next_idx = theme.combo_row(ImGui, ctx, label, labels, idx)
+  return next_idx
 end
 
 local function color(r, g, b, a)
@@ -256,34 +253,44 @@ local function loop()
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(260, avail_h - footer_h)
     if ImGui.BeginChild(ctx, "##object_space_controls", 0, control_h) then
-    ImGui.Text(ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
-    draw_preview()
-    settings.mode = combo("Mode", settings.mode, MODE_LABELS)
-    settings.source_format = combo("Source format", settings.source_format, SOURCE_LABELS)
-    settings.output_order = combo("Output order", settings.output_order, ORDER_LABELS)
-    ImGui.Separator(ctx)
-    local changed
-    changed, settings.source_spread = ImGui.SliderDouble(ctx, "Source object spread", settings.source_spread, 0.0, 1.0, "%.2f")
-    changed, settings.object_clarity = ImGui.SliderDouble(ctx, "Object clarity", settings.object_clarity, 0.0, 1.0, "%.2f")
-    changed, settings.dry_level = ImGui.SliderDouble(ctx, "Dry object level", settings.dry_level, 0.0, 1.5, "%.2f")
-    changed, settings.space_amount = ImGui.SliderDouble(ctx, "Space amount", settings.space_amount, 0.0, 2.0, "%.2f")
-    changed, settings.spread_deg = ImGui.SliderDouble(ctx, "Spatial spread deg", settings.spread_deg, 1.0, 180.0, "%.1f")
-    changed, settings.motion = ImGui.SliderDouble(ctx, "Spatial motion", settings.motion, 0.0, 1.0, "%.2f")
-    changed, settings.resonance_hz = ImGui.SliderDouble(ctx, "Resonance Hz", settings.resonance_hz, 30.0, 6000.0, "%.1f")
-    changed, settings.feedback = ImGui.SliderDouble(ctx, "Resonant feedback", settings.feedback, 0.0, 0.92, "%.2f")
-    changed, settings.smear = ImGui.SliderDouble(ctx, "Spectral smear", settings.smear, 0.0, 1.0, "%.2f")
-    changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
-    if settings.normalize then
-      changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+      theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
+      draw_preview()
+      local changed
+      local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Routing", 123)
+      settings.mode = combo("Mode", settings.mode, MODE_LABELS)
+      settings.source_format = combo("Source format", settings.source_format, SOURCE_LABELS)
+      settings.output_order = combo("Output order", settings.output_order, ORDER_LABELS)
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Object / Space", 180)
+      changed, settings.source_spread = theme.slider_double(ImGui, ctx, "Source object spread", settings.source_spread, 0.0, 1.0, "%.2f")
+      changed, settings.object_clarity = theme.slider_double(ImGui, ctx, "Object clarity", settings.object_clarity, 0.0, 1.0, "%.2f")
+      changed, settings.dry_level = theme.slider_double(ImGui, ctx, "Dry object level", settings.dry_level, 0.0, 1.5, "%.2f")
+      changed, settings.space_amount = theme.slider_double(ImGui, ctx, "Space amount", settings.space_amount, 0.0, 2.0, "%.2f")
+      changed, settings.spread_deg = theme.slider_double(ImGui, ctx, "Spatial spread deg", settings.spread_deg, 1.0, 180.0, "%.1f")
+      changed, settings.motion = theme.slider_double(ImGui, ctx, "Spatial motion", settings.motion, 0.0, 1.0, "%.2f")
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Spectral", 114)
+      changed, settings.resonance_hz = theme.slider_double(ImGui, ctx, "Resonance Hz", settings.resonance_hz, 30.0, 6000.0, "%.1f")
+      changed, settings.feedback = theme.slider_double(ImGui, ctx, "Resonant feedback", settings.feedback, 0.0, 0.92, "%.2f")
+      changed, settings.smear = theme.slider_double(ImGui, ctx, "Spectral smear", settings.smear, 0.0, 1.0, "%.2f")
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Output", settings.normalize and 123 or 98)
+      changed, settings.normalize = theme.checkbox_row(ImGui, ctx, "Peak normalize", settings.normalize)
+      if settings.normalize then
+        changed, settings.normalize_db = theme.slider_double(ImGui, ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+      end
+      changed, settings.seed = theme.input_int_row(ImGui, ctx, "Seed", math.floor(settings.seed))
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      theme.muted(ImGui, ctx, "Auto treats 4ch, 10ch, and 16ch as ACN/SN3D; 9ch WAVs are accepted as 2OA.")
+      ImGui.EndChild(ctx)
     end
-    changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
-    ImGui.Separator(ctx)
-    ImGui.TextWrapped(ctx, "Auto treats 4ch, 10ch, and 16ch as ACN/SN3D ambisonic in REAPER practice; 9ch WAVs are also accepted as 2OA. Other channel counts are encoded as source objects.")
-    ImGui.EndChild(ctx)
-    end
-    if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
+    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
     ImGui.Dummy(ctx, 1, 10)
     ImGui.End(ctx)
   end

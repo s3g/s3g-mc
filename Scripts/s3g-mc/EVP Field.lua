@@ -25,6 +25,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 
 local TITLE = "EVP Field"
@@ -66,8 +68,171 @@ local function gets(k, d) local v = reaper.GetExtState(EXT, k); if v == "" then 
 local function getb(k, d) local v = reaper.GetExtState(EXT, k); if v == "" then return d end; return v ~= "0" end
 local function set(k, v) reaper.SetExtState(EXT, k, type(v) == "boolean" and (v and "1" or "0") or tostring(v), true) end
 local function rgba(r, g, b, a) return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1) end
+local function clamp(value, lo, hi)
+  if value < lo then return lo end
+  if value > hi then return hi end
+  return value
+end
+
+local ROW_H = 25
+local LABEL_W = 86
+local CONTROL_GAP = 8
+local VALUE_W = 76
+local LABEL_ABBR = {
+  ["VOICE TREATMENT"] = "TREAT",
+  ["OUTPUT"] = "OUTPUT",
+  ["SHAPE"] = "SHAPE",
+  ["CHANNELS"] = "CHANNELS",
+  ["ESPEAK VOICE"] = "VOICE",
+  ["SPEECH SPEED WPM"] = "SPEED",
+  ["SPEECH PITCH"] = "PITCH",
+  ["TIME EXPANSION"] = "TIME",
+  ["EXPANSION FACTOR"] = "EXPAND",
+  ["ROOT SEMITONE"] = "ROOT",
+  ["MELODY DEPTH"] = "MELODY",
+  ["VOWEL SUSTAIN"] = "VOWEL",
+  ["CHOIR VOICES"] = "CHOIR",
+  ["SHADOW VOICE"] = "SHADOW",
+  ["GHOST MIX"] = "GHOST",
+  ["SPECTRAL SHAPER"] = "SHAPER",
+  ["SHAPER PRESET"] = "PRESET",
+  ["TONE LIST"] = "TONES",
+  ["SHAPER STRENGTH"] = "STRENGTH",
+  ["SHAPER BANDWIDTH"] = "WIDTH",
+  ["SHAPER PARTIALS"] = "PARTIAL",
+  ["SHAPER BRIGHTNESS"] = "BRIGHT",
+  ["FOLLOW MELODY"] = "FOLLOW",
+  ["CODEC DAMAGE"] = "CODEC",
+  ["CODEC AMOUNT"] = "AMOUNT",
+  ["CODEC QUALITY"] = "QUALITY",
+  ["PACKET LOSS"] = "LOSS",
+  ["RESIDUE INSTEAD OF DECODED SPEECH"] = "RESIDUE",
+  ["PITCH HZ"] = "PITCH",
+  ["PITCH SPREAD"] = "SPREAD",
+  ["FORMANT SHIFT"] = "FORMANT",
+  ["MOUTH SIZE"] = "MOUTH",
+  ["FORMANT SMEAR"] = "SMEAR",
+  ["AZIMUTH WIDTH"] = "AZ WIDTH",
+  ["ELEVATION WIDTH"] = "EL WIDTH",
+  ["SPATIAL MOTION"] = "MOTION",
+  ["SPEAKER SPREAD"] = "SPREAD",
+  ["PRE-GAIN DB"] = "GAIN",
+  ["PEAK NORMALIZE"] = "PEAK",
+  ["NORMALIZE DB"] = "NORM DB",
+}
+
+local function row_label_text(label)
+  local upper = tostring(label or ""):upper()
+  return LABEL_ABBR[upper] or upper
+end
+
+local function row_layout(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" then avail = 560 end
+  local control_x = x + LABEL_W
+  local control_w = math.max(120, avail - LABEL_W - CONTROL_GAP)
+  return x, y, control_x, control_w
+end
+
+local function row_label(ctx, x, y, label)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 4, THEME.label, row_label_text(label))
+end
+
+local function finish_row(ctx, x, y)
+  ImGui.SetCursorScreenPos(ctx, x, y + ROW_H)
+end
+
+local function draw_custom_slider(ctx, label, value, lo, hi, fmt, integer)
+  local x, y, control_x, control_w = row_layout(ctx)
+  local slider_w = math.max(80, control_w - VALUE_W - CONTROL_GAP)
+  local value_x = control_x + slider_w + CONTROL_GAP
+  local track_y = y + 8
+  local track_h = 8
+  local norm = hi ~= lo and clamp((value - lo) / (hi - lo), 0, 1) or 0
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.InvisibleButton(ctx, "##" .. label, slider_w, ROW_H)
+  local hovered = ImGui.IsItemHovered(ctx)
+  local active = ImGui.IsItemActive(ctx)
+  local changed = false
+  if (hovered or active) and ImGui.IsMouseDown(ctx, 0) then
+    local mx = ImGui.GetMousePos(ctx)
+    local next_norm = clamp((mx - control_x) / slider_w, 0, 1)
+    local next_value = lo + (hi - lo) * next_norm
+    if integer then next_value = math.floor(next_value + 0.5) end
+    if math.abs(next_value - value) > (integer and 0 or 0.0000001) then
+      value = next_value
+      norm = next_norm
+      changed = true
+    end
+  end
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local frame = active and THEME.frame_active or (hovered and THEME.frame_hover or THEME.frame)
+  local fill = active and THEME.active or THEME.fill
+  local handle = active and THEME.active_hover or THEME.active
+  ImGui.DrawList_AddRectFilled(draw, control_x, track_y, control_x + slider_w, track_y + track_h, frame)
+  ImGui.DrawList_AddRectFilled(draw, control_x + 1, track_y + 1, control_x + math.max(2, slider_w * norm), track_y + track_h - 1, fill)
+  local hx = clamp(control_x + slider_w * norm - 1.5, control_x + 1, control_x + slider_w - 4)
+  ImGui.DrawList_AddRectFilled(draw, hx, track_y - 2, hx + 3, track_y + track_h + 2, handle)
+  ImGui.DrawList_AddText(draw, value_x, y + 4, THEME.value, integer and tostring(math.floor(value + 0.5)) or string.format(fmt or "%.3f", value))
+  finish_row(ctx, x, y)
+  return changed, value
+end
+
+local function draw_int_input(ctx, label, value)
+  local x, y, control_x, control_w = row_layout(ctx)
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  local changed, next_value = ImGui.InputInt(ctx, "##" .. label, math.floor(value))
+  finish_row(ctx, x, y)
+  return changed, next_value
+end
+
+local function draw_text_input(ctx, label, value)
+  local x, y, control_x, control_w = row_layout(ctx)
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  local changed, next_value = ImGui.InputText(ctx, "##" .. label, value or "")
+  finish_row(ctx, x, y)
+  return changed, next_value
+end
+
+local function draw_checkbox(ctx, label, value)
+  local x, y, control_x = row_layout(ctx)
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y + 2)
+  local changed, next_value = ImGui.Checkbox(ctx, "##" .. label, value)
+  finish_row(ctx, x, y)
+  return changed, next_value
+end
+
+local function section(ctx, label, height)
+  local stack = theme.push_soft_panel(ImGui, ctx)
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local w = ImGui.GetContentRegionAvail(ctx)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + height, THEME.panel_soft)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + 2, THEME.active)
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
+  theme.text(ImGui, ctx, label:upper())
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
+  return x, y, height, stack
+end
+
+local function finish_section(ctx, x, y, height, stack)
+  theme.pop_soft_panel(ImGui, ctx, stack)
+  ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
+end
+
 local function combo(ctx, label, idx, names)
-  if ImGui.BeginCombo(ctx, label, names[idx] or "") then
+  local x, y, control_x, control_w = row_layout(ctx)
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  if ImGui.BeginCombo(ctx, "##" .. label, names[idx] or "") then
     for i, name in ipairs(names) do
       local selected = i == idx
       if ImGui.Selectable(ctx, name, selected) then idx = i end
@@ -75,6 +240,7 @@ local function combo(ctx, label, idx, names)
     end
     ImGui.EndCombo(ctx)
   end
+  finish_row(ctx, x, y)
   return idx
 end
 
@@ -296,89 +462,96 @@ local function loop()
     local control_h = math.max(460, (avail_h or 860) - 44)
     if ImGui.BeginChild(ctx, "##evp_controls", 0, control_h) then
       local changed
-      changed, settings.text = ImGui.InputTextMultiline(ctx, "Text seed", settings.text, 420, 76)
+      local sx, sy, sh, stack = section(ctx, "Text / Output", OUTPUT_KEYS[settings.output] ~= "3oa" and 252 or 200)
+      changed, settings.text = ImGui.InputTextMultiline(ctx, "##Text seed", settings.text, math.max(360, ImGui.GetContentRegionAvail(ctx)), 76)
+      ImGui.SetCursorScreenPos(ctx, sx + 12, select(2, ImGui.GetCursorScreenPos(ctx)))
       settings.output = combo(ctx, "Output", settings.output, OUTPUT_LABELS)
       if OUTPUT_KEYS[settings.output] ~= "3oa" then
         settings.layout = combo(ctx, "Shape", settings.layout, LAYOUT_LABELS)
         settings.channels_index = combo(ctx, "Channels", settings.channels_index, CHANNEL_LABELS)
       else
-        ImGui.Text(ctx, "Output channels: 16")
+        theme.muted(ImGui, ctx, "Output channels: 16")
       end
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Speech", TIME_KEYS[settings.time_mode] == "manual_expand" and 252 or 226)
       settings.treatment = combo(ctx, "Voice treatment", settings.treatment, TREATMENT_LABELS)
-      changed, settings.tts_voice = ImGui.InputText(ctx, "eSpeak voice", settings.tts_voice, 96)
-      changed, settings.tts_speed = ImGui.SliderDouble(ctx, "Speech speed wpm", settings.tts_speed, 80.0, 280.0, "%.0f")
-      changed, settings.tts_pitch = ImGui.SliderDouble(ctx, "Speech pitch", settings.tts_pitch, 0.0, 99.0, "%.0f")
-      ImGui.TextWrapped(ctx, "EVP Field requires eSpeak NG. Treatments reshape the rendered speech before spatial output.")
-      changed, settings.duration = ImGui.SliderDouble(ctx, "Duration sec", settings.duration, 0.5, 300.0, "%.2f")
+      changed, settings.tts_voice = draw_text_input(ctx, "eSpeak voice", settings.tts_voice)
+      changed, settings.tts_speed = draw_custom_slider(ctx, "Speech speed wpm", settings.tts_speed, 80.0, 280.0, "%.0f", false)
+      changed, settings.tts_pitch = draw_custom_slider(ctx, "Speech pitch", settings.tts_pitch, 0.0, 99.0, "%.0f", false)
+      changed, settings.duration = draw_custom_slider(ctx, "Duration sec", settings.duration, 0.5, 300.0, "%.2f", false)
       settings.time_mode = combo(ctx, "Time expansion", settings.time_mode, TIME_LABELS)
       if TIME_KEYS[settings.time_mode] == "manual_expand" then
-        changed, settings.time_expand = ImGui.SliderDouble(ctx, "Expansion factor", settings.time_expand, 1.0, 12.0, "%.2f")
+        changed, settings.time_expand = draw_custom_slider(ctx, "Expansion factor", settings.time_expand, 1.0, 12.0, "%.2f", false)
       elseif TIME_KEYS[settings.time_mode] == "fill_duration" then
-        ImGui.TextWrapped(ctx, "Stretches the spoken source to fill the requested duration before treatment.")
+        theme.muted(ImGui, ctx, "Stretches speech to fill the requested duration.")
       else
-        ImGui.TextWrapped(ctx, "Uses the natural eSpeak phrase length; the render may end before the requested duration.")
+        theme.muted(ImGui, ctx, "Uses the natural eSpeak phrase length.")
       end
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Melody / Choir", 226)
       settings.scale = combo(ctx, "Scale", settings.scale, SCALE_LABELS)
-      changed, settings.root_note = ImGui.SliderInt(ctx, "Root semitone", settings.root_note, -12, 12)
-      changed, settings.melody_depth = ImGui.SliderDouble(ctx, "Melody depth", settings.melody_depth, 0.0, 1.0, "%.2f")
-      changed, settings.vowel_sustain = ImGui.SliderDouble(ctx, "Vowel sustain", settings.vowel_sustain, 0.0, 1.0, "%.2f")
-      changed, settings.choir_voices = ImGui.SliderInt(ctx, "Choir voices", settings.choir_voices, 1, 8)
-      changed, settings.shadow_voice = ImGui.SliderDouble(ctx, "Shadow voice", settings.shadow_voice, 0.0, 1.0, "%.2f")
-      changed, settings.ghost_mix = ImGui.SliderDouble(ctx, "Ghost mix", settings.ghost_mix, 0.0, 1.0, "%.2f")
-      ImGui.Separator(ctx)
+      changed, settings.root_note = draw_custom_slider(ctx, "Root semitone", settings.root_note, -12, 12, nil, true)
+      changed, settings.melody_depth = draw_custom_slider(ctx, "Melody depth", settings.melody_depth, 0.0, 1.0, "%.2f", false)
+      changed, settings.vowel_sustain = draw_custom_slider(ctx, "Vowel sustain", settings.vowel_sustain, 0.0, 1.0, "%.2f", false)
+      changed, settings.choir_voices = draw_custom_slider(ctx, "Choir voices", settings.choir_voices, 1, 8, nil, true)
+      changed, settings.shadow_voice = draw_custom_slider(ctx, "Shadow voice", settings.shadow_voice, 0.0, 1.0, "%.2f", false)
+      changed, settings.ghost_mix = draw_custom_slider(ctx, "Ghost mix", settings.ghost_mix, 0.0, 1.0, "%.2f", false)
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Spectral Shaper", SHAPER_KEYS[settings.shaper] == "off" and 70 or (SHAPER_KEYS[settings.shaper] == "tone_list" and 252 or 226))
       settings.shaper = combo(ctx, "Spectral shaper", settings.shaper, SHAPER_LABELS)
       if SHAPER_KEYS[settings.shaper] == "preset" then
         settings.shaper_preset = combo(ctx, "Shaper preset", settings.shaper_preset, SHAPER_PRESET_LABELS)
       elseif SHAPER_KEYS[settings.shaper] == "tone_list" then
-        changed, settings.tone_list = ImGui.InputText(ctx, "Tone list", settings.tone_list, 240)
-        ImGui.TextWrapped(ctx, "Use MIDI numbers, note names, or frequencies: C3 Eb3 G3 Bb3 / 60 63 67 / 220Hz.")
+        changed, settings.tone_list = draw_text_input(ctx, "Tone list", settings.tone_list)
+        theme.muted(ImGui, ctx, "Use MIDI, note names, or Hz.")
       elseif SHAPER_KEYS[settings.shaper] == "profile_item" then
-        ImGui.TextWrapped(ctx, "Uses the first selected WAV media item as a spectral imprint before rendering.")
+        theme.muted(ImGui, ctx, "Uses the first selected WAV item as spectral imprint.")
       end
       if SHAPER_KEYS[settings.shaper] ~= "off" then
-        changed, settings.shaper_strength = ImGui.SliderDouble(ctx, "Shaper strength", settings.shaper_strength, 0.0, 1.0, "%.2f")
-        changed, settings.shaper_bandwidth = ImGui.SliderDouble(ctx, "Shaper bandwidth", settings.shaper_bandwidth, 0.03, 0.80, "%.2f")
-        changed, settings.shaper_partials = ImGui.SliderInt(ctx, "Shaper partials", settings.shaper_partials, 1, 16)
-        changed, settings.shaper_brightness = ImGui.SliderDouble(ctx, "Shaper brightness", settings.shaper_brightness, -1.0, 1.0, "%.2f")
-        changed, settings.shaper_follow_melody = ImGui.Checkbox(ctx, "Follow melody", settings.shaper_follow_melody)
+        changed, settings.shaper_strength = draw_custom_slider(ctx, "Shaper strength", settings.shaper_strength, 0.0, 1.0, "%.2f", false)
+        changed, settings.shaper_bandwidth = draw_custom_slider(ctx, "Shaper bandwidth", settings.shaper_bandwidth, 0.03, 0.80, "%.2f", false)
+        changed, settings.shaper_partials = draw_custom_slider(ctx, "Shaper partials", settings.shaper_partials, 1, 16, nil, true)
+        changed, settings.shaper_brightness = draw_custom_slider(ctx, "Shaper brightness", settings.shaper_brightness, -1.0, 1.0, "%.2f", false)
+        changed, settings.shaper_follow_melody = draw_checkbox(ctx, "Follow melody", settings.shaper_follow_melody)
       end
-      ImGui.Separator(ctx)
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Codec", CODEC_KEYS[settings.codec_damage] ~= "off" and 174 or 70)
       settings.codec_damage = combo(ctx, "Codec damage", settings.codec_damage, CODEC_LABELS)
       if CODEC_KEYS[settings.codec_damage] ~= "off" then
-        ImGui.TextWrapped(ctx, "Requires Speex command-line tools: speexenc and speexdec.")
-        changed, settings.codec_amount = ImGui.SliderDouble(ctx, "Codec amount", settings.codec_amount, 0.0, 1.0, "%.2f")
-        changed, settings.codec_quality = ImGui.SliderInt(ctx, "Codec quality", settings.codec_quality, 0, 10)
-        changed, settings.codec_packet_loss = ImGui.SliderDouble(ctx, "Packet loss", settings.codec_packet_loss, 0.0, 0.45, "%.2f")
-        changed, settings.codec_residue = ImGui.Checkbox(ctx, "Residue instead of decoded speech", settings.codec_residue)
+        changed, settings.codec_amount = draw_custom_slider(ctx, "Codec amount", settings.codec_amount, 0.0, 1.0, "%.2f", false)
+        changed, settings.codec_quality = draw_custom_slider(ctx, "Codec quality", settings.codec_quality, 0, 10, nil, true)
+        changed, settings.codec_packet_loss = draw_custom_slider(ctx, "Packet loss", settings.codec_packet_loss, 0.0, 0.45, "%.2f", false)
+        changed, settings.codec_residue = draw_checkbox(ctx, "Residue instead of decoded speech", settings.codec_residue)
       end
-      ImGui.Separator(ctx)
-      changed, settings.pitch_hz = ImGui.SliderDouble(ctx, "Pitch Hz", settings.pitch_hz, 35.0, 420.0, "%.1f")
-      changed, settings.pitch_spread = ImGui.SliderDouble(ctx, "Pitch spread", settings.pitch_spread, 0.0, 2.0, "%.2f")
-      changed, settings.formant_shift = ImGui.SliderDouble(ctx, "Formant shift", settings.formant_shift, -1.0, 1.0, "%.2f")
-      changed, settings.mouth_size = ImGui.SliderDouble(ctx, "Mouth size", settings.mouth_size, 0.0, 1.0, "%.2f")
-      changed, settings.breath = ImGui.SliderDouble(ctx, "Breath", settings.breath, 0.0, 1.0, "%.2f")
-      changed, settings.noise = ImGui.SliderDouble(ctx, "Noise", settings.noise, 0.0, 1.0, "%.2f")
-      changed, settings.whisper = ImGui.SliderDouble(ctx, "Whisper", settings.whisper, 0.0, 1.0, "%.2f")
-      changed, settings.smear = ImGui.SliderDouble(ctx, "Formant smear", settings.smear, 0.0, 1.0, "%.2f")
-      ImGui.Separator(ctx)
-      changed, settings.az_width = ImGui.SliderDouble(ctx, "Azimuth width", settings.az_width, 0.0, 360.0, "%.1f")
-      changed, settings.el_width = ImGui.SliderDouble(ctx, "Elevation width", settings.el_width, 0.0, 178.0, "%.1f")
-      changed, settings.spatial_motion = ImGui.SliderDouble(ctx, "Spatial motion", settings.spatial_motion, 0.0, 1.0, "%.2f")
-      changed, settings.spatial_width = ImGui.SliderDouble(ctx, "Speaker spread", settings.spatial_width, 0.02, 1.0, "%.2f")
-      changed, settings.distance = ImGui.SliderDouble(ctx, "Distance", settings.distance, 0.2, 4.0, "%.2f")
-      ImGui.Separator(ctx)
-      changed, settings.drive = ImGui.SliderDouble(ctx, "Drive", settings.drive, 0.0, 1.0, "%.2f")
-      changed, settings.gain_db = ImGui.SliderDouble(ctx, "Pre-gain dB", settings.gain_db, -36.0, 0.0, "%.1f")
-      changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
-      if settings.normalize then changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f") end
-      changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
-      ImGui.Separator(ctx)
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Voice", 252)
+      changed, settings.pitch_hz = draw_custom_slider(ctx, "Pitch Hz", settings.pitch_hz, 35.0, 420.0, "%.1f", false)
+      changed, settings.pitch_spread = draw_custom_slider(ctx, "Pitch spread", settings.pitch_spread, 0.0, 2.0, "%.2f", false)
+      changed, settings.formant_shift = draw_custom_slider(ctx, "Formant shift", settings.formant_shift, -1.0, 1.0, "%.2f", false)
+      changed, settings.mouth_size = draw_custom_slider(ctx, "Mouth size", settings.mouth_size, 0.0, 1.0, "%.2f", false)
+      changed, settings.breath = draw_custom_slider(ctx, "Breath", settings.breath, 0.0, 1.0, "%.2f", false)
+      changed, settings.noise = draw_custom_slider(ctx, "Noise", settings.noise, 0.0, 1.0, "%.2f", false)
+      changed, settings.whisper = draw_custom_slider(ctx, "Whisper", settings.whisper, 0.0, 1.0, "%.2f", false)
+      changed, settings.smear = draw_custom_slider(ctx, "Formant smear", settings.smear, 0.0, 1.0, "%.2f", false)
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Spatial / Output", settings.normalize and 252 or 226)
+      changed, settings.az_width = draw_custom_slider(ctx, "Azimuth width", settings.az_width, 0.0, 360.0, "%.1f", false)
+      changed, settings.el_width = draw_custom_slider(ctx, "Elevation width", settings.el_width, 0.0, 178.0, "%.1f", false)
+      changed, settings.spatial_motion = draw_custom_slider(ctx, "Spatial motion", settings.spatial_motion, 0.0, 1.0, "%.2f", false)
+      changed, settings.spatial_width = draw_custom_slider(ctx, "Speaker spread", settings.spatial_width, 0.02, 1.0, "%.2f", false)
+      changed, settings.distance = draw_custom_slider(ctx, "Distance", settings.distance, 0.2, 4.0, "%.2f", false)
+      changed, settings.drive = draw_custom_slider(ctx, "Drive", settings.drive, 0.0, 1.0, "%.2f", false)
+      changed, settings.gain_db = draw_custom_slider(ctx, "Pre-gain dB", settings.gain_db, -36.0, 0.0, "%.1f", false)
+      changed, settings.normalize = draw_checkbox(ctx, "Peak normalize", settings.normalize)
+      if settings.normalize then changed, settings.normalize_db = draw_custom_slider(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f", false) end
+      changed, settings.seed = draw_int_input(ctx, "Seed", settings.seed)
+      finish_section(ctx, sx, sy, sh, stack)
       selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
+    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
     ImGui.End(ctx)
   end
   persist()

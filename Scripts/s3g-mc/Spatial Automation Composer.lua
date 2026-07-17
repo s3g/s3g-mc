@@ -651,14 +651,14 @@ local function loop()
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     local spec, fx = detect_panner(track)
     if not track then
-      ImGui.Text(ctx, "Select a track with an s3g panner.")
+      theme.muted(ImGui, ctx, "SELECT A TRACK WITH AN S3G PANNER.")
     elseif not spec then
       theme.status(ImGui, ctx, "No supported s3g AED/XYZ panner found on the selected track.", "warn")
       theme.muted(ImGui, ctx, "Supported: Layout, 12ch Dodeca, 17ch Cube XYZ, 25ch Dome panners.")
     else
       local start_pos, end_pos = time_range()
       footer_track, footer_fx, footer_spec, footer_start, footer_end = track, fx, spec, start_pos, end_pos
-      ImGui.Text(ctx, "Target: " .. spec.label)
+      theme.muted(ImGui, ctx, "TARGET: " .. spec.label)
       ImGui.SameLine(ctx)
       theme.muted(ImGui, ctx, spec.coord .. " / FX #" .. tostring(fx + 1))
 

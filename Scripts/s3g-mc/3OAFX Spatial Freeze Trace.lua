@@ -15,6 +15,7 @@ if not reaper.APIExists("ImGui_GetVersion") then
   reaper.MB("ReaImGui is not installed.", "3OAFX Spatial Freeze Trace", 0)
   return
 end
+local theme = ui_theme or require("s3g-mc ImGui Theme")
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
@@ -81,15 +82,7 @@ local function setv(key, value)
 end
 
 local function combo(label, index, names)
-  if ImGui.BeginCombo(ctx, label, names[index] or "") then
-    for i, name in ipairs(names) do
-      local selected = index == i
-      if ImGui.Selectable(ctx, name, selected) then index = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return index
+  return select(2, theme.combo_row(ImGui, ctx, label, names, index))
 end
 
 local function order_for_channels(channels)
@@ -247,37 +240,41 @@ local function loop()
     local footer_h = 42
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     if ImGui.BeginChild(ctx, "##body", 0, math.max(280, avail_h - footer_h)) then
-      ImGui.Text(ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
+      theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
       draw_preview()
+      local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Mode", 123)
       settings.order = combo("Ambisonic order", settings.order, ORDER_NAMES)
       settings.mode = combo("Mode", settings.mode, MODES)
       settings.fft = combo("FFT size", settings.fft, FFT_NAMES)
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
       local changed
-      changed, settings.duration = ImGui.SliderDouble(ctx, "Output duration sec", settings.duration, 0.25, 600.0, "%.2f")
-      changed, settings.freeze_pos = ImGui.SliderDouble(ctx, "Freeze position", settings.freeze_pos, 0.0, 1.0, "%.3f")
-      changed, settings.trace_width = ImGui.SliderDouble(ctx, "Trace width", settings.trace_width, 0.01, 1.0, "%.3f")
-      changed, settings.amount = ImGui.SliderDouble(ctx, "Freeze/trace amount", settings.amount, 0.0, 1.0, "%.3f")
-      changed, settings.wet_mix = ImGui.SliderDouble(ctx, "Wet mix", settings.wet_mix, 0.0, 1.0, "%.3f")
-      changed, settings.smooth_bins = ImGui.SliderInt(ctx, "Spectral smoothing bins", math.floor(settings.smooth_bins), 0, 96)
-      changed, settings.ghost_smooth_bins = ImGui.SliderInt(ctx, "Ghost smoothing bins", math.floor(settings.ghost_smooth_bins), 0, 160)
-      changed, settings.floor = ImGui.SliderDouble(ctx, "Envelope floor", settings.floor, 0.0, 0.5, "%.3f")
-      ImGui.Separator(ctx)
-      changed, settings.yaw_start = ImGui.SliderDouble(ctx, "Yaw start deg", settings.yaw_start, -360.0, 360.0, "%.1f")
-      changed, settings.yaw_end = ImGui.SliderDouble(ctx, "Yaw end deg", settings.yaw_end, -360.0, 360.0, "%.1f")
-      changed, settings.higher_order_weight = ImGui.SliderDouble(ctx, "Higher-order weight", settings.higher_order_weight, 0.0, 2.0, "%.2f")
-      changed, settings.w_weight = ImGui.SliderDouble(ctx, "W weight", settings.w_weight, 0.0, 2.0, "%.2f")
-      changed, settings.soft_limit = ImGui.Checkbox(ctx, "Soft limit before normalize", settings.soft_limit)
-      changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Spectral", 248)
+      changed, settings.duration = theme.slider_double(ImGui, ctx, "Output duration sec", settings.duration, 0.25, 600.0, "%.2f")
+      changed, settings.freeze_pos = theme.slider_double(ImGui, ctx, "Freeze position", settings.freeze_pos, 0.0, 1.0, "%.3f")
+      changed, settings.trace_width = theme.slider_double(ImGui, ctx, "Trace width", settings.trace_width, 0.01, 1.0, "%.3f")
+      changed, settings.amount = theme.slider_double(ImGui, ctx, "Freeze/trace amount", settings.amount, 0.0, 1.0, "%.3f")
+      changed, settings.wet_mix = theme.slider_double(ImGui, ctx, "Wet mix", settings.wet_mix, 0.0, 1.0, "%.3f")
+      changed, settings.smooth_bins = theme.slider_int(ImGui, ctx, "Spectral smoothing bins", math.floor(settings.smooth_bins), 0, 96)
+      changed, settings.ghost_smooth_bins = theme.slider_int(ImGui, ctx, "Ghost smoothing bins", math.floor(settings.ghost_smooth_bins), 0, 160)
+      changed, settings.floor = theme.slider_double(ImGui, ctx, "Envelope floor", settings.floor, 0.0, 0.5, "%.3f")
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Spatial / Output", settings.normalize and 198 or 173)
+      changed, settings.yaw_start = theme.slider_double(ImGui, ctx, "Yaw start deg", settings.yaw_start, -360.0, 360.0, "%.1f")
+      changed, settings.yaw_end = theme.slider_double(ImGui, ctx, "Yaw end deg", settings.yaw_end, -360.0, 360.0, "%.1f")
+      changed, settings.higher_order_weight = theme.slider_double(ImGui, ctx, "Higher-order weight", settings.higher_order_weight, 0.0, 2.0, "%.2f")
+      changed, settings.w_weight = theme.slider_double(ImGui, ctx, "W weight", settings.w_weight, 0.0, 2.0, "%.2f")
+      changed, settings.soft_limit = theme.checkbox_row(ImGui, ctx, "Soft limit before normalize", settings.soft_limit)
+      changed, settings.normalize = theme.checkbox_row(ImGui, ctx, "Peak normalize", settings.normalize)
       if settings.normalize then
-        changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+        changed, settings.normalize_db = theme.slider_double(ImGui, ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
       end
-      ImGui.Separator(ctx)
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
       muted_wrapped_text("The same spectral frame or trace path is applied across all encoded channels, keeping the ambisonic channel set coherent.")
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "Render", 104, 28) then should_render = true end
+    if ImGui.Button(ctx, "RENDER", 104, 28) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 104, 28) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 104, 28) then open = false end
     ImGui.End(ctx)
   end
   persist()

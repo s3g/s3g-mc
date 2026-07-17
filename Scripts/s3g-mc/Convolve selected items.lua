@@ -30,6 +30,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
+local sol_ui = dofile(script_dir .. "Spectral Offline Library.lua")
 
 
 local MODE_MATCHED_WRAP = 1
@@ -664,33 +666,33 @@ local function main()
       local source = swap and entries[2] or entries[1]
       local impulse = swap and entries[1] or entries[2]
       local plan, output_channels = channel_plan(source.channels, impulse.channels, mode)
-      ImGui.Text(ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
-      ImGui.Text(ctx, "Impulse: " .. impulse.name .. "  (" .. tostring(impulse.channels) .. " ch)")
-      if ImGui.Button(ctx, "Swap source / impulse") then swap = not swap end
-      ImGui.Spacing(ctx)
+      theme.muted(ImGui, ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
+      theme.muted(ImGui, ctx, "Impulse: " .. impulse.name .. "  (" .. tostring(impulse.channels) .. " ch)")
+      if ImGui.Button(ctx, "SWAP", 92, 26) then swap = not swap end
       local changed
-      changed, mode = draw_combo(ctx, "Channel mode", mode, MODE_NAMES, MODE_MATCHED_WRAP, MODE_MATRIX)
-      changed, tail_mode = draw_combo(ctx, "Output length", tail_mode, TAIL_NAMES, TAIL_FULL, TAIL_TRIM)
-      changed, wet_gain_db = ImGui.SliderDouble(ctx, "Pre-normalize gain dB", wet_gain_db, -36, 12, "%.1f")
-      changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
+      local sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Convolution", normalize and 173 or 148)
+      changed, mode = sol_ui.draw_combo(ImGui, ctx, "Channel mode", mode, MODE_NAMES, MODE_MATCHED_WRAP, MODE_MATRIX)
+      changed, tail_mode = sol_ui.draw_combo(ImGui, ctx, "Output length", tail_mode, TAIL_NAMES, TAIL_FULL, TAIL_TRIM)
+      changed, wet_gain_db = sol_ui.draw_slider(ImGui, ctx, "Pre-normalize gain dB", wet_gain_db, -36, 12, "%.1f", false)
+      changed, normalize = sol_ui.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
       if normalize then
-        changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f")
+        changed, normalize_db = sol_ui.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false)
       end
-      ImGui.Spacing(ctx)
-      ImGui.Separator(ctx)
-      ImGui.Spacing(ctx)
-      ImGui.Text(ctx, "Convolution paths: " .. tostring(#plan))
-      ImGui.Text(ctx, "Output channels: " .. tostring(output_channels))
+      sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Summary", 110)
+      theme.muted(ImGui, ctx, "Convolution paths: " .. tostring(#plan))
+      theme.muted(ImGui, ctx, "Output channels: " .. tostring(output_channels))
       if output_channels > mc.MAX_REAPER_TRACK_CHANNELS then
-        ImGui.Text(ctx, "Too many output channels for REAPER.")
+        theme.status(ImGui, ctx, "Too many output channels for REAPER.", "warn")
       else
-        ImGui.Text(ctx, "Renders offline from WAV media with NumPy.")
+        theme.muted(ImGui, ctx, "Renders offline from WAV media with NumPy.")
       end
-      if ImGui.Button(ctx, "Render", 92, 26) and output_channels <= mc.MAX_REAPER_TRACK_CHANNELS then
+      sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
+      if ImGui.Button(ctx, "RENDER", 92, 26) and output_channels <= mc.MAX_REAPER_TRACK_CHANNELS then
         should_render = true
       end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+      if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
       ImGui.End(ctx)
     end
 

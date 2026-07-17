@@ -52,19 +52,22 @@ local function loop()
   if visible then
     theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
     local changed
+    local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Accumulate", 198)
     changed, fft_index = sol.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
-    changed, amount = ImGui.SliderDouble(ctx, "Accumulate amount", amount, 0, 1, "%.3f")
-    changed, decay = ImGui.SliderDouble(ctx, "Memory decay", decay, 0.9, 1.0, "%.4f")
-    changed, floor = ImGui.SliderDouble(ctx, "Spectral floor", floor, 0.001, 0.25, "%.3f")
-    changed, expand = ImGui.SliderDouble(ctx, "Expansion", expand, 1.0, 8.0, "%.2fx")
-    changed, mix = ImGui.SliderDouble(ctx, "Wet mix", mix, 0, 1, "%.3f")
-    changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
-    if normalize then changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f") end
-    ImGui.Separator(ctx)
+    changed, amount = sol.draw_slider(ImGui, ctx, "Accumulate amount", amount, 0, 1, "%.3f", false)
+    changed, decay = sol.draw_slider(ImGui, ctx, "Memory decay", decay, 0.9, 1.0, "%.4f", false)
+    changed, floor = sol.draw_slider(ImGui, ctx, "Spectral floor", floor, 0.001, 0.25, "%.3f", false)
+    changed, expand = sol.draw_slider(ImGui, ctx, "Expansion", expand, 1.0, 8.0, "%.2fx", false)
+    changed, mix = sol.draw_slider(ImGui, ctx, "Wet mix", mix, 0, 1, "%.3f", false)
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Output", normalize and 98 or 73)
+    changed, normalize = sol.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
+    if normalize then changed, normalize_db = sol.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false) end
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
     theme.muted(ImGui, ctx, "Sustains each bin until stronger energy replaces it.")
-    if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
+    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
     ImGui.End(ctx)
   end
   if should_render then

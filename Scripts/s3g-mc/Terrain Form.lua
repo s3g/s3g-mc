@@ -37,13 +37,11 @@ local open = true
 local status = ""
 
 local function ui_slider_int(label, value, min_value, max_value)
-  if theme and theme.slider_int then return theme.slider_int(ImGui, ctx, label, value, min_value, max_value) end
-  return ImGui.SliderInt(ctx, label, value, min_value, max_value)
+  return theme.slider_int(ImGui, ctx, label, value, min_value, max_value)
 end
 
 local function ui_slider_double(label, value, min_value, max_value, format)
-  if theme and theme.slider_double then return theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format) end
-  return ImGui.SliderDouble(ctx, label, value, min_value, max_value, format)
+  return theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format)
 end
 
 local ROOTS = midi.ROOT_NAMES

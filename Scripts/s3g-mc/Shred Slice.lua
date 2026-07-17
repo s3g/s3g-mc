@@ -34,6 +34,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 
 local SLICE_EQUAL = 1
@@ -175,6 +177,84 @@ local function clamp_value(value, lo, hi)
   if value < lo then return lo end
   if value > hi then return hi end
   return value
+end
+
+local ROW_H = 25
+local LABEL_W = 86
+local CONTROL_GAP = 8
+local VALUE_W = 76
+
+local LABEL_ABBR = {
+  ["OUTPUT CHANNELS"] = "OUT CH",
+  ["SOURCE CHANNEL"] = "SRC CH",
+  ["FADE SECONDS"] = "FADE",
+}
+
+local function clamp(value, lo, hi)
+  if value < lo then return lo end
+  if value > hi then return hi end
+  return value
+end
+
+local function row_label_text(label)
+  local upper = tostring(label or ""):upper()
+  return LABEL_ABBR[upper] or upper
+end
+
+local function row_layout(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" then avail = 360 end
+  local control_x = x + LABEL_W
+  local control_w = math.max(120, avail - LABEL_W - CONTROL_GAP)
+  return x, y, control_x, control_w
+end
+
+local function row_label(ctx, x, y, label)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 4, THEME.label, row_label_text(label))
+end
+
+local function finish_row(ctx, x, y)
+  ImGui.SetCursorScreenPos(ctx, x, y + ROW_H)
+end
+
+local function draw_custom_slider(ctx, label, value, lo, hi, fmt, integer)
+  local x, y, control_x, control_w = row_layout(ctx)
+  local slider_w = math.max(80, control_w - VALUE_W - CONTROL_GAP)
+  local value_x = control_x + slider_w + CONTROL_GAP
+  local track_y = y + 8
+  local track_h = 8
+  local norm = hi ~= lo and clamp((value - lo) / (hi - lo), 0, 1) or 0
+
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.InvisibleButton(ctx, "##" .. label, slider_w, ROW_H)
+  local hovered = ImGui.IsItemHovered(ctx)
+  local active = ImGui.IsItemActive(ctx)
+  local changed = false
+  if (hovered or active) and ImGui.IsMouseDown(ctx, 0) then
+    local mx = ImGui.GetMousePos(ctx)
+    local next_norm = clamp((mx - control_x) / slider_w, 0, 1)
+    local next_value = lo + (hi - lo) * next_norm
+    if integer then next_value = math.floor(next_value + 0.5) end
+    if math.abs(next_value - value) > (integer and 0 or 0.0000001) then
+      value = next_value
+      norm = next_norm
+      changed = true
+    end
+  end
+
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local frame = active and THEME.frame_active or (hovered and THEME.frame_hover or THEME.frame)
+  local fill = active and THEME.active or THEME.fill
+  local handle = active and THEME.active_hover or THEME.active
+  ImGui.DrawList_AddRectFilled(draw, control_x, track_y, control_x + slider_w, track_y + track_h, frame)
+  ImGui.DrawList_AddRectFilled(draw, control_x + 1, track_y + 1, control_x + math.max(2, slider_w * norm), track_y + track_h - 1, fill)
+  local hx = clamp(control_x + slider_w * norm - 1.5, control_x + 1, control_x + slider_w - 4)
+  ImGui.DrawList_AddRectFilled(draw, hx, track_y - 2, hx + 3, track_y + track_h + 2, handle)
+  ImGui.DrawList_AddText(draw, value_x, y + 4, THEME.value, integer and tostring(math.floor(value + 0.5)) or string.format(fmt or "%.3f", value))
+  finish_row(ctx, x, y)
+  return changed, value
 end
 
 local function run_process(item, take, source_channels, slice_mode, motion_mode, slice_count, output_channels, source_channel, fade_seconds)
@@ -319,7 +399,11 @@ end
 
 local function draw_combo(ctx, label, value, names, first_index, last_index)
   local changed = false
-  if ImGui.BeginCombo(ctx, label, names[value] or "") then
+  local x, y, control_x, control_w = row_layout(ctx)
+  row_label(ctx, x, y, label)
+  ImGui.SetCursorScreenPos(ctx, control_x, y)
+  ImGui.SetNextItemWidth(ctx, control_w)
+  if ImGui.BeginCombo(ctx, "##" .. label, names[value] or "") then
     for index = first_index, last_index do
       local selected = value == index
       if ImGui.Selectable(ctx, names[index], selected) then
@@ -330,7 +414,26 @@ local function draw_combo(ctx, label, value, names, first_index, last_index)
     end
     ImGui.EndCombo(ctx)
   end
+  finish_row(ctx, x, y)
   return changed, value
+end
+
+local function section(ctx, label, height)
+  local stack = theme.push_soft_panel(ImGui, ctx)
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local w = ImGui.GetContentRegionAvail(ctx)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + height, THEME.panel_soft)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + 2, THEME.active)
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
+  theme.text(ImGui, ctx, label:upper())
+  ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
+  return x, y, height, stack
+end
+
+local function finish_section(ctx, x, y, height, stack)
+  theme.pop_soft_panel(ImGui, ctx, stack)
+  ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
 end
 
 local function main()
@@ -354,46 +457,48 @@ local function main()
     visible, open = ImGui.Begin(ctx, "Shred / Slice", open)
 
     if visible then
-      ImGui.Text(ctx, "Source: " .. mc.item_label(item) .. "  (" .. tostring(source_channels) .. " ch)")
+      theme.muted(ImGui, ctx, "Source: " .. mc.item_label(item) .. "  (" .. tostring(source_channels) .. " ch)")
       ImGui.Spacing(ctx)
       local changed
+      local sx, sy, sh, stack = section(ctx, "Settings", 238)
       changed, slice_mode = draw_combo(ctx, "Slice", slice_mode, SLICE_MODE_NAMES, SLICE_EQUAL, SLICE_MARKERS)
       changed, motion_mode = draw_combo(ctx, "Motion", motion_mode, MOTION_MODE_NAMES, MODE_ORDERED_MONO, MODE_RANDOM_ROTATE)
 
       local mono_motion = is_mono_motion(motion_mode)
       source_channel = clamp_value(source_channel, 1, source_channels)
       if slice_mode == SLICE_EQUAL then
-        changed, slice_count = ImGui.SliderInt(ctx, "Slices", slice_count, 2, 256)
+        changed, slice_count = draw_custom_slider(ctx, "Slices", slice_count, 2, 256, nil, true)
       else
-        ImGui.Text(ctx, "Slices: project or active-take markers inside item")
+        theme.muted(ImGui, ctx, "Slices follow project or active-take markers inside item.")
       end
 
       if mono_motion then
-        changed, output_channels = ImGui.SliderInt(ctx, "Output channels", output_channels, 2, mc.MAX_REAPER_TRACK_CHANNELS)
-        changed, source_channel = ImGui.SliderInt(ctx, "Source channel", source_channel, 1, source_channels)
+        changed, output_channels = draw_custom_slider(ctx, "Output channels", output_channels, 2, mc.MAX_REAPER_TRACK_CHANNELS, nil, true)
+        changed, source_channel = draw_custom_slider(ctx, "Source channel", source_channel, 1, source_channels, nil, true)
       else
         output_channels = source_channels
-        ImGui.Text(ctx, "Output channels: " .. tostring(output_channels) .. " (matches source)")
-        ImGui.Text(ctx, "Source: all channels")
+        theme.muted(ImGui, ctx, "Output channels: " .. tostring(output_channels) .. " (matches source)")
+        theme.muted(ImGui, ctx, "Source: all channels")
       end
 
-      changed, fade_seconds = ImGui.SliderDouble(ctx, "Fade seconds", fade_seconds, 0, 0.1, "%.4f")
+      changed, fade_seconds = draw_custom_slider(ctx, "Fade seconds", fade_seconds, 0, 0.1, "%.4f", false)
+      finish_section(ctx, sx, sy, sh, stack)
       ImGui.Spacing(ctx)
       ImGui.Separator(ctx)
       ImGui.Spacing(ctx)
 
       local can_render = mono_motion or source_channels >= 2
       if not can_render then
-        ImGui.Text(ctx, "Multichannel motion needs a multichannel source item.")
+        theme.status(ImGui, ctx, "Multichannel motion needs a multichannel source item.", "warn")
       elseif status ~= "" then
-        ImGui.Text(ctx, status)
+        theme.status(ImGui, ctx, status, "warn")
       elseif slice_mode == SLICE_MARKERS then
-        ImGui.Text(ctx, "Uses markers inside the selected item as slice boundaries.")
+        theme.muted(ImGui, ctx, "Uses markers inside the selected item as slice boundaries.")
       else
-        ImGui.Text(ctx, "Uses " .. tostring(slice_count) .. " equal slices.")
+        theme.muted(ImGui, ctx, "Uses " .. tostring(slice_count) .. " equal slices.")
       end
 
-      if ImGui.Button(ctx, "Render", 92, 26) then
+      if ImGui.Button(ctx, "RENDER", 92, 26) then
         if can_render then
           should_render = true
         else
@@ -401,7 +506,7 @@ local function main()
         end
       end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Cancel", 92, 26) then
+      if ImGui.Button(ctx, "CANCEL", 92, 26) then
         open = false
       end
       ImGui.End(ctx)

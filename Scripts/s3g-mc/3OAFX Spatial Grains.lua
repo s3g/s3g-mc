@@ -14,6 +14,7 @@ local nr = dofile(script_dir .. "NumPy Render Library.lua")
 if not reaper.APIExists("ImGui_GetVersion") then reaper.MB("ReaImGui is not installed.", "3OAFX Spatial Grains", 0) return end
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local theme
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -22,7 +23,10 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme then
+    theme = _s3g_theme
+    if _s3g_theme.install then _s3g_theme.install(ImGui) end
+  end
 end
 
 local EXT = "s3g_mc_foafx_spatial_grains_v1"
@@ -33,15 +37,8 @@ local function getn(k, d) return tonumber(reaper.GetExtState(EXT, k)) or d end
 local function getb(k, d) local v = reaper.GetExtState(EXT, k); if v == "" then return d end; return v ~= "0" end
 local function set(k, v) reaper.SetExtState(EXT, k, type(v) == "boolean" and (v and "1" or "0") or tostring(v), true) end
 local function combo(ctx, label, idx, names)
-  if ImGui.BeginCombo(ctx, label, names[idx] or "") then
-    for i, name in ipairs(names) do
-      local selected = i == idx
-      if ImGui.Selectable(ctx, name, selected) then idx = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return idx
+  local _, next_idx = theme.combo_row(ImGui, ctx, label, names, idx)
+  return next_idx
 end
 local function order_for(ch) if ch >= 16 then return 3 elseif ch >= 9 then return 2 else return 1 end end
 local function order_channels(order) return (order + 1) * (order + 1) end
@@ -130,37 +127,47 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, "3OAFX Spatial Grains", open)
   if visible then
-    ImGui.Text(ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
+    theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
     local changed
-    changed, settings.order = ImGui.SliderInt(ctx, "Ambisonic order", math.floor(settings.order), 1, 3)
+    local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Routing", 123)
+    changed, settings.order = theme.slider_int(ImGui, ctx, "Ambisonic order", math.floor(settings.order), 1, 3)
     settings.mode = combo(ctx, "Navigation mode", settings.mode, MODE_LABELS)
-    changed, settings.duration = ImGui.SliderDouble(ctx, "Output duration sec", settings.duration, 0.25, 300.0, "%.2f")
-    changed, settings.density = ImGui.SliderDouble(ctx, "Density grains/sec", settings.density, 1.0, 240.0, "%.1f")
-    changed, settings.grain_ms = ImGui.SliderDouble(ctx, "Grain size ms", settings.grain_ms, 8.0, 600.0, "%.1f")
-    changed, settings.position_jitter = ImGui.SliderDouble(ctx, "Source-time scatter", settings.position_jitter, 0.0, 1.0, "%.2f")
-    changed, settings.rate = ImGui.SliderDouble(ctx, "Playback rate", settings.rate, 0.125, 4.0, "%.3f")
-    changed, settings.rate_jitter = ImGui.SliderDouble(ctx, "Rate jitter oct", settings.rate_jitter, 0.0, 1.0, "%.3f")
-    changed, settings.reverse_probability = ImGui.SliderDouble(ctx, "Reverse probability", settings.reverse_probability, 0.0, 1.0, "%.2f")
-    changed, settings.freeze_position = ImGui.SliderDouble(ctx, "Freeze position", settings.freeze_position, 0.0, 1.0, "%.3f")
-    changed, settings.dual_a = ImGui.SliderDouble(ctx, "Dual state A", settings.dual_a, 0.0, 1.0, "%.3f")
-    changed, settings.dual_b = ImGui.SliderDouble(ctx, "Dual state B", settings.dual_b, 0.0, 1.0, "%.3f")
-    changed, settings.jump_steps = ImGui.SliderInt(ctx, "Jump steps", math.floor(settings.jump_steps), 2, 64)
-    changed, settings.room_memory = ImGui.SliderDouble(ctx, "Room memory", settings.room_memory, 0.0, 1.0, "%.2f")
-    changed, settings.doppler_rate = ImGui.SliderDouble(ctx, "Doppler-like rate", settings.doppler_rate, 0.0, 1.0, "%.2f")
-    ImGui.Separator(ctx)
-    changed, settings.yaw_start = ImGui.SliderDouble(ctx, "Yaw start deg", settings.yaw_start, -360.0, 360.0, "%.1f")
-    changed, settings.yaw_end = ImGui.SliderDouble(ctx, "Yaw end deg", settings.yaw_end, -360.0, 360.0, "%.1f")
-    changed, settings.yaw_scatter = ImGui.SliderDouble(ctx, "Per-grain yaw scatter", settings.yaw_scatter, 0.0, 180.0, "%.1f")
-    changed, settings.higher_order_weight = ImGui.SliderDouble(ctx, "Higher-order weight", settings.higher_order_weight, 0.0, 2.0, "%.2f")
-    changed, settings.w_weight = ImGui.SliderDouble(ctx, "W weight", settings.w_weight, 0.0, 2.0, "%.2f")
-    changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
-    if settings.normalize then changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f") end
-    changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
-    ImGui.Separator(ctx)
-    ImGui.Text(ctx, "Every grain event is shared across all encoded HOA channels.")
-    if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
+    changed, settings.duration = theme.slider_double(ImGui, ctx, "Output duration sec", settings.duration, 0.25, 300.0, "%.2f")
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Grains", 246)
+    changed, settings.density = theme.slider_double(ImGui, ctx, "Density grains/sec", settings.density, 1.0, 240.0, "%.1f")
+    changed, settings.grain_ms = theme.slider_double(ImGui, ctx, "Grain size ms", settings.grain_ms, 8.0, 600.0, "%.1f")
+    changed, settings.position_jitter = theme.slider_double(ImGui, ctx, "Source-time scatter", settings.position_jitter, 0.0, 1.0, "%.2f")
+    changed, settings.rate = theme.slider_double(ImGui, ctx, "Playback rate", settings.rate, 0.125, 4.0, "%.3f")
+    changed, settings.rate_jitter = theme.slider_double(ImGui, ctx, "Rate jitter oct", settings.rate_jitter, 0.0, 1.0, "%.3f")
+    changed, settings.reverse_probability = theme.slider_double(ImGui, ctx, "Reverse probability", settings.reverse_probability, 0.0, 1.0, "%.2f")
+    changed, settings.freeze_position = theme.slider_double(ImGui, ctx, "Freeze position", settings.freeze_position, 0.0, 1.0, "%.3f")
+    changed, settings.dual_a = theme.slider_double(ImGui, ctx, "Dual state A", settings.dual_a, 0.0, 1.0, "%.3f")
+    changed, settings.dual_b = theme.slider_double(ImGui, ctx, "Dual state B", settings.dual_b, 0.0, 1.0, "%.3f")
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Motion", 136)
+    changed, settings.jump_steps = theme.slider_int(ImGui, ctx, "Jump steps", math.floor(settings.jump_steps), 2, 64)
+    changed, settings.room_memory = theme.slider_double(ImGui, ctx, "Room memory", settings.room_memory, 0.0, 1.0, "%.2f")
+    changed, settings.doppler_rate = theme.slider_double(ImGui, ctx, "Doppler-like rate", settings.doppler_rate, 0.0, 1.0, "%.2f")
+    changed, settings.yaw_start = theme.slider_double(ImGui, ctx, "Yaw start deg", settings.yaw_start, -360.0, 360.0, "%.1f")
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Spatial / Output", settings.normalize and 224 or 199)
+    changed, settings.yaw_end = theme.slider_double(ImGui, ctx, "Yaw end deg", settings.yaw_end, -360.0, 360.0, "%.1f")
+    changed, settings.yaw_scatter = theme.slider_double(ImGui, ctx, "Per-grain yaw scatter", settings.yaw_scatter, 0.0, 180.0, "%.1f")
+    changed, settings.higher_order_weight = theme.slider_double(ImGui, ctx, "Higher-order weight", settings.higher_order_weight, 0.0, 2.0, "%.2f")
+    changed, settings.w_weight = theme.slider_double(ImGui, ctx, "W weight", settings.w_weight, 0.0, 2.0, "%.2f")
+    changed, settings.normalize = theme.checkbox_row(ImGui, ctx, "Peak normalize", settings.normalize)
+    if settings.normalize then changed, settings.normalize_db = theme.slider_double(ImGui, ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f") end
+    changed, settings.seed = theme.input_int_row(ImGui, ctx, "Seed", math.floor(settings.seed))
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+    theme.muted(ImGui, ctx, "Every grain event is shared across all encoded HOA channels.")
+    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
     ImGui.End(ctx)
   end
   persist()

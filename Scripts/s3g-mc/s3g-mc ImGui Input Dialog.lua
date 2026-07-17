@@ -91,7 +91,7 @@ function M.prompt_csv(title, labels_csv, defaults_csv, on_submit, opts)
       local input_w = opts.input_width or math.max(160, window_width - label_w - 54)
       for index, label in ipairs(labels) do
         ImGui.AlignTextToFramePadding(ctx)
-        ImGui.Text(ctx, tostring(label))
+        if theme and theme.muted then theme.muted(ImGui, ctx, tostring(label):upper()) else ImGui.TextColored(ctx, 0x9a9a9aff, tostring(label):upper()) end
         ImGui.SameLine(ctx, label_w)
         ImGui.PushItemWidth(ctx, input_w)
         local changed, value = ImGui.InputText(ctx, "##field" .. tostring(index), values[index] or "")
@@ -100,12 +100,12 @@ function M.prompt_csv(title, labels_csv, defaults_csv, on_submit, opts)
       end
 
       ImGui.Spacing(ctx)
-      if ImGui.Button(ctx, button_label, 96, 28) then
+      if ImGui.Button(ctx, tostring(button_label):upper(), 96, 28) then
         submitted = true
         open = false
       end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Cancel", 96, 28) then
+      if ImGui.Button(ctx, "CANCEL", 96, 28) then
         open = false
       end
       ImGui.End(ctx)

@@ -37,13 +37,11 @@ local open = true
 local status = ""
 
 local function ui_slider_int(label, value, min_value, max_value)
-  if ui_theme and ui_theme.slider_int then return ui_theme.slider_int(ImGui, ctx, label, value, min_value, max_value) end
-  return ImGui.SliderInt(ctx, label, value, min_value, max_value)
+  return ui_theme.slider_int(ImGui, ctx, label, value, min_value, max_value)
 end
 
 local function ui_slider_double(label, value, min_value, max_value, format)
-  if ui_theme and ui_theme.slider_double then return ui_theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format) end
-  return ImGui.SliderDouble(ctx, label, value, min_value, max_value, format)
+  return ui_theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format)
 end
 
 local STRATEGY_NAMES = { "Channel canon", "Drift variation", "Expanded return", "Fragmented blocks", "Source echo", "Terrain hybrid" }
@@ -85,7 +83,7 @@ local CANVAS = {
 }
 
 local function muted_text(value)
-  if ui_theme and ui_theme.muted then ui_theme.muted(ImGui, ctx, value) else ImGui.Text(ctx, value) end
+  ui_theme.muted(ImGui, ctx, value)
 end
 
 local function combo(label, labels, value, width)

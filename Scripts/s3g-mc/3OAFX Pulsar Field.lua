@@ -15,6 +15,7 @@ local be = dofile(script_dir .. "Breakpoint Envelope Library.lua")
 if not reaper.APIExists("ImGui_GetVersion") then reaper.MB("ReaImGui is not installed.", "3OAFX Pulsar Field", 0) return end
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local theme
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -23,7 +24,10 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme then
+    theme = _s3g_theme
+    if _s3g_theme.install then _s3g_theme.install(ImGui) end
+  end
 end
 
 
@@ -53,15 +57,8 @@ local function order_channels(order) return (order + 1) * (order + 1) end
 local function rgba(r, g, b, a) return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1) end
 local settings
 local function combo(ctx, label, idx, names)
-  if ImGui.BeginCombo(ctx, label, names[idx] or "") then
-    for i, name in ipairs(names) do
-      local selected = i == idx
-      if ImGui.Selectable(ctx, name, selected) then idx = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return idx
+  local _, next_idx = theme.combo_row(ImGui, ctx, label, names, idx)
+  return next_idx
 end
 
 local function draw_diagram(ctx)
@@ -209,43 +206,51 @@ local function loop()
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(400, (avail_h or 760) - 44)
     if ImGui.BeginChild(ctx, "##pulsar_controls", 0, control_h) then
-    local changed
-    changed, settings.order = ImGui.SliderInt(ctx, "Ambisonic order", math.floor(settings.order), 1, 3)
-    changed, settings.duration = ImGui.SliderDouble(ctx, "Duration sec", settings.duration, 0.25, 120.0, "%.2f")
-    changed, settings.streams = ImGui.SliderInt(ctx, "Pulsar streams", math.floor(settings.streams), 1, 12)
-    settings.curve = combo(ctx, "Train curve", settings.curve, CURVE_LABELS)
-    settings.mask = combo(ctx, "Pulse mask", settings.mask, MASK_LABELS)
-    ImGui.Separator(ctx)
-    changed, settings.fund_start = ImGui.SliderDouble(ctx, "Fundamental start Hz", settings.fund_start, 0.25, 250.0, "%.2f")
-    changed, settings.fund_end = ImGui.SliderDouble(ctx, "Fundamental end Hz", settings.fund_end, 0.25, 250.0, "%.2f")
-    changed, settings.form_start = ImGui.SliderDouble(ctx, "Formant start Hz", settings.form_start, 40.0, 8000.0, "%.1f")
-    changed, settings.form_end = ImGui.SliderDouble(ctx, "Formant end Hz", settings.form_end, 40.0, 8000.0, "%.1f")
-    changed, settings.formant_scatter = ImGui.SliderDouble(ctx, "Formant scatter", settings.formant_scatter, 0.0, 1.0, "%.2f")
-    changed, settings.drift = ImGui.SliderDouble(ctx, "Train drift", settings.drift, 0.0, 1.0, "%.2f")
-    ImGui.Separator(ctx)
-    settings.pulsaret = combo(ctx, "Pulsaret", settings.pulsaret, PULSARET_LABELS)
-    settings.envelope = combo(ctx, "Pulsaret envelope", settings.envelope, ENV_LABELS)
-    changed, settings.edge = ImGui.SliderDouble(ctx, "Edge / cutoff softness", settings.edge, 0.0, 1.0, "%.2f")
-    changed, settings.probability = ImGui.SliderDouble(ctx, "Stochastic probability", settings.probability, 0.0, 1.0, "%.2f")
-    changed, settings.burst_on = ImGui.SliderInt(ctx, "Burst on", math.floor(settings.burst_on), 1, 32)
-    changed, settings.burst_off = ImGui.SliderInt(ctx, "Burst off", math.floor(settings.burst_off), 0, 32)
-    ImGui.Separator(ctx)
-    changed, settings.yaw_start = ImGui.SliderDouble(ctx, "Azimuth start deg", settings.yaw_start, -180.0, 180.0, "%.1f")
-    changed, settings.yaw_end = ImGui.SliderDouble(ctx, "Azimuth end deg", settings.yaw_end, -180.0, 180.0, "%.1f")
-    changed, settings.elevation = ImGui.SliderDouble(ctx, "Elevation deg", settings.elevation, -89.0, 89.0, "%.1f")
-    changed, settings.spatial_spread = ImGui.SliderDouble(ctx, "Stream spatial spread", settings.spatial_spread, 0.0, 1.0, "%.2f")
-    changed, settings.channel_mask = ImGui.SliderDouble(ctx, "Per-pulse channel mask", settings.channel_mask, 0.0, 1.0, "%.2f")
-    changed, settings.gain_db = ImGui.SliderDouble(ctx, "Pre-gain dB", settings.gain_db, -36.0, 0.0, "%.1f")
-    changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
-    if settings.normalize then changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f") end
-    changed, settings.seed = ImGui.InputInt(ctx, "Seed", math.floor(settings.seed))
-    ImGui.Separator(ctx)
-    selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
+      local changed
+      local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Pulsar", 158)
+      changed, settings.order = theme.slider_int(ImGui, ctx, "Ambisonic order", math.floor(settings.order), 1, 3)
+      changed, settings.duration = theme.slider_double(ImGui, ctx, "Duration sec", settings.duration, 0.25, 120.0, "%.2f")
+      changed, settings.streams = theme.slider_int(ImGui, ctx, "Pulsar streams", math.floor(settings.streams), 1, 12)
+      settings.curve = combo(ctx, "Train curve", settings.curve, CURVE_LABELS)
+      settings.mask = combo(ctx, "Pulse mask", settings.mask, MASK_LABELS)
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Spectrum", 180)
+      changed, settings.fund_start = theme.slider_double(ImGui, ctx, "Fundamental start Hz", settings.fund_start, 0.25, 250.0, "%.2f")
+      changed, settings.fund_end = theme.slider_double(ImGui, ctx, "Fundamental end Hz", settings.fund_end, 0.25, 250.0, "%.2f")
+      changed, settings.form_start = theme.slider_double(ImGui, ctx, "Formant start Hz", settings.form_start, 40.0, 8000.0, "%.1f")
+      changed, settings.form_end = theme.slider_double(ImGui, ctx, "Formant end Hz", settings.form_end, 40.0, 8000.0, "%.1f")
+      changed, settings.formant_scatter = theme.slider_double(ImGui, ctx, "Formant scatter", settings.formant_scatter, 0.0, 1.0, "%.2f")
+      changed, settings.drift = theme.slider_double(ImGui, ctx, "Train drift", settings.drift, 0.0, 1.0, "%.2f")
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Pulsaret", 180)
+      settings.pulsaret = combo(ctx, "Pulsaret", settings.pulsaret, PULSARET_LABELS)
+      settings.envelope = combo(ctx, "Pulsaret envelope", settings.envelope, ENV_LABELS)
+      changed, settings.edge = theme.slider_double(ImGui, ctx, "Edge / cutoff softness", settings.edge, 0.0, 1.0, "%.2f")
+      changed, settings.probability = theme.slider_double(ImGui, ctx, "Stochastic probability", settings.probability, 0.0, 1.0, "%.2f")
+      changed, settings.burst_on = theme.slider_int(ImGui, ctx, "Burst on", math.floor(settings.burst_on), 1, 32)
+      changed, settings.burst_off = theme.slider_int(ImGui, ctx, "Burst off", math.floor(settings.burst_off), 0, 32)
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Spatial / Output", settings.normalize and 246 or 221)
+      changed, settings.yaw_start = theme.slider_double(ImGui, ctx, "Azimuth start deg", settings.yaw_start, -180.0, 180.0, "%.1f")
+      changed, settings.yaw_end = theme.slider_double(ImGui, ctx, "Azimuth end deg", settings.yaw_end, -180.0, 180.0, "%.1f")
+      changed, settings.elevation = theme.slider_double(ImGui, ctx, "Elevation deg", settings.elevation, -89.0, 89.0, "%.1f")
+      changed, settings.spatial_spread = theme.slider_double(ImGui, ctx, "Stream spatial spread", settings.spatial_spread, 0.0, 1.0, "%.2f")
+      changed, settings.channel_mask = theme.slider_double(ImGui, ctx, "Per-pulse channel mask", settings.channel_mask, 0.0, 1.0, "%.2f")
+      changed, settings.gain_db = theme.slider_double(ImGui, ctx, "Pre-gain dB", settings.gain_db, -36.0, 0.0, "%.1f")
+      changed, settings.normalize = theme.checkbox_row(ImGui, ctx, "Peak normalize", settings.normalize)
+      if settings.normalize then changed, settings.normalize_db = theme.slider_double(ImGui, ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f") end
+      changed, settings.seed = theme.input_int_row(ImGui, ctx, "Seed", math.floor(settings.seed))
+      theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "Render", 96, 28) then should_render = true end
+    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
     ImGui.End(ctx)
   end
   persist()

@@ -106,15 +106,8 @@ local function set_value(key, value)
 end
 
 local function combo(label, idx, labels)
-  if ImGui.BeginCombo(ctx, label, labels[idx] or "") then
-    for i, name in ipairs(labels) do
-      local selected = i == idx
-      if ImGui.Selectable(ctx, name, selected) then idx = i end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return idx
+  local _, next_idx = theme.combo_row(ImGui, ctx, label, labels, idx)
+  return next_idx
 end
 
 local function order_channels(order_index)
@@ -363,7 +356,7 @@ local function camera_controls()
   local function nudge(label, width, height, apply)
     if ImGui.Button(ctx, label, width, height) or ImGui.IsItemActive(ctx) then apply() end
   end
-  ImGui.Text(ctx, "View")
+  theme.muted(ImGui, ctx, "VIEW")
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, (view_mode == 1 and "[3/4]" or "3/4"), 54, 24) then set_camera_preset(1, -38, -28) end
   ImGui.SameLine(ctx)
@@ -371,32 +364,32 @@ local function camera_controls()
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, (view_mode == 3 and "[SIDE]" or "SIDE"), 54, 24) then set_camera_preset(3, 0, -90) end
   ImGui.SameLine(ctx)
-  nudge("Zoom -", 74, 24, function() view_zoom = clamp(view_zoom * 0.975, 0.35, 3.0) end)
+  nudge("ZOOM -", 74, 24, function() view_zoom = clamp(view_zoom * 0.975, 0.35, 3.0) end)
   ImGui.SameLine(ctx)
-  nudge("Zoom +", 74, 24, function() view_zoom = clamp(view_zoom * 1.025, 0.35, 3.0) end)
+  nudge("ZOOM +", 74, 24, function() view_zoom = clamp(view_zoom * 1.025, 0.35, 3.0) end)
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Reset View", 94, 24) then view_zoom, view_pan_x, view_pan_y = 1.0, 0.0, 0.0 end
+  if ImGui.Button(ctx, "RESET VIEW", 104, 24) then view_zoom, view_pan_x, view_pan_y = 1.0, 0.0, 0.0 end
   ImGui.SameLine(ctx)
-  nudge("Left", 48, 24, function() view_pan_x = clamp(view_pan_x + 0.035 / view_zoom, -2, 2) end)
+  nudge("LEFT", 48, 24, function() view_pan_x = clamp(view_pan_x + 0.035 / view_zoom, -2, 2) end)
   ImGui.SameLine(ctx)
-  nudge("Right", 54, 24, function() view_pan_x = clamp(view_pan_x - 0.035 / view_zoom, -2, 2) end)
+  nudge("RIGHT", 54, 24, function() view_pan_x = clamp(view_pan_x - 0.035 / view_zoom, -2, 2) end)
   ImGui.SameLine(ctx)
-  nudge("Up", 42, 24, function() view_pan_y = clamp(view_pan_y - 0.035 / view_zoom, -2, 2) end)
+  nudge("UP", 42, 24, function() view_pan_y = clamp(view_pan_y - 0.035 / view_zoom, -2, 2) end)
   ImGui.SameLine(ctx)
-  nudge("Down", 54, 24, function() view_pan_y = clamp(view_pan_y + 0.035 / view_zoom, -2, 2) end)
+  nudge("DOWN", 54, 24, function() view_pan_y = clamp(view_pan_y + 0.035 / view_zoom, -2, 2) end)
   ImGui.SameLine(ctx)
-  ImGui.Text(ctx, string.format("view %.2fx", view_zoom))
-  nudge("Az -##scene_cam", 58, 24, function() view_mode = 1; view_azim_deg = view_azim_deg - 2 end)
+  theme.muted(ImGui, ctx, string.format("VIEW %.2fx", view_zoom))
+  nudge("AZ -##scene_cam", 58, 24, function() view_mode = 1; view_azim_deg = view_azim_deg - 2 end)
   ImGui.SameLine(ctx)
-  nudge("Az +##scene_cam", 58, 24, function() view_mode = 1; view_azim_deg = view_azim_deg + 2 end)
+  nudge("AZ +##scene_cam", 58, 24, function() view_mode = 1; view_azim_deg = view_azim_deg + 2 end)
   ImGui.SameLine(ctx)
-  nudge("El +##scene_cam", 58, 24, function() view_mode = 1; view_elev_deg = clamp(view_elev_deg + 2, -89, 89) end)
+  nudge("EL +##scene_cam", 58, 24, function() view_mode = 1; view_elev_deg = clamp(view_elev_deg + 2, -89, 89) end)
   ImGui.SameLine(ctx)
-  nudge("El -##scene_cam", 58, 24, function() view_mode = 1; view_elev_deg = clamp(view_elev_deg - 2, -89, 89) end)
+  nudge("EL -##scene_cam", 58, 24, function() view_mode = 1; view_elev_deg = clamp(view_elev_deg - 2, -89, 89) end)
   local changed
-  changed, view_azim_deg = ImGui.SliderDouble(ctx, "Camera azim", view_azim_deg, -180, 180, "%.0f deg")
+  changed, view_azim_deg = theme.slider_double(ImGui, ctx, "Camera azim", view_azim_deg, -180, 180, "%.0f deg")
   if changed then view_mode = 1 end
-  changed, view_elev_deg = ImGui.SliderDouble(ctx, "Camera elev", view_elev_deg, -89, 89, "%.0f deg")
+  changed, view_elev_deg = theme.slider_double(ImGui, ctx, "Camera elev", view_elev_deg, -89, 89, "%.0f deg")
   if changed then view_mode = 1 end
 end
 
@@ -669,18 +662,18 @@ local function draw_preview_transport(path, settings)
     preview_t = preview_t + dt * preview_speed / math.max(0.001, settings.duration)
     if preview_t >= 1.0 then preview_t = 1.0; preview_playing = false end
   end
-  if ImGui.Button(ctx, preview_playing and "Stop Preview" or "Play Preview", 118, 28) then
+  if ImGui.Button(ctx, preview_playing and "STOP PREVIEW" or "PLAY PREVIEW", 128, 28) then
     preview_playing = not preview_playing
     preview_last_time = reaper.time_precise()
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Reset Preview", 112, 28) then preview_t = 0.0; preview_playing = false end
+  if ImGui.Button(ctx, "RESET PREVIEW", 124, 28) then preview_t = 0.0; preview_playing = false end
   ImGui.SameLine(ctx)
   local changed
-  changed, preview_speed = ImGui.SliderDouble(ctx, "Preview speed", preview_speed, 0.1, 8.0, "%.2fx")
-  changed, preview_t = ImGui.SliderDouble(ctx, "Preview time", preview_t, 0.0, 1.0, "%.3f")
+  changed, preview_speed = theme.slider_double(ImGui, ctx, "Preview speed", preview_speed, 0.1, 8.0, "%.2fx")
+  changed, preview_t = theme.slider_double(ImGui, ctx, "Preview time", preview_t, 0.0, 1.0, "%.3f")
   local row = oriented_path_row(path, preview_t, settings.orientation_mode)
-  ImGui.Text(ctx, string.format("Preview head: X %.2f  Y %.2f  Z %.2f  yaw %.1f  pitch %.1f  roll %.1f", row[1], row[2], row[3], row[4], row[5], row[6]))
+  theme.muted(ImGui, ctx, string.format("Preview head: X %.2f  Y %.2f  Z %.2f  yaw %.1f  pitch %.1f  roll %.1f", row[1], row[2], row[3], row[4], row[5], row[6]))
   return row
 end
 
@@ -833,80 +826,82 @@ local function loop()
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(300, avail_h - footer_h)
     if ImGui.BeginChild(ctx, "##scene_navigator_controls", 0, control_h) then
-    ImGui.Text(ctx, "Selected 3OAFX scene nodes: " .. tostring(#entries))
+    theme.muted(ImGui, ctx, "Selected 3OAFX scene nodes: " .. tostring(#entries))
     theme.muted(ImGui, ctx, "Each selected item is a movable soundfield node; the path is the listener trajectory.")
     local preview_row = draw_preview_transport(path_points, settings)
     camera_controls()
     draw_top_map(nodes, path_points, settings, preview_row)
     draw_orientation_breakpoints(path_points, settings.orientation_mode)
 
-    ImGui.Separator(ctx)
+    local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Render", 334)
     settings.source_order = combo("Source order", settings.source_order, ORDER_LABELS)
     settings.output_order = combo("Output order", settings.output_order, ORDER_LABELS)
     settings.mode = combo("Navigation mode", settings.mode, MODE_LABELS)
     settings.orientation_mode = combo("Head orientation", settings.orientation_mode, ORIENTATION_LABELS)
     local changed
-    changed, settings.duration = ImGui.SliderDouble(ctx, "Duration sec", settings.duration, 0.25, 900.0, "%.2f")
-    changed, settings.influence_radius = ImGui.SliderDouble(ctx, "Global node radius", settings.influence_radius, 0.05, 4.0, "%.2f")
-    changed, settings.distance_falloff = ImGui.SliderDouble(ctx, "Distance falloff", settings.distance_falloff, 0.2, 5.0, "%.2f")
-    changed, settings.blend_sharpness = ImGui.SliderDouble(ctx, "Blend sharpness", settings.blend_sharpness, 0.1, 5.0, "%.2f")
-    changed, settings.perspective_rotation = ImGui.SliderDouble(ctx, "Perspective rotation", settings.perspective_rotation, 0.0, 1.0, "%.2f")
-    changed, settings.near_field_blur = ImGui.SliderDouble(ctx, "Near-field blur", settings.near_field_blur, 0.0, 1.0, "%.2f")
-    changed, settings.height_sensitivity = ImGui.SliderDouble(ctx, "Height sensitivity", settings.height_sensitivity, 0.0, 2.0, "%.2f")
-    changed, settings.motion_smoothing = ImGui.SliderDouble(ctx, "Motion smoothing", settings.motion_smoothing, 0.0, 0.98, "%.2f")
-    changed, settings.loop_crossfade_ms = ImGui.SliderDouble(ctx, "Source loop crossfade ms", settings.loop_crossfade_ms, 0.0, 1000.0, "%.0f")
-    changed, settings.output_gain_db = ImGui.SliderDouble(ctx, "Output gain dB", settings.output_gain_db, -24.0, 24.0, "%.1f")
+    changed, settings.duration = theme.slider_double(ImGui, ctx, "Duration sec", settings.duration, 0.25, 900.0, "%.2f")
+    changed, settings.influence_radius = theme.slider_double(ImGui, ctx, "Global node radius", settings.influence_radius, 0.05, 4.0, "%.2f")
+    changed, settings.distance_falloff = theme.slider_double(ImGui, ctx, "Distance falloff", settings.distance_falloff, 0.2, 5.0, "%.2f")
+    changed, settings.blend_sharpness = theme.slider_double(ImGui, ctx, "Blend sharpness", settings.blend_sharpness, 0.1, 5.0, "%.2f")
+    changed, settings.perspective_rotation = theme.slider_double(ImGui, ctx, "Perspective rotation", settings.perspective_rotation, 0.0, 1.0, "%.2f")
+    changed, settings.near_field_blur = theme.slider_double(ImGui, ctx, "Near-field blur", settings.near_field_blur, 0.0, 1.0, "%.2f")
+    changed, settings.height_sensitivity = theme.slider_double(ImGui, ctx, "Height sensitivity", settings.height_sensitivity, 0.0, 2.0, "%.2f")
+    changed, settings.motion_smoothing = theme.slider_double(ImGui, ctx, "Motion smoothing", settings.motion_smoothing, 0.0, 0.98, "%.2f")
+    changed, settings.loop_crossfade_ms = theme.slider_double(ImGui, ctx, "Source loop crossfade ms", settings.loop_crossfade_ms, 0.0, 1000.0, "%.0f")
+    changed, settings.output_gain_db = theme.slider_double(ImGui, ctx, "Output gain dB", settings.output_gain_db, -24.0, 24.0, "%.1f")
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-    if ImGui.CollapsingHeader(ctx, "Selected Node", ImGui.TreeNodeFlags_DefaultOpen) then
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Selected Node", 158)
       selected_node = clamp(selected_node, 1, #nodes)
-      ImGui.Text(ctx, entries[selected_node] and entries[selected_node].name or ("Node " .. tostring(selected_node)))
-      changed, nodes[selected_node][1] = ImGui.SliderDouble(ctx, "Node X", nodes[selected_node][1], -2.0, 2.0, "%.3f")
-      changed, nodes[selected_node][2] = ImGui.SliderDouble(ctx, "Node Y", nodes[selected_node][2], -2.0, 2.0, "%.3f")
-      changed, nodes[selected_node][3] = ImGui.SliderDouble(ctx, "Node Z", nodes[selected_node][3], -2.0, 2.0, "%.3f")
+      theme.muted(ImGui, ctx, entries[selected_node] and entries[selected_node].name or ("Node " .. tostring(selected_node)))
+      changed, nodes[selected_node][1] = theme.slider_double(ImGui, ctx, "Node X", nodes[selected_node][1], -2.0, 2.0, "%.3f")
+      changed, nodes[selected_node][2] = theme.slider_double(ImGui, ctx, "Node Y", nodes[selected_node][2], -2.0, 2.0, "%.3f")
+      changed, nodes[selected_node][3] = theme.slider_double(ImGui, ctx, "Node Z", nodes[selected_node][3], -2.0, 2.0, "%.3f")
       nodes[selected_node][4] = nodes[selected_node][4] or 1.0
-      changed, nodes[selected_node][4] = ImGui.SliderDouble(ctx, "Node radius", nodes[selected_node][4], 0.10, 3.00, "%.2f")
+      changed, nodes[selected_node][4] = theme.slider_double(ImGui, ctx, "Node radius", nodes[selected_node][4], 0.10, 3.00, "%.2f")
       theme.muted(ImGui, ctx, string.format("Effective radius: %.2f", settings.influence_radius * nodes[selected_node][4]))
-    end
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-    if ImGui.CollapsingHeader(ctx, "Listener Path", ImGui.TreeNodeFlags_DefaultOpen) then
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Listener Path", settings.orientation_mode == 1 and 202 or 268)
       selected_point = clamp(selected_point, 1, #path_points)
-      if ImGui.Button(ctx, "Line") then preset_line(path_points) end
+      if ImGui.Button(ctx, "LINE") then preset_line(path_points) end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Orbit") then preset_orbit(path_points) end
+      if ImGui.Button(ctx, "ORBIT") then preset_orbit(path_points) end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Head Scan") then preset_head_scan(path_points) end
+      if ImGui.Button(ctx, "HEAD SCAN") then preset_head_scan(path_points) end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Add Point") then add_path_point(path_points) end
+      if ImGui.Button(ctx, "ADD POINT") then add_path_point(path_points) end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Remove Point") then remove_path_point(path_points) end
-      ImGui.Text(ctx, "Point " .. tostring(selected_point) .. " / " .. tostring(#path_points))
+      if ImGui.Button(ctx, "REMOVE POINT") then remove_path_point(path_points) end
+      theme.muted(ImGui, ctx, "Point " .. tostring(selected_point) .. " / " .. tostring(#path_points))
       local p = path_points[selected_point]
-      changed, p[1] = ImGui.SliderDouble(ctx, "Listener X", p[1], -2.0, 2.0, "%.3f")
-      changed, p[2] = ImGui.SliderDouble(ctx, "Listener Y", p[2], -2.0, 2.0, "%.3f")
-      changed, p[3] = ImGui.SliderDouble(ctx, "Listener Z", p[3], -2.0, 2.0, "%.3f")
+      changed, p[1] = theme.slider_double(ImGui, ctx, "Listener X", p[1], -2.0, 2.0, "%.3f")
+      changed, p[2] = theme.slider_double(ImGui, ctx, "Listener Y", p[2], -2.0, 2.0, "%.3f")
+      changed, p[3] = theme.slider_double(ImGui, ctx, "Listener Z", p[3], -2.0, 2.0, "%.3f")
       if settings.orientation_mode == 1 then
         local o = oriented_path_row(path_points, p[7] or 0, settings.orientation_mode)
         theme.muted(ImGui, ctx, string.format("Head faces path: yaw %.1f / pitch %.1f / roll %.1f", o[4], o[5], o[6]))
       else
-        changed, p[4] = ImGui.SliderDouble(ctx, "Yaw deg", p[4], -360.0, 360.0, "%.1f")
-        changed, p[5] = ImGui.SliderDouble(ctx, "Pitch deg", p[5], -90.0, 90.0, "%.1f")
-        changed, p[6] = ImGui.SliderDouble(ctx, "Roll deg", p[6], -180.0, 180.0, "%.1f")
+        changed, p[4] = theme.slider_double(ImGui, ctx, "Yaw deg", p[4], -360.0, 360.0, "%.1f")
+        changed, p[5] = theme.slider_double(ImGui, ctx, "Pitch deg", p[5], -90.0, 90.0, "%.1f")
+        changed, p[6] = theme.slider_double(ImGui, ctx, "Roll deg", p[6], -180.0, 180.0, "%.1f")
       end
-      changed, p[7] = ImGui.SliderDouble(ctx, "Time", p[7], 0.0, 1.0, "%.3f")
-    end
+      changed, p[7] = theme.slider_double(ImGui, ctx, "Time", p[7], 0.0, 1.0, "%.3f")
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-    changed, settings.normalize = ImGui.Checkbox(ctx, "Peak normalize", settings.normalize)
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Output", settings.normalize and 123 or 98)
+    changed, settings.normalize = theme.checkbox_row(ImGui, ctx, "Peak normalize", settings.normalize)
     if settings.normalize then
-      changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+      changed, settings.normalize_db = theme.slider_double(ImGui, ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
     end
-    changed, settings.soft_limit = ImGui.Checkbox(ctx, "Soft limit", settings.soft_limit)
-    ImGui.Separator(ctx)
-    ImGui.TextWrapped(ctx, "This is a scene-interpolation / perspective traversal renderer. It does not claim literal physical 6DoF translation inside a single HOA recording; it navigates between selected soundfield nodes.")
+    changed, settings.soft_limit = theme.checkbox_row(ImGui, ctx, "Soft limit", settings.soft_limit)
+    theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    theme.wrapped_text(ImGui, ctx, "This is a scene-interpolation / perspective traversal renderer. It navigates between selected soundfield nodes.", STYLE.muted, 720)
     ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "Render", 110, 30) then render() end
+    if ImGui.Button(ctx, "RENDER", 110, 30) then render() end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 110, 30) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 110, 30) then open = false end
     ImGui.Dummy(ctx, 1, 10)
     ImGui.End(ctx)
   end

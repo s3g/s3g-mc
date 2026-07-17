@@ -23,6 +23,7 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
 
 
 local FFT_NAMES = { [1] = "1024", [2] = "2048", [3] = "4096", [4] = "8192" }
@@ -54,26 +55,29 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, "Spectral Step Drunk Freeze", open)
   if visible then
-    ImGui.Text(ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
+    theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
     local changed
+    local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Freeze", mode_index == 2 and 273 or 223)
     changed, mode_index = sol.draw_combo(ImGui, ctx, "Freeze mode", mode_index, MODE_NAMES, 1, 2)
     changed, fft_index = sol.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
-    changed, step_frames = ImGui.SliderInt(ctx, "Hold clock frames", step_frames, 1, 96)
+    changed, step_frames = sol.draw_slider_int(ImGui, ctx, "Hold clock frames", step_frames, 1, 96)
     if mode_index == 2 then
-      changed, jump_frames = ImGui.SliderInt(ctx, "Random walk jump", jump_frames, 1, 96)
-      changed, seed = ImGui.SliderInt(ctx, "Random seed", seed, 1, 9999)
+      changed, jump_frames = sol.draw_slider_int(ImGui, ctx, "Random walk jump", jump_frames, 1, 96)
+      changed, seed = sol.draw_slider_int(ImGui, ctx, "Random seed", seed, 1, 9999)
     end
-    changed, smooth_bins = ImGui.SliderInt(ctx, "Spectral smoothing bins", smooth_bins, 1, 96)
-    changed, amount = ImGui.SliderDouble(ctx, "Freeze amount", amount, 0, 1, "%.3f")
-    changed, expand = ImGui.SliderDouble(ctx, "Expansion", expand, 1.0, 8.0, "%.2fx")
-    changed, mix = ImGui.SliderDouble(ctx, "Wet mix", mix, 0, 1, "%.3f")
-    changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
-    if normalize then changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f") end
-    ImGui.Separator(ctx)
-    ImGui.Text(ctx, "Holds spectral frames by clock or random walk.")
-    if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
+    changed, smooth_bins = sol.draw_slider_int(ImGui, ctx, "Spectral smoothing bins", smooth_bins, 1, 96)
+    changed, amount = sol.draw_slider(ImGui, ctx, "Freeze amount", amount, 0, 1, "%.3f", false)
+    changed, expand = sol.draw_slider(ImGui, ctx, "Expansion", expand, 1.0, 8.0, "%.2fx", false)
+    changed, mix = sol.draw_slider(ImGui, ctx, "Wet mix", mix, 0, 1, "%.3f", false)
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Output", normalize and 98 or 73)
+    changed, normalize = sol.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
+    if normalize then changed, normalize_db = sol.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false) end
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    theme.muted(ImGui, ctx, "Holds spectral frames by clock or random walk.")
+    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
     ImGui.End(ctx)
   end
   if should_render then

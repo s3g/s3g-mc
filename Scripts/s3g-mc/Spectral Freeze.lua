@@ -54,21 +54,24 @@ local function loop()
   if visible then
     theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
     local changed
+    local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Freeze", 248)
     changed, fft_index = sol.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
-    changed, pos = ImGui.SliderDouble(ctx, "Freeze position", pos, 0, 1, "%.3f")
-    changed, amount = ImGui.SliderDouble(ctx, "Freeze amount", amount, 0, 1, "%.3f")
-    changed, mix = ImGui.SliderDouble(ctx, "Wet mix", mix, 0, 1, "%.3f")
-    changed, smooth_bins = ImGui.SliderInt(ctx, "Spectral smoothing bins", smooth_bins, 1, 96)
-    changed, expand = ImGui.SliderDouble(ctx, "Expansion", expand, 1.0, 8.0, "%.2fx")
-    changed, floor = ImGui.SliderDouble(ctx, "Envelope floor", floor, 0.001, 0.5, "%.3f")
-    changed, safe = ImGui.Checkbox(ctx, "Safe envelope mode", safe)
-    changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
-    if normalize then changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f") end
-    ImGui.Separator(ctx)
+    changed, pos = sol.draw_slider(ImGui, ctx, "Freeze position", pos, 0, 1, "%.3f", false)
+    changed, amount = sol.draw_slider(ImGui, ctx, "Freeze amount", amount, 0, 1, "%.3f", false)
+    changed, mix = sol.draw_slider(ImGui, ctx, "Wet mix", mix, 0, 1, "%.3f", false)
+    changed, smooth_bins = sol.draw_slider_int(ImGui, ctx, "Spectral smoothing bins", smooth_bins, 1, 96)
+    changed, expand = sol.draw_slider(ImGui, ctx, "Expansion", expand, 1.0, 8.0, "%.2fx", false)
+    changed, floor = sol.draw_slider(ImGui, ctx, "Envelope floor", floor, 0.001, 0.5, "%.3f", false)
+    changed, safe = sol.draw_checkbox(ImGui, ctx, "Safe envelope mode", safe)
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Output", normalize and 98 or 73)
+    changed, normalize = sol.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
+    if normalize then changed, normalize_db = sol.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false) end
+    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
     theme.muted(ImGui, ctx, "Freezes one spectral magnitude frame across the selected item.")
-    if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
+    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end
+    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
     ImGui.End(ctx)
   end
   if should_render then

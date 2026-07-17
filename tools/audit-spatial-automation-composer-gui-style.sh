@@ -54,8 +54,12 @@ check \
   '^[[:space:]]*if ImGui\.BeginCombo\(ctx, label,'
 
 check \
-  'mixed-case fixed buttons/checkboxes' \
-  'ImGui\.(Button|Checkbox)\(ctx, "(Write automation|Close|Clear existing|Stop Preview|Play Preview|Reset Preview)'
+  'fixed buttons should use all-CAPS visible labels' \
+  'ImGui\.(SmallButton|Button)\(ctx, "[^"#]*[a-z][^"#]*(##|")'
+
+check \
+  'mixed-case fixed checkboxes' \
+  'ImGui\.Checkbox\(ctx, "[^"#]*[a-z][^"#]*(##|")'
 
 check_has \
   'missing soft-panel control region' \

@@ -628,13 +628,13 @@ local function draw_routing_overview(node_count, ambi_ch)
       ImGui.TableSetColumnIndex(ctx, 0)
       if ImGui.Selectable(ctx, "N" .. tostring(n), selected_node == n) then selected_node = n end
       ImGui.TableSetColumnIndex(ctx, 1)
-      ImGui.Text(ctx, short_name(node_name(n), 34))
+      theme.muted(ImGui, ctx, short_name(node_name(n), 34))
       ImGui.TableSetColumnIndex(ctx, 2)
-      ImGui.Text(ctx, string.format("%d-%d", input_start, input_start + ambi_ch - 1))
+      theme.muted(ImGui, ctx, string.format("%d-%d", input_start, input_start + ambi_ch - 1))
       ImGui.TableSetColumnIndex(ctx, 3)
-      ImGui.Text(ctx, string.format("1-%d", ambi_ch))
+      theme.muted(ImGui, ctx, string.format("1-%d", ambi_ch))
       ImGui.TableSetColumnIndex(ctx, 4)
-      ImGui.Text(ctx, string.format("%.3f", cursor_weight_for_node(n, mix_mode)))
+      theme.muted(ImGui, ctx, string.format("%.3f", cursor_weight_for_node(n, mix_mode)))
     end
     ImGui.EndTable(ctx)
   end
@@ -646,11 +646,13 @@ local function loop()
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
     local _, bus_name = reaper.GetTrackName(bus, "")
-    ImGui.Text(ctx, bus_name ~= "" and bus_name or "Ambisonic Node Track Mixer bus")
+    theme.muted(ImGui, ctx, bus_name ~= "" and bus_name or "AMBISONIC NODE TRACK MIXER BUS")
     theme.muted(ImGui, ctx, "Whole ACN/SN3D streams are mixed as nodes. No decode, encode, or speaker-channel remapping is applied.")
 
+    local tool_panel = theme.push_soft_panel(ImGui, ctx)
+    if ImGui.BeginChild(ctx, "##ambi_node_mixer_tool_area", 0, 0, 0) then
     local order = math.floor(get_param(bus, fx, ORDER_PARAM, 2) + 0.5)
-    ImGui.Text(ctx, "Ambisonic order: " .. (ORDERS[order + 1] and ORDERS[order + 1].label or ORDERS[3].label))
+    theme.muted(ImGui, ctx, "AMBISONIC ORDER: " .. (ORDERS[order + 1] and ORDERS[order + 1].label or ORDERS[3].label))
     theme.muted(ImGui, ctx, "Order is set when the bus is created so input blocks stay aligned.")
     local ambi_ch = order_channels(order)
     local node_count = math.floor(get_param(bus, fx, NODE_COUNT_PARAM, 4) + 0.5)
@@ -669,7 +671,7 @@ local function loop()
 
     if theme.toolbox_header(ImGui, ctx, "AUTOMATION", ImGui.TreeNodeFlags_DefaultOpen) then
       local mode_name = automation_mode_name(bus)
-      ImGui.Text(ctx, "Track automation: " .. mode_name)
+      theme.muted(ImGui, ctx, "TRACK AUTOMATION: " .. mode_name:upper())
       ImGui.SameLine(ctx)
       local write_mode = mode_name == "Write"
       if ImGui.Button(ctx, write_mode and "SET TRIM/READ + SAFE" or "SET WRITE + GUI") then
@@ -750,9 +752,9 @@ local function loop()
     if mix_mode == 1 then draw_stack_view(node_count, order) else draw_field_view(node_count, order) end
 
     if theme.toolbox_header(ImGui, ctx, "SELECTED NODE", ImGui.TreeNodeFlags_DefaultOpen) then
-      ImGui.Text(ctx, "Node " .. tostring(selected_node) .. ": " .. node_name(selected_node))
+      theme.muted(ImGui, ctx, "NODE " .. tostring(selected_node) .. ": " .. node_name(selected_node))
       local active = get_param(bus, fx, node_param(selected_node, 0), 1) >= 0.5
-      changed, active = ImGui.Checkbox(ctx, "ACTIVE", active)
+      changed, active = theme.checkbox_row(ImGui, ctx, "ACTIVE", active)
       if changed then set_param(bus, fx, node_param(selected_node, 0), active and 1 or 0) end
       local input_start = math.floor(get_param(bus, fx, node_param(selected_node, 2), 1) + 0.5)
       changed, input_start = theme.slider_int(ImGui, ctx, "Input start channel", input_start, 1, MAX_CH, 420)
@@ -772,6 +774,9 @@ local function loop()
     draw_routing_overview(node_count, ambi_ch)
 
     if ImGui.Button(ctx, "CLOSE", 100, 28) then open = false end
+    end
+    ImGui.EndChild(ctx)
+    theme.pop_soft_panel(ImGui, ctx, tool_panel)
     ImGui.End(ctx)
   end
   if open then reaper.defer(loop) end

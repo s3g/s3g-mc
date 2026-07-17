@@ -435,83 +435,85 @@ local function loop()
   if visible then
     local focused_track, focused_fx, focused_err = focused_track_fx()
     local track, fx, err = target_track_fx()
+    local tool_panel = theme.push_soft_panel(ImGui, ctx)
+    if ImGui.BeginChild(ctx, "##focused_fx_tool_area", 0, 0, 0) then
     if err then
-      ImGui.TextColored(ctx, STYLE.warn, err)
+      theme.status(ImGui, ctx, err, "warn")
     else
-      ImGui.Text(ctx, "Locked: " .. track_name(track))
+      theme.muted(ImGui, ctx, "LOCKED: " .. track_name(track))
       ImGui.SameLine(ctx)
-      ImGui.TextColored(ctx, STYLE.muted, " / " .. fx_name(track, fx))
+      theme.muted(ImGui, ctx, " / " .. fx_name(track, fx))
     end
 
     local changed
-    if ImGui.Button(ctx, "Lock FX", 78, 24) then refresh_params(true) end
+    if ImGui.Button(ctx, "LOCK FX", 78, 24) then refresh_params(true) end
     if focused_err then
       ImGui.SameLine(ctx)
-      ImGui.TextColored(ctx, STYLE.muted, "Focus or touch a plugin parameter, then lock.")
+      theme.muted(ImGui, ctx, "Focus or touch a plugin parameter, then lock.")
     elseif focused_track and focused_fx >= 0 then
       ImGui.SameLine(ctx)
-      ImGui.TextColored(ctx, STYLE.muted, "Focused: " .. track_name(focused_track) .. " / " .. fx_name(focused_track, focused_fx))
+      theme.muted(ImGui, ctx, "Focused: " .. track_name(focused_track) .. " / " .. fx_name(focused_track, focused_fx))
     end
     ImGui.SameLine(ctx)
     ImGui.SetNextItemWidth(ctx, 330)
     changed, filter_text = ImGui.InputText(ctx, "Filter", filter_text)
     ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, STYLE.muted, tostring(selected_count()) .. " selected")
+    theme.muted(ImGui, ctx, tostring(selected_count()) .. " selected")
     ImGui.SameLine(ctx)
-    changed, show_params = ImGui.Checkbox(ctx, "Show list", show_params)
+    changed, show_params = ImGui.Checkbox(ctx, "SHOW LIST", show_params)
 
-    if ImGui.Button(ctx, "Select visible", 104, 24) then select_visible(true) end
+    if ImGui.Button(ctx, "SELECT VISIBLE", 104, 24) then select_visible(true) end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "None", 58, 24) then select_visible(false) end
+    if ImGui.Button(ctx, "NONE", 58, 24) then select_visible(false) end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Invert", 64, 24) then invert_visible() end
+    if ImGui.Button(ctx, "INVERT", 64, 24) then invert_visible() end
     ImGui.SameLine(ctx)
-    changed, skip_empty = ImGui.Checkbox(ctx, "Skip empty names", skip_empty)
+    changed, skip_empty = ImGui.Checkbox(ctx, "SKIP EMPTY NAMES", skip_empty)
 
     ImGui.Separator(ctx)
     local preview = buckets[active_bucket] and buckets[active_bucket].name or "(none)"
-    ImGui.SetNextItemWidth(ctx, 220)
-    if ImGui.BeginCombo(ctx, "Stored", preview) then
-      for i, bucket in ipairs(buckets) do
-        local chosen = i == active_bucket
-        local label = bucket.name .. " (" .. tostring(#(bucket.params or {})) .. ")"
-        if ImGui.Selectable(ctx, label, chosen) then
-          active_bucket = i
-          bucket_name = bucket.name
+    do
+      local labels = {}
+      for i, bucket in ipairs(buckets) do labels[i] = bucket.name .. " (" .. tostring(#(bucket.params or {})) .. ")" end
+      if #labels > 0 then
+        local bucket_changed, next_bucket = theme.combo_row(ImGui, ctx, "Stored", labels, active_bucket, 220)
+        if bucket_changed and buckets[next_bucket] then
+          active_bucket = next_bucket
+          bucket_name = buckets[next_bucket].name
         end
-        if chosen then ImGui.SetItemDefaultFocus(ctx) end
+      else
+        theme.combo_row(ImGui, ctx, "Stored", { "(none)" }, 1, 220)
       end
-      ImGui.EndCombo(ctx)
     end
     ImGui.SameLine(ctx)
     ImGui.SetNextItemWidth(ctx, 160)
     changed, bucket_name = ImGui.InputText(ctx, "Bucket name", bucket_name)
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Save visible", 96, 24) then save_bucket_from(visible_params()) end
+    if ImGui.Button(ctx, "SAVE VISIBLE", 96, 24) then save_bucket_from(visible_params()) end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Save selected", 104, 24) then save_bucket_from(selected_params()) end
-    if ImGui.Button(ctx, "Recall", 72, 24) then recall_bucket(false) end
+    if ImGui.Button(ctx, "SAVE SELECTED", 104, 24) then save_bucket_from(selected_params()) end
+    if ImGui.Button(ctx, "RECALL", 72, 24) then recall_bucket(false) end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Add", 54, 24) then recall_bucket(true) end
+    if ImGui.Button(ctx, "ADD", 54, 24) then recall_bucket(true) end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Delete", 64, 24) then delete_bucket() end
+    if ImGui.Button(ctx, "DELETE", 64, 24) then delete_bucket() end
     ImGui.SameLine(ctx)
     if buckets[active_bucket] then
-      ImGui.TextColored(ctx, STYLE.muted, bucket_preview(buckets[active_bucket]))
+      theme.muted(ImGui, ctx, bucket_preview(buckets[active_bucket]))
     else
-      ImGui.TextColored(ctx, STYLE.muted, "No stored bucket for this FX.")
+      theme.muted(ImGui, ctx, "No stored bucket for this FX.")
     end
 
     ImGui.Separator(ctx)
-    if ImGui.Button(ctx, "Save Point at Cursor", 168, 30) then save_point_at_cursor() end
+    if ImGui.Button(ctx, "SAVE POINT AT CURSOR", 168, 30) then save_point_at_cursor() end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Show Selected Lanes", 154, 30) then show_selected_lanes() end
+    if ImGui.Button(ctx, "SHOW SELECTED LANES", 154, 30) then show_selected_lanes() end
     ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, STYLE.muted, "Move cursor, adjust plugin GUI, save again. REAPER handles envelope interpolation.")
+    theme.muted(ImGui, ctx, "Move cursor, adjust plugin GUI, save again. REAPER handles envelope interpolation.")
 
     if show_params then
       ImGui.Separator(ctx)
-      ImGui.TextColored(ctx, STYLE.muted, "Parameters")
+      theme.section_label(ImGui, ctx, "PARAMETERS")
       if #params == 0 and track and fx >= 0 then refresh_params(false) end
       for _, p in ipairs(params) do
         if visible_param(p) then
@@ -521,19 +523,21 @@ local function loop()
           changed_sel, is_selected = ImGui.Checkbox(ctx, "##sel_" .. tostring(p.index), is_selected)
           if changed_sel then selected[p.index] = is_selected end
           ImGui.SameLine(ctx)
-          ImGui.Text(ctx, label)
+          theme.muted(ImGui, ctx, label)
           ImGui.SameLine(ctx)
-          ImGui.TextColored(ctx, STYLE.muted, p.display)
+          theme.muted(ImGui, ctx, p.display)
         end
       end
     end
 
     if status ~= "" then
       local ok_status = status:find("Wrote", 1, true) or status:find("Created", 1, true) or status:find("Saved", 1, true) or status:find("Updated", 1, true) or status:find("Selected", 1, true)
-      local col = ok_status and STYLE.ok or STYLE.muted
-      ImGui.TextColored(ctx, col, status)
+      theme.status(ImGui, ctx, status, ok_status and "ok" or "muted")
     end
-    if ImGui.Button(ctx, "Close", 90, 28) then open = false end
+    if ImGui.Button(ctx, "CLOSE", 90, 28) then open = false end
+    end
+    ImGui.EndChild(ctx)
+    theme.pop_soft_panel(ImGui, ctx, tool_panel)
     ImGui.End(ctx)
   end
 

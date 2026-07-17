@@ -136,11 +136,7 @@ local CANVAS = {
 }
 
 local function muted_text(value)
-  if ui_theme and ui_theme.muted then
-    ui_theme.muted(ImGui, ctx, value)
-  else
-    ImGui.Text(ctx, value)
-  end
+  ui_theme.muted(ImGui, ctx, value)
 end
 
 local function displayed_item_color(item, track)
@@ -180,12 +176,10 @@ end
 local TRACK_FILTERS = { "All tracks", "Selected tracks" }
 
 local function combo_index(label, value, names)
-  if ImGui.BeginCombo(ctx, label, names[value] or names[1] or "") then
-    for i, name in ipairs(names) do
-      local selected = i == value
-      if ImGui.Selectable(ctx, name, selected) then value = i end
-    end
-    ImGui.EndCombo(ctx)
+  if ui_theme and ui_theme.combo_row then
+    local changed, next_value = ui_theme.combo_row(ImGui, ctx, label, names, value, 188)
+    if changed then return next_value or value end
+    return value
   end
   return value
 end
@@ -531,12 +525,12 @@ local function draw_transport()
     status = "Transport: start"
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Stop##transport_stop", 48, 24) then
+  if ImGui.Button(ctx, "STOP##transport_stop", 48, 24) then
     reaper.OnStopButton()
     status = "Transport: stop"
   end
   ImGui.SameLine(ctx)
-  local play_label = ((reaper.GetPlayState() % 2) == 1) and "Pause" or "Play"
+  local play_label = ((reaper.GetPlayState() % 2) == 1) and "PAUSE" or "PLAY"
   if ImGui.Button(ctx, play_label .. "##transport_play_pause", 58, 24) then
     if (reaper.GetPlayState() % 2) == 1 then
       reaper.Main_OnCommand(1008, 0) -- Transport: Pause
@@ -547,7 +541,7 @@ local function draw_transport()
     end
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Cursor##transport_center_cursor", 64, 24) then
+  if ImGui.Button(ctx, "CURSOR##transport_center_cursor", 64, 24) then
     view_start = math.max(0, reaper.GetCursorPosition() - 6 * seconds_per_pixel * 84)
     status = "View centered near edit cursor"
   end
@@ -955,29 +949,30 @@ local function loop()
       view_start = clamp(play_pos - (avail_h * seconds_per_pixel * 0.45), 0, math.max(0, project_len - 1))
     end
 
+    local tool_panel = ui_theme and ui_theme.push_soft_panel and ui_theme.push_soft_panel(ImGui, ctx) or nil
+    if ImGui.BeginChild(ctx, "##vertical_timeline_tool_area", 0, selected_marker and 156 or 126, 0) then
     draw_transport()
 
-    if ImGui.Button(ctx, "Fit Project", 92, 24) then
+    if ImGui.Button(ctx, "FIT PROJECT", 92, 24) then
       local _, avail_h = ImGui.GetContentRegionAvail(ctx)
       fit_project(math.max(240, avail_h - 92))
     end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Fit Selection", 104, 24) then
+    if ImGui.Button(ctx, "FIT SELECTION", 104, 24) then
       local _, avail_h = ImGui.GetContentRegionAvail(ctx)
       fit_time_selection(math.max(240, avail_h - 92))
     end
     ImGui.SameLine(ctx)
-    _, follow_play = ImGui.Checkbox(ctx, "Follow play", follow_play)
+    _, follow_play = ImGui.Checkbox(ctx, "FOLLOW PLAY", follow_play)
     ImGui.SameLine(ctx)
-    _, show_time_selection = ImGui.Checkbox(ctx, "Time selection", show_time_selection)
+    _, show_time_selection = ImGui.Checkbox(ctx, "TIME SELECTION", show_time_selection)
     ImGui.SameLine(ctx)
-    _, show_markers = ImGui.Checkbox(ctx, "Markers", show_markers)
+    _, show_markers = ImGui.Checkbox(ctx, "MARKERS", show_markers)
     ImGui.SameLine(ctx)
-    _, show_regions = ImGui.Checkbox(ctx, "Regions", show_regions)
+    _, show_regions = ImGui.Checkbox(ctx, "REGIONS", show_regions)
     ImGui.SameLine(ctx)
-    _, snap_enabled = ImGui.Checkbox(ctx, "Snap", snap_enabled)
+    _, snap_enabled = ImGui.Checkbox(ctx, "SNAP", snap_enabled)
 
-    ImGui.SetNextItemWidth(ctx, 188)
     local previous_filter = track_filter
     track_filter = combo_index("Track filter", track_filter, TRACK_FILTERS)
     if track_filter ~= previous_filter then
@@ -991,37 +986,41 @@ local function loop()
       status = "Track filter: " .. (TRACK_FILTERS[track_filter] or "")
     end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Add Marker", 90, 24) then add_marker_at_cursor() end
+    if ImGui.Button(ctx, "ADD MARKER", 90, 24) then add_marker_at_cursor() end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Add Region", 88, 24) then add_region_from_time_selection() end
+    if ImGui.Button(ctx, "ADD REGION", 88, 24) then add_region_from_time_selection() end
     if selected_marker then
       ImGui.SetNextItemWidth(ctx, 260)
       local changed_name
       changed_name, selected_marker_name = ImGui.InputText(ctx, "Marker / region name", selected_marker_name or "")
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Save Name", 86, 24) then
+      if ImGui.Button(ctx, "SAVE NAME", 86, 24) then
         set_marker_or_region(selected_marker, selected_marker.pos, selected_marker.rgnend, selected_marker_name)
         status = "Saved marker/region name"
       end
     end
 
     local changed
-    changed, seconds_per_pixel = ImGui.SliderDouble(ctx, "Seconds / pixel", seconds_per_pixel, 0.002, 2.0, "%.3f")
+    changed, seconds_per_pixel = ui_theme.slider_double(ImGui, ctx, "Seconds / pixel", seconds_per_pixel, 0.002, 2.0, "%.3f", 380)
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "-", 26, 22) then seconds_per_pixel = clamp(seconds_per_pixel * 1.25, 0.002, 5.0) end
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "+", 26, 22) then seconds_per_pixel = clamp(seconds_per_pixel / 1.25, 0.002, 5.0) end
-    changed, view_start = ImGui.SliderDouble(ctx, "View start", view_start, 0.0, math.max(0.0, project_len), "%.2f sec")
+    changed, view_start = ui_theme.slider_double(ImGui, ctx, "View start", view_start, 0.0, math.max(0.0, project_len), "%.2f sec", 380)
     track_count = math.max(1, #build_track_list())
     visible_tracks = clamp(visible_tracks, 1, math.min(64, track_count))
     track_start = clamp(track_start, 1, track_count)
-    changed, visible_tracks = ImGui.SliderInt(ctx, "Visible tracks", visible_tracks, 1, math.max(1, math.min(64, track_count)))
+    changed, visible_tracks = ui_theme.slider_int(ImGui, ctx, "Visible tracks", visible_tracks, 1, math.max(1, math.min(64, track_count)), 380)
     if track_start + visible_tracks - 1 > track_count then
       track_start = math.max(1, track_count - visible_tracks + 1)
     end
     local first_track_max = math.max(1, track_count - visible_tracks + 1)
-    changed, track_start = ImGui.SliderInt(ctx, "First track", track_start, 1, first_track_max)
+    changed, track_start = ui_theme.slider_int(ImGui, ctx, "First track", track_start, 1, first_track_max, 380)
     muted_text("Wheel scrolls time. Cmd/Ctrl-wheel zooms. First track slider moves side-to-side.")
+    end
+    ImGui.EndChild(ctx)
+    if ui_theme and ui_theme.pop_soft_panel then ui_theme.pop_soft_panel(ImGui, ctx, tool_panel) end
+    ImGui.Spacing(ctx)
 
     local canvas_w, avail_h = ImGui.GetContentRegionAvail(ctx)
     local canvas_h = math.max(320, avail_h - 26)
