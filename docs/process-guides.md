@@ -24,7 +24,10 @@ These pages provide practical notes for selected processes. The guide categories
 Many processes use custom ImGui interfaces with diagrams, tables, breakpoint
 lanes, or spatial views. These visuals are meant to show how the process is
 mapping time, channels, pitch, space, or source material, so they can be read as
-part of the control surface while setting up a render.
+part of the control surface while setting up a render. Most controller windows
+use the same compact visual language: dark gray tool areas, aligned labels,
+short button labels for commands, dropdowns for one-of-many choices, and fixed
+footer rows for render or write actions when a footer is needed.
 
 ## General Pattern
 

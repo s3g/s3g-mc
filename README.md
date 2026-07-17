@@ -28,10 +28,10 @@ For step-by-step notes on selected processes, see the [Process Guides](docs/proc
 
 Current package snapshot: the browser exposes 121 user-facing tools/controllers,
 plus the Package Browser. Of those, 50 are Python/NumPy-backed offline
-processes, 26 load, control, or render included JSFX, and 45 are native
-Lua/ReaImGui REAPER actions. The repository also ships 24 underlying JSFX
-engine/effect files. The Lua folder includes helper libraries and support
-dialogs that are not shown as Package Browser entries.
+processes, 26 load, control, or render included JSFX, and 45 are Lua/ReaImGui
+REAPER actions. The repository also ships 24 underlying JSFX engine/effect
+files. The Lua folder includes helper libraries and support dialogs that are
+not shown as Package Browser entries.
 
 Package Browser group counts:
 
@@ -88,9 +88,9 @@ Package Browser group counts:
   layouts can be mixed as spatial objects or aligned stacked shapes. The
   controller includes track-name node labels, routing overview, top/side camera
   views, cursor falloff/gate controls, and automation lane helpers.
-- `Focused FX Automation Capture`: reads the currently focused track FX,
-  filters and stores parameter buckets, and writes current plugin settings as
-  editable automation points at the edit cursor.
+- `Focused FX Automation Capture`: locks the currently focused or touched
+  track FX, filters/selects parameters, and writes the current plugin settings
+  as editable automation points at the edit cursor.
 - `MC to Stereo Autogain`: multichannel fold-down with layout modes, width,
   rotation, weighting, 3D projection attenuation, autogain, and output trim.
   The JSFX declares only stereo outputs; in multichannel listening chains, set

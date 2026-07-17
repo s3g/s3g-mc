@@ -417,13 +417,37 @@ end
 local function ensure_envelope(track, fx, param)
   local env = reaper.GetFXEnvelope(track, fx, param, true)
   if not env then return nil end
+  return env
+end
+
+local function configure_envelope(env)
+  if not env then return false end
   if reaper.SetEnvelopeInfo_Value then
     pcall(reaper.SetEnvelopeInfo_Value, env, "B_VISIBLE", show_lanes and 1 or 0)
     pcall(reaper.SetEnvelopeInfo_Value, env, "B_ACTIVE", 1)
     pcall(reaper.SetEnvelopeInfo_Value, env, "B_ARM", arm_lanes and 1 or 0)
     pcall(reaper.SetEnvelopeInfo_Value, env, "I_TCPH", show_lanes and lane_height or 0)
   end
-  return env
+  return true
+end
+
+local function refresh_arrange()
+  reaper.TrackList_AdjustWindows(false)
+  reaper.UpdateArrange()
+end
+
+local function apply_selected_lane_settings(create_missing)
+  local track, fx, err = target_track_fx()
+  if err then status = err return 0 end
+  local lanes = 0
+  for _, p in ipairs(params) do
+    if selected[p.index] then
+      local env = create_missing and ensure_envelope(track, fx, p.index) or reaper.GetFXEnvelope(track, fx, p.index, false)
+      if configure_envelope(env) then lanes = lanes + 1 end
+    end
+  end
+  refresh_arrange()
+  return lanes
 end
 
 local function current_envelope_value(env, track, fx, param)
@@ -447,6 +471,7 @@ local function write_selected()
     if selected[p.index] then
       local env = ensure_envelope(track, fx, p.index)
       if env then
+        configure_envelope(env)
         lanes = lanes + 1
         local value = current_envelope_value(env, track, fx, p.index)
         reaper.InsertEnvelopePoint(env, cursor_pos, value, 0, 0, false, true)
@@ -456,8 +481,7 @@ local function write_selected()
     end
   end
   reaper.Undo_EndBlock("Focused FX Automation Capture", -1)
-  reaper.TrackList_AdjustWindows(false)
-  reaper.UpdateArrange()
+  refresh_arrange()
 
   status = string.format("Wrote %d envelope points across %d lanes.", wrote, lanes)
 end
@@ -469,22 +493,34 @@ end
 local function show_selected_lanes()
   local track, fx, err = target_track_fx()
   if err then status = err return end
+  show_lanes = true
   local lanes = 0
   reaper.Undo_BeginBlock()
   for _, p in ipairs(params) do
     if selected[p.index] then
       local env = ensure_envelope(track, fx, p.index)
-      if env then lanes = lanes + 1 end
+      if configure_envelope(env) then lanes = lanes + 1 end
     end
   end
   reaper.Undo_EndBlock("Focused FX Automation Capture Show Lanes", -1)
-  reaper.TrackList_AdjustWindows(false)
-  reaper.UpdateArrange()
-  status = string.format("Created/showed %d automation lanes.", lanes)
+  refresh_arrange()
+  if show_lanes then
+    status = string.format("Created/showed %d automation lanes.", lanes)
+  else
+    status = string.format("Created/configured %d hidden automation lanes.", lanes)
+  end
+end
+
+local function hide_selected_lanes()
+  local previous_show = show_lanes
+  show_lanes = false
+  local lanes = apply_selected_lane_settings(false)
+  show_lanes = previous_show
+  status = string.format("Hid %d existing selected lanes.", lanes)
 end
 
 local function loop()
-  local body_h = show_params and 684 or 474
+  local body_h = show_params and 658 or 448
   set_next_window_size(820, body_h + 48, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
@@ -527,18 +563,21 @@ local function loop()
       changed, skip_empty = theme.checkbox_row(ImGui, ctx, "Skip empty names", skip_empty)
       theme.finish_section(ImGui, ctx, px, py, ph, stack)
 
-      px, py, ph, stack = theme.begin_section(ImGui, ctx, "Step 3 - Write Automation", 154)
-      changed, arm_lanes = theme.checkbox_row(ImGui, ctx, "Arm lanes", arm_lanes)
-      changed, show_lanes = theme.checkbox_row(ImGui, ctx, "Show lanes", show_lanes)
-      changed, lane_height = theme.slider_int(ImGui, ctx, "Lane height", lane_height, 32, 160)
+      px, py, ph, stack = theme.begin_section(ImGui, ctx, "Step 3 - Cursor Point", 128)
+      local lane_changed
+      lane_changed, lane_height = theme.slider_int(ImGui, ctx, "Lane height", lane_height, 32, 160)
+      if lane_changed then
+        local lanes = apply_selected_lane_settings(false)
+        status = string.format("Updated lane height for %d existing selected lanes.", lanes)
+      end
       local capture_action = theme.button_row(ImGui, ctx, {
-        { label = "SAVE POINT", width = 118 },
+        { label = "WRITE POINT", width = 118 },
         { label = "SHOW LANES", width = 110 },
-        { label = "CLOSE", width = 72 },
+        { label = "HIDE LANES", width = 108 },
       }, 30)
       if capture_action == 1 then save_point_at_cursor() end
       if capture_action == 2 then show_selected_lanes() end
-      if capture_action == 3 then open = false end
+      if capture_action == 3 then hide_selected_lanes() end
       labeled_status_row("Status", status ~= "" and status or "Ready.", status ~= "" and status_kind() or "muted")
       theme.finish_section(ImGui, ctx, px, py, ph, stack)
 

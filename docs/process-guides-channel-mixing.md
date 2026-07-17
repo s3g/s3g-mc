@@ -256,24 +256,25 @@ the node bus, so the bus becomes the monitored/output path.
 
 Use this when a plugin window is already open and you want to turn its current
 settings into editable automation lanes. Focus the FX window or touch one of
-its parameters, run `Focused FX Automation Capture`, then click `Lock FX`.
-After the FX is locked, adjust the plugin, return to the capture window, and
-capture or write from the locked target. The parameter filter and bucket
-controls help choose which parameters are included.
+its parameters, run `Focused FX Automation Capture`, then use the step-by-step
+window:
 
-For plugins with long parameter lists, use the filter to narrow the visible
-parameters, then save either the selected parameters or the visible result as a
-named bucket. Buckets are recalled for the same focused FX and can be used to
-quickly reselect a working set of parameters before saving automation points.
+1. `Step 1 - Lock FX`: lock the focused or last-touched track FX as the target.
+2. `Step 2 - Choose Params`: filter the parameter list, select visible
+   parameters, clear the selection, invert it, or show a compact parameter list.
+3. `Step 3 - Cursor Point`: move the REAPER edit cursor to the desired time,
+   then write the current plugin values there. The same section includes
+   shortcuts to show or hide selected automation lanes.
 
 The main workflow is point-based. Set the edit cursor, adjust the locked
-plugin GUI, and click `Save Point at Cursor`. Move the edit cursor later in
-the timeline, adjust the plugin again, and save another point. REAPER's normal
-envelope behavior handles the interpolation between those points.
+plugin GUI, and click `Write Point`. Move the edit cursor later in the
+timeline, adjust the plugin again, and write another point. REAPER's normal envelope
+behavior handles the interpolation between those points.
 
-`Show Selected Lanes` creates, shows, and arms the selected FX envelopes
-without writing a point. The first version targets track FX; take FX are not
-included.
+`Show Lanes` creates and shows selected FX envelopes without writing a point.
+`Hide Lanes` hides existing selected envelopes. `Lane height` updates any
+existing selected visible envelopes when changed. The first version targets
+track FX; take FX are not included.
 
 
 ## Snapshot Surface
@@ -429,7 +430,7 @@ Important controls:
 - 3D attenuation can reduce overhead, underhead, or distant speakers in sphere, hemisphere, and cube-style layouts.
 - Autogain helps keep the fold-down from jumping in level as channel count changes.
 
-Use ring projection for circular layouts, sphere or hemisphere projection for dome-like material, and cube-style projection for XYZ/cube work. Watch the graphic: smaller dots indicate channels receiving stronger 3D attenuation.
+Use ring projection for circular layouts, sphere or hemisphere projection for dome-like material, and cube-style projection for XYZ/cube work. Watch the graphic for how input channels are folded toward the stereo output; stronger 3D attenuation is reflected in the channel point and connection behavior rather than duplicated as a separate meter.
 
 
 
