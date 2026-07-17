@@ -13,29 +13,50 @@ local function color(ImGui, r, g, b, a)
 end
 
 function M.palette(ImGui)
-  return {
-    bg = color(ImGui, 0.030, 0.032, 0.034, 1.0),
-    bg_alt = color(ImGui, 0.042, 0.045, 0.048, 1.0),
-    panel = color(ImGui, 0.060, 0.064, 0.068, 1.0),
-    panel_soft = color(ImGui, 0.078, 0.083, 0.088, 1.0),
-    frame = color(ImGui, 0.090, 0.096, 0.102, 1.0),
-    frame_hover = color(ImGui, 0.135, 0.144, 0.152, 1.0),
-    frame_active = color(ImGui, 0.178, 0.190, 0.200, 1.0),
-    title = color(ImGui, 0.018, 0.020, 0.022, 1.0),
-    title_active = color(ImGui, 0.145, 0.155, 0.165, 1.0),
-    title_collapsed = color(ImGui, 0.045, 0.048, 0.052, 1.0),
-    edge = color(ImGui, 0.310, 0.325, 0.340, 1.0),
-    edge_soft = color(ImGui, 0.220, 0.232, 0.244, 1.0),
-    text = color(ImGui, 0.830, 0.850, 0.860, 1.0),
-    muted = color(ImGui, 0.560, 0.590, 0.600, 1.0),
-    disabled = color(ImGui, 0.360, 0.380, 0.390, 1.0),
-    active = color(ImGui, 0.620, 0.690, 0.720, 1.0),
-    active_hover = color(ImGui, 0.710, 0.770, 0.790, 1.0),
+  local p = {
+    bg = color(ImGui, 0.047, 0.047, 0.047, 1.0),       -- #0c0c0c
+    bg_alt = color(ImGui, 0.074, 0.074, 0.074, 1.0),   -- #131313
+    panel = color(ImGui, 0.113, 0.113, 0.113, 1.0),    -- #1d1d1d
+    panel_soft = color(ImGui, 0.145, 0.145, 0.145, 1.0),
+    frame = color(ImGui, 0.074, 0.074, 0.074, 1.0),
+    frame_hover = color(ImGui, 0.145, 0.145, 0.145, 1.0),
+    frame_active = color(ImGui, 0.195, 0.195, 0.195, 1.0),
+    title = color(ImGui, 0.047, 0.047, 0.047, 1.0),
+    title_active = color(ImGui, 0.074, 0.074, 0.074, 1.0),
+    title_collapsed = color(ImGui, 0.047, 0.047, 0.047, 1.0),
+    edge = color(ImGui, 0.337, 0.337, 0.337, 1.0),     -- #565656
+    edge_soft = color(ImGui, 0.230, 0.230, 0.230, 1.0),
+    text = color(ImGui, 0.788, 0.788, 0.788, 1.0),     -- #c9c9c9
+    label = color(ImGui, 0.659, 0.659, 0.659, 1.0),    -- #a8a8a8
+    value = color(ImGui, 0.572, 0.572, 0.572, 1.0),    -- #929292
+    muted = color(ImGui, 0.560, 0.560, 0.560, 1.0),    -- #8f8f8f
+    disabled = color(ImGui, 0.360, 0.360, 0.360, 1.0),
+    active = color(ImGui, 0.720, 0.720, 0.720, 1.0),   -- #b8b8b8
+    active_hover = color(ImGui, 0.790, 0.790, 0.790, 1.0),
+    fill = color(ImGui, 0.498, 0.498, 0.498, 1.0),     -- #7f7f7f
     ok = color(ImGui, 0.340, 0.710, 0.520, 1.0),
     warn = color(ImGui, 0.940, 0.500, 0.340, 1.0),
     amber = color(ImGui, 0.880, 0.700, 0.360, 1.0),
     clear = color(ImGui, 0.0, 0.0, 0.0, 0.0),
   }
+
+  -- Compatibility aliases used by older s3g-mc scripts. New scripts should
+  -- prefer the semantic names above, but these keep local canvases on the same
+  -- grayscale base without requiring a risky repo-wide rewrite.
+  p.strip = p.bg_alt
+  p.cellBg = p.panel
+  p.grid = p.edge
+  p.dim = p.muted
+  p.button = p.frame
+  p.button_hover = p.frame_hover
+  p.button_active = p.frame_active
+  p.selected = p.active
+  p.selection = color(ImGui, 0.720, 0.720, 0.720, 0.22)
+  p.send = color(ImGui, 0.620, 0.690, 0.720, 0.70)
+  p.receive = color(ImGui, 0.580, 0.620, 0.660, 0.55)
+  p.folder = color(ImGui, 0.880, 0.700, 0.360, 0.82)
+  p.master = color(ImGui, 0.500, 0.640, 0.560, 0.72)
+  return p
 end
 
 local function push_style_color(ImGui, ctx, name, value)
@@ -56,6 +77,365 @@ local function push_style_var(ImGui, ctx, name, ...)
     return 1
   end
   return 0
+end
+
+
+function M.text(ImGui, ctx, value)
+  ImGui.TextColored(ctx, M.palette(ImGui).label, value)
+end
+
+function M.muted(ImGui, ctx, value)
+  ImGui.TextColored(ctx, M.palette(ImGui).muted, value)
+end
+
+function M.value(ImGui, ctx, value)
+  ImGui.TextColored(ctx, M.palette(ImGui).value, value)
+end
+
+function M.status(ImGui, ctx, value, color_name)
+  local p = M.palette(ImGui)
+  ImGui.TextColored(ctx, p[color_name or "value"] or p.value, value)
+end
+
+function M.wrapped_text(ImGui, ctx, value, color_value, width)
+  value = tostring(value or "")
+  if value == "" then return end
+  ImGui.PushStyleColor(ctx, ImGui.Col_Text, color_value or M.palette(ImGui).label)
+  ImGui.PushTextWrapPos(ctx, ImGui.GetCursorScreenPos(ctx) + (width or 260))
+  ImGui.TextWrapped(ctx, value)
+  ImGui.PopTextWrapPos(ctx)
+  ImGui.PopStyleColor(ctx)
+end
+
+local function clamp(v, lo, hi)
+  if v < lo then return lo end
+  if v > hi then return hi end
+  return v
+end
+
+local SLIDER_ABBR = {
+  ["TIMELINE PREVIEW"] = "TIME",
+  ["PREVIEW SPEED"] = "SPEED",
+  ["LOOP SECONDS"] = "LOOP",
+  ["MIDI LANES"] = "MIDI",
+  ["EVENT RATE"] = "RATE",
+  ["FLOOR DB"] = "FLOOR",
+  ["MIN HZ"] = "MIN",
+  ["MAX HZ"] = "MAX",
+  ["MIN BEATS"] = "MIN",
+  ["MAX BEATS"] = "MAX",
+  ["BAR BEATS"] = "BAR",
+  ["PITCH SPAN"] = "PITCH",
+  ["CH MOTION"] = "CH",
+  ["NLEN VAR"] = "NVAR",
+  ["SELECTED SOURCE"] = "SRC",
+  ["LAYOUT FOCUS"] = "FOCUS",
+  ["DISTANCE ROLLOFF"] = "ROLLOFF",
+  ["DISTANCE DIFFUSION"] = "DIFF",
+  ["MOTION SMOOTHING"] = "SMOOTH",
+  ["GLOBAL AZIMUTH"] = "G AZ",
+  ["GLOBAL ELEVATION"] = "G EL",
+  ["GLOBAL DISTANCE OFFSET"] = "G DIST",
+  ["OUTPUT GAIN"] = "OUT",
+  ["SPHERE FOCUS"] = "FOCUS",
+  ["COSINE FOCUS"] = "FOCUS",
+  ["DBAP FOCUS"] = "FOCUS",
+  ["FOCUS AMOUNT"] = "FOCUS",
+  ["VECTOR SHARPNESS"] = "SHARP",
+  ["LBAP SHARPNESS"] = "SHARP",
+  ["VBAP SHARPNESS"] = "SHARP",
+  ["REGION SHARPNESS"] = "SHARP",
+  ["LBAP WIDTH"] = "WIDTH",
+  ["DBAP ROLLOFF"] = "ROLLOFF",
+  ["REGION BLEND"] = "BLEND",
+  ["REGION WIDTH"] = "WIDTH",
+  ["SNAPSHOT MORPH"] = "MORPH",
+  ["XYZ SPREAD RADIUS"] = "SPREAD",
+  ["GLOBAL X OFFSET"] = "G X",
+  ["GLOBAL Y OFFSET"] = "G Y",
+  ["GLOBAL Z OFFSET"] = "G Z",
+  ["PATH METHOD"] = "METHOD",
+  ["SOURCE RELATIONSHIP"] = "RELATE",
+  ["POINT RATE"] = "RATE",
+  ["SOURCE PHASE SPREAD"] = "PHASE",
+  ["CANON DELAY"] = "DELAY",
+  ["DURATION"] = "DUR",
+  ["CONTINUITY"] = "CONT",
+  ["CYCLES"] = "CYC",
+  ["GRAPH NODES"] = "NODES",
+  ["GRAPH MEMORY"] = "MEM",
+  ["PATH CORNERS"] = "CORNERS",
+  ["HOLE RADIUS"] = "HOLE",
+  ["HOLE REPULSION"] = "REPEL",
+  ["BOUNDARY FORCE"] = "FORCE",
+  ["XYZ RADIUS"] = "RADIUS",
+  ["AZIMUTH CENTER"] = "AZ CTR",
+  ["AZIMUTH RANGE"] = "AZ RNG",
+  ["ELEVATION CENTER"] = "EL CTR",
+  ["ELEVATION RANGE"] = "EL RNG",
+  ["DISTANCE CENTER"] = "D CTR",
+  ["DISTANCE RANGE"] = "D RNG",
+  ["TEAR / JUMP CHANCE"] = "TEAR",
+}
+
+local MAX_SLIDER_LABEL_CHARS = 8
+
+local function clamp_slider_label(value)
+  value = tostring(value or ""):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+  if #value <= MAX_SLIDER_LABEL_CHARS then return value end
+  local compact = value:gsub("[AEIOU]", "")
+  if #compact <= MAX_SLIDER_LABEL_CHARS then return compact end
+  return compact:sub(1, MAX_SLIDER_LABEL_CHARS)
+end
+
+local function slider_label(label)
+  local visible = tostring(label or ""):gsub("##.*$", "")
+  visible = visible:gsub("%s*%b()", "")
+  local upper = visible:upper()
+  upper = upper:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+  local source_label = upper:match("^S%d+%s+(.+)$")
+  if source_label then
+    if source_label:match("^LIVE AZIMUTH") then return clamp_slider_label("AZ") end
+    if source_label:match("^LIVE ELEVATION") then return clamp_slider_label("EL") end
+    if source_label:match("^LIVE DISTANCE") then return clamp_slider_label("DIST") end
+    if source_label:match("^AZIMUTH") then return clamp_slider_label("AZ") end
+    if source_label:match("^ELEVATION") then return clamp_slider_label("EL") end
+    if source_label:match("^DISTANCE") then return clamp_slider_label("DIST") end
+    if source_label:match("^GAIN") then return clamp_slider_label("GAIN") end
+    if source_label:match("^TRIANGLE PATH") then return clamp_slider_label("PATH") end
+    if source_label:match("^POSITION") then return clamp_slider_label("POS") end
+    if source_label:match("^CENTER BLEND") then return clamp_slider_label("BLEND") end
+    if source_label:match("^VERTEX WIDTH") then return clamp_slider_label("WIDTH") end
+    if source_label:match("^WIDTH") then return clamp_slider_label("WIDTH") end
+    if source_label == "X" or source_label == "Y" or source_label == "Z" then return clamp_slider_label(source_label) end
+  end
+  return clamp_slider_label(SLIDER_ABBR[upper] or upper)
+end
+
+local function display_slider_value(value, format, integer)
+  if integer then return tostring(math.floor(value + 0.5)) end
+  if format and format ~= "" then return string.format(format, value) end
+  return string.format("%.3f", value)
+end
+
+local function push_borderless_frame(ImGui, ctx)
+  local vars = 0
+  if ImGui.StyleVar_FrameBorderSize then
+    ImGui.PushStyleVar(ctx, ImGui.StyleVar_FrameBorderSize, 0.0)
+    vars = vars + 1
+  end
+  return vars
+end
+
+local function pop_borderless_frame(ImGui, ctx, vars)
+  if vars and vars > 0 then ImGui.PopStyleVar(ctx, vars) end
+end
+
+function M.slider_row(ImGui, ctx, label, value, min_value, max_value, format, integer, width)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local avail = width or ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" or avail < 220 then
+    if integer then return ImGui.SliderInt(ctx, label, math.floor(value + 0.5), min_value, max_value) end
+    return ImGui.SliderDouble(ctx, label, value, min_value, max_value, format or "%.3f")
+  end
+
+  local p = M.palette(ImGui)
+  local h = 22
+  local label_w = 82
+  local value_w = 76
+  local track_x = x + label_w
+  local track_w = math.max(52, avail - label_w - value_w - 8)
+  local value_x = track_x + track_w + 8
+  local track_y = y + 6
+  local track_h = 8
+  local norm = 0
+  if max_value ~= min_value then norm = clamp((value - min_value) / (max_value - min_value), 0, 1) end
+
+  local id = string.format("##s3g_slider_%s_%d_%d", tostring(label or ""), math.floor(x + 0.5), math.floor(y + 0.5))
+  ImGui.InvisibleButton(ctx, id, avail, h)
+  local hovered = ImGui.IsItemHovered(ctx)
+  local active = ImGui.IsItemActive(ctx)
+  local changed = false
+  if (hovered or active) and ImGui.IsMouseDown(ctx, 0) then
+    local mx = ImGui.GetMousePos(ctx)
+    local new_norm = clamp((mx - track_x) / track_w, 0, 1)
+    local new_value = min_value + (max_value - min_value) * new_norm
+    if integer then new_value = math.floor(new_value + 0.5) end
+    if math.abs(new_value - value) > (integer and 0 or 0.0000001) then
+      value = new_value
+      changed = true
+      norm = new_norm
+    end
+  end
+
+  local draw = ImGui.GetWindowDrawList(ctx)
+  local track_col = active and p.frame_active or (hovered and p.frame_hover or p.frame)
+  local fill_col = active and p.active or p.fill
+  local handle_col = active and p.active_hover or p.active
+  ImGui.DrawList_AddText(draw, x, y + 2, p.label, slider_label(label))
+  ImGui.DrawList_AddRectFilled(draw, track_x, track_y, track_x + track_w, track_y + track_h, track_col)
+  ImGui.DrawList_AddRectFilled(draw, track_x + 1, track_y + 1, track_x + math.max(2, track_w * norm), track_y + track_h - 1, fill_col)
+  local hx = clamp(track_x + track_w * norm - 1.5, track_x + 1, track_x + track_w - 4)
+  ImGui.DrawList_AddRectFilled(draw, hx, track_y - 2, hx + 3, track_y + track_h + 2, handle_col)
+  ImGui.DrawList_AddText(draw, value_x, y + 2, p.value, display_slider_value(value, format, integer))
+  return changed, value
+end
+
+function M.slider_int(ImGui, ctx, label, value, min_value, max_value, width)
+  return M.slider_row(ImGui, ctx, label, value, min_value, max_value, nil, true, width)
+end
+
+function M.slider_double(ImGui, ctx, label, value, min_value, max_value, format, width)
+  return M.slider_row(ImGui, ctx, label, value, min_value, max_value, format or "%.3f", false, width)
+end
+
+function M.combo_row(ImGui, ctx, label, labels, value, width)
+  labels = labels or {}
+  width = width or 160
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local p = M.palette(ImGui)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 3, p.label, slider_label(label))
+  ImGui.SetCursorScreenPos(ctx, x + 82, y)
+  ImGui.SetNextItemWidth(ctx, width)
+  local border_vars = push_borderless_frame(ImGui, ctx)
+  local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), (value or 1) - 1, table.concat(labels, "\0") .. "\0")
+  pop_borderless_frame(ImGui, ctx, border_vars)
+  ImGui.SetCursorScreenPos(ctx, x, y + 24)
+  ImGui.Dummy(ctx, 1, 1)
+  return changed, next_value + 1
+end
+
+function M.combo_action_row(ImGui, ctx, label, labels, value, width, button_label, button_width)
+  labels = labels or {}
+  width = width or 160
+  button_width = button_width or 88
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local p = M.palette(ImGui)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 3, p.label, slider_label(label))
+  ImGui.SetCursorScreenPos(ctx, x + 82, y)
+  ImGui.SetNextItemWidth(ctx, width)
+  local border_vars = push_borderless_frame(ImGui, ctx)
+  local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), (value or 1) - 1, table.concat(labels, "\0") .. "\0")
+  pop_borderless_frame(ImGui, ctx, border_vars)
+  ImGui.SameLine(ctx)
+  local pressed = ImGui.Button(ctx, tostring(button_label or "APPLY"), button_width, 24)
+  ImGui.SetCursorScreenPos(ctx, x, y + 26)
+  ImGui.Dummy(ctx, 1, 1)
+  return changed, next_value + 1, pressed
+end
+
+function M.input_int_row(ImGui, ctx, label, value, step, step_fast, width)
+  width = width or 110
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local p = M.palette(ImGui)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 3, p.label, slider_label(label))
+  ImGui.SetCursorScreenPos(ctx, x + 82, y)
+  ImGui.SetNextItemWidth(ctx, width)
+  local border_vars = push_borderless_frame(ImGui, ctx)
+  local changed, next_value = ImGui.InputInt(ctx, "##input_" .. tostring(label or ""), value, step or 1, step_fast or 10)
+  pop_borderless_frame(ImGui, ctx, border_vars)
+  ImGui.SetCursorScreenPos(ctx, x, y + 24)
+  ImGui.Dummy(ctx, 1, 1)
+  return changed, next_value
+end
+
+function M.input_text_row(ImGui, ctx, label, value, width)
+  width = width or 220
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local p = M.palette(ImGui)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 3, p.label, slider_label(label))
+  ImGui.SetCursorScreenPos(ctx, x + 82, y)
+  ImGui.SetNextItemWidth(ctx, width)
+  local border_vars = push_borderless_frame(ImGui, ctx)
+  local changed, next_value = ImGui.InputText(ctx, "##input_" .. tostring(label or ""), value or "")
+  pop_borderless_frame(ImGui, ctx, border_vars)
+  ImGui.SetCursorScreenPos(ctx, x, y + 24)
+  ImGui.Dummy(ctx, 1, 1)
+  return changed, next_value
+end
+
+function M.section_label(ImGui, ctx, label)
+  ImGui.Dummy(ctx, 1, 4)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y, M.palette(ImGui).muted, slider_label(label))
+  ImGui.Dummy(ctx, 1, 16)
+end
+
+function M.toolbox_header(ImGui, ctx, title, flags)
+  local open_state
+  title = tostring(title or ""):upper()
+  if flags then
+    open_state = ImGui.CollapsingHeader(ctx, title, nil, flags)
+  else
+    open_state = ImGui.CollapsingHeader(ctx, title)
+  end
+  if ImGui.GetItemRectMin and ImGui.GetItemRectMax and ImGui.GetWindowDrawList then
+    local x0, y0 = ImGui.GetItemRectMin(ctx)
+    local x1 = ImGui.GetItemRectMax(ctx)
+    ImGui.DrawList_AddLine(
+      ImGui.GetWindowDrawList(ctx),
+      x0 + 1,
+      y0 + 1,
+      x1 - 1,
+      y0 + 1,
+      ImGui.ColorConvertDouble4ToU32(0.88, 0.88, 0.86, 0.58),
+      1.0)
+  end
+  ImGui.Dummy(ctx, 1, 3)
+  return open_state
+end
+
+function M.push_soft_panel(ImGui, ctx)
+  local function rgba(r, g, b, a) return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1.0) end
+  local colors = 0
+  local vars = 0
+  local body = rgba(0.125, 0.128, 0.130, 1.0)
+  local title = rgba(0.058, 0.060, 0.062, 1.0)
+  local title_hover = rgba(0.078, 0.080, 0.083, 1.0)
+  local title_active = rgba(0.094, 0.096, 0.098, 1.0)
+  local control = rgba(0.052, 0.054, 0.056, 1.0)
+  local control_hover = rgba(0.070, 0.072, 0.074, 1.0)
+  local control_active = rgba(0.088, 0.090, 0.092, 1.0)
+  if ImGui.Col_ChildBg then ImGui.PushStyleColor(ctx, ImGui.Col_ChildBg, body); colors = colors + 1 end
+  if ImGui.Col_Border then ImGui.PushStyleColor(ctx, ImGui.Col_Border, rgba(0.10, 0.11, 0.12, 0.16)); colors = colors + 1 end
+  if ImGui.Col_Separator then ImGui.PushStyleColor(ctx, ImGui.Col_Separator, rgba(0.11, 0.12, 0.13, 0.30)); colors = colors + 1 end
+  if ImGui.Col_Header then ImGui.PushStyleColor(ctx, ImGui.Col_Header, title); colors = colors + 1 end
+  if ImGui.Col_HeaderHovered then ImGui.PushStyleColor(ctx, ImGui.Col_HeaderHovered, title_hover); colors = colors + 1 end
+  if ImGui.Col_HeaderActive then ImGui.PushStyleColor(ctx, ImGui.Col_HeaderActive, title_active); colors = colors + 1 end
+  if ImGui.Col_FrameBg then ImGui.PushStyleColor(ctx, ImGui.Col_FrameBg, control); colors = colors + 1 end
+  if ImGui.Col_FrameBgHovered then ImGui.PushStyleColor(ctx, ImGui.Col_FrameBgHovered, control_hover); colors = colors + 1 end
+  if ImGui.Col_FrameBgActive then ImGui.PushStyleColor(ctx, ImGui.Col_FrameBgActive, control_active); colors = colors + 1 end
+  if ImGui.Col_Button then ImGui.PushStyleColor(ctx, ImGui.Col_Button, rgba(0.064, 0.066, 0.068, 1.0)); colors = colors + 1 end
+  if ImGui.Col_ButtonHovered then ImGui.PushStyleColor(ctx, ImGui.Col_ButtonHovered, rgba(0.084, 0.086, 0.088, 1.0)); colors = colors + 1 end
+  if ImGui.Col_ButtonActive then ImGui.PushStyleColor(ctx, ImGui.Col_ButtonActive, rgba(0.110, 0.112, 0.114, 1.0)); colors = colors + 1 end
+  if ImGui.Col_CheckMark then ImGui.PushStyleColor(ctx, ImGui.Col_CheckMark, rgba(0.62, 0.64, 0.64, 1.0)); colors = colors + 1 end
+  if ImGui.Col_SliderGrab then ImGui.PushStyleColor(ctx, ImGui.Col_SliderGrab, rgba(0.42, 0.43, 0.43, 1.0)); colors = colors + 1 end
+  if ImGui.Col_SliderGrabActive then ImGui.PushStyleColor(ctx, ImGui.Col_SliderGrabActive, rgba(0.64, 0.65, 0.64, 1.0)); colors = colors + 1 end
+  if ImGui.StyleVar_ChildBorderSize then ImGui.PushStyleVar(ctx, ImGui.StyleVar_ChildBorderSize, 0.0); vars = vars + 1 end
+  if ImGui.StyleVar_FrameBorderSize then ImGui.PushStyleVar(ctx, ImGui.StyleVar_FrameBorderSize, 0.0); vars = vars + 1 end
+  if ImGui.StyleVar_FramePadding then ImGui.PushStyleVar(ctx, ImGui.StyleVar_FramePadding, 5, 2); vars = vars + 1 end
+  if ImGui.StyleVar_GrabMinSize then ImGui.PushStyleVar(ctx, ImGui.StyleVar_GrabMinSize, 6.0); vars = vars + 1 end
+  return { colors = colors, vars = vars }
+end
+
+function M.pop_soft_panel(ImGui, ctx, stack)
+  if not stack then return end
+  if stack.colors and stack.colors > 0 then ImGui.PopStyleColor(ctx, stack.colors) end
+  if stack.vars and stack.vars > 0 then ImGui.PopStyleVar(ctx, stack.vars) end
+end
+
+function M.push_panel(ImGui, ctx)
+  local p = M.palette(ImGui)
+  local colors = 0
+  colors = colors + push_style_color(ImGui, ctx, "ChildBg", p.panel)
+  colors = colors + push_style_color(ImGui, ctx, "Border", p.edge)
+  return { colors = colors, vars = 0 }
+end
+
+function M.static_header(ImGui, ctx, title)
+  local p = M.palette(ImGui)
+  ImGui.TextColored(ctx, p.label, title)
+  if ImGui.Separator then ImGui.Separator(ctx) end
 end
 
 function M.attach_font(ImGui, ctx, size)
@@ -114,7 +494,7 @@ function M.push(ImGui, ctx)
   colors = colors + push_style_color(ImGui, ctx, "PopupBg", p.panel)
   colors = colors + push_style_color(ImGui, ctx, "Border", p.edge)
   colors = colors + push_style_color(ImGui, ctx, "BorderShadow", p.clear)
-  colors = colors + push_style_color(ImGui, ctx, "Text", p.text)
+  colors = colors + push_style_color(ImGui, ctx, "Text", p.label)
   colors = colors + push_style_color(ImGui, ctx, "TextDisabled", p.disabled)
   colors = colors + push_style_color(ImGui, ctx, "FrameBg", p.frame)
   colors = colors + push_style_color(ImGui, ctx, "FrameBgHovered", p.frame_hover)
@@ -126,8 +506,8 @@ function M.push(ImGui, ctx)
   colors = colors + push_style_color(ImGui, ctx, "HeaderHovered", p.frame_hover)
   colors = colors + push_style_color(ImGui, ctx, "HeaderActive", p.frame_active)
   colors = colors + push_style_color(ImGui, ctx, "CheckMark", p.active)
-  colors = colors + push_style_color(ImGui, ctx, "SliderGrab", p.active)
-  colors = colors + push_style_color(ImGui, ctx, "SliderGrabActive", p.active_hover)
+  colors = colors + push_style_color(ImGui, ctx, "SliderGrab", p.fill)
+  colors = colors + push_style_color(ImGui, ctx, "SliderGrabActive", p.active)
   colors = colors + push_style_color(ImGui, ctx, "ScrollbarBg", p.bg)
   colors = colors + push_style_color(ImGui, ctx, "ScrollbarGrab", p.frame_active)
   colors = colors + push_style_color(ImGui, ctx, "ScrollbarGrabHovered", p.edge)

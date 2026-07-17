@@ -17,6 +17,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ui_theme = nil
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -25,7 +26,7 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui); ui_theme = _s3g_theme end
 end
 
 
@@ -33,6 +34,16 @@ local TITLE = "Musical Space"
 local ctx = ImGui.CreateContext(TITLE)
 local open = true
 local status = ""
+
+local function ui_slider_int(label, value, min_value, max_value)
+  if ui_theme and ui_theme.slider_int then return ui_theme.slider_int(ImGui, ctx, label, value, min_value, max_value) end
+  return ImGui.SliderInt(ctx, label, value, min_value, max_value)
+end
+
+local function ui_slider_double(label, value, min_value, max_value, format)
+  if ui_theme and ui_theme.slider_double then return ui_theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format) end
+  return ImGui.SliderDouble(ctx, label, value, min_value, max_value, format)
+end
 
 local ROOTS = midi.ROOT_NAMES
 local SCALES = midi.SCALE_NAMES
@@ -137,9 +148,33 @@ local preview_loop_seconds = 8.0
 local last_time = reaper.time_precise()
 
 local function combo(label, labels, value, width)
+  if ui_theme and ui_theme.combo_row then return ui_theme.combo_row(ImGui, ctx, label, labels, value, width) end
   ImGui.SetNextItemWidth(ctx, width or 160)
-  local changed, next_value = ImGui.Combo(ctx, label, value - 1, table.concat(labels, "\0") .. "\0")
+  local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), value - 1, table.concat(labels, "\0") .. "\0")
   return changed, next_value + 1
+end
+
+local function ui_input_int(label, value, step, step_fast, width)
+  if ui_theme and ui_theme.input_int_row then return ui_theme.input_int_row(ImGui, ctx, label, value, step, step_fast, width) end
+  return ImGui.InputInt(ctx, "##input_" .. tostring(label or ""), value, step or 1, step_fast or 10)
+end
+
+local function muted_text(value)
+  if ui_theme and ui_theme.muted then ui_theme.muted(ImGui, ctx, value) else ImGui.Text(ctx, value) end
+end
+
+local function toolbox_header(title, flags)
+  if ui_theme and ui_theme.toolbox_header then return ui_theme.toolbox_header(ImGui, ctx, title, flags) end
+  return ImGui.CollapsingHeader(ctx, tostring(title or ""):upper(), nil, flags)
+end
+
+local function push_soft_panel()
+  if ui_theme and ui_theme.push_soft_panel then return ui_theme.push_soft_panel(ImGui, ctx) end
+  return nil
+end
+
+local function pop_soft_panel(stack)
+  if ui_theme and ui_theme.pop_soft_panel then ui_theme.pop_soft_panel(ImGui, ctx, stack) end
 end
 
 local function choose_from(list)
@@ -617,24 +652,19 @@ end
 
 local function draw_preview_controls()
   local changed
-  changed, preview_t = ImGui.SliderDouble(ctx, "Timeline preview", preview_t, 0, 1, "%.3f")
-  if ImGui.Button(ctx, preview_play and "Stop Preview" or "Play Preview", 130, 26) then
+  changed, preview_t = ui_slider_double("TIMELINE PREVIEW", preview_t, 0, 1, "%.3f")
+  if ImGui.Button(ctx, preview_play and "STOP PREVIEW" or "PLAY PREVIEW", 130, 26) then
     preview_play = not preview_play
     last_time = reaper.time_precise()
   end
   ImGui.SameLine(ctx)
-  changed, preview_sync_project_bpm = ImGui.Checkbox(ctx, "Project BPM", preview_sync_project_bpm)
-  ImGui.SameLine(ctx)
-  ImGui.SetNextItemWidth(ctx, 120)
-  changed, preview_speed = ImGui.SliderDouble(ctx, "Preview speed", preview_speed, 0.125, 4.0, "%.3fx")
+  changed, preview_sync_project_bpm = ImGui.Checkbox(ctx, "PROJECT BPM", preview_sync_project_bpm)
+  changed, preview_speed = ui_slider_double("PREVIEW SPEED", preview_speed, 0.125, 4.0, "%.3fx")
   if not preview_sync_project_bpm then
-    ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 112)
-    changed, preview_loop_seconds = ImGui.SliderDouble(ctx, "Loop seconds", preview_loop_seconds, 1.0, 30.0, "%.1f")
+    changed, preview_loop_seconds = ui_slider_double("LOOP SECONDS", preview_loop_seconds, 1.0, 30.0, "%.1f")
   else
     local start_qn = current_start_qn()
-    ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, COLORS.dim, string.format("%.1f BPM", tempo_at_qn(start_qn)))
+    muted_text(string.format("%.1f BPM", tempo_at_qn(start_qn)))
   end
 end
 
@@ -662,12 +692,12 @@ end
 generate_preview()
 
 local function draw_footer()
-  ImGui.Separator(ctx)
-  if ImGui.Button(ctx, "Generate MIDI Item", 160, 30) then generate_item() end
+  ImGui.Dummy(ctx, 1, 6)
+  if ImGui.Button(ctx, "GENERATE MIDI", 160, 30) then generate_item() end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Refresh Preview", 130, 30) then generate_preview() end
+  if ImGui.Button(ctx, "REFRESH", 130, 30) then generate_preview() end
   ImGui.SameLine(ctx)
-  ImGui.TextColored(ctx, COLORS.dim, status)
+  muted_text(status)
 end
 
 local function loop()
@@ -692,49 +722,49 @@ local function loop()
     local footer_height = 52
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local content_height = math.max(220, avail_h - footer_height)
+    local main_panel_style = push_soft_panel()
     local child_visible = ImGui.BeginChild(ctx, "##main_content", 0, content_height)
     if child_visible then
       draw_preview()
       draw_preview_controls()
       local changed = false
       local c
-      if ImGui.CollapsingHeader(ctx, "Pitch Space", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-        c, state.root = combo("Root", ROOTS, state.root, 90); changed = changed or c
-        ImGui.SameLine(ctx)
-        c, state.scale = combo("Scale", SCALES, state.scale, 170); changed = changed or c
-        ImGui.SameLine(ctx)
-        c, state.space = combo("Space", SPACES, state.space, 210); changed = changed or c
-        c, state.length = combo("Length", LENGTHS, state.length, 160); changed = changed or c
-        c, state.octave = ImGui.SliderInt(ctx, "Base octave", state.octave, 0, 8); changed = changed or c
-        c, state.span = ImGui.SliderInt(ctx, "Register span", state.span, 1, 6); changed = changed or c
+      if toolbox_header("PITCH SPACE", ImGui.TreeNodeFlags_DefaultOpen) then
+        c, state.root = combo("ROOT", ROOTS, state.root, 90); changed = changed or c
+        c, state.scale = combo("SCALE", SCALES, state.scale, 170); changed = changed or c
+        c, state.space = combo("SPACE", SPACES, state.space, 210); changed = changed or c
+        c, state.length = combo("LENGTH", LENGTHS, state.length, 160); changed = changed or c
+        c, state.octave = ui_slider_int("OCT", state.octave, 0, 8); changed = changed or c
+        c, state.span = ui_slider_int("SPAN", state.span, 1, 6); changed = changed or c
       end
-      if ImGui.CollapsingHeader(ctx, "Rhythm Path", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-        c, state.rhythm_mode = combo("Rhythm model", RHYTHM_MODES, state.rhythm_mode, 180); changed = changed or c
-        c, state.rhythm_variation = ImGui.SliderDouble(ctx, "Rhythm variation", state.rhythm_variation, 0, 1, "%.3f"); changed = changed or c
-        c, state.steps = ImGui.SliderInt(ctx, "Steps", state.steps, 3, 128); changed = changed or c
-        c, state.pulses = ImGui.SliderInt(ctx, "Pulses", state.pulses, 0, state.steps); changed = changed or c
-        c, state.rotate = ImGui.SliderInt(ctx, "Rotate", state.rotate, -state.steps, state.steps); changed = changed or c
-        c, state.density = ImGui.SliderDouble(ctx, "Density", state.density, 0, 1, "%.3f"); changed = changed or c
-        c, state.surprise = ImGui.SliderDouble(ctx, "Path surprise", state.surprise, 0, 1, "%.3f"); changed = changed or c
+      if toolbox_header("RHYTHM PATH", ImGui.TreeNodeFlags_DefaultOpen) then
+        c, state.rhythm_mode = combo("RHYTHM", RHYTHM_MODES, state.rhythm_mode, 180); changed = changed or c
+        c, state.rhythm_variation = ui_slider_double("RVAR", state.rhythm_variation, 0, 1, "%.3f"); changed = changed or c
+        c, state.steps = ui_slider_int("STEP", state.steps, 3, 128); changed = changed or c
+        c, state.pulses = ui_slider_int("PULS", state.pulses, 0, state.steps); changed = changed or c
+        c, state.rotate = ui_slider_int("ROT", state.rotate, -state.steps, state.steps); changed = changed or c
+        c, state.density = ui_slider_double("DENS", state.density, 0, 1, "%.3f"); changed = changed or c
+        c, state.surprise = ui_slider_double("SURP", state.surprise, 0, 1, "%.3f"); changed = changed or c
       end
-      if ImGui.CollapsingHeader(ctx, "Output", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-        c, state.note_len = ImGui.SliderDouble(ctx, "Note length", state.note_len, 0.05, 1.5, "%.2f steps"); changed = changed or c
-        c, state.note_len_variation = ImGui.SliderDouble(ctx, "Note length variation", state.note_len_variation, 0, 1, "%.3f"); changed = changed or c
-        c, state.voicing = combo("Voicing", VOICINGS, state.voicing, 140); changed = changed or c
-        c, state.voicing_variation = ImGui.SliderDouble(ctx, "Voicing variation", state.voicing_variation, 0, 1, "%.3f"); changed = changed or c
-        c, state.velocity = ImGui.SliderInt(ctx, "Velocity", state.velocity, 1, 127); changed = changed or c
-        c, state.jitter = ImGui.SliderInt(ctx, "Velocity jitter", state.jitter, 0, 48); changed = changed or c
-        c, state.channel_mode = combo("Channel mode", CHANNEL_MODES, state.channel_mode, 180); changed = changed or c
+      if toolbox_header("OUTPUT", ImGui.TreeNodeFlags_DefaultOpen) then
+        c, state.note_len = ui_slider_double("NLEN", state.note_len, 0.05, 1.5, "%.2f steps"); changed = changed or c
+        c, state.note_len_variation = ui_slider_double("NLEN VAR", state.note_len_variation, 0, 1, "%.3f"); changed = changed or c
+        c, state.voicing = combo("VOICE", VOICINGS, state.voicing, 140); changed = changed or c
+        c, state.voicing_variation = ui_slider_double("VVAR", state.voicing_variation, 0, 1, "%.3f"); changed = changed or c
+        c, state.velocity = ui_slider_int("VELO", state.velocity, 1, 127); changed = changed or c
+        c, state.jitter = ui_slider_int("VJIT", state.jitter, 0, 48); changed = changed or c
+        c, state.channel_mode = combo("MIDI MODE", CHANNEL_MODES, state.channel_mode, 180); changed = changed or c
         if CHANNEL_MODES[state.channel_mode] == "Single channel" then
-          c, state.single_channel = ImGui.SliderInt(ctx, "MIDI channel", state.single_channel, 1, 16); changed = changed or c
+          c, state.single_channel = ui_slider_int("MIDI", state.single_channel, 1, 16); changed = changed or c
         else
-          c, state.channels = ImGui.SliderInt(ctx, "MIDI channels / source lanes", state.channels, 1, 16); changed = changed or c
+          c, state.channels = ui_slider_int("MIDI LANES", state.channels, 1, 16); changed = changed or c
         end
-        c, state.seed = ImGui.InputInt(ctx, "Seed", state.seed); changed = changed or c
+        c, state.seed = ui_input_int("SEED", state.seed, 1, 10, 110); changed = changed or c
       end
       if changed then generate_preview() end
     end
     ImGui.EndChild(ctx)
+    pop_soft_panel(main_panel_style)
     draw_footer()
   end
   ImGui.End(ctx)

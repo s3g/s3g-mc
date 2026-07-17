@@ -28,16 +28,27 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
-
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local TITLE = "Terrain Form"
 local ctx = ImGui.CreateContext(TITLE)
 local open = true
 local status = ""
 
+local function ui_slider_int(label, value, min_value, max_value)
+  if theme and theme.slider_int then return theme.slider_int(ImGui, ctx, label, value, min_value, max_value) end
+  return ImGui.SliderInt(ctx, label, value, min_value, max_value)
+end
+
+local function ui_slider_double(label, value, min_value, max_value, format)
+  if theme and theme.slider_double then return theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format) end
+  return ImGui.SliderDouble(ctx, label, value, min_value, max_value, format)
+end
+
 local ROOTS = midi.ROOT_NAMES
 local SCALES = midi.SCALE_NAMES
-local FORM_NAMES = { "Arc", "Episodes", "Return", "Drift", "Blocks", "Terrain", "Ritual", "Cascade", "Constellation" }
+local FORM_NAMES = { "Arc", "Episodes", "Return", "Drift", "Blocks", "TERRAIN", "Ritual", "Cascade", "Constellation" }
 local FORM_KEYS = { "arc", "episodes", "return", "drift", "blocks", "terrain", "ritual", "cascade", "constellation" }
 local TERRAIN_NAMES = { "Ridge", "Basin", "Spiral", "Fault", "Cellular", "Attractor" }
 local TERRAIN_KEYS = { "ridge", "basin", "spiral", "fault", "cellular", "attractor" }
@@ -72,21 +83,36 @@ local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
-  panel = color(0.055, 0.060, 0.064, 1),
-  edge = color(0.30, 0.32, 0.33, 1),
-  grid = color(0.48, 0.52, 0.51, 0.22),
-  text = color(0.80, 0.84, 0.82, 1),
-  dim = color(0.50, 0.55, 0.54, 1),
-  line = color(0.28, 0.72, 0.68, 1),
-  hit = color(0.95, 0.74, 0.28, 1),
-  section = color(0.22, 0.30, 0.32, 1),
+local STYLE = {
+  panel = THEME.panel,
+  edge = THEME.edge,
+  grid = THEME.grid,
+  text = THEME.text,
+  dim = THEME.value,
+  line = color(0.42, 0.62, 0.58, 1),
+  hit = THEME.amber,
+  section = color(0.22, 0.27, 0.28, 1),
 }
 
 local function combo(label, labels, value, width)
+  if theme and theme.combo_row then return theme.combo_row(ImGui, ctx, label, labels, value, width) end
   ImGui.SetNextItemWidth(ctx, width or 160)
-  local changed, next_value = ImGui.Combo(ctx, label, value - 1, table.concat(labels, "\0") .. "\0")
+  local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), value - 1, table.concat(labels, "\0") .. "\0")
   return changed, next_value + 1
+end
+
+local function ui_input_int(label, value, step, step_fast, width)
+  if theme and theme.input_int_row then return theme.input_int_row(ImGui, ctx, label, value, step, step_fast, width) end
+  return ImGui.InputInt(ctx, "##input_" .. tostring(label or ""), value, step or 1, step_fast or 10)
+end
+
+local function push_soft_panel()
+  if theme and theme.push_soft_panel then return theme.push_soft_panel(ImGui, ctx) end
+  return nil
+end
+
+local function pop_soft_panel(stack)
+  if theme and theme.pop_soft_panel then theme.pop_soft_panel(ImGui, ctx, stack) end
 end
 
 local function qn_to_time(qn)
@@ -195,9 +221,9 @@ local function draw_preview()
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
   local h = 250
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, COLORS.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, COLORS.edge)
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, COLORS.dim, "MIDI TERRAIN FORM")
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, STYLE.panel)
+  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, STYLE.edge)
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, STYLE.dim, "MIDI TERRAIN FORM")
   local left, top, right, bottom = x + 18, y + 48, x + w - 18, y + h - 30
   local section_w = (right - left) / math.max(1, state.sections)
   for section = 1, state.sections do
@@ -211,9 +237,9 @@ local function draw_preview()
     elseif FORM_KEYS[state.form] == "return" then energy = (section % 3 == 1) and 0.8 or (0.35 + 0.45 * math.sin(math.pi * t))
     else energy = 0.35 + 0.5 * ((section * 37 + state.seed) % 11) / 10 end
     local sy = bottom - energy * (bottom - top)
-    ImGui.DrawList_AddRectFilled(draw_list, sx0, sy, sx1, bottom, COLORS.section)
-    ImGui.DrawList_AddRect(draw_list, sx0, top, sx1, bottom, COLORS.grid)
-    ImGui.DrawList_AddText(draw_list, sx0 + 5, bottom + 7, COLORS.dim, tostring(section))
+    ImGui.DrawList_AddRectFilled(draw_list, sx0, sy, sx1, bottom, STYLE.section)
+    ImGui.DrawList_AddRect(draw_list, sx0, top, sx1, bottom, STYLE.grid)
+    ImGui.DrawList_AddText(draw_list, sx0 + 5, bottom + 7, STYLE.dim, tostring(section))
   end
   local last_x, last_y
   local points = 96
@@ -225,10 +251,10 @@ local function draw_preview()
     elseif TERRAIN_KEYS[state.terrain] == "fault" then terrain = t > 0.45 and 0.88 or 0.22 end
     local px = left + t * (right - left)
     local py = bottom - terrain * (bottom - top)
-    if last_x then ImGui.DrawList_AddLine(draw_list, last_x, last_y, px, py, COLORS.line, 1.4) end
+    if last_x then ImGui.DrawList_AddLine(draw_list, last_x, last_y, px, py, STYLE.line, 1.4) end
     last_x, last_y = px, py
   end
-  ImGui.DrawList_AddText(draw_list, x + 18, y + h - 20, COLORS.dim,
+  ImGui.DrawList_AddText(draw_list, x + 18, y + h - 20, STYLE.dim,
     string.format("%s / %s / %d beats / %d lanes", FORM_NAMES[state.form], TERRAIN_NAMES[state.terrain], state.duration_beats, state.lanes))
   ImGui.SetCursorScreenPos(ctx, x, y + h + 12)
 end
@@ -238,36 +264,41 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    draw_preview()
-    _, state.form = combo("Form", FORM_NAMES, state.form, 170)
-    ImGui.SameLine(ctx)
-    _, state.terrain = combo("Terrain", TERRAIN_NAMES, state.terrain, 170)
-    _, state.duration_beats = ImGui.SliderInt(ctx, "Duration beats", state.duration_beats, 16, 4096)
-    _, state.sections = ImGui.SliderInt(ctx, "Sections", state.sections, 1, 32)
-    _, state.lanes = ImGui.SliderInt(ctx, "MIDI channels / lanes", state.lanes, 1, 16)
-    _, state.root = combo("Root", ROOTS, state.root, 90)
-    ImGui.SameLine(ctx)
-    _, state.scale = combo("Scale", SCALES, state.scale, 170)
-    ImGui.Separator(ctx)
-    _, state.density = ImGui.SliderDouble(ctx, "Density", state.density, 0, 1, "%.3f")
-    _, state.contrast = ImGui.SliderDouble(ctx, "Section contrast", state.contrast, 0, 1, "%.3f")
-    _, state.recurrence = ImGui.SliderDouble(ctx, "Motif recurrence", state.recurrence, 0, 1, "%.3f")
-    _, state.channel_motion = ImGui.SliderDouble(ctx, "Channel motion", state.channel_motion, 0, 1, "%.3f")
-    ImGui.Separator(ctx)
-    _, state.octave = ImGui.SliderInt(ctx, "Base octave", state.octave, 0, 8)
-    _, state.register_span = ImGui.SliderInt(ctx, "Register span", state.register_span, 1, 7)
-    _, state.pitch_span = ImGui.SliderInt(ctx, "Pitch span degrees", state.pitch_span, 4, 80)
-    _, state.min_note = ImGui.SliderDouble(ctx, "Minimum note beats", state.min_note, 0.03125, 4, "%.3f")
-    _, state.max_note = ImGui.SliderDouble(ctx, "Maximum note beats", state.max_note, state.min_note, 16, "%.3f")
-    _, state.velocity = ImGui.SliderInt(ctx, "Velocity center", state.velocity, 1, 127)
-    _, state.velocity_range = ImGui.SliderInt(ctx, "Velocity range", state.velocity_range, 0, 80)
-    _, state.seed = ImGui.InputInt(ctx, "Seed", state.seed)
-    _, state.add_markers = ImGui.Checkbox(ctx, "Add project markers for sections", state.add_markers)
-    if ImGui.Button(ctx, "New Seed", 100, 28) then state.seed = state.seed + 1 end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Generate MIDI Form", 170, 28) then generate() end
-    ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, COLORS.dim, status)
+    local footer_height = 0
+    local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+    local content_height = math.max(220, avail_h - footer_height)
+    local main_panel_style = push_soft_panel()
+    local child_visible = ImGui.BeginChild(ctx, "##main_content", 0, content_height)
+    if child_visible then
+      draw_preview()
+      _, state.form = combo("FORM", FORM_NAMES, state.form, 170)
+      _, state.terrain = combo("TERRAIN", TERRAIN_NAMES, state.terrain, 170)
+      _, state.duration_beats = ui_slider_int("BEATS", state.duration_beats, 16, 4096)
+      _, state.sections = ui_slider_int("SECTIONS", state.sections, 1, 32)
+      _, state.lanes = ui_slider_int("MIDI LANES", state.lanes, 1, 16)
+      _, state.root = combo("ROOT", ROOTS, state.root, 90)
+      _, state.scale = combo("SCALE", SCALES, state.scale, 170)
+      _, state.density = ui_slider_double("DENS", state.density, 0, 1, "%.3f")
+      _, state.contrast = ui_slider_double("CONTRAST", state.contrast, 0, 1, "%.3f")
+      _, state.recurrence = ui_slider_double("RECUR", state.recurrence, 0, 1, "%.3f")
+      _, state.channel_motion = ui_slider_double("CH MOTION", state.channel_motion, 0, 1, "%.3f")
+      _, state.octave = ui_slider_int("OCT", state.octave, 0, 8)
+      _, state.register_span = ui_slider_int("SPAN", state.register_span, 1, 7)
+      _, state.pitch_span = ui_slider_int("PITCH SPAN", state.pitch_span, 4, 80)
+      _, state.min_note = ui_slider_double("MIN BEATS", state.min_note, 0.03125, 4, "%.3f")
+      _, state.max_note = ui_slider_double("MAX BEATS", state.max_note, state.min_note, 16, "%.3f")
+      _, state.velocity = ui_slider_int("VELO", state.velocity, 1, 127)
+      _, state.velocity_range = ui_slider_int("VRNG", state.velocity_range, 0, 80)
+      _, state.seed = ui_input_int("SEED", state.seed, 1, 10, 110)
+      _, state.add_markers = ImGui.Checkbox(ctx, "ADD MARKERS", state.add_markers)
+      if ImGui.Button(ctx, "NEW SEED", 100, 28) then state.seed = state.seed + 1 end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "GENERATE MIDI", 170, 28) then generate() end
+      ImGui.SameLine(ctx)
+      if status ~= "" then theme.muted(ImGui, ctx, status) end
+    end
+    ImGui.EndChild(ctx)
+    pop_soft_panel(main_panel_style)
   end
   ImGui.End(ctx)
   if open then reaper.defer(loop) end

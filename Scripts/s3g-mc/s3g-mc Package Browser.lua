@@ -32,12 +32,19 @@ local detail_level = 2
 local scripts = {}
 local command_cache = {}
 
-local COLORS = {
+local STYLE = {
   panel = THEME.panel,
-  edge = THEME.edge,
-  text = THEME.text,
-  dim = THEME.muted,
+  panel_hover = THEME.panel_soft,
+  edge = THEME.edge_soft,
+  edge_hover = THEME.edge,
+  title = THEME.text,
+  text = THEME.label,
+  dim = THEME.value,
+  active = THEME.active,
+  fill = THEME.fill,
 }
+
+local DETAIL_LABELS = { "COMPACT", "STANDARD", "FULL" }
 
 local CATEGORY_ORDER = {
   "All",
@@ -256,7 +263,8 @@ end
 
 local function category_button(label)
   local display = CATEGORY_LABELS[label] or label
-  local shown = active_category == label and ("*" .. display) or display
+  local selected = active_category == label
+  local shown = selected and ("> " .. display) or display
   if ImGui.Button(ctx, shown) then active_category = label end
 end
 
@@ -308,21 +316,28 @@ local function metadata_line_height(text, width)
 end
 
 local function draw_wrapped_text(text, color_value, width)
-  if text == "" then return end
-  ImGui.PushStyleColor(ctx, ImGui.Col_Text, color_value)
-  ImGui.PushTextWrapPos(ctx, ImGui.GetCursorScreenPos(ctx) + width)
-  ImGui.TextWrapped(ctx, text)
-  ImGui.PopTextWrapPos(ctx)
-  ImGui.PopStyleColor(ctx)
+  theme.wrapped_text(ImGui, ctx, text, color_value, width)
 end
 
 local function draw_wrapped_metadata(label, value, width)
   if value == "" then return end
-  ImGui.PushStyleColor(ctx, ImGui.Col_Text, COLORS.dim)
-  ImGui.PushTextWrapPos(ctx, ImGui.GetCursorScreenPos(ctx) + width)
-  ImGui.TextWrapped(ctx, label .. value)
-  ImGui.PopTextWrapPos(ctx)
-  ImGui.PopStyleColor(ctx)
+  theme.wrapped_text(ImGui, ctx, label .. value, STYLE.dim, width)
+end
+
+local function detail_menu()
+  local preview = DETAIL_LABELS[detail_level] or DETAIL_LABELS[2]
+  local changed = false
+  if ImGui.BeginCombo(ctx, "Detail", preview) then
+    for index, label in ipairs(DETAIL_LABELS) do
+      local selected = detail_level == index
+      if ImGui.Selectable(ctx, label, selected) then
+        detail_level = index
+        changed = true
+      end
+    end
+    ImGui.EndCombo(ctx)
+  end
+  return changed
 end
 
 local function draw_script_card(entry)
@@ -346,11 +361,12 @@ local function draw_script_card(entry)
   local mx, my = ImGui.GetMousePos(ctx)
   local hovered = mx >= x and mx <= x + w and my >= y and my <= y + h
 
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, COLORS.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, hovered and COLORS.text or COLORS.edge)
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, hovered and STYLE.panel_hover or STYLE.panel)
+  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, hovered and STYLE.edge_hover or STYLE.edge)
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + 2, hovered and STYLE.active or STYLE.edge)
   ImGui.SetCursorScreenPos(ctx, x + pad, y + 8)
-  draw_wrapped_text(entry.description, COLORS.text, text_w)
-  draw_wrapped_text(entry.category .. (entry.version ~= "" and ("  v" .. entry.version) or "") .. "  -  " .. entry.filename, COLORS.dim, text_w)
+  draw_wrapped_text(entry.description, STYLE.title, text_w)
+  draw_wrapped_text(entry.category .. (entry.version ~= "" and ("  v" .. entry.version) or "") .. "  -  " .. entry.filename, STYLE.dim, text_w)
   if entry.requires ~= "" then
     draw_wrapped_metadata("Requires: ", entry.requires, text_w)
   end
@@ -368,7 +384,7 @@ local function draw_script_card(entry)
   local button_y = narrow and (y + h - button_h - pad) or (y + 8)
   ImGui.SetCursorScreenPos(ctx, button_x, button_y)
   if entry.filename == script_name then
-    ImGui.TextColored(ctx, COLORS.dim, "Open")
+    ImGui.TextColored(ctx, STYLE.dim, "Open")
   elseif ImGui.Button(ctx, "Run##" .. entry.filename, button_w, button_h) then
     launch_script(entry)
   end
@@ -384,8 +400,7 @@ local function loop()
   visible, open = ImGui.Begin(ctx, "s3g-mc Package Browser", open)
 
   if visible then
-    ImGui.Text(ctx, "s3g-mc")
-    ImGui.SameLine(ctx)
+    theme.static_header(ImGui, ctx, "S3G-MC")
     if ImGui.Button(ctx, "Rescan") then scan_scripts() end
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Install/refresh actions") then register_actions() end
@@ -393,13 +408,13 @@ local function loop()
     local changed
     changed, search = ImGui.InputText(ctx, "Search", search)
     ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 120)
-    changed, detail_level = ImGui.SliderInt(ctx, "Detail", detail_level, 1, 3)
+    ImGui.SetNextItemWidth(ctx, 128)
+    detail_menu()
 
     draw_category_buttons()
 
     ImGui.Separator(ctx)
-    ImGui.Text(ctx, status)
+    theme.value(ImGui, ctx, status)
 
     ImGui.BeginChild(ctx, "##script_list", 0, 0)
       for _, entry in ipairs(scripts) do

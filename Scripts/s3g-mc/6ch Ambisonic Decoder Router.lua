@@ -22,7 +22,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
-
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local PROJECT = 0
 local FX_NAME = "s3g 6ch Ambisonic Decoder Router"
@@ -60,21 +61,21 @@ local DEFAULT_LAYOUT = {
   { az = -90, el = 60 },
 }
 
-local COLORS = {
-  bg = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1),
-  panel = ImGui.ColorConvertDouble4ToU32(0.060, 0.066, 0.070, 1),
-  edge = ImGui.ColorConvertDouble4ToU32(0.32, 0.35, 0.36, 1),
-  grid = ImGui.ColorConvertDouble4ToU32(0.18, 0.20, 0.20, 1),
-  text = ImGui.ColorConvertDouble4ToU32(0.78, 0.82, 0.84, 1),
-  muted = ImGui.ColorConvertDouble4ToU32(0.48, 0.52, 0.54, 1),
-  selected = ImGui.ColorConvertDouble4ToU32(0.96, 0.72, 0.28, 1),
-  speaker = ImGui.ColorConvertDouble4ToU32(0.25, 0.70, 0.92, 1),
-  overhead = ImGui.ColorConvertDouble4ToU32(0.48, 0.82, 0.62, 1),
-}
-
 local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a)
 end
+
+local STYLE = {
+  bg = THEME.bg,
+  panel = THEME.panel,
+  edge = THEME.edge,
+  grid = THEME.grid,
+  text = THEME.text,
+  muted = THEME.value,
+  selected = THEME.amber,
+  speaker = THEME.fill,
+  overhead = color(0.50, 0.60, 0.54, 1),
+}
 
 local function clamp(value, lo, hi)
   if value < lo then return lo end
@@ -275,9 +276,9 @@ local function draw_layout(track, fx)
   local cx, cy = x0 + canvas_width * 0.5, y0 + height * 0.58
   local radius = math.min(canvas_width, height) * 0.36
   local dl = ImGui.GetWindowDrawList(ctx)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, COLORS.bg)
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 14, COLORS.text, "6ch Ambisonic Decoder Router")
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 34, COLORS.muted, "4 speaker bed + 2 elevated side speakers")
+  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, STYLE.bg)
+  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 14, STYLE.text, "6ch Ambisonic Decoder Router")
+  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 34, STYLE.muted, "4 speaker bed + 2 elevated side speakers")
 
   local points = {}
   local by_id = {}
@@ -309,20 +310,20 @@ local function draw_layout(track, fx)
   table.sort(points, function(a, b) return a.z < b.z end)
   for _, p in ipairs(points) do
     local overhead = math.abs(p.el) > 20
-    local fill = overhead and COLORS.overhead or COLORS.speaker
+    local fill = overhead and STYLE.overhead or STYLE.speaker
     local selected = p.id == selected_speaker
     local front = clamp((p.z + 1) * 0.5, 0, 1)
     local size = (overhead and 7.5 or 6.0) + 2.0 * front
     ImGui.DrawList_AddCircleFilled(dl, p.x, p.y, size + 5, color(0.04, 0.045, 0.05, 0.78), 24)
     ImGui.DrawList_AddCircleFilled(dl, p.x, p.y, size + 2, color(0.10, 0.12, 0.13, 0.95), 24)
     ImGui.DrawList_AddCircleFilled(dl, p.x, p.y, size, fill, 24)
-    ImGui.DrawList_AddCircle(dl, p.x, p.y, selected and size + 7 or size + 3, selected and COLORS.selected or color(0.66, 0.70, 0.72, 0.40 + 0.35 * front), 24, selected and 3 or 1.5)
-    ImGui.DrawList_AddText(dl, p.x - 4, p.y - 7, COLORS.bg, tostring(p.id))
+    ImGui.DrawList_AddCircle(dl, p.x, p.y, selected and size + 7 or size + 3, selected and STYLE.selected or color(0.66, 0.70, 0.72, 0.40 + 0.35 * front), 24, selected and 3 or 1.5)
+    ImGui.DrawList_AddText(dl, p.x - 4, p.y - 7, STYLE.bg, tostring(p.id))
     ImGui.DrawList_AddText(dl, p.x + size + 6, p.y - 7, color(0.82, 0.88, 0.90, 0.52 + 0.35 * front), p.name .. "  " .. string.format("%.0f/%.0f", p.az, p.el))
   end
 
-  ImGui.DrawList_AddText(dl, x0 + canvas_width - 205, y0 + 14, COLORS.muted, "speaker outputs 1-6")
-  ImGui.DrawList_AddText(dl, x0 + canvas_width - 212, y0 + 34, COLORS.muted, "click a dot to edit az / el")
+  ImGui.DrawList_AddText(dl, x0 + canvas_width - 205, y0 + 14, STYLE.muted, "speaker outputs 1-6")
+  ImGui.DrawList_AddText(dl, x0 + canvas_width - 212, y0 + 34, STYLE.muted, "click a dot to edit az / el")
 
   if ImGui.IsItemHovered(ctx) and ImGui.IsMouseClicked(ctx, 0) then
     local mx, my = ImGui.GetMousePos(ctx)
@@ -350,7 +351,7 @@ local function draw_speaker_controls(track, fx)
   local d = DEFAULT_LAYOUT[selected_speaker]
   ImGui.Text(ctx, "Speaker " .. tostring(selected_speaker) .. " / " .. speaker.name)
   ImGui.SameLine(ctx)
-  ImGui.TextColored(ctx, COLORS.muted, "default " .. tostring(d.az) .. " / " .. tostring(d.el))
+  theme.muted(ImGui, ctx, "default " .. tostring(d.az) .. " / " .. tostring(d.el))
   slider_actual(track, fx, speaker.name .. " azimuth", speaker.az_param, -180, 180, "%.1f deg")
   slider_actual(track, fx, speaker.name .. " elevation", speaker.el_param, -90, 90, "%.1f deg")
 end
@@ -376,7 +377,7 @@ local function migrate_old_default_layout(track, fx)
 end
 
 local function draw_default_layout_summary()
-  ImGui.TextColored(ctx, COLORS.muted, "Default layout:")
+  theme.muted(ImGui, ctx, "Default layout:")
   for i, speaker in ipairs(SPEAKERS) do
     local d = DEFAULT_LAYOUT[i]
     ImGui.Text(ctx, string.format("%d %s  AZ %g  EL %g", i, speaker.name, d.az, d.el))
@@ -426,7 +427,7 @@ local function loop()
             if i < #SPEAKERS then ImGui.SameLine(ctx) end
           end
         end
-        ImGui.TextColored(ctx, COLORS.muted, "Native monitor decoder: useful for sketching. For formal calibrated playback, use a measured decoder such as IEM AllRADecoder.")
+        theme.muted(ImGui, ctx, "Monitor decoder for sketching. For formal calibrated playback, use a measured decoder such as IEM AllRADecoder.")
       end
     end
     ImGui.End(ctx)

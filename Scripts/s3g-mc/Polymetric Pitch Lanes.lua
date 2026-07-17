@@ -17,6 +17,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ui_theme = nil
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -25,7 +26,7 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui); ui_theme = _s3g_theme end
 end
 
 
@@ -33,6 +34,16 @@ local TITLE = "Polymetric Pitch Lanes"
 local ctx = ImGui.CreateContext(TITLE)
 local open = true
 local status = ""
+
+local function ui_slider_int(label, value, min_value, max_value)
+  if ui_theme and ui_theme.slider_int then return ui_theme.slider_int(ImGui, ctx, label, value, min_value, max_value) end
+  return ImGui.SliderInt(ctx, label, value, min_value, max_value)
+end
+
+local function ui_slider_double(label, value, min_value, max_value, format)
+  if ui_theme and ui_theme.slider_double then return ui_theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format) end
+  return ImGui.SliderDouble(ctx, label, value, min_value, max_value, format)
+end
 
 local GRID_NAMES = { "1/64", "1/32", "1/16", "1/8", "1/4", "1/2", "1 beat", "2 beats", "4 beats" }
 local GRID_VALUES = { 1 / 16, 1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8, 16 }
@@ -124,7 +135,7 @@ local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
+local CANVAS = {
   panel = color(0.055, 0.060, 0.064, 1),
   edge = color(0.30, 0.32, 0.33, 1),
   grid = color(0.50, 0.55, 0.54, 0.20),
@@ -136,7 +147,7 @@ local COLORS = {
   muted = color(0.22, 0.24, 0.25, 1),
 }
 
-local RING_COLORS = {
+local RING_PALETTE = {
   color(1.00, 0.78, 0.18, 1),
   color(0.08, 0.78, 0.92, 1),
   color(0.96, 0.22, 0.34, 1),
@@ -148,7 +159,55 @@ local RING_COLORS = {
 }
 
 local function ring_color(index)
-  return RING_COLORS[((index - 1) % #RING_COLORS) + 1]
+  return RING_PALETTE[((index - 1) % #RING_PALETTE) + 1]
+end
+
+local function muted_text(value)
+  if ui_theme and ui_theme.muted then ui_theme.muted(ImGui, ctx, value) else ImGui.Text(ctx, value) end
+end
+
+local function toolbox_header(title, flags)
+  if ui_theme and ui_theme.toolbox_header then return ui_theme.toolbox_header(ImGui, ctx, title, flags) end
+  return ImGui.CollapsingHeader(ctx, tostring(title or ""):upper(), nil, flags)
+end
+
+local function push_soft_panel()
+  if ui_theme and ui_theme.push_soft_panel then return ui_theme.push_soft_panel(ImGui, ctx) end
+  return nil
+end
+
+local function pop_soft_panel(stack)
+  if ui_theme and ui_theme.pop_soft_panel then ui_theme.pop_soft_panel(ImGui, ctx, stack) end
+end
+
+local function combo(label, labels, value, width)
+  if ui_theme and ui_theme.combo_row then return ui_theme.combo_row(ImGui, ctx, label, labels, value, width) end
+  ImGui.SetNextItemWidth(ctx, width or 160)
+  local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), value - 1, table.concat(labels, "\0") .. "\0")
+  return changed, next_value + 1
+end
+
+local function combo_action(label, labels, value, width, button_label, button_width)
+  if ui_theme and ui_theme.combo_action_row then return ui_theme.combo_action_row(ImGui, ctx, label, labels, value, width, button_label, button_width) end
+  local changed, next_value = combo(label, labels, value, width)
+  ImGui.SameLine(ctx)
+  return changed, next_value, ImGui.Button(ctx, button_label or "APPLY", button_width or 88, 24)
+end
+
+local function ui_input_int(label, value, step, step_fast, width)
+  if ui_theme and ui_theme.input_int_row then return ui_theme.input_int_row(ImGui, ctx, label, value, step, step_fast, width) end
+  return ImGui.InputInt(ctx, "##input_" .. tostring(label or ""), value, step or 1, step_fast or 10)
+end
+
+local function ui_input_text(label, value, width)
+  if ui_theme and ui_theme.input_text_row then return ui_theme.input_text_row(ImGui, ctx, label, value, width) end
+  ImGui.SetNextItemWidth(ctx, width or 220)
+  return ImGui.InputText(ctx, "##input_" .. tostring(label or ""), value or "")
+end
+
+local function section_label(label)
+  if ui_theme and ui_theme.section_label then return ui_theme.section_label(ImGui, ctx, label) end
+  muted_text(tostring(label or ""):upper())
 end
 
 local function point_on_circle(cx, cy, radius, step, steps)
@@ -397,9 +456,9 @@ local function draw_lane_preview()
   local h = 380
   local timeline_h = 46
   local geo_h = h - timeline_h
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, COLORS.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, COLORS.edge)
-  ImGui.DrawList_AddLine(draw_list, x, y + geo_h, x + w, y + geo_h, COLORS.edge, 1)
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, CANVAS.panel)
+  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, CANVAS.edge)
+  ImGui.DrawList_AddLine(draw_list, x, y + geo_h, x + w, y + geo_h, CANVAS.edge, 1)
 
   local legend_w = 230
   local cx = x + (w - legend_w) * 0.5
@@ -409,8 +468,8 @@ local function draw_lane_preview()
   local preview_beat = preview_t * math.max(0.25, duration_beats)
   local preview_grid_step = math.floor((preview_beat / math.max(0.0001, grid_beats())) + 0.000001)
 
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, COLORS.dim, "RHYTHM + PITCH MAP")
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 28, COLORS.dim,
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, CANVAS.dim, "RHYTHM + PITCH MAP")
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 28, CANVAS.dim,
     string.format("%s %s  oct %d  span %d  %s",
       midi.ROOT_NAMES[root_index] or "C",
       midi.SCALE_NAMES[scale_index] or "Major",
@@ -421,15 +480,15 @@ local function draw_lane_preview()
     local lane = lanes[i]
     local radius = max_r - (i - 1) * spacing
     if radius < 14 then break end
-    local col = lane.muted and COLORS.dim or ring_color(i)
-    ImGui.DrawList_AddCircle(draw_list, cx, cy, radius, lane.muted and COLORS.muted or COLORS.grid, 96, 1)
+    local col = lane.muted and CANVAS.dim or ring_color(i)
+    ImGui.DrawList_AddCircle(draw_list, cx, cy, radius, lane.muted and CANVAS.muted or CANVAS.grid, 96, 1)
     if not lane.muted then
       local pattern = pattern_from_lane(lane)
       local hit_points = {}
       for step = 1, lane.steps do
         local p1x, p1y = point_on_circle(cx, cy, radius - 3, step - 1, lane.steps)
         local p2x, p2y = point_on_circle(cx, cy, radius + 3, step - 1, lane.steps)
-        ImGui.DrawList_AddLine(draw_list, p1x, p1y, p2x, p2y, pattern[step] and col or COLORS.grid, 1)
+        ImGui.DrawList_AddLine(draw_list, p1x, p1y, p2x, p2y, pattern[step] and col or CANVAS.grid, 1)
         if pattern[step] then
           local hx, hy = point_on_circle(cx, cy, radius - spacing * 0.42, step - 1, lane.steps)
           hit_points[#hit_points + 1] = { x = hx, y = hy }
@@ -453,16 +512,16 @@ local function draw_lane_preview()
         active_point = hit_points[hit_index]
       end
       if active_point then
-        ImGui.DrawList_AddCircleFilled(draw_list, active_point.x, active_point.y, 6.8, COLORS.panel)
-        ImGui.DrawList_AddCircleFilled(draw_list, active_point.x, active_point.y, 5.0, COLORS.playhead)
+        ImGui.DrawList_AddCircleFilled(draw_list, active_point.x, active_point.y, 6.8, CANVAS.panel)
+        ImGui.DrawList_AddCircleFilled(draw_list, active_point.x, active_point.y, 5.0, CANVAS.playhead)
       end
     end
     local label_y = y + 34 + (i - 1) * 16
     if label_y < y + geo_h - 8 then
       ImGui.DrawList_AddRectFilled(draw_list, x + w - legend_w + 14, label_y - 8, x + w - legend_w + 23, label_y + 1, col)
-      ImGui.DrawList_AddText(draw_list, x + w - legend_w + 30, label_y - 10, lane.muted and COLORS.dim or col,
+      ImGui.DrawList_AddText(draw_list, x + w - legend_w + 30, label_y - 10, lane.muted and CANVAS.dim or col,
         string.format("ch%02d %s", output_channel_for_lane(i), lane_pitch_label(lane)))
-      ImGui.DrawList_AddText(draw_list, x + w - legend_w + 136, label_y - 10, COLORS.dim,
+      ImGui.DrawList_AddText(draw_list, x + w - legend_w + 136, label_y - 10, CANVAS.dim,
         string.format("%d/%d %s", lane.pulses, lane.steps, interval_vector(pattern_from_lane(lane))))
     end
   end
@@ -472,8 +531,8 @@ local function draw_lane_preview()
   local tw = w - 36
   ImGui.DrawList_AddLine(draw_list, tx, ty, tx + tw, ty, color(0.55, 0.60, 0.58, 0.32), 1)
   ImGui.DrawList_AddRectFilled(draw_list, tx, ty - 4, tx + tw, ty + 4, color(0.18, 0.42, 0.42, 0.22))
-  ImGui.DrawList_AddRect(draw_list, tx, ty - 4, tx + tw, ty + 4, COLORS.lane)
-  ImGui.DrawList_AddCircleFilled(draw_list, tx + tw * preview_t, ty, 3.4, COLORS.play)
+  ImGui.DrawList_AddRect(draw_list, tx, ty - 4, tx + tw, ty + 4, CANVAS.lane)
+  ImGui.DrawList_AddCircleFilled(draw_list, tx + tw * preview_t, ty, 3.4, CANVAS.play)
   ImGui.SetCursorScreenPos(ctx, x, y + h + 12)
 end
 
@@ -531,117 +590,82 @@ end
 
 local function draw_preview_controls()
   local changed
-  changed, preview_t = ImGui.SliderDouble(ctx, "Timeline preview", preview_t, 0, 1, "%.3f")
-  if ImGui.Button(ctx, preview_play and "Stop Preview" or "Play Preview", 130, 26) then
+  changed, preview_t = ui_slider_double("TIMELINE PREVIEW", preview_t, 0, 1, "%.3f")
+  if ImGui.Button(ctx, preview_play and "STOP PREVIEW" or "PLAY PREVIEW", 130, 26) then
     preview_play = not preview_play
     last_time = reaper.time_precise()
   end
   ImGui.SameLine(ctx)
-  changed, preview_sync_project_bpm = ImGui.Checkbox(ctx, "Project BPM", preview_sync_project_bpm)
-  ImGui.SameLine(ctx)
-  ImGui.SetNextItemWidth(ctx, 120)
-  changed, preview_speed = ImGui.SliderDouble(ctx, "Preview speed", preview_speed, 0.125, 4.0, "%.3fx")
+  changed, preview_sync_project_bpm = ImGui.Checkbox(ctx, "PROJECT BPM", preview_sync_project_bpm)
+  changed, preview_speed = ui_slider_double("PREVIEW SPEED", preview_speed, 0.125, 4.0, "%.3fx")
   if not preview_sync_project_bpm then
-    ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 112)
-    changed, preview_loop_seconds = ImGui.SliderDouble(ctx, "Loop seconds", preview_loop_seconds, 1.0, 30.0, "%.1f")
+    changed, preview_loop_seconds = ui_slider_double("LOOP SECONDS", preview_loop_seconds, 1.0, 30.0, "%.1f")
   else
     local start_qn = current_start_qn()
-    ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, COLORS.dim, string.format("%.1f BPM", tempo_at_qn(start_qn)))
+    muted_text(string.format("%.1f BPM", tempo_at_qn(start_qn)))
   end
 end
 
 local function draw_global_controls()
   local changed
-  if ImGui.CollapsingHeader(ctx, "Pitch / Output", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-    changed, lane_count = ImGui.SliderInt(ctx, "Pitch lanes", lane_count, 1, 16)
-    changed, duration_beats = ImGui.SliderDouble(ctx, "Duration beats", duration_beats, 1, 256, "%.1f")
-    local channel_mode_zero = channel_mode_index - 1
-    ImGui.SetNextItemWidth(ctx, 150)
-    changed, channel_mode_zero = ImGui.Combo(ctx, "MIDI channel mode", channel_mode_zero, CHANNEL_MODE_ITEMS)
-    if changed then channel_mode_index = channel_mode_zero + 1 end
+  if toolbox_header("PITCH / OUTPUT", ImGui.TreeNodeFlags_DefaultOpen) then
+    changed, lane_count = ui_slider_int("LANES", lane_count, 1, 16)
+    changed, duration_beats = ui_slider_double("BEATS", duration_beats, 1, 256, "%.1f")
+    changed, channel_mode_index = combo("MIDI MODE", CHANNEL_MODE_NAMES, channel_mode_index, 150)
     if channel_mode_index == 2 then
-      ImGui.SameLine(ctx)
-      ImGui.SetNextItemWidth(ctx, 90)
-      changed, single_channel = ImGui.SliderInt(ctx, "Channel", single_channel, 1, 16)
+      changed, single_channel = ui_slider_int("CHAN", single_channel, 1, 16)
     end
-    ImGui.SetNextItemWidth(ctx, 90)
-    local root_zero = root_index - 1
-    changed, root_zero = ImGui.Combo(ctx, "Root", root_zero, table.concat(midi.ROOT_NAMES, "\0") .. "\0")
-    if changed then root_index = root_zero + 1 end
-    ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 170)
-    local scale_zero = scale_index - 1
-    changed, scale_zero = ImGui.Combo(ctx, "Scale", scale_zero, table.concat(midi.SCALE_NAMES, "\0") .. "\0")
-    if changed then scale_index = scale_zero + 1 end
-    changed, base_octave = ImGui.SliderInt(ctx, "Base octave", base_octave, 0, 8)
-    changed, lane_spread = ImGui.SliderInt(ctx, "Lane register span", lane_spread, 1, 6)
+    changed, root_index = combo("ROOT", midi.ROOT_NAMES, root_index, 90)
+    changed, scale_index = combo("SCALE", midi.SCALE_NAMES, scale_index, 170)
+    changed, base_octave = ui_slider_int("OCT", base_octave, 0, 8)
+    changed, lane_spread = ui_slider_int("SPAN", lane_spread, 1, 6)
   end
-  if ImGui.CollapsingHeader(ctx, "Timing / Generation", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-    local grid_zero = grid_index - 1
-    ImGui.SetNextItemWidth(ctx, 112)
-    changed, grid_zero = ImGui.Combo(ctx, "Grid", grid_zero, GRID_ITEMS)
-    if changed then grid_index = grid_zero + 1 end
-    changed, density = ImGui.SliderDouble(ctx, "Hit probability", density, 0, 1, "%.3f")
-    changed, note_len = ImGui.SliderDouble(ctx, "Note length", note_len, 0.05, 1.5, "%.2f grid")
-    changed, note_len_variation = ImGui.SliderDouble(ctx, "Note length variation", note_len_variation, 0, 1, "%.3f")
-    changed, velocity = ImGui.SliderInt(ctx, "Base velocity", velocity, 1, 127)
-    changed, velocity_slope = ImGui.SliderInt(ctx, "Lane velocity slope", velocity_slope, -10, 10)
-    changed, seed = ImGui.InputInt(ctx, "Seed", seed)
+  if toolbox_header("TIMING / GENERATION", ImGui.TreeNodeFlags_DefaultOpen) then
+    changed, grid_index = combo("GRID", GRID_NAMES, grid_index, 112)
+    changed, density = ui_slider_double("PROB", density, 0, 1, "%.3f")
+    changed, note_len = ui_slider_double("NLEN", note_len, 0.05, 1.5, "%.2f grid")
+    changed, note_len_variation = ui_slider_double("NLEN VAR", note_len_variation, 0, 1, "%.3f")
+    changed, velocity = ui_slider_int("VELO", velocity, 1, 127)
+    changed, velocity_slope = ui_slider_int("VSLOPE", velocity_slope, -10, 10)
+    changed, seed = ui_input_int("SEED", seed, 1, 10, 110)
   end
 end
 
 local function draw_lane_editor()
-  ImGui.Separator(ctx)
-  ImGui.Text(ctx, "Pitch Lanes")
+  section_label("Pitch lanes")
   local changed
-  local bank_zero = form_bank_index - 1
-  ImGui.SetNextItemWidth(ctx, 190)
-  changed, bank_zero = ImGui.Combo(ctx, "Preset bank", bank_zero, FORM_BANK_ITEMS)
-  if changed then form_bank_index = bank_zero + 1 end
-  ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Apply Bank", 92, 24) then
+  local apply_bank
+  changed, form_bank_index, apply_bank = combo_action("BANK", FORM_BANK_NAMES, form_bank_index, 190, "APPLY", 92)
+  if apply_bank then
     apply_form_bank(FORM_BANK_NAMES[form_bank_index] or "No bank")
   end
   if ImGui.BeginChild(ctx, "##lanes", 0, 390) then
     for i = 1, lane_count do
       local lane = lanes[i]
       ImGui.PushID(ctx, i)
-      ImGui.Separator(ctx)
-      changed, lane.muted = ImGui.Checkbox(ctx, "Mute", lane.muted)
+      changed, lane.muted = ImGui.Checkbox(ctx, "MUTE", lane.muted)
       ImGui.SameLine(ctx)
-      ImGui.TextColored(ctx, ring_color(i), string.format("%02d", i))
-      ImGui.SameLine(ctx)
+      local nx, ny = ImGui.GetCursorScreenPos(ctx)
+      ImGui.Dummy(ctx, 24, 18)
+      ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), nx, ny + 2, ring_color(i), string.format("%02d", i))
       local preset_zero = euclidean_preset_index(lane)
-      ImGui.SetNextItemWidth(ctx, 168)
-      changed, preset_zero = ImGui.Combo(ctx, "Preset", preset_zero, EUCLIDEAN_PRESET_ITEMS)
-      if changed then apply_euclidean_preset(lane, EUCLIDEAN_PRESETS[preset_zero + 1]) end
-      ImGui.SameLine(ctx)
+      changed, preset_zero = combo("PSET", EUCLIDEAN_PRESET_NAMES, preset_zero + 1, 168)
+      if changed then apply_euclidean_preset(lane, EUCLIDEAN_PRESETS[preset_zero]) end
       if ImGui.Button(ctx, "<##rotate_left", 24, 22) then lane.rotate = lane.rotate - 1 end
       ImGui.SameLine(ctx)
       if ImGui.Button(ctx, ">##rotate_right", 24, 22) then lane.rotate = lane.rotate + 1 end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Comp##complement", 42, 22) and i > 1 then
+      if ImGui.Button(ctx, "COMP##complement", 42, 22) and i > 1 then
         local prev = lanes[i - 1]
         set_lane_pattern(lane, math.max(0, prev.steps - prev.pulses), prev.steps, prev.rotate)
       end
-      ImGui.SetNextItemWidth(ctx, 90)
-      changed, lane.steps = ImGui.SliderInt(ctx, "Steps", lane.steps, 1, 64)
-      ImGui.SameLine(ctx)
-      ImGui.SetNextItemWidth(ctx, 90)
+      changed, lane.steps = ui_slider_int("STEP", lane.steps, 1, 64)
       lane.pulses = math.min(lane.pulses, lane.steps)
-      changed, lane.pulses = ImGui.SliderInt(ctx, "Pulses", lane.pulses, 0, lane.steps)
-      ImGui.SameLine(ctx)
-      ImGui.SetNextItemWidth(ctx, 90)
-      changed, lane.rotate = ImGui.SliderInt(ctx, "Rotate", lane.rotate, -lane.steps, lane.steps)
-      ImGui.SameLine(ctx)
-      ImGui.SetNextItemWidth(ctx, 90)
-      changed, lane.degree = ImGui.SliderInt(ctx, "Degree", lane.degree, -24, 48)
-      ImGui.SameLine(ctx)
-      ImGui.TextColored(ctx, COLORS.dim, interval_vector(pattern_from_lane(lane)))
-      ImGui.SetNextItemWidth(ctx, 300)
-      changed, lane.pattern_input = ImGui.InputText(ctx, "Pattern", lane.pattern_input or lane.custom_pattern or "")
+      changed, lane.pulses = ui_slider_int("PULS", lane.pulses, 0, lane.steps)
+      changed, lane.rotate = ui_slider_int("ROT", lane.rotate, -lane.steps, lane.steps)
+      changed, lane.degree = ui_slider_int("DEG", lane.degree, -24, 48)
+      muted_text(interval_vector(pattern_from_lane(lane)))
+      changed, lane.pattern_input = ui_input_text("PTRN", lane.pattern_input or lane.custom_pattern or "", 300)
       if changed then
         if (lane.pattern_input or "") == "" then
           lane.custom_pattern = nil
@@ -649,11 +673,11 @@ local function draw_lane_editor()
           apply_custom_pattern(lane)
         end
       end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Clear Pattern", 104, 22) then
+      if ImGui.Button(ctx, "CLEAR", 104, 22) then
         lane.custom_pattern = nil
         lane.pattern_input = ""
       end
+      ImGui.Dummy(ctx, 1, 6)
       ImGui.PopID(ctx)
     end
     ImGui.EndChild(ctx)
@@ -661,12 +685,12 @@ local function draw_lane_editor()
 end
 
 local function draw_footer()
-  ImGui.Separator(ctx)
-  if ImGui.Button(ctx, "Generate MIDI Item", 170, 32) then write_midi() end
+  ImGui.Dummy(ctx, 1, 6)
+  if ImGui.Button(ctx, "GENERATE MIDI", 170, 32) then write_midi() end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Reset Lanes", 110, 32) then reset_lanes() end
+  if ImGui.Button(ctx, "RESET", 110, 32) then reset_lanes() end
   ImGui.SameLine(ctx)
-  ImGui.TextColored(ctx, COLORS.dim, status)
+  muted_text(status)
 end
 
 local function loop()
@@ -691,6 +715,7 @@ local function loop()
     local footer_height = 52
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local content_height = math.max(220, avail_h - footer_height)
+    local main_panel_style = push_soft_panel()
     local child_visible = ImGui.BeginChild(ctx, "##main_content", 0, content_height)
     if child_visible then
       draw_lane_preview()
@@ -699,6 +724,7 @@ local function loop()
       draw_global_controls()
     end
     ImGui.EndChild(ctx)
+    pop_soft_panel(main_panel_style)
     draw_footer()
   end
   ImGui.End(ctx)

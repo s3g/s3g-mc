@@ -20,12 +20,16 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ui_theme = nil
 do
   local script_path = ({ reaper.get_action_context() })[2]
   local script_dir = script_path:match("^(.*[/\\])") or ""
   package.path = script_dir .. "?.lua;" .. package.path
   local ok, theme = pcall(require, "s3g-mc ImGui Theme")
-  if ok and theme and theme.install then theme.install(ImGui) end
+  if ok and theme then
+    ui_theme = theme
+    if theme.install then theme.install(ImGui) end
+  end
 end
 
 local ctx = ImGui.CreateContext(TITLE)
@@ -115,7 +119,7 @@ local function muted_native_color(native_color, alpha, fallback)
   return rgba(r, g, b, alpha or 1)
 end
 
-local COLORS = {
+local CANVAS = {
   bg = rgba(0.035, 0.038, 0.041, 1),
   panel = rgba(0.070, 0.074, 0.078, 1),
   edge = rgba(0.34, 0.36, 0.37, 1),
@@ -130,6 +134,14 @@ local COLORS = {
   play = rgba(0.38, 0.80, 0.58, 1),
   selection = rgba(0.76, 0.78, 0.82, 0.20),
 }
+
+local function muted_text(value)
+  if ui_theme and ui_theme.muted then
+    ui_theme.muted(ImGui, ctx, value)
+  else
+    ImGui.Text(ctx, value)
+  end
+end
 
 local function displayed_item_color(item, track)
   if reaper.GetDisplayedMediaItemColor then
@@ -155,14 +167,14 @@ end
 local function item_fill_color(item, track, selected)
   local color = displayed_item_color(item, track)
   if selected then
-    return muted_native_color(color, 0.96, COLORS.item_sel)
+    return muted_native_color(color, 0.96, CANVAS.item_sel)
   end
-  return muted_native_color(color, 0.84, COLORS.item)
+  return muted_native_color(color, 0.84, CANVAS.item)
 end
 
 local function item_accent_color(item, track, selected)
   local color = displayed_item_color(item, track)
-  return muted_native_color(color, selected and 1.0 or 0.92, selected and COLORS.item_sel or COLORS.item)
+  return muted_native_color(color, selected and 1.0 or 0.92, selected and CANVAS.item_sel or CANVAS.item)
 end
 
 local TRACK_FILTERS = { "All tracks", "Selected tracks" }
@@ -540,7 +552,7 @@ local function draw_transport()
     status = "View centered near edit cursor"
   end
   ImGui.SameLine(ctx)
-  ImGui.TextColored(ctx, COLORS.muted, string.format("%s  %s", state_label, time_to_string(display_pos)))
+  muted_text(string.format("%s  %s", state_label, time_to_string(display_pos)))
 end
 
 local function draw_timeline(canvas_w, canvas_h)
@@ -551,8 +563,8 @@ local function draw_timeline(canvas_w, canvas_h)
   local minimap_w = 58
   local minimap_gap = 8
   local x1 = math.max(x0 + 240, full_x1 - minimap_w - minimap_gap)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, full_x1, y1, COLORS.bg)
-  ImGui.DrawList_AddRect(dl, x0, y0, full_x1, y1, COLORS.edge, 0, 0, 1.2)
+  ImGui.DrawList_AddRectFilled(dl, x0, y0, full_x1, y1, CANVAS.bg)
+  ImGui.DrawList_AddRect(dl, x0, y0, full_x1, y1, CANVAS.edge, 0, 0, 1.2)
 
   local ruler_w = 68
   local header_h = 42
@@ -604,8 +616,8 @@ local function draw_timeline(canvas_w, canvas_h)
     end
   end
 
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, usable_y0, COLORS.panel)
-  ImGui.DrawList_AddText(dl, x0 + 10, y0 + 10, COLORS.muted, "time")
+  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, usable_y0, CANVAS.panel)
+  ImGui.DrawList_AddText(dl, x0 + 10, y0 + 10, CANVAS.muted, "time")
 
   for i = 0, visible_tracks - 1 do
     local entry = track_list[track_start + i]
@@ -616,13 +628,13 @@ local function draw_timeline(canvas_w, canvas_h)
     if track then
       ImGui.DrawList_AddRectFilled(dl, tx0, usable_y0, tx1, y1, track_tint(track))
     end
-    ImGui.DrawList_AddLine(dl, tx0, y0, tx0, y1, COLORS.grid, 1)
+    ImGui.DrawList_AddLine(dl, tx0, y0, tx0, y1, CANVAS.grid, 1)
     if track then
       local name = track_name(track, track_index)
       local line1, line2 = track_header_lines(track_index, name, track_w)
-      ImGui.DrawList_AddText(dl, tx0 + 5, y0 + (line2 and 6 or 13), COLORS.text, line1)
+      ImGui.DrawList_AddText(dl, tx0 + 5, y0 + (line2 and 6 or 13), CANVAS.text, line1)
       if line2 then
-        ImGui.DrawList_AddText(dl, tx0 + 5, y0 + 22, COLORS.muted, line2)
+        ImGui.DrawList_AddText(dl, tx0 + 5, y0 + 22, CANVAS.muted, line2)
       end
     end
   end
@@ -640,8 +652,8 @@ local function draw_timeline(canvas_w, canvas_h)
   while t <= view_end + grid_step do
     local y = y_for_time(t)
     if y >= usable_y0 and y <= y1 then
-      ImGui.DrawList_AddLine(dl, x0, y, x1, y, COLORS.grid, 1)
-      ImGui.DrawList_AddText(dl, x0 + 8, y + 3, COLORS.muted, time_to_string(t))
+      ImGui.DrawList_AddLine(dl, x0, y, x1, y, CANVAS.grid, 1)
+      ImGui.DrawList_AddText(dl, x0 + 8, y + 3, CANVAS.muted, time_to_string(t))
     end
     t = t + grid_step
   end
@@ -651,7 +663,7 @@ local function draw_timeline(canvas_w, canvas_h)
     if end_pos > start_pos and end_pos >= view_start and start_pos <= view_end then
       local sy0 = clamp(y_for_time(start_pos), usable_y0, y1)
       local sy1 = clamp(y_for_time(end_pos), usable_y0, y1)
-      ImGui.DrawList_AddRectFilled(dl, usable_x0, sy0, x1, sy1, COLORS.selection)
+      ImGui.DrawList_AddRectFilled(dl, usable_x0, sy0, x1, sy1, CANVAS.selection)
       ImGui.DrawList_AddRect(dl, usable_x0, sy0, x1, sy1, rgba(0.78, 0.80, 0.82, 0.38), 0, 0, 1)
     end
   end
@@ -677,7 +689,7 @@ local function draw_timeline(canvas_w, canvas_h)
         ImGui.DrawList_AddRectFilled(dl, ix0, iy0, ix1, iy1, fill)
         ImGui.DrawList_AddRectFilled(dl, ix0, iy0, ix1, math.min(iy1, iy0 + 3), item_accent_color(item, track, selected))
         draw_item_channels(dl, item, ix0, iy0 + 3, ix1, iy1)
-        ImGui.DrawList_AddRect(dl, ix0, iy0, ix1, iy1, selected and COLORS.text or COLORS.edge, 0, 0, selected and 1.6 or 1)
+        ImGui.DrawList_AddRect(dl, ix0, iy0, ix1, iy1, selected and CANVAS.text or CANVAS.edge, 0, 0, selected and 1.6 or 1)
         if iy1 - iy0 > 16 then
           local name = item_display_name(item)
           if #name > 16 then name = name:sub(1, 15) .. "." end
@@ -699,13 +711,13 @@ local function draw_timeline(canvas_w, canvas_h)
           local ry0 = clamp(y_for_time(pos), usable_y0, y1)
           local ry1 = clamp(y_for_time(rgnend), usable_y0, y1)
           ImGui.DrawList_AddRectFilled(dl, usable_x0, ry0, x1, ry1, rgba(0.45, 0.36, 0.65, selected and 0.34 or 0.22))
-          ImGui.DrawList_AddRect(dl, usable_x0, ry0, x1, ry1, selected and COLORS.marker or rgba(0.72, 0.68, 0.92, 0.48), 0, 0, selected and 2 or 1)
-          ImGui.DrawList_AddText(dl, usable_x0 + 8, ry0 + 4, COLORS.text, name ~= "" and name or "region")
+          ImGui.DrawList_AddRect(dl, usable_x0, ry0, x1, ry1, selected and CANVAS.marker or rgba(0.72, 0.68, 0.92, 0.48), 0, 0, selected and 2 or 1)
+          ImGui.DrawList_AddText(dl, usable_x0 + 8, ry0 + 4, CANVAS.text, name ~= "" and name or "region")
           hit_markers[#hit_markers + 1] = { marker = marker, x0 = usable_x0, x1 = x1, y0 = ry0, y1 = ry1, click_kind = "region" }
         elseif (not is_region) and show_markers and pos >= view_start and pos <= view_end then
           local my = y_for_time(pos)
-          ImGui.DrawList_AddLine(dl, usable_x0, my, x1, my, selected and COLORS.text or COLORS.marker, selected and 3 or 2)
-          ImGui.DrawList_AddText(dl, usable_x0 + 8, my + 4, COLORS.marker, name ~= "" and name or "marker")
+          ImGui.DrawList_AddLine(dl, usable_x0, my, x1, my, selected and CANVAS.text or CANVAS.marker, selected and 3 or 2)
+          ImGui.DrawList_AddText(dl, usable_x0 + 8, my + 4, CANVAS.marker, name ~= "" and name or "marker")
           hit_markers[#hit_markers + 1] = { marker = marker, x0 = usable_x0, x1 = x1, y0 = my - 6, y1 = my + 10, click_kind = "marker" }
         end
       end
@@ -718,8 +730,8 @@ local function draw_timeline(canvas_w, canvas_h)
   local map_y1 = y1 - 8
   if map_x1 > map_x0 + 12 and map_y1 > map_y0 + 40 then
     ImGui.DrawList_AddRectFilled(dl, map_x0, map_y0, map_x1, map_y1, rgba(0.055, 0.058, 0.060, 1))
-    ImGui.DrawList_AddRect(dl, map_x0, map_y0, map_x1, map_y1, COLORS.edge, 0, 0, 1)
-    ImGui.DrawList_AddText(dl, map_x0 + 4, y0 + 10, COLORS.muted, "map")
+    ImGui.DrawList_AddRect(dl, map_x0, map_y0, map_x1, map_y1, CANVAS.edge, 0, 0, 1)
+    ImGui.DrawList_AddText(dl, map_x0 + 4, y0 + 10, CANVAS.muted, "map")
     for i = 0, item_count - 1 do
       local item = reaper.GetMediaItem(PROJECT, i)
       local track = reaper.GetMediaItem_Track(item)
@@ -733,13 +745,13 @@ local function draw_timeline(canvas_w, canvas_h)
     end
     local vy0 = map_y0 + (view_start / project_len) * (map_y1 - map_y0)
     local vy1 = map_y0 + (math.min(project_len, view_end) / project_len) * (map_y1 - map_y0)
-    ImGui.DrawList_AddRect(dl, map_x0 + 1, vy0, map_x1 - 1, math.max(vy0 + 8, vy1), COLORS.cursor, 0, 0, 1.4)
+    ImGui.DrawList_AddRect(dl, map_x0 + 1, vy0, map_x1 - 1, math.max(vy0 + 8, vy1), CANVAS.cursor, 0, 0, 1.4)
   end
 
   local edit_pos = reaper.GetCursorPosition()
   if edit_pos >= view_start and edit_pos <= view_end then
     local cy = y_for_time(edit_pos)
-    ImGui.DrawList_AddLine(dl, x0, cy, x1, cy, COLORS.cursor, 2.0)
+    ImGui.DrawList_AddLine(dl, x0, cy, x1, cy, CANVAS.cursor, 2.0)
   end
   local playing = (reaper.GetPlayState() % 2) == 1
   local play_pos = smooth_play_position(reaper.GetPlayPosition(), playing)
@@ -747,9 +759,9 @@ local function draw_timeline(canvas_w, canvas_h)
     local py = y_for_time(play_pos)
     local glow = rgba(0.38, 0.80, 0.58, 0.18)
     ImGui.DrawList_AddRectFilled(dl, x0, py - 2, x1, py + 2, glow)
-    ImGui.DrawList_AddLine(dl, x0, py, x1, py, COLORS.play, 2.0)
+    ImGui.DrawList_AddLine(dl, x0, py, x1, py, CANVAS.play, 2.0)
     local label_y = clamp(py - 16, usable_y0 + 3, y1 - 18)
-    ImGui.DrawList_AddText(dl, snap_pixel(x1 - 58), snap_pixel(label_y), COLORS.play, "play")
+    ImGui.DrawList_AddText(dl, snap_pixel(x1 - 58), snap_pixel(label_y), CANVAS.play, "play")
   end
 
   local mx, my = ImGui.GetMousePos(ctx)
@@ -1009,12 +1021,12 @@ local function loop()
     end
     local first_track_max = math.max(1, track_count - visible_tracks + 1)
     changed, track_start = ImGui.SliderInt(ctx, "First track", track_start, 1, first_track_max)
-    ImGui.TextColored(ctx, COLORS.muted, "Wheel scrolls time. Cmd/Ctrl-wheel zooms. First track slider moves side-to-side.")
+    muted_text("Wheel scrolls time. Cmd/Ctrl-wheel zooms. First track slider moves side-to-side.")
 
     local canvas_w, avail_h = ImGui.GetContentRegionAvail(ctx)
     local canvas_h = math.max(320, avail_h - 26)
     draw_timeline(canvas_w, canvas_h)
-    ImGui.TextColored(ctx, COLORS.muted, status)
+    muted_text(status)
   end
   ImGui.End(ctx)
   persist()

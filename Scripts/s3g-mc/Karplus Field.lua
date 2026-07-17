@@ -24,6 +24,7 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
 
 local EXT = "s3g_mc_karplus_field_v1"
 local function getn(k,d) return tonumber(reaper.GetExtState(EXT,k)) or d end
@@ -44,8 +45,39 @@ local function render()
   mc.print_plan("Karplus Field",{"Output: "..output_path,string.format("NumPy time: %.2f sec",elapsed),log})
 end
 local function loop()
-  ImGui.SetNextWindowSize(ctx,520,470,ImGui.Cond_Appearing); local vis; vis,open=ImGui.Begin(ctx,"Karplus Field",open)
-  if vis then local changed; changed,s.duration=ImGui.SliderDouble(ctx,"Duration sec",s.duration,0.5,180,"%.2f"); changed,s.channels=ImGui.SliderInt(ctx,"Channels",math.floor(s.channels),1,mc.MAX_REAPER_TRACK_CHANNELS); changed,s.events=ImGui.SliderInt(ctx,"Pluck events",math.floor(s.events),1,800); changed,s.base_freq=ImGui.SliderDouble(ctx,"Base frequency",s.base_freq,20,440,"%.1f"); changed,s.spread_oct=ImGui.SliderDouble(ctx,"Spread octaves",s.spread_oct,0.1,7,"%.2f"); changed,s.decay=ImGui.SliderDouble(ctx,"String decay",s.decay,0.80,0.9995,"%.4f"); changed,s.damping=ImGui.SliderDouble(ctx,"Damping",s.damping,0,0.98,"%.2f"); changed,s.brightness=ImGui.SliderDouble(ctx,"Brightness",s.brightness,0,1,"%.2f"); changed,s.dispersion=ImGui.SliderDouble(ctx,"Dispersion",s.dispersion,0,0.5,"%.2f"); changed,s.spatial_width=ImGui.SliderDouble(ctx,"Spatial width",s.spatial_width,0.2,8,"%.2f"); changed,s.normalize=ImGui.Checkbox(ctx,"Peak normalize",s.normalize); if s.normalize then changed,s.normalize_db=ImGui.SliderDouble(ctx,"Normalize dB",s.normalize_db,-36,0,"%.1f") end; changed,s.seed=ImGui.InputInt(ctx,"Seed",math.floor(s.seed)); if ImGui.Button(ctx,"Render",96,28) then go=true end; ImGui.SameLine(ctx); if ImGui.Button(ctx,"Cancel",96,28) then open=false end; ImGui.End(ctx) end
-  persist(); if go then open=false; render(); return end; if open then reaper.defer(loop) end
+  ImGui.SetNextWindowSize(ctx, 520, 470, ImGui.Cond_Appearing)
+  local vis
+  vis, open = ImGui.Begin(ctx, "Karplus Field", open)
+  if vis then
+    local changed
+    theme.muted(ImGui, ctx, "Offline plucked resonator field render")
+    changed, s.duration = ImGui.SliderDouble(ctx, "Duration sec", s.duration, 0.5, 180, "%.2f")
+    changed, s.channels = ImGui.SliderInt(ctx, "Channels", math.floor(s.channels), 1, mc.MAX_REAPER_TRACK_CHANNELS)
+    changed, s.events = ImGui.SliderInt(ctx, "Pluck events", math.floor(s.events), 1, 800)
+    changed, s.base_freq = ImGui.SliderDouble(ctx, "Base frequency", s.base_freq, 20, 440, "%.1f")
+    changed, s.spread_oct = ImGui.SliderDouble(ctx, "Spread octaves", s.spread_oct, 0.1, 7, "%.2f")
+    changed, s.decay = ImGui.SliderDouble(ctx, "String decay", s.decay, 0.80, 0.9995, "%.4f")
+    changed, s.damping = ImGui.SliderDouble(ctx, "Damping", s.damping, 0, 0.98, "%.2f")
+    changed, s.brightness = ImGui.SliderDouble(ctx, "Brightness", s.brightness, 0, 1, "%.2f")
+    changed, s.dispersion = ImGui.SliderDouble(ctx, "Dispersion", s.dispersion, 0, 0.5, "%.2f")
+    changed, s.spatial_width = ImGui.SliderDouble(ctx, "Spatial width", s.spatial_width, 0.2, 8, "%.2f")
+    changed, s.normalize = ImGui.Checkbox(ctx, "Peak normalize", s.normalize)
+    if s.normalize then
+      changed, s.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", s.normalize_db, -36, 0, "%.1f")
+    end
+    changed, s.seed = ImGui.InputInt(ctx, "Seed", math.floor(s.seed))
+    ImGui.Separator(ctx)
+    if ImGui.Button(ctx, "Render", 96, 28) then go = true end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "Cancel", 96, 28) then open = false end
+    ImGui.End(ctx)
+  end
+  persist()
+  if go then
+    open = false
+    render()
+    return
+  end
+  if open then reaper.defer(loop) end
 end
 reaper.defer(loop)

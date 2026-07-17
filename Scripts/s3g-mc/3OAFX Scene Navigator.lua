@@ -31,14 +31,15 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
-
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local ORDER_LABELS = { "1OA / 4ch", "2OA / 9ch", "3OA / 16ch" }
 local MODE_LABELS = { "Blend field", "Nearest field" }
 local MODE_KEYS = { "blend", "nearest" }
 local ORIENTATION_LABELS = { "Face trajectory", "Manual AED" }
 local ORIENTATION_KEYS = { "path", "manual" }
-local VIEW_LABELS = { "3/4", "Top", "Side" }
+local VIEW_LABELS = { "3/4", "TOP", "SIDE" }
 local ctx
 local open = true
 local selected_node = 1
@@ -60,19 +61,19 @@ local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
-  bg = color(0.035, 0.039, 0.042, 1),
-  panel = color(0.060, 0.066, 0.070, 1),
-  edge = color(0.34, 0.38, 0.38, 1),
-  grid = color(0.55, 0.60, 0.60, 0.18),
-  text = color(0.78, 0.83, 0.82, 1),
-  muted = color(0.48, 0.54, 0.54, 1),
-  node = color(0.25, 0.68, 0.90, 0.92),
-  node_sel = color(0.98, 0.72, 0.25, 0.98),
-  path = color(0.90, 0.56, 0.95, 0.92),
-  path_soft = color(0.90, 0.56, 0.95, 0.24),
-  listener = color(0.98, 0.42, 0.28, 0.96),
-  influence = color(0.25, 0.68, 0.90, 0.13),
+local STYLE = {
+  bg = THEME.bg,
+  panel = THEME.panel,
+  edge = THEME.edge,
+  grid = THEME.grid,
+  text = THEME.text,
+  muted = THEME.value,
+  node = color(0.42, 0.62, 0.66, 0.92),
+  node_sel = THEME.amber,
+  path = color(0.62, 0.54, 0.68, 0.92),
+  path_soft = color(0.62, 0.54, 0.68, 0.24),
+  listener = color(0.78, 0.48, 0.38, 0.96),
+  influence = color(0.42, 0.62, 0.66, 0.13),
 }
 
 local function clamp(v, lo, hi)
@@ -330,18 +331,18 @@ local function side_to_world(mx, my, x0, y0, w, h)
 end
 
 local function draw_grid(draw_list, x0, y0, w, h)
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + w, y0 + h, COLORS.bg)
-  ImGui.DrawList_AddRect(draw_list, x0, y0, x0 + w, y0 + h, COLORS.edge)
+  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + w, y0 + h, STYLE.bg)
+  ImGui.DrawList_AddRect(draw_list, x0, y0, x0 + w, y0 + h, STYLE.edge)
   local fx, fy = world_to_top(0, 1.0, x0, y0, w, h, 0)
   local rx, ry = world_to_top(0, -1.0, x0, y0, w, h, 0)
   local lx, ly = world_to_top(1.0, 0, x0, y0, w, h, 0)
   local bx, by = world_to_top(-1.0, 0, x0, y0, w, h, 0)
-  ImGui.DrawList_AddLine(draw_list, fx, fy, rx, ry, COLORS.grid, 1)
-  ImGui.DrawList_AddLine(draw_list, lx, ly, bx, by, COLORS.grid, 1)
+  ImGui.DrawList_AddLine(draw_list, fx, fy, rx, ry, STYLE.grid, 1)
+  ImGui.DrawList_AddLine(draw_list, lx, ly, bx, by, STYLE.grid, 1)
   local ux, uy = world_to_top(0, 0, x0, y0, w, h, 0)
   local zx, zy = world_to_top(0, 0, x0, y0, w, h, 1.0)
-  ImGui.DrawList_AddLine(draw_list, ux, uy, zx, zy, COLORS.grid, 1.4)
-  ImGui.DrawList_AddText(draw_list, zx + 5, zy - 8, COLORS.muted, "Z")
+  ImGui.DrawList_AddLine(draw_list, ux, uy, zx, zy, STYLE.grid, 1.4)
+  ImGui.DrawList_AddText(draw_list, zx + 5, zy - 8, STYLE.muted, "Z")
   local degree_marks = {
     { 0, "0 front" },
     { -90, "-90 right" },
@@ -354,7 +355,7 @@ local function draw_grid(draw_list, x0, y0, w, h)
     local wx = -math.sin(rad)
     local wy = math.cos(rad)
     local x, y = world_to_top(wx, wy, x0, y0, w, h, 0)
-    ImGui.DrawList_AddText(draw_list, x + 6, y - 8, COLORS.muted, mark[2])
+    ImGui.DrawList_AddText(draw_list, x + 6, y - 8, STYLE.muted, mark[2])
   end
 end
 
@@ -366,9 +367,9 @@ local function camera_controls()
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, (view_mode == 1 and "[3/4]" or "3/4"), 54, 24) then set_camera_preset(1, -38, -28) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, (view_mode == 2 and "[Top]" or "Top"), 54, 24) then set_camera_preset(2, 0, 0) end
+  if ImGui.Button(ctx, (view_mode == 2 and "[TOP]" or "TOP"), 54, 24) then set_camera_preset(2, 0, 0) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, (view_mode == 3 and "[Side]" or "Side"), 54, 24) then set_camera_preset(3, 0, -90) end
+  if ImGui.Button(ctx, (view_mode == 3 and "[SIDE]" or "SIDE"), 54, 24) then set_camera_preset(3, 0, -90) end
   ImGui.SameLine(ctx)
   nudge("Zoom -", 74, 24, function() view_zoom = clamp(view_zoom * 0.975, 0.35, 3.0) end)
   ImGui.SameLine(ctx)
@@ -422,7 +423,7 @@ local function draw_head(draw_list, cx, cy, yaw_deg, pitch_deg, roll_deg, scale,
   local roll_off = math.sin(roll) * 3.0
   ImGui.DrawList_AddCircleFilled(draw_list, cx + side_x * (r + 3), cy + side_y * (r + 3) + roll_off, ear_r, line_col, 12)
   ImGui.DrawList_AddCircleFilled(draw_list, cx - side_x * (r + 3), cy - side_y * (r + 3) - roll_off, ear_r, line_col, 12)
-  if label then ImGui.DrawList_AddText(draw_list, cx + r + 5, cy - r - 2, COLORS.text, label) end
+  if label then ImGui.DrawList_AddText(draw_list, cx + r + 5, cy - r - 2, STYLE.text, label) end
 end
 
 local function draw_preview_cursor(draw_list, cx, cy, yaw_deg, label)
@@ -431,18 +432,18 @@ local function draw_preview_cursor(draw_list, cx, cy, yaw_deg, label)
   local ry = -math.cos(yaw)
   local side_x = -ry
   local side_y = rx
-  ImGui.DrawList_AddCircle(draw_list, cx, cy, 16, COLORS.listener, 28, 1.8)
-  ImGui.DrawList_AddLine(draw_list, cx - 5, cy, cx + 5, cy, COLORS.listener, 1.2)
-  ImGui.DrawList_AddLine(draw_list, cx, cy - 5, cx, cy + 5, COLORS.listener, 1.2)
+  ImGui.DrawList_AddCircle(draw_list, cx, cy, 16, STYLE.listener, 28, 1.8)
+  ImGui.DrawList_AddLine(draw_list, cx - 5, cy, cx + 5, cy, STYLE.listener, 1.2)
+  ImGui.DrawList_AddLine(draw_list, cx, cy - 5, cx, cy + 5, STYLE.listener, 1.2)
   local tip_x = cx + rx * 28
   local tip_y = cy + ry * 28
-  ImGui.DrawList_AddLine(draw_list, cx, cy, tip_x, tip_y, COLORS.listener, 2.2)
+  ImGui.DrawList_AddLine(draw_list, cx, cy, tip_x, tip_y, STYLE.listener, 2.2)
   ImGui.DrawList_AddTriangleFilled(draw_list,
     tip_x, tip_y,
     cx + rx * 20 + side_x * 4, cy + ry * 20 + side_y * 4,
     cx + rx * 20 - side_x * 4, cy + ry * 20 - side_y * 4,
-    COLORS.listener)
-  if label then ImGui.DrawList_AddText(draw_list, tip_x + 5, tip_y - 8, COLORS.text, label) end
+    STYLE.listener)
+  if label then ImGui.DrawList_AddText(draw_list, tip_x + 5, tip_y - 8, STYLE.text, label) end
 end
 
 local function draw_node_field(draw_list, cx, cy, radius, selected)
@@ -466,9 +467,9 @@ local function draw_top_map(nodes, path, settings, preview_row)
   local hovered = ImGui.IsItemHovered(ctx)
   local mx, my = ImGui.GetMousePos(ctx)
   draw_grid(draw_list, x0, y0, w, h)
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, COLORS.text, "Scene map: nodes and listener path")
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, STYLE.text, "Scene map: nodes and listener path")
   local drag_hint = view_mode == 3 and "drag in side view = X/Z" or "drag = X/Y; use sliders for Z"
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 32, COLORS.muted, drag_hint)
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 32, STYLE.muted, drag_hint)
 
   for i, node in ipairs(nodes) do
     local nx, ny = world_to_top(node[1], node[2], x0, y0, w, h, node[3] or 0)
@@ -476,15 +477,15 @@ local function draw_top_map(nodes, path, settings, preview_row)
     local radius = node_radius * math.min(w, h) * 0.42 * view_zoom
     local ball = clamp(5.5 + node_radius * 4.8 + math.abs(node[3] or 0) * 2.0, 6, 22)
     draw_node_field(draw_list, nx, ny, radius, i == selected_node)
-    ImGui.DrawList_AddCircleFilled(draw_list, nx, ny, i == selected_node and ball + 2 or ball, i == selected_node and COLORS.node_sel or COLORS.node, 28)
-    ImGui.DrawList_AddText(draw_list, nx + ball + 4, ny - 9, COLORS.text, tostring(i))
-    ImGui.DrawList_AddText(draw_list, nx + ball + 4, ny + 7, COLORS.muted, string.format("r %.2f z %.2f", node_radius, node[3] or 0))
+    ImGui.DrawList_AddCircleFilled(draw_list, nx, ny, i == selected_node and ball + 2 or ball, i == selected_node and STYLE.node_sel or STYLE.node, 28)
+    ImGui.DrawList_AddText(draw_list, nx + ball + 4, ny - 9, STYLE.text, tostring(i))
+    ImGui.DrawList_AddText(draw_list, nx + ball + 4, ny + 7, STYLE.muted, string.format("r %.2f z %.2f", node_radius, node[3] or 0))
   end
 
   for i = 1, #path - 1 do
     local ax, ay = world_to_top(path[i][1], path[i][2], x0, y0, w, h, path[i][3] or 0)
     local bx, by = world_to_top(path[i + 1][1], path[i + 1][2], x0, y0, w, h, path[i + 1][3] or 0)
-    ImGui.DrawList_AddLine(draw_list, ax, ay, bx, by, COLORS.path, 2.4)
+    ImGui.DrawList_AddLine(draw_list, ax, ay, bx, by, STYLE.path, 2.4)
   end
   for i, point in ipairs(path) do
     local px, py = world_to_top(point[1], point[2], x0, y0, w, h, point[3] or 0)
@@ -492,10 +493,10 @@ local function draw_top_map(nodes, path, settings, preview_row)
     if settings.orientation_mode == 1 then
       display = oriented_path_row(path, point[7] or 0, settings.orientation_mode)
     end
-    ImGui.DrawList_AddCircleFilled(draw_list, px, py, i == selected_point and 8 or 5, i == selected_point and COLORS.listener or COLORS.path, 20)
-    ImGui.DrawList_AddCircle(draw_list, px, py, 18, COLORS.path_soft, 28, 1.2)
+    ImGui.DrawList_AddCircleFilled(draw_list, px, py, i == selected_point and 8 or 5, i == selected_point and STYLE.listener or STYLE.path, 20)
+    ImGui.DrawList_AddCircle(draw_list, px, py, 18, STYLE.path_soft, 28, 1.2)
     local yaw = math.rad(display[4] or 0)
-    local tick_col = i == selected_point and COLORS.listener or COLORS.path
+    local tick_col = i == selected_point and STYLE.listener or STYLE.path
     local tick_len = i == selected_point and 22 or 18
     ImGui.DrawList_AddLine(draw_list, px, py, px - math.sin(yaw) * tick_len, py - math.cos(yaw) * tick_len, tick_col, i == selected_point and 2.0 or 1.5)
   end
@@ -544,29 +545,29 @@ local function draw_side_view(nodes, path, preview_row)
   ImGui.InvisibleButton(ctx, "##scene_side_view", w, h)
   local hovered = ImGui.IsItemHovered(ctx)
   local mx, my = ImGui.GetMousePos(ctx)
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + w, y0 + h, COLORS.bg)
-  ImGui.DrawList_AddRect(draw_list, x0, y0, x0 + w, y0 + h, COLORS.edge)
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, COLORS.text, "Height view: X-Z")
-  ImGui.DrawList_AddLine(draw_list, x0 + 12, y0 + h * 0.5, x0 + w - 12, y0 + h * 0.5, COLORS.grid, 1)
+  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + w, y0 + h, STYLE.bg)
+  ImGui.DrawList_AddRect(draw_list, x0, y0, x0 + w, y0 + h, STYLE.edge)
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, STYLE.text, "Height view: X-Z")
+  ImGui.DrawList_AddLine(draw_list, x0 + 12, y0 + h * 0.5, x0 + w - 12, y0 + h * 0.5, STYLE.grid, 1)
 
   for i = 1, #path - 1 do
     local ax, ay = world_to_side(path[i][1], path[i][3], x0, y0, w, h)
     local bx, by = world_to_side(path[i + 1][1], path[i + 1][3], x0, y0, w, h)
-    ImGui.DrawList_AddLine(draw_list, ax, ay, bx, by, COLORS.path, 2)
+    ImGui.DrawList_AddLine(draw_list, ax, ay, bx, by, STYLE.path, 2)
   end
   for i, node in ipairs(nodes) do
     local x, y = world_to_side(node[1], node[3], x0, y0, w, h)
-    ImGui.DrawList_AddCircleFilled(draw_list, x, y, i == selected_node and 9 or 6, i == selected_node and COLORS.node_sel or COLORS.node, 20)
-    ImGui.DrawList_AddText(draw_list, x + 10, y - 8, COLORS.text, tostring(i))
+    ImGui.DrawList_AddCircleFilled(draw_list, x, y, i == selected_node and 9 or 6, i == selected_node and STYLE.node_sel or STYLE.node, 20)
+    ImGui.DrawList_AddText(draw_list, x + 10, y - 8, STYLE.text, tostring(i))
   end
   for i, point in ipairs(path) do
     local x, y = world_to_side(point[1], point[3], x0, y0, w, h)
-    ImGui.DrawList_AddCircleFilled(draw_list, x, y, i == selected_point and 7 or 4, i == selected_point and COLORS.listener or COLORS.path, 18)
+    ImGui.DrawList_AddCircleFilled(draw_list, x, y, i == selected_point and 7 or 4, i == selected_point and STYLE.listener or STYLE.path, 18)
   end
   if preview_row then
     local x, y = world_to_side(preview_row[1], preview_row[3], x0, y0, w, h)
-    ImGui.DrawList_AddCircle(draw_list, x, y, 18, COLORS.listener, 28, 2.0)
-    ImGui.DrawList_AddText(draw_list, x + 20, y - 9, COLORS.text, "preview")
+    ImGui.DrawList_AddCircle(draw_list, x, y, 18, STYLE.listener, 28, 2.0)
+    ImGui.DrawList_AddText(draw_list, x + 20, y - 9, STYLE.text, "preview")
   end
 
   if hovered and ImGui.IsMouseClicked(ctx, 0) then
@@ -604,13 +605,13 @@ local function draw_orientation_breakpoints(path, orientation_mode)
   ImGui.InvisibleButton(ctx, "##orientation_breakpoints", w, h)
   local hovered = ImGui.IsItemHovered(ctx)
   local mx, my = ImGui.GetMousePos(ctx)
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + w, y0 + h, COLORS.bg)
-  ImGui.DrawList_AddRect(draw_list, x0, y0, x0 + w, y0 + h, COLORS.edge)
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 10, COLORS.text, "Listener AED / time breakpoints")
+  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + w, y0 + h, STYLE.bg)
+  ImGui.DrawList_AddRect(draw_list, x0, y0, x0 + w, y0 + h, STYLE.edge)
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 10, STYLE.text, "Listener AED / time breakpoints")
   if orientation_mode == 1 then
-    ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 30, COLORS.muted, "horizontal = render time; yaw/pitch are derived from trajectory direction")
+    ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 30, STYLE.muted, "horizontal = render time; yaw/pitch are derived from trajectory direction")
   else
-    ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 30, COLORS.muted, "horizontal = render time; vertical lanes show yaw, pitch, and roll")
+    ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 30, STYLE.muted, "horizontal = render time; vertical lanes show yaw, pitch, and roll")
   end
   local left, right = x0 + 70, x0 + w - 18
   local lanes = {
@@ -620,8 +621,8 @@ local function draw_orientation_breakpoints(path, orientation_mode)
   }
   for li, lane in ipairs(lanes) do
     local cy = y0 + 60 + (li - 1) * 34
-    ImGui.DrawList_AddText(draw_list, x0 + 16, cy - 8, COLORS.text, lane.label)
-    ImGui.DrawList_AddLine(draw_list, left, cy, right, cy, COLORS.grid, 1)
+    ImGui.DrawList_AddText(draw_list, x0 + 16, cy - 8, STYLE.text, lane.label)
+    ImGui.DrawList_AddLine(draw_list, left, cy, right, cy, STYLE.grid, 1)
     local sorted = sorted_path(path)
     for i = 1, #sorted - 1 do
       local a, b = sorted[i], sorted[i + 1]
@@ -642,11 +643,11 @@ local function draw_orientation_breakpoints(path, orientation_mode)
       local v = p[lane.index]
       if orientation_mode == 1 then v = oriented_path_row(path, p[7] or 0, orientation_mode)[lane.index] end
       local py = cy - ((clamp(v, lane.min, lane.max) - lane.min) / (lane.max - lane.min) - 0.5) * 24
-      ImGui.DrawList_AddCircleFilled(draw_list, px, py, i == selected_point and 5.5 or 3.5, i == selected_point and COLORS.node_sel or lane.col, 14)
+      ImGui.DrawList_AddCircleFilled(draw_list, px, py, i == selected_point and 5.5 or 3.5, i == selected_point and STYLE.node_sel or lane.col, 14)
     end
   end
   local play_x = left + preview_t * (right - left)
-  ImGui.DrawList_AddLine(draw_list, play_x, y0 + 54, play_x, y0 + h - 16, COLORS.listener, 2.0)
+  ImGui.DrawList_AddLine(draw_list, play_x, y0 + 54, play_x, y0 + h - 16, STYLE.listener, 2.0)
 
   if hovered and ImGui.IsMouseClicked(ctx, 0) then
     local best_i, best_d = selected_point, 1e9
@@ -833,7 +834,7 @@ local function loop()
     local control_h = math.max(300, avail_h - footer_h)
     if ImGui.BeginChild(ctx, "##scene_navigator_controls", 0, control_h) then
     ImGui.Text(ctx, "Selected 3OAFX scene nodes: " .. tostring(#entries))
-    ImGui.TextColored(ctx, COLORS.muted, "Each selected item is a movable soundfield node; the path is the listener trajectory.")
+    theme.muted(ImGui, ctx, "Each selected item is a movable soundfield node; the path is the listener trajectory.")
     local preview_row = draw_preview_transport(path_points, settings)
     camera_controls()
     draw_top_map(nodes, path_points, settings, preview_row)
@@ -864,7 +865,7 @@ local function loop()
       changed, nodes[selected_node][3] = ImGui.SliderDouble(ctx, "Node Z", nodes[selected_node][3], -2.0, 2.0, "%.3f")
       nodes[selected_node][4] = nodes[selected_node][4] or 1.0
       changed, nodes[selected_node][4] = ImGui.SliderDouble(ctx, "Node radius", nodes[selected_node][4], 0.10, 3.00, "%.2f")
-      ImGui.TextColored(ctx, COLORS.muted, string.format("Effective radius: %.2f", settings.influence_radius * nodes[selected_node][4]))
+      theme.muted(ImGui, ctx, string.format("Effective radius: %.2f", settings.influence_radius * nodes[selected_node][4]))
     end
 
     if ImGui.CollapsingHeader(ctx, "Listener Path", ImGui.TreeNodeFlags_DefaultOpen) then
@@ -885,7 +886,7 @@ local function loop()
       changed, p[3] = ImGui.SliderDouble(ctx, "Listener Z", p[3], -2.0, 2.0, "%.3f")
       if settings.orientation_mode == 1 then
         local o = oriented_path_row(path_points, p[7] or 0, settings.orientation_mode)
-        ImGui.TextColored(ctx, COLORS.muted, string.format("Head faces path: yaw %.1f / pitch %.1f / roll %.1f", o[4], o[5], o[6]))
+        theme.muted(ImGui, ctx, string.format("Head faces path: yaw %.1f / pitch %.1f / roll %.1f", o[4], o[5], o[6]))
       else
         changed, p[4] = ImGui.SliderDouble(ctx, "Yaw deg", p[4], -360.0, 360.0, "%.1f")
         changed, p[5] = ImGui.SliderDouble(ctx, "Pitch deg", p[5], -90.0, 90.0, "%.1f")

@@ -8,7 +8,7 @@ const spaceCanvas = document.getElementById("spaceView");
 const spaceCtx = spaceCanvas.getContext("2d");
 
 const STORAGE_KEY = "s3g-mc-automation-score-autosave-v1";
-const palette = ["#5aa8c7", "#d8a24a", "#ff7f6e", "#8fcf7a", "#c18bd8", "#69b6a7", "#d66f9b", "#b6c05b", "#7aa4e8", "#e0a16f", "#8ecfbc", "#d0d0d0"];
+const palette = ["#7f9aa3", "#a99b76", "#ff7f6e", "#8fcf7a", "#c18bd8", "#69b6a7", "#d66f9b", "#b6c05b", "#7aa4e8", "#e0a16f", "#8ecfbc", "#d0d0d0"];
 let lastAutosaveJson = "";
 
 const state = {
@@ -556,7 +556,7 @@ function draw() {
   const r = fieldRect();
   drawSectionMarkers(ctx, r.x, r.y, r.w, r.h, { noLabel: state.viewMode === "stacked" });
   const playX = r.x + state.playT * r.w;
-  ctx.strokeStyle = "#d8a24a";
+  ctx.strokeStyle = "#a99b76";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(playX, r.y);
@@ -675,7 +675,7 @@ function drawAggregateLine(x0, y0, width, height, steps) {
     barCtx.stroke();
   }
 
-  barCtx.strokeStyle = state.aggregateMode === "density" || state.aggregateMode === "delta" || state.aggregateMode === "pairwise" ? "#d8a24a" : "#5aa8c7";
+  barCtx.strokeStyle = state.aggregateMode === "density" || state.aggregateMode === "delta" || state.aggregateMode === "pairwise" ? "#a99b76" : "#7f9aa3";
   barCtx.lineWidth = 1.7;
   barCtx.beginPath();
   for (let i = 0; i <= steps; i++) {
@@ -955,7 +955,7 @@ function drawRelationMatrix(g, x, y, size, options = {}) {
     for (let col = 0; col < n; col++) {
       const cv = laneValue(lanes[col], state.playT);
       const similarity = 1 - Math.abs(rv - cv);
-      const hue = similarity > 0.66 ? "#5aa8c7" : similarity > 0.33 ? "#d8a24a" : "#ff7f6e";
+      const hue = similarity > 0.66 ? "#7f9aa3" : similarity > 0.33 ? "#a99b76" : "#ff7f6e";
       g.fillStyle = hexToRgba(hue, 0.18 + similarity * 0.72);
       g.fillRect(gx + col * cell, gy + row * cell, Math.ceil(cell), Math.ceil(cell));
     }

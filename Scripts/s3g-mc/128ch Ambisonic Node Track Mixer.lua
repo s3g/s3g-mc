@@ -23,6 +23,9 @@ do
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
 
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
+
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
 local mc = dofile(script_dir .. "Multichannel Library.lua")
@@ -73,23 +76,23 @@ local AUTO_MODE_NAMES = {
   [5] = "Latch Preview",
 }
 
-local COLORS = {
-  bg = ImGui.ColorConvertDouble4ToU32(0.025, 0.030, 0.040, 1),
-  panel = ImGui.ColorConvertDouble4ToU32(0.052, 0.060, 0.078, 1),
-  edge = ImGui.ColorConvertDouble4ToU32(0.31, 0.36, 0.45, 1),
-  grid = ImGui.ColorConvertDouble4ToU32(0.62, 0.68, 0.78, 0.16),
-  text = ImGui.ColorConvertDouble4ToU32(0.80, 0.86, 0.92, 1),
-  muted = ImGui.ColorConvertDouble4ToU32(0.50, 0.58, 0.66, 1),
-  node = ImGui.ColorConvertDouble4ToU32(0.30, 0.54, 1.00, 0.92),
-  node_sel = ImGui.ColorConvertDouble4ToU32(0.96, 0.48, 1.00, 0.98),
-  cursor = ImGui.ColorConvertDouble4ToU32(0.20, 0.96, 0.82, 1),
-  warm = ImGui.ColorConvertDouble4ToU32(1.00, 0.72, 0.30, 1),
-  warn = ImGui.ColorConvertDouble4ToU32(0.95, 0.42, 0.32, 1),
-}
-
 local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
+
+local STYLE = {
+  bg = THEME.bg,
+  panel = THEME.panel,
+  edge = THEME.edge,
+  grid = color(0.55, 0.55, 0.55, 0.16),
+  text = THEME.text,
+  muted = THEME.value,
+  node = color(0.58, 0.64, 0.68, 0.92),
+  node_sel = THEME.active,
+  cursor = THEME.amber,
+  warm = THEME.amber,
+  warn = THEME.warn,
+}
 
 local function clamp(v, lo, hi)
   if v < lo then return lo end
@@ -340,13 +343,13 @@ local function draw_curve_display(influence, radius, focus, gate)
   local w = math.max(260, ImGui.GetContentRegionAvail(ctx))
   local h = 88
   ImGui.InvisibleButton(ctx, "##ambi_cursor_curve", w, h)
-  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + h, COLORS.bg)
-  ImGui.DrawList_AddRect(draw, x, y, x + w, y + h, COLORS.edge)
-  ImGui.DrawList_AddText(draw, x + 10, y + 8, COLORS.muted, "cursor falloff")
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + h, STYLE.bg)
+  ImGui.DrawList_AddRect(draw, x, y, x + w, y + h, STYLE.edge)
+  ImGui.DrawList_AddText(draw, x + 10, y + 8, STYLE.muted, "cursor falloff")
   local gx1, gy1 = x + 16, y + h - 16
   local gx2, gy2 = x + w - 14, y + 22
-  ImGui.DrawList_AddLine(draw, gx1, gy1, gx2, gy1, COLORS.grid, 1)
-  ImGui.DrawList_AddLine(draw, gx1, gy1, gx1, gy2, COLORS.grid, 1)
+  ImGui.DrawList_AddLine(draw, gx1, gy1, gx2, gy1, STYLE.grid, 1)
+  ImGui.DrawList_AddLine(draw, gx1, gy1, gx1, gy2, STYLE.grid, 1)
   local max_dist = math.max(1, radius * 3)
   local last_x, last_y
   for i = 0, 96 do
@@ -354,7 +357,7 @@ local function draw_curve_display(influence, radius, focus, gate)
     local weight = cursor_weight_for_distance(t * max_dist, influence, radius, focus, gate)
     local px = gx1 + (gx2 - gx1) * t
     local py = gy1 - (gy1 - gy2) * clamp(weight, 0, 1)
-    if last_x then ImGui.DrawList_AddLine(draw, last_x, last_y, px, py, COLORS.cursor, 2) end
+    if last_x then ImGui.DrawList_AddLine(draw, last_x, last_y, px, py, STYLE.cursor, 2) end
     last_x, last_y = px, py
   end
 end
@@ -458,7 +461,7 @@ local function draw_node_field(dl, x, y, r, selected)
 end
 
 local function draw_ambi_glyph(dl, x, y, r, order, selected)
-  local col = selected and COLORS.node_sel or COLORS.node
+  local col = selected and STYLE.node_sel or STYLE.node
   ImGui.DrawList_AddCircle(dl, x, y, r, col, 36, 1.3)
   ImGui.DrawList_AddLine(dl, x - r, y, x + r, y, color(0.72, 0.84, 1.0, selected and 0.45 or 0.25), 1)
   ImGui.DrawList_AddLine(dl, x, y - r, x, y + r, color(0.72, 0.84, 1.0, selected and 0.45 or 0.25), 1)
@@ -472,10 +475,10 @@ local function draw_stack_view(node_count, order)
   local w = math.max(620, ImGui.GetContentRegionAvail(ctx))
   local h = 380
   ImGui.InvisibleButton(ctx, "##ambi_stack_view", w, h)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x0 + w, y0 + h, COLORS.bg)
-  ImGui.DrawList_AddRect(dl, x0, y0, x0 + w, y0 + h, COLORS.edge)
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 12, COLORS.text, "Ambisonic stack scan")
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 30, COLORS.muted, "Cursor scans between complete encoded streams; channels remain aligned.")
+  ImGui.DrawList_AddRectFilled(dl, x0, y0, x0 + w, y0 + h, STYLE.bg)
+  ImGui.DrawList_AddRect(dl, x0, y0, x0 + w, y0 + h, STYLE.edge)
+  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 12, STYLE.text, "Ambisonic stack scan")
+  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 30, STYLE.muted, "Cursor scans between complete encoded streams; channels remain aligned.")
 
   local rail_x1, rail_x2 = x0 + 28, x0 + w - 28
   local rail_y = y0 + 62
@@ -492,16 +495,16 @@ local function draw_stack_view(node_count, order)
     drag_kind = nil
   end
 
-  ImGui.DrawList_AddLine(dl, rail_x1, rail_y, rail_x2, rail_y, COLORS.grid, 1)
+  ImGui.DrawList_AddLine(dl, rail_x1, rail_y, rail_x2, rail_y, STYLE.grid, 1)
   for n = 1, node_count do
     local tx = rail_x1 + (rail_x2 - rail_x1) * ((n - 1) / math.max(1, node_count - 1))
     local weight = cursor_weight_for_node(n, 1)
     local selected = n == selected_node
-    ImGui.DrawList_AddCircleFilled(dl, tx, rail_y, 4 + weight * 5, selected and COLORS.node_sel or COLORS.node, 18)
-    ImGui.DrawList_AddText(dl, tx - 4, rail_y - 24, COLORS.muted, tostring(n))
+    ImGui.DrawList_AddCircleFilled(dl, tx, rail_y, 4 + weight * 5, selected and STYLE.node_sel or STYLE.node, 18)
+    ImGui.DrawList_AddText(dl, tx - 4, rail_y - 24, STYLE.muted, tostring(n))
   end
   local cursor_x = rail_x1 + (rail_x2 - rail_x1) * ((get_param(bus, fx, STACK_POSITION_PARAM, 1) - 1) / math.max(1, node_count - 1))
-  ImGui.DrawList_AddLine(dl, cursor_x, rail_y - 18, cursor_x, y0 + h - 18, COLORS.cursor, 2)
+  ImGui.DrawList_AddLine(dl, cursor_x, rail_y - 18, cursor_x, y0 + h - 18, STYLE.cursor, 2)
 
   local cols = math.min(4, math.max(1, node_count))
   local rows = math.ceil(node_count / cols)
@@ -515,7 +518,7 @@ local function draw_stack_view(node_count, order)
     local selected = n == selected_node
     local weight = cursor_weight_for_node(n, 1)
     draw_ambi_glyph(dl, cx, cy, math.min(cell_w, cell_h) * 0.22, order, selected)
-    ImGui.DrawList_AddText(dl, cx - 42, cy + math.min(cell_w, cell_h) * 0.25, selected and COLORS.node_sel or COLORS.text,
+    ImGui.DrawList_AddText(dl, cx - 42, cy + math.min(cell_w, cell_h) * 0.25, selected and STYLE.node_sel or STYLE.text,
       string.format("N%d %.2f", n, weight))
   end
 end
@@ -526,18 +529,18 @@ local function draw_field_view(node_count, order)
   local w = math.max(620, ImGui.GetContentRegionAvail(ctx))
   local h = 430
   ImGui.InvisibleButton(ctx, "##ambi_node_view", w, h)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x0 + w, y0 + h, COLORS.bg)
-  ImGui.DrawList_AddRect(dl, x0, y0, x0 + w, y0 + h, COLORS.edge)
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 12, COLORS.text, "Ambisonic node field")
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 30, COLORS.muted, "Each node is a full encoded stream; cursor distance controls whole-stream weighting.")
+  ImGui.DrawList_AddRectFilled(dl, x0, y0, x0 + w, y0 + h, STYLE.bg)
+  ImGui.DrawList_AddRect(dl, x0, y0, x0 + w, y0 + h, STYLE.edge)
+  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 12, STYLE.text, "Ambisonic node field")
+  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 30, STYLE.muted, "Each node is a full encoded stream; cursor distance controls whole-stream weighting.")
 
   for g = -2, 2 do
     local ax, ay = project(g * 0.5, -1.1, 0, x0, y0, w, h)
     local bx, by = project(g * 0.5, 1.1, 0, x0, y0, w, h)
-    ImGui.DrawList_AddLine(dl, ax, ay, bx, by, COLORS.grid, 1)
+    ImGui.DrawList_AddLine(dl, ax, ay, bx, by, STYLE.grid, 1)
     ax, ay = project(-1.1, g * 0.5, 0, x0, y0, w, h)
     bx, by = project(1.1, g * 0.5, 0, x0, y0, w, h)
-    ImGui.DrawList_AddLine(dl, ax, ay, bx, by, COLORS.grid, 1)
+    ImGui.DrawList_AddLine(dl, ax, ay, bx, by, STYLE.grid, 1)
   end
 
   local cx = get_param(bus, fx, CURSOR_X_PARAM, 0)
@@ -586,9 +589,9 @@ local function draw_field_view(node_count, order)
     drag_kind, drag_node = nil, nil
   end
 
-  ImGui.DrawList_AddCircle(dl, cpx, cpy, 13, COLORS.cursor, 28, 2)
-  ImGui.DrawList_AddLine(dl, cpx - 18, cpy, cpx + 18, cpy, COLORS.cursor, 1.5)
-  ImGui.DrawList_AddLine(dl, cpx, cpy - 18, cpx, cpy + 18, COLORS.cursor, 1.5)
+  ImGui.DrawList_AddCircle(dl, cpx, cpy, 13, STYLE.cursor, 28, 2)
+  ImGui.DrawList_AddLine(dl, cpx - 18, cpy, cpx + 18, cpy, STYLE.cursor, 1.5)
+  ImGui.DrawList_AddLine(dl, cpx, cpy - 18, cpx, cpy + 18, STYLE.cursor, 1.5)
 
   for n = 1, node_count do
     local pos = node_positions[n] or { px = x0 + w * 0.5, py = y0 + h * 0.5 }
@@ -597,26 +600,20 @@ local function draw_field_view(node_count, order)
     local weight = cursor_weight_for_node(n, 0)
     draw_node_field(dl, pos.px, pos.py, radius * math.min(w, h) * 0.16 * view_zoom, selected)
     draw_ambi_glyph(dl, pos.px, pos.py, selected and 18 or 15, order, selected)
-    ImGui.DrawList_AddText(dl, pos.px + 18, pos.py - 9, selected and COLORS.node_sel or COLORS.text,
+    ImGui.DrawList_AddText(dl, pos.px + 18, pos.py - 9, selected and STYLE.node_sel or STYLE.text,
       string.format("%d %.2f %s", n, weight, short_name(node_name(n), 20)))
   end
 end
 
 local function combo_mix_mode(mode)
-  if ImGui.BeginCombo(ctx, "Mix mode", MIX_MODES[mode + 1] or MIX_MODES[1]) then
-    for i, label in ipairs(MIX_MODES) do
-      local selected = mode == i - 1
-      if ImGui.Selectable(ctx, label, selected) then mode = i - 1 end
-      if selected then ImGui.SetItemDefaultFocus(ctx) end
-    end
-    ImGui.EndCombo(ctx)
-  end
+  local changed, next_value = theme.combo_row(ImGui, ctx, "Mix mode", MIX_MODES, mode + 1, 180)
+  if changed then return (next_value or mode + 1) - 1 end
   return mode
 end
 
 local function draw_routing_overview(node_count, ambi_ch)
-  if not ImGui.CollapsingHeader(ctx, "Routing overview", ImGui.TreeNodeFlags_DefaultOpen) then return end
-  ImGui.TextColored(ctx, COLORS.muted, "Whole encoded streams are weighted, then summed channel-for-channel to the output.")
+  if not theme.toolbox_header(ImGui, ctx, "ROUTING OVERVIEW", ImGui.TreeNodeFlags_DefaultOpen) then return end
+  theme.muted(ImGui, ctx, "Whole encoded streams are weighted, then summed channel-for-channel to the output.")
   if ImGui.BeginTable(ctx, "ambi_routing_overview", 5, ImGui.TableFlags_Borders | ImGui.TableFlags_RowBg | ImGui.TableFlags_SizingStretchProp) then
     ImGui.TableSetupColumn(ctx, "Node", ImGui.TableColumnFlags_WidthFixed, 54)
     ImGui.TableSetupColumn(ctx, "Track", ImGui.TableColumnFlags_WidthFixed, 240)
@@ -650,15 +647,15 @@ local function loop()
   if visible then
     local _, bus_name = reaper.GetTrackName(bus, "")
     ImGui.Text(ctx, bus_name ~= "" and bus_name or "Ambisonic Node Track Mixer bus")
-    ImGui.TextColored(ctx, COLORS.muted, "Whole ACN/SN3D streams are mixed as nodes. No decode, encode, or speaker-channel remapping is applied.")
+    theme.muted(ImGui, ctx, "Whole ACN/SN3D streams are mixed as nodes. No decode, encode, or speaker-channel remapping is applied.")
 
     local order = math.floor(get_param(bus, fx, ORDER_PARAM, 2) + 0.5)
     ImGui.Text(ctx, "Ambisonic order: " .. (ORDERS[order + 1] and ORDERS[order + 1].label or ORDERS[3].label))
-    ImGui.TextColored(ctx, COLORS.muted, "Order is set when the bus is created so input blocks stay aligned.")
+    theme.muted(ImGui, ctx, "Order is set when the bus is created so input blocks stay aligned.")
     local ambi_ch = order_channels(order)
     local node_count = math.floor(get_param(bus, fx, NODE_COUNT_PARAM, 4) + 0.5)
     local changed
-    changed, node_count = ImGui.SliderInt(ctx, "Node count", node_count, 1, MAX_NODES)
+    changed, node_count = theme.slider_int(ImGui, ctx, "Node count", node_count, 1, MAX_NODES, 420)
     if changed then set_param(bus, fx, NODE_COUNT_PARAM, node_count) end
     selected_node = clamp(selected_node, 1, node_count)
     local bus_channels = math.max(ambi_ch, node_count * ambi_ch)
@@ -670,51 +667,51 @@ local function loop()
     mix_mode = combo_mix_mode(mix_mode)
     set_param(bus, fx, MIX_MODE_PARAM, mix_mode)
 
-    if ImGui.CollapsingHeader(ctx, "Automation", ImGui.TreeNodeFlags_DefaultOpen) then
+    if theme.toolbox_header(ImGui, ctx, "AUTOMATION", ImGui.TreeNodeFlags_DefaultOpen) then
       local mode_name = automation_mode_name(bus)
       ImGui.Text(ctx, "Track automation: " .. mode_name)
       ImGui.SameLine(ctx)
       local write_mode = mode_name == "Write"
-      if ImGui.Button(ctx, write_mode and "Set Trim/Read + safe" or "Set Write + GUI") then
+      if ImGui.Button(ctx, write_mode and "SET TRIM/READ + SAFE" or "SET WRITE + GUI") then
         set_track_write_mode(bus, not write_mode)
       end
       local cursor_params = { CURSOR_X_PARAM, CURSOR_Y_PARAM, CURSOR_Z_PARAM }
       local curve_params = { CURSOR_INFLUENCE_PARAM, CURSOR_RADIUS_PARAM, CURSOR_FOCUS_PARAM, CURSOR_GATE_PARAM }
       local stack_params = { STACK_POSITION_PARAM }
-      if ImGui.Button(ctx, "Show cursor lanes") then automation_status = "Shown/armed " .. tostring(show_params(cursor_params)) .. " cursor envelopes." end
+      if ImGui.Button(ctx, "SHOW CURSOR") then automation_status = "Shown/armed " .. tostring(show_params(cursor_params)) .. " cursor envelopes." end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Hide cursor") then automation_status = "Hidden " .. tostring(hide_params(cursor_params)) .. " cursor envelopes." end
+      if ImGui.Button(ctx, "HIDE CURSOR") then automation_status = "Hidden " .. tostring(hide_params(cursor_params)) .. " cursor envelopes." end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Show curve lanes") then automation_status = "Shown/armed " .. tostring(show_params(curve_params)) .. " curve envelopes." end
+      if ImGui.Button(ctx, "SHOW CURVE") then automation_status = "Shown/armed " .. tostring(show_params(curve_params)) .. " curve envelopes." end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Hide curve") then automation_status = "Hidden " .. tostring(hide_params(curve_params)) .. " curve envelopes." end
+      if ImGui.Button(ctx, "HIDE CURVE") then automation_status = "Hidden " .. tostring(hide_params(curve_params)) .. " curve envelopes." end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Show stack") then automation_status = "Shown/armed " .. tostring(show_params(stack_params)) .. " stack envelope." end
+      if ImGui.Button(ctx, "SHOW STACK") then automation_status = "Shown/armed " .. tostring(show_params(stack_params)) .. " stack envelope." end
       ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "Hide stack") then automation_status = "Hidden " .. tostring(hide_params(stack_params)) .. " stack envelope." end
-      ImGui.TextColored(ctx, COLORS.muted, write_mode and "Write mode: GUI movement writes to armed automation lanes." or "Trim/Read: GUI controls parameters live without writing automation.")
-      if automation_status ~= "" then ImGui.TextColored(ctx, COLORS.muted, automation_status) end
+      if ImGui.Button(ctx, "HIDE STACK") then automation_status = "Hidden " .. tostring(hide_params(stack_params)) .. " stack envelope." end
+      theme.muted(ImGui, ctx, write_mode and "Write mode: GUI movement writes to armed automation lanes." or "Trim/Read: GUI controls parameters live without writing automation.")
+      if automation_status ~= "" then theme.muted(ImGui, ctx, automation_status) end
     end
 
-    if ImGui.CollapsingHeader(ctx, "Mix Cursor", ImGui.TreeNodeFlags_DefaultOpen) then
+    if theme.toolbox_header(ImGui, ctx, "MIX CURSOR", ImGui.TreeNodeFlags_DefaultOpen) then
       local influence = get_param(bus, fx, CURSOR_INFLUENCE_PARAM, 1)
-      changed, influence = ImGui.SliderDouble(ctx, "Cursor influence", influence, 0, 1, "%.3f")
+      changed, influence = theme.slider_double(ImGui, ctx, "Cursor influence", influence, 0, 1, "%.3f", 420)
       if changed then set_param(bus, fx, CURSOR_INFLUENCE_PARAM, influence) end
       if mix_mode == 1 then
         local stack_pos = get_param(bus, fx, STACK_POSITION_PARAM, 1)
-        changed, stack_pos = ImGui.SliderDouble(ctx, "Stack position", stack_pos, 1, node_count, "%.3f")
+        changed, stack_pos = theme.slider_double(ImGui, ctx, "Stack position", stack_pos, 1, node_count, "%.3f", 420)
         if changed then set_param(bus, fx, STACK_POSITION_PARAM, stack_pos) end
       else
         local cx = get_param(bus, fx, CURSOR_X_PARAM, 0)
         local cy = get_param(bus, fx, CURSOR_Y_PARAM, 0)
         local cz = get_param(bus, fx, CURSOR_Z_PARAM, 0)
-        changed, cx = ImGui.SliderDouble(ctx, "Cursor X", cx, -2, 2, "%.3f")
+        changed, cx = theme.slider_double(ImGui, ctx, "Cursor X", cx, -2, 2, "%.3f", 420)
         if changed then set_param(bus, fx, CURSOR_X_PARAM, cx) end
-        changed, cy = ImGui.SliderDouble(ctx, "Cursor Y", cy, -2, 2, "%.3f")
+        changed, cy = theme.slider_double(ImGui, ctx, "Cursor Y", cy, -2, 2, "%.3f", 420)
         if changed then set_param(bus, fx, CURSOR_Y_PARAM, cy) end
-        changed, cz = ImGui.SliderDouble(ctx, "Cursor Z", cz, -2, 2, "%.3f")
+        changed, cz = theme.slider_double(ImGui, ctx, "Cursor Z", cz, -2, 2, "%.3f", 420)
         if changed then set_param(bus, fx, CURSOR_Z_PARAM, cz) end
-        if ImGui.Button(ctx, "Center Cursor", 120, 24) then
+        if ImGui.Button(ctx, "CENTER", 120, 24) then
           set_param(bus, fx, CURSOR_X_PARAM, 0)
           set_param(bus, fx, CURSOR_Y_PARAM, 0)
           set_param(bus, fx, CURSOR_Z_PARAM, 0)
@@ -723,28 +720,28 @@ local function loop()
       local radius = get_param(bus, fx, CURSOR_RADIUS_PARAM, 1)
       local focus = get_param(bus, fx, CURSOR_FOCUS_PARAM, 2)
       local gate = get_param(bus, fx, CURSOR_GATE_PARAM, 0)
-      changed, radius = ImGui.SliderDouble(ctx, "Global radius", radius, 0.05, 8, "%.3f")
+      changed, radius = theme.slider_double(ImGui, ctx, "Global radius", radius, 0.05, 8, "%.3f", 420)
       if changed then set_param(bus, fx, CURSOR_RADIUS_PARAM, radius) end
-      changed, focus = ImGui.SliderDouble(ctx, "Global focus", focus, 0.2, 12, "%.3f")
+      changed, focus = theme.slider_double(ImGui, ctx, "Global focus", focus, 0.2, 12, "%.3f", 420)
       if changed then set_param(bus, fx, CURSOR_FOCUS_PARAM, focus) end
-      changed, gate = ImGui.SliderDouble(ctx, "Cursor gate", gate, 0, 0.95, "%.3f")
+      changed, gate = theme.slider_double(ImGui, ctx, "Cursor gate", gate, 0, 0.95, "%.3f", 420)
       if changed then set_param(bus, fx, CURSOR_GATE_PARAM, gate) end
       draw_curve_display(influence, radius, focus, gate)
     end
 
     if ImGui.Button(ctx, "3/4", 48, 24) then view_azim_deg, view_elev_deg = -38, -28 end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Top", 48, 24) then view_azim_deg, view_elev_deg = 0, 0 end
+    if ImGui.Button(ctx, "TOP", 48, 24) then view_azim_deg, view_elev_deg = 0, 0 end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Side", 48, 24) then view_azim_deg, view_elev_deg = 0, -89 end
+    if ImGui.Button(ctx, "SIDE", 48, 24) then view_azim_deg, view_elev_deg = 0, -89 end
     ImGui.SameLine(ctx)
-    nudge("Az -", 44, 24, function() view_azim_deg = view_azim_deg - 2 end)
+    nudge("AZ -", 44, 24, function() view_azim_deg = view_azim_deg - 2 end)
     ImGui.SameLine(ctx)
-    nudge("Az +", 44, 24, function() view_azim_deg = view_azim_deg + 2 end)
+    nudge("AZ +", 44, 24, function() view_azim_deg = view_azim_deg + 2 end)
     ImGui.SameLine(ctx)
-    nudge("El +", 44, 24, function() view_elev_deg = clamp(view_elev_deg + 2, -89, 89) end)
+    nudge("EL +", 44, 24, function() view_elev_deg = clamp(view_elev_deg + 2, -89, 89) end)
     ImGui.SameLine(ctx)
-    nudge("El -", 44, 24, function() view_elev_deg = clamp(view_elev_deg - 2, -89, 89) end)
+    nudge("EL -", 44, 24, function() view_elev_deg = clamp(view_elev_deg - 2, -89, 89) end)
     ImGui.SameLine(ctx)
     nudge("-", 28, 24, function() view_zoom = clamp(view_zoom * 0.975, 0.35, 3.0) end)
     ImGui.SameLine(ctx)
@@ -752,13 +749,13 @@ local function loop()
 
     if mix_mode == 1 then draw_stack_view(node_count, order) else draw_field_view(node_count, order) end
 
-    if ImGui.CollapsingHeader(ctx, "Selected Node", ImGui.TreeNodeFlags_DefaultOpen) then
+    if theme.toolbox_header(ImGui, ctx, "SELECTED NODE", ImGui.TreeNodeFlags_DefaultOpen) then
       ImGui.Text(ctx, "Node " .. tostring(selected_node) .. ": " .. node_name(selected_node))
       local active = get_param(bus, fx, node_param(selected_node, 0), 1) >= 0.5
-      changed, active = ImGui.Checkbox(ctx, "Active", active)
+      changed, active = ImGui.Checkbox(ctx, "ACTIVE", active)
       if changed then set_param(bus, fx, node_param(selected_node, 0), active and 1 or 0) end
       local input_start = math.floor(get_param(bus, fx, node_param(selected_node, 2), 1) + 0.5)
-      changed, input_start = ImGui.SliderInt(ctx, "Input start channel", input_start, 1, MAX_CH)
+      changed, input_start = theme.slider_int(ImGui, ctx, "Input start channel", input_start, 1, MAX_CH, 420)
       if changed then set_param(bus, fx, node_param(selected_node, 2), input_start) end
       local labels = mix_mode == 1 and { "Level dB" } or { "Level dB", "X", "Y", "Z", "Node radius", "Node focus" }
       local offsets = mix_mode == 1 and { 1 } or { 1, 3, 4, 5, 6, 7 }
@@ -767,14 +764,14 @@ local function loop()
         or { { -60, 12, "%.1f" }, { -2, 2, "%.3f" }, { -2, 2, "%.3f" }, { -2, 2, "%.3f" }, { 0.05, 8, "%.3f" }, { 0.2, 12, "%.3f" } }
       for i = 1, #labels do
         local v = get_param(bus, fx, node_param(selected_node, offsets[i]), 0)
-        changed, v = ImGui.SliderDouble(ctx, labels[i], v, ranges[i][1], ranges[i][2], ranges[i][3])
+        changed, v = theme.slider_double(ImGui, ctx, labels[i], v, ranges[i][1], ranges[i][2], ranges[i][3], 420)
         if changed then set_param(bus, fx, node_param(selected_node, offsets[i]), v) end
       end
     end
 
     draw_routing_overview(node_count, ambi_ch)
 
-    if ImGui.Button(ctx, "Close", 100, 28) then open = false end
+    if ImGui.Button(ctx, "CLOSE", 100, 28) then open = false end
     ImGui.End(ctx)
   end
   if open then reaper.defer(loop) end

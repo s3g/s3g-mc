@@ -27,6 +27,8 @@ do
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
 
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local TITLE = "Focused FX Automation Capture"
 local EXT = "s3g-mc Focused FX Automation Capture"
@@ -53,10 +55,10 @@ local make_key
 local fx_name
 local param_label
 
-local COLORS = {
-  muted = ImGui.ColorConvertDouble4ToU32(0.55, 0.59, 0.60, 1),
-  warn = ImGui.ColorConvertDouble4ToU32(0.95, 0.45, 0.34, 1),
-  ok = ImGui.ColorConvertDouble4ToU32(0.45, 0.86, 0.58, 1),
+local STYLE = {
+  muted = THEME.value,
+  warn = THEME.warn,
+  ok = THEME.ok,
 }
 
 local function lower(s)
@@ -434,27 +436,27 @@ local function loop()
     local focused_track, focused_fx, focused_err = focused_track_fx()
     local track, fx, err = target_track_fx()
     if err then
-      ImGui.TextColored(ctx, COLORS.warn, err)
+      ImGui.TextColored(ctx, STYLE.warn, err)
     else
       ImGui.Text(ctx, "Locked: " .. track_name(track))
       ImGui.SameLine(ctx)
-      ImGui.TextColored(ctx, COLORS.muted, " / " .. fx_name(track, fx))
+      ImGui.TextColored(ctx, STYLE.muted, " / " .. fx_name(track, fx))
     end
 
     local changed
     if ImGui.Button(ctx, "Lock FX", 78, 24) then refresh_params(true) end
     if focused_err then
       ImGui.SameLine(ctx)
-      ImGui.TextColored(ctx, COLORS.muted, "Focus or touch a plugin parameter, then lock.")
+      ImGui.TextColored(ctx, STYLE.muted, "Focus or touch a plugin parameter, then lock.")
     elseif focused_track and focused_fx >= 0 then
       ImGui.SameLine(ctx)
-      ImGui.TextColored(ctx, COLORS.muted, "Focused: " .. track_name(focused_track) .. " / " .. fx_name(focused_track, focused_fx))
+      ImGui.TextColored(ctx, STYLE.muted, "Focused: " .. track_name(focused_track) .. " / " .. fx_name(focused_track, focused_fx))
     end
     ImGui.SameLine(ctx)
     ImGui.SetNextItemWidth(ctx, 330)
     changed, filter_text = ImGui.InputText(ctx, "Filter", filter_text)
     ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, COLORS.muted, tostring(selected_count()) .. " selected")
+    ImGui.TextColored(ctx, STYLE.muted, tostring(selected_count()) .. " selected")
     ImGui.SameLine(ctx)
     changed, show_params = ImGui.Checkbox(ctx, "Show list", show_params)
 
@@ -495,9 +497,9 @@ local function loop()
     if ImGui.Button(ctx, "Delete", 64, 24) then delete_bucket() end
     ImGui.SameLine(ctx)
     if buckets[active_bucket] then
-      ImGui.TextColored(ctx, COLORS.muted, bucket_preview(buckets[active_bucket]))
+      ImGui.TextColored(ctx, STYLE.muted, bucket_preview(buckets[active_bucket]))
     else
-      ImGui.TextColored(ctx, COLORS.muted, "No stored bucket for this FX.")
+      ImGui.TextColored(ctx, STYLE.muted, "No stored bucket for this FX.")
     end
 
     ImGui.Separator(ctx)
@@ -505,11 +507,11 @@ local function loop()
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Show Selected Lanes", 154, 30) then show_selected_lanes() end
     ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, COLORS.muted, "Move cursor, adjust plugin GUI, save again. REAPER handles envelope interpolation.")
+    ImGui.TextColored(ctx, STYLE.muted, "Move cursor, adjust plugin GUI, save again. REAPER handles envelope interpolation.")
 
     if show_params then
       ImGui.Separator(ctx)
-      ImGui.TextColored(ctx, COLORS.muted, "Parameters")
+      ImGui.TextColored(ctx, STYLE.muted, "Parameters")
       if #params == 0 and track and fx >= 0 then refresh_params(false) end
       for _, p in ipairs(params) do
         if visible_param(p) then
@@ -521,14 +523,14 @@ local function loop()
           ImGui.SameLine(ctx)
           ImGui.Text(ctx, label)
           ImGui.SameLine(ctx)
-          ImGui.TextColored(ctx, COLORS.muted, p.display)
+          ImGui.TextColored(ctx, STYLE.muted, p.display)
         end
       end
     end
 
     if status ~= "" then
       local ok_status = status:find("Wrote", 1, true) or status:find("Created", 1, true) or status:find("Saved", 1, true) or status:find("Updated", 1, true) or status:find("Selected", 1, true)
-      local col = ok_status and COLORS.ok or COLORS.muted
+      local col = ok_status and STYLE.ok or STYLE.muted
       ImGui.TextColored(ctx, col, status)
     end
     if ImGui.Button(ctx, "Close", 90, 28) then open = false end

@@ -23,7 +23,7 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
-
+local theme = require("s3g-mc ImGui Theme")
 
 local FFT_NAMES = { [1] = "1024", [2] = "2048", [3] = "4096", [4] = "8192" }
 local FFT_VALUES = { [1] = 1024, [2] = 2048, [3] = 4096, [4] = 8192 }
@@ -31,6 +31,7 @@ local FFT_VALUES = { [1] = 1024, [2] = 2048, [3] = 4096, [4] = 8192 }
 local entries = sol.selected_entries()
 local entry = entries[1]
 if not entry then reaper.MB("Select one WAV-backed audio media item.", "Spectral Accumulate", 0) return end
+local theme = require("s3g-mc ImGui Theme")
 
 local ctx = ImGui.CreateContext("Spectral Accumulate")
 local open = true
@@ -49,7 +50,7 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, "Spectral Accumulate", open)
   if visible then
-    ImGui.Text(ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
+    theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
     local changed
     changed, fft_index = sol.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
     changed, amount = ImGui.SliderDouble(ctx, "Accumulate amount", amount, 0, 1, "%.3f")
@@ -60,7 +61,7 @@ local function loop()
     changed, normalize = ImGui.Checkbox(ctx, "Peak normalize", normalize)
     if normalize then changed, normalize_db = ImGui.SliderDouble(ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f") end
     ImGui.Separator(ctx)
-    ImGui.Text(ctx, "Sustains each bin until stronger energy replaces it.")
+    theme.muted(ImGui, ctx, "Sustains each bin until stronger energy replaces it.")
     if ImGui.Button(ctx, "Render", 92, 26) then should_render = true end
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "Cancel", 92, 26) then open = false end

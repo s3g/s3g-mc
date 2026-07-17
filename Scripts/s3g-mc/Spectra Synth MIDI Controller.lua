@@ -23,6 +23,8 @@ do
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
 
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local FX_NAME = "s3g MC Spectra Synth Engine"
 local FX_NAME_CLEAN = "MC Spectra Synth Engine"
@@ -73,12 +75,12 @@ local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
-  panel = color(0.055, 0.060, 0.064, 1),
-  edge = color(0.30, 0.32, 0.33, 1),
-  text = color(0.80, 0.84, 0.82, 1),
-  dim = color(0.50, 0.55, 0.54, 1),
-  active = color(0.25, 0.78, 0.62, 1),
+local STYLE = {
+  panel = THEME.panel,
+  edge = THEME.edge,
+  text = THEME.text,
+  dim = THEME.value,
+  warn = THEME.warn,
 }
 
 local function clamp(value, lo, hi)
@@ -165,12 +167,11 @@ local function section(label, height)
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + height, COLORS.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + height, COLORS.edge)
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + height, STYLE.panel)
+  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + height, STYLE.edge)
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + 2, THEME.active)
   ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
-  ImGui.PushStyleColor(ctx, ImGui.Col_Text, COLORS.text)
-  ImGui.Text(ctx, label)
-  ImGui.PopStyleColor(ctx)
+  theme.text(ImGui, ctx, label)
   ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
   return x, y, w, height
 end
@@ -188,7 +189,7 @@ local function loop()
     if track and (fx < 0 or find_fx(track) ~= fx) then fx = load_fx(track) end
 
     if not track or fx < 0 then
-      ImGui.TextColored(ctx, color(1, 0.45, 0.35, 1), status ~= "" and status or "Select a track and rescan JSFX if the engine is missing.")
+      theme.status(ImGui, ctx, status ~= "" and status or "Select a track and rescan JSFX if the engine is missing.", "warn")
     else
       local x, y, _, h = section("Engine", 180)
       draw_channels()

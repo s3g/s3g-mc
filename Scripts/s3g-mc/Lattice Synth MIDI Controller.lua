@@ -23,6 +23,8 @@ do
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
 
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local FX_NAME = "s3g MC Lattice Synth Engine"
 local FX_NAME_CLEAN = "MC Lattice Synth Engine"
@@ -80,17 +82,18 @@ local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
-  panel = color(0.055, 0.060, 0.064, 1),
-  edge = color(0.30, 0.32, 0.33, 1),
-  grid = color(0.48, 0.52, 0.51, 0.32),
-  text = color(0.80, 0.84, 0.82, 1),
-  dim = color(0.50, 0.55, 0.54, 1),
-  line = color(0.28, 0.72, 0.68, 1),
-  hit = color(0.95, 0.74, 0.28, 1),
-  ingress = color(0.16, 0.80, 0.95, 1),
-  egress = color(1.00, 0.36, 0.28, 1),
-  muted = color(0.22, 0.24, 0.25, 1),
+local STYLE = {
+  panel = THEME.panel,
+  edge = THEME.edge,
+  grid = color(0.50, 0.50, 0.50, 0.26),
+  text = THEME.text,
+  dim = THEME.value,
+  line = color(0.54, 0.66, 0.64, 0.90),
+  hit = THEME.amber,
+  ingress = color(0.58, 0.66, 0.70, 1),
+  egress = THEME.warn,
+  muted = THEME.frame,
+  warn = THEME.warn,
 }
 
 local function clamp(value, lo, hi)
@@ -234,9 +237,9 @@ local function draw_lattice_preview()
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
   local h = 300
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, COLORS.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, COLORS.edge)
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, COLORS.dim, "LATTICE SYNTH")
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, STYLE.panel)
+  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, STYLE.edge)
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, STYLE.dim, "LATTICE SYNTH")
 
   local rows = math.floor(get_param(PARAM.rows) + 0.5)
   local cols = math.floor(get_param(PARAM.cols) + 0.5)
@@ -261,7 +264,7 @@ local function draw_lattice_preview()
   for layer = layers, 1, -1 do
     local off = (layer - 1) * 4
     ImGui.DrawList_AddRect(draw_list, gx + off, gy - off, gx + grid_w + off, gy + grid_h - off,
-      layer == 1 and COLORS.grid or COLORS.muted)
+      layer == 1 and STYLE.grid or STYLE.muted)
   end
 
   for row = 1, rows do
@@ -272,7 +275,7 @@ local function draw_lattice_preview()
       local shade = 0.08 + v * 0.13
       ImGui.DrawList_AddRectFilled(draw_list, cx1, cy1, cx1 + cell - 1, cy1 + cell - 1,
         color(shade, shade + 0.012, shade + 0.014, 1))
-      ImGui.DrawList_AddRect(draw_list, cx1, cy1, cx1 + cell, cy1 + cell, COLORS.grid)
+      ImGui.DrawList_AddRect(draw_list, cx1, cy1, cx1 + cell, cy1 + cell, STYLE.grid)
     end
   end
 
@@ -282,9 +285,9 @@ local function draw_lattice_preview()
   for index = 1, steps do
     local px = gx + (col - 0.5) * cell
     local py = gy + (row - 0.5) * cell
-    if last_x then ImGui.DrawList_AddLine(draw_list, last_x, last_y, px, py, COLORS.line, 1.2) end
+    if last_x then ImGui.DrawList_AddLine(draw_list, last_x, last_y, px, py, STYLE.line, 1.2) end
     local active = index / steps <= pos
-    ImGui.DrawList_AddCircleFilled(draw_list, px, py, active and 4.4 or 2.5, active and COLORS.hit or COLORS.dim)
+    ImGui.DrawList_AddCircleFilled(draw_list, px, py, active and 4.4 or 2.5, active and STYLE.hit or STYLE.dim)
     local jitter = (hash01(seed * 19 + index * 7) - 0.5) * mutation
     row, col = path_step(template, row + jitter, col - jitter, in_row, in_col, out_row, out_col, rows, cols, index)
     last_x, last_y = px, py
@@ -294,17 +297,17 @@ local function draw_lattice_preview()
   local iy = gy + (in_row - 0.5) * cell
   local ox = gx + (out_col - 0.5) * cell
   local oy = gy + (out_row - 0.5) * cell
-  ImGui.DrawList_AddCircle(draw_list, ix, iy, 9, COLORS.ingress, 16, 2)
-  ImGui.DrawList_AddCircle(draw_list, ox, oy, 9, COLORS.egress, 16, 2)
+  ImGui.DrawList_AddCircle(draw_list, ix, iy, 9, STYLE.ingress, 16, 2)
+  ImGui.DrawList_AddCircle(draw_list, ox, oy, 9, STYLE.egress, 16, 2)
 
   local sx = gx + grid_w + 44
-  ImGui.DrawList_AddText(draw_list, sx, y + 42, COLORS.dim, TEMPLATES[template])
-  ImGui.DrawList_AddText(draw_list, sx, y + 66, COLORS.dim, "layers " .. tostring(layers))
-  ImGui.DrawList_AddText(draw_list, sx, y + 90, COLORS.dim, "in " .. in_row .. "," .. in_col)
-  ImGui.DrawList_AddText(draw_list, sx, y + 114, COLORS.dim, "out " .. out_row .. "," .. out_col)
-  ImGui.DrawList_AddText(draw_list, sx, y + 148, COLORS.text, "MIDI notes excite the table")
-  ImGui.DrawList_AddText(draw_list, sx, y + 170, COLORS.dim, "channel = source focus")
-  ImGui.DrawList_AddText(draw_list, sx, y + 192, COLORS.dim, "velocity = excitation")
+  ImGui.DrawList_AddText(draw_list, sx, y + 42, STYLE.dim, TEMPLATES[template])
+  ImGui.DrawList_AddText(draw_list, sx, y + 66, STYLE.dim, "layers " .. tostring(layers))
+  ImGui.DrawList_AddText(draw_list, sx, y + 90, STYLE.dim, "in " .. in_row .. "," .. in_col)
+  ImGui.DrawList_AddText(draw_list, sx, y + 114, STYLE.dim, "out " .. out_row .. "," .. out_col)
+  ImGui.DrawList_AddText(draw_list, sx, y + 148, STYLE.text, "MIDI notes excite the table")
+  ImGui.DrawList_AddText(draw_list, sx, y + 170, STYLE.dim, "channel = source focus")
+  ImGui.DrawList_AddText(draw_list, sx, y + 192, STYLE.dim, "velocity = excitation")
   ImGui.SetCursorScreenPos(ctx, x, y + h + 10)
 end
 
@@ -312,12 +315,11 @@ local function section(label, height)
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + height, COLORS.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + height, COLORS.edge)
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + height, STYLE.panel)
+  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + height, STYLE.edge)
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + 2, THEME.active)
   ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
-  ImGui.PushStyleColor(ctx, ImGui.Col_Text, COLORS.text)
-  ImGui.Text(ctx, label)
-  ImGui.PopStyleColor(ctx)
+  theme.text(ImGui, ctx, label)
   ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
   return x, y, w, height
 end
@@ -335,7 +337,7 @@ local function loop()
     if track and (fx < 0 or find_fx(track) ~= fx) then fx = load_fx(track) end
 
     if not track or fx < 0 then
-      ImGui.TextColored(ctx, color(1, 0.45, 0.35, 1), status ~= "" and status or "Select a track and rescan JSFX if the engine is missing.")
+      theme.status(ImGui, ctx, status ~= "" and status or "Select a track and rescan JSFX if the engine is missing.", "warn")
     else
       draw_lattice_preview()
 

@@ -30,18 +30,22 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 local EXT = "s3g_mc_ambisonic_kernel_collage_v1"
-local COLOR_BG = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0)
-local COLOR_PANEL = ImGui.ColorConvertDouble4ToU32(0.060, 0.066, 0.070, 1.0)
-local COLOR_EDGE = ImGui.ColorConvertDouble4ToU32(0.34, 0.38, 0.38, 1.0)
-local COLOR_TEXT = ImGui.ColorConvertDouble4ToU32(0.78, 0.83, 0.82, 1.0)
-local COLOR_MUTED = ImGui.ColorConvertDouble4ToU32(0.48, 0.54, 0.54, 1.0)
-local COLOR_FLOW = ImGui.ColorConvertDouble4ToU32(0.95, 0.68, 0.25, 0.95)
-local COLOR_WET = ImGui.ColorConvertDouble4ToU32(0.25, 0.68, 0.90, 0.92)
-local COLOR_WARN = ImGui.ColorConvertDouble4ToU32(1.0, 0.70, 0.25, 1.0)
-local COLOR_ERROR = ImGui.ColorConvertDouble4ToU32(1.0, 0.35, 0.22, 1.0)
+local STYLE = {
+  bg = THEME.bg,
+  panel = THEME.panel,
+  edge = THEME.edge,
+  text = THEME.text,
+  muted = THEME.value,
+  flow = THEME.amber,
+  wet = ImGui.ColorConvertDouble4ToU32(0.42, 0.62, 0.58, 0.92),
+  warn = THEME.warn,
+  error = THEME.danger,
+}
 
 local ORDER_NAMES = { "1OA / 4ch", "2OA / 9ch", "3OA / 16ch" }
 local ORDER_VALUES = { 1, 2, 3 }
@@ -165,33 +169,33 @@ local function draw_flow(ctx, settings, kernel_count)
   local x0, y0 = ImGui.GetItemRectMin(ctx)
   local x1, y1 = x0 + width, y0 + height
   local draw_list = ImGui.GetWindowDrawList(ctx)
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, COLOR_BG)
-  ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, COLOR_EDGE)
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, COLOR_TEXT, "ambisonic recording-as-kernel collage")
+  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, STYLE.bg)
+  ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, STYLE.edge)
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, STYLE.text, "ambisonic recording-as-kernel collage")
 
   local margin, gap = 14, 14
   local box_w = (width - margin * 2 - gap * 3) / 4
   local by = y0 + 40
   local box_h = 64
   local function box(x, title, detail, color)
-    ImGui.DrawList_AddRectFilled(draw_list, x, by, x + box_w, by + box_h, COLOR_PANEL)
-    ImGui.DrawList_AddRect(draw_list, x, by, x + box_w, by + box_h, color or COLOR_EDGE)
-    ImGui.DrawList_AddText(draw_list, x + 8, by + 9, COLOR_TEXT, title)
-    ImGui.DrawList_AddText(draw_list, x + 8, by + 30, COLOR_MUTED, detail)
+    ImGui.DrawList_AddRectFilled(draw_list, x, by, x + box_w, by + box_h, STYLE.panel)
+    ImGui.DrawList_AddRect(draw_list, x, by, x + box_w, by + box_h, color or STYLE.edge)
+    ImGui.DrawList_AddText(draw_list, x + 8, by + 9, STYLE.text, title)
+    ImGui.DrawList_AddText(draw_list, x + 8, by + 30, STYLE.muted, detail)
   end
   local a = x0 + margin
   local b = a + box_w + gap
   local c = b + box_w + gap
   local d = c + box_w + gap
-  box(a, "ACN/SN3D source", ORDER_NAMES[settings.order_index] or "Ambisonic", COLOR_EDGE)
-  box(b, "direction feeds", tostring(direction_count_for(settings)) .. " virtual", COLOR_FLOW)
-  box(c, "kernel recordings", tostring(kernel_count) .. " ambisonic", COLOR_WET)
-  box(d, "summed output", ORDER_NAMES[settings.order_index] or "Ambisonic", COLOR_EDGE)
+  box(a, "ACN/SN3D source", ORDER_NAMES[settings.order_index] or "Ambisonic", STYLE.edge)
+  box(b, "direction feeds", tostring(direction_count_for(settings)) .. " virtual", STYLE.flow)
+  box(c, "kernel recordings", tostring(kernel_count) .. " ambisonic", STYLE.wet)
+  box(d, "summed output", ORDER_NAMES[settings.order_index] or "Ambisonic", STYLE.edge)
   local cy = by + box_h * 0.5
-  ImGui.DrawList_AddLine(draw_list, a + box_w + 3, cy, b - 5, cy, COLOR_FLOW, 2.0)
-  ImGui.DrawList_AddLine(draw_list, b + box_w + 3, cy, c - 5, cy, COLOR_FLOW, 2.0)
-  ImGui.DrawList_AddLine(draw_list, c + box_w + 3, cy, d - 5, cy, COLOR_FLOW, 2.0)
-  ImGui.DrawList_AddText(draw_list, a + 4, by + box_h + 10, COLOR_MUTED, "Kernels are recordings, so short windows and low wet gain are usually safer starting points.")
+  ImGui.DrawList_AddLine(draw_list, a + box_w + 3, cy, b - 5, cy, STYLE.flow, 2.0)
+  ImGui.DrawList_AddLine(draw_list, b + box_w + 3, cy, c - 5, cy, STYLE.flow, 2.0)
+  ImGui.DrawList_AddLine(draw_list, c + box_w + 3, cy, d - 5, cy, STYLE.flow, 2.0)
+  ImGui.DrawList_AddText(draw_list, a + 4, by + box_h + 10, STYLE.muted, "Kernels are recordings, so short windows and low wet gain are usually safer starting points.")
 end
 
 local function direction_layout_points(settings)
@@ -297,9 +301,9 @@ local function draw_direction_map(ctx, settings, kernel_count)
   local x0, y0 = ImGui.GetItemRectMin(ctx)
   local x1, y1 = x0 + width, y0 + height
   local draw_list = ImGui.GetWindowDrawList(ctx)
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, COLOR_BG)
-  ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, COLOR_EDGE)
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, COLOR_TEXT, "direction / kernel assignment")
+  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, STYLE.bg)
+  ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, STYLE.edge)
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, STYLE.text, "direction / kernel assignment")
 
   local cx = x0 + math.min(210, width * 0.34)
   local cy = y0 + 118
@@ -334,36 +338,36 @@ local function draw_direction_map(ctx, settings, kernel_count)
       local color = line_color
       ImGui.DrawList_AddLine(draw_list, projected[edge[1]].x, projected[edge[1]].y, projected[edge[2]].x, projected[edge[2]].y, color, 1.2)
     end
-    ImGui.DrawList_AddText(draw_list, cx - 44, y0 + 38, COLOR_MUTED, "8-dir map")
-    ImGui.DrawList_AddText(draw_list, cx - 16, cy - scale * 0.82, COLOR_MUTED, "up +")
-    ImGui.DrawList_AddText(draw_list, cx - 24, cy + scale * 0.72, COLOR_MUTED, "down -")
-    ImGui.DrawList_AddText(draw_list, cx - scale * 0.68, cy - scale * 0.42 - 6, COLOR_MUTED, "L")
-    ImGui.DrawList_AddText(draw_list, cx + scale * 0.56, cy - scale * 0.42 - 6, COLOR_MUTED, "R")
-    ImGui.DrawList_AddText(draw_list, cx - scale * 0.68, cy + scale * 0.42 - 6, COLOR_MUTED, "L")
-    ImGui.DrawList_AddText(draw_list, cx + scale * 0.56, cy + scale * 0.42 - 6, COLOR_MUTED, "R")
+    ImGui.DrawList_AddText(draw_list, cx - 44, y0 + 38, STYLE.muted, "8-dir map")
+    ImGui.DrawList_AddText(draw_list, cx - 16, cy - scale * 0.82, STYLE.muted, "up +")
+    ImGui.DrawList_AddText(draw_list, cx - 24, cy + scale * 0.72, STYLE.muted, "down -")
+    ImGui.DrawList_AddText(draw_list, cx - scale * 0.68, cy - scale * 0.42 - 6, STYLE.muted, "L")
+    ImGui.DrawList_AddText(draw_list, cx + scale * 0.56, cy - scale * 0.42 - 6, STYLE.muted, "R")
+    ImGui.DrawList_AddText(draw_list, cx - scale * 0.68, cy + scale * 0.42 - 6, STYLE.muted, "L")
+    ImGui.DrawList_AddText(draw_list, cx + scale * 0.56, cy + scale * 0.42 - 6, STYLE.muted, "R")
   elseif #points == 6 then
     ImGui.DrawList_AddLine(draw_list, projected[4].x, projected[4].y, projected[2].x, projected[2].y, line_color, 1.2)
     ImGui.DrawList_AddLine(draw_list, projected[1].x, projected[1].y, projected[3].x, projected[3].y, line_color, 1.2)
     ImGui.DrawList_AddLine(draw_list, projected[5].x, projected[5].y, projected[6].x, projected[6].y, far_line_color, 1.0)
-    ImGui.DrawList_AddText(draw_list, cx - 50, y0 + 38, COLOR_MUTED, "6-dir map")
-    ImGui.DrawList_AddText(draw_list, projected[1].x - 16, projected[1].y - 18, COLOR_MUTED, "front")
-    ImGui.DrawList_AddText(draw_list, projected[3].x - 12, projected[3].y + 9, COLOR_MUTED, "rear")
-    ImGui.DrawList_AddText(draw_list, projected[4].x - 18, projected[4].y - 7, COLOR_MUTED, "L")
-    ImGui.DrawList_AddText(draw_list, projected[2].x + 10, projected[2].y - 7, COLOR_MUTED, "R")
-    ImGui.DrawList_AddText(draw_list, projected[5].x - 20, projected[5].y - 18, COLOR_MUTED, "up +")
-    ImGui.DrawList_AddText(draw_list, projected[6].x - 14, projected[6].y + 9, COLOR_MUTED, "down -")
+    ImGui.DrawList_AddText(draw_list, cx - 50, y0 + 38, STYLE.muted, "6-dir map")
+    ImGui.DrawList_AddText(draw_list, projected[1].x - 16, projected[1].y - 18, STYLE.muted, "front")
+    ImGui.DrawList_AddText(draw_list, projected[3].x - 12, projected[3].y + 9, STYLE.muted, "rear")
+    ImGui.DrawList_AddText(draw_list, projected[4].x - 18, projected[4].y - 7, STYLE.muted, "L")
+    ImGui.DrawList_AddText(draw_list, projected[2].x + 10, projected[2].y - 7, STYLE.muted, "R")
+    ImGui.DrawList_AddText(draw_list, projected[5].x - 20, projected[5].y - 18, STYLE.muted, "up +")
+    ImGui.DrawList_AddText(draw_list, projected[6].x - 14, projected[6].y + 9, STYLE.muted, "down -")
   else
     ImGui.DrawList_AddCircleFilled(draw_list, cx, cy, 4.5, axis_color, 12)
-    ImGui.DrawList_AddText(draw_list, cx - 14, cy - scale * 0.82, COLOR_MUTED, "front")
-    ImGui.DrawList_AddText(draw_list, cx - 10, cy + scale * 0.72, COLOR_MUTED, "rear")
-    ImGui.DrawList_AddText(draw_list, cx - scale * 0.92, cy - 7, COLOR_MUTED, "L")
-    ImGui.DrawList_AddText(draw_list, cx + scale * 0.84, cy - 7, COLOR_MUTED, "R")
+    ImGui.DrawList_AddText(draw_list, cx - 14, cy - scale * 0.82, STYLE.muted, "front")
+    ImGui.DrawList_AddText(draw_list, cx - 10, cy + scale * 0.72, STYLE.muted, "rear")
+    ImGui.DrawList_AddText(draw_list, cx - scale * 0.92, cy - 7, STYLE.muted, "L")
+    ImGui.DrawList_AddText(draw_list, cx + scale * 0.84, cy - 7, STYLE.muted, "R")
     for index, p in ipairs(projected) do
       ImGui.DrawList_AddLine(draw_list, cx, cy, p.x, p.y, line_color, 1.0)
       local marker = (index == 1 or index == 4) and "+" or "-"
-      ImGui.DrawList_AddText(draw_list, p.x + 14, p.y - 7, COLOR_MUTED, marker)
+      ImGui.DrawList_AddText(draw_list, p.x + 14, p.y - 7, STYLE.muted, marker)
     end
-    ImGui.DrawList_AddText(draw_list, cx - 76, y0 + 38, COLOR_MUTED, "tetra 1OA map")
+    ImGui.DrawList_AddText(draw_list, cx - 76, y0 + 38, STYLE.muted, "tetra 1OA map")
   end
 
   local draw_points = {}
@@ -373,15 +377,15 @@ local function draw_direction_map(ctx, settings, kernel_count)
   table.sort(draw_points, function(a, b) return a.depth < b.depth end)
   for _, point in ipairs(draw_points) do
     local radius = 12
-    ImGui.DrawList_AddCircleFilled(draw_list, point.x, point.y, radius, COLOR_WET, 16)
-    ImGui.DrawList_AddText(draw_list, point.x - 4, point.y - 7, COLOR_BG, tostring(point.index))
+    ImGui.DrawList_AddCircleFilled(draw_list, point.x, point.y, radius, STYLE.wet, 16)
+    ImGui.DrawList_AddText(draw_list, point.x - 4, point.y - 7, STYLE.bg, tostring(point.index))
   end
 
-  ImGui.DrawList_AddText(draw_list, label_x, label_y - 20, COLOR_MUTED, "direction -> kernel source")
+  ImGui.DrawList_AddText(draw_list, label_x, label_y - 20, STYLE.muted, "direction -> kernel source")
   for index, point in ipairs(points) do
     local label = kernel_assignment_label(settings, index, kernel_count)
     local text = string.format("%02d  %-14s  %s  az %.0f  el %.0f", index, label, direction_name(point), point.az, point.el)
-    ImGui.DrawList_AddText(draw_list, label_x, label_y + (index - 1) * 18, COLOR_TEXT, text)
+    ImGui.DrawList_AddText(draw_list, label_x, label_y + (index - 1) * 18, STYLE.text, text)
   end
 end
 
@@ -523,13 +527,13 @@ local function main()
       if settings.layer_index == 2 and settings.order_index > 1 then
         ImGui.Text(ctx, "Uses four tetrahedral first-order microphone directions as a sparse higher-order layer.")
       elseif settings.layer_index == 3 and settings.order_index == 1 then
-        ImGui.TextColored(ctx, COLOR_WARN, "1OA practical mode uses a 6-direction axial layer; spatial resolution remains first-order.")
+        theme.status(ImGui, ctx, "1OA practical mode uses a 6-direction axial layer; spatial resolution remains first-order.", "amber")
       elseif settings.layer_index == 3 then
         ImGui.Text(ctx, "Uses eight cube-corner directions for 2OA/3OA.")
       end
       settings.assignment_index = combo(ctx, "Kernel assignment", settings.assignment_index, ASSIGNMENT_NAMES)
       if settings.assignment_index == 3 then
-        ImGui.TextColored(ctx, COLOR_WARN, "Dense mode can get large quickly: directions x kernels x channels.")
+        theme.status(ImGui, ctx, "Dense mode can get large quickly: directions x kernels x channels.", "amber")
       elseif settings.assignment_index == 4 then
         ImGui.Text(ctx, "Extra kernels are ignored; missing direction kernels are silent.")
       elseif settings.assignment_index == 5 then
@@ -569,7 +573,7 @@ local function main()
         ImGui.Text(ctx, "Required channels per item: " .. tostring(order_channels(settings.order_index)))
       end
       if validation then
-        ImGui.TextColored(ctx, COLOR_ERROR, validation)
+        theme.status(ImGui, ctx, validation, "danger")
       else
         ImGui.Text(ctx, "Renders offline from WAV media with NumPy.")
       end

@@ -23,6 +23,8 @@ do
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
 
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local PROJECT = 0
 local FX_NAME = "s3g Transaural Crosstalk Canceller"
@@ -138,18 +140,17 @@ local load_error = ""
 local param_warning = ""
 local param_ready = true
 
-local COLORS = {
-  bg = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1),
-  panel = ImGui.ColorConvertDouble4ToU32(0.060, 0.066, 0.070, 1),
-  edge = ImGui.ColorConvertDouble4ToU32(0.30, 0.33, 0.34, 1),
-  text = ImGui.ColorConvertDouble4ToU32(0.78, 0.82, 0.84, 1),
-  muted = ImGui.ColorConvertDouble4ToU32(0.48, 0.52, 0.54, 1),
-  active = ImGui.ColorConvertDouble4ToU32(0.16, 0.63, 0.38, 1),
-  button = ImGui.ColorConvertDouble4ToU32(0.12, 0.13, 0.14, 1),
-  speaker = ImGui.ColorConvertDouble4ToU32(0.42, 0.74, 0.96, 1),
-  cancel = ImGui.ColorConvertDouble4ToU32(0.95, 0.58, 0.38, 1),
-  direct = ImGui.ColorConvertDouble4ToU32(0.46, 0.86, 0.56, 1),
-  meter = ImGui.ColorConvertDouble4ToU32(0.46, 0.86, 0.56, 1),
+local STYLE = {
+  bg = THEME.bg,
+  panel = THEME.panel,
+  edge = THEME.edge,
+  text = THEME.text,
+  muted = THEME.value,
+  speaker = THEME.fill,
+  cancel = THEME.warn,
+  direct = THEME.ok,
+  meter = THEME.ok,
+  fill = THEME.fill,
 }
 
 local function color(r, g, b, a)
@@ -258,14 +259,13 @@ local function option_buttons(track, fx, title, param, labels, columns)
   local norm = fx >= 0 and reaper.TrackFX_GetParamNormalized(track, fx, param) or 0
   local current = math.floor(norm * (#labels - 1) + 0.5) + 1
   columns = columns or #labels
-  ImGui.TextColored(ctx, COLORS.muted, title)
+  theme.muted(ImGui, ctx, title)
   for index, label in ipairs(labels) do
     if index > 1 and ((index - 1) % columns) ~= 0 then ImGui.SameLine(ctx) end
-    ImGui.PushStyleColor(ctx, ImGui.Col_Button, current == index and COLORS.active or COLORS.button)
-    if ImGui.Button(ctx, label .. "##" .. title .. tostring(index)) then
+    local shown = current == index and ("> " .. label) or label
+    if ImGui.Button(ctx, shown .. "##" .. title .. tostring(index)) then
       reaper.TrackFX_SetParamNormalized(track, fx, param, (index - 1) / math.max(1, #labels - 1))
     end
-    ImGui.PopStyleColor(ctx)
   end
 end
 
@@ -285,7 +285,7 @@ local function apply_preset(track, fx, preset)
 end
 
 local function draw_presets(track, fx)
-  ImGui.TextColored(ctx, COLORS.muted, "Presets")
+  theme.muted(ImGui, ctx, "Presets")
   for index, preset in ipairs(PRESETS) do
     if index > 1 and index ~= 4 then ImGui.SameLine(ctx) end
     if ImGui.Button(ctx, preset.name .. "##preset" .. index) then
@@ -302,16 +302,16 @@ end
 
 local function draw_meter(track, x, y, w, h)
   local dl = ImGui.GetWindowDrawList(ctx)
-  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + h, COLORS.panel)
-  ImGui.DrawList_AddRect(dl, x, y, x + w, y + h, COLORS.edge)
-  ImGui.DrawList_AddText(dl, x + 12, y + 10, COLORS.text, "Output")
+  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + h, STYLE.panel)
+  ImGui.DrawList_AddRect(dl, x, y, x + w, y + h, STYLE.edge)
+  ImGui.DrawList_AddText(dl, x + 12, y + 10, STYLE.text, "Output")
   for ch = 0, 1 do
     local mx = x + 80 + ch * 40
     local norm = peak_to_norm(reaper.Track_GetPeakInfo(track, ch) or 0)
-    ImGui.DrawList_AddRectFilled(dl, mx, y + 16, mx + 24, y + h - 18, COLORS.bg)
-    ImGui.DrawList_AddRectFilled(dl, mx, y + 16 + (h - 34) * (1 - norm), mx + 24, y + h - 18, COLORS.meter)
-    ImGui.DrawList_AddRect(dl, mx, y + 16, mx + 24, y + h - 18, COLORS.edge)
-    ImGui.DrawList_AddText(dl, mx + 7, y + h - 16, COLORS.muted, ch == 0 and "L" or "R")
+    ImGui.DrawList_AddRectFilled(dl, mx, y + 16, mx + 24, y + h - 18, STYLE.bg)
+    ImGui.DrawList_AddRectFilled(dl, mx, y + 16 + (h - 34) * (1 - norm), mx + 24, y + h - 18, STYLE.meter)
+    ImGui.DrawList_AddRect(dl, mx, y + 16, mx + 24, y + h - 18, STYLE.edge)
+    ImGui.DrawList_AddText(dl, mx + 7, y + h - 16, STYLE.muted, ch == 0 and "L" or "R")
   end
 end
 
@@ -324,9 +324,9 @@ local function draw_visual(track, fx)
   local cx, cy = x0 + width * 0.43, y0 + height * 0.58
   local r = math.min(width, height) * 0.30
   local dl = ImGui.GetWindowDrawList(ctx)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, COLORS.bg)
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 14, COLORS.text, "Transaural Crosstalk Canceller")
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 34, COLORS.muted, "speaker playback / opposite-channel cancellation")
+  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, STYLE.bg)
+  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 14, STYLE.text, "Transaural Crosstalk Canceller")
+  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 34, STYLE.muted, "speaker playback / opposite-channel cancellation")
 
   local amount = get_param(track, fx, PARAM.amount, 100) / 100
   local mode = math.floor(get_param(track, fx, PARAM.mode, 1) + 0.5)
@@ -348,15 +348,15 @@ local function draw_visual(track, fx)
   local spk_r = { x = cx + math.sin(angle) * spk_dist, y = cy - math.cos(angle) * spk_dist }
 
   ImGui.DrawList_AddCircle(dl, cx, cy, head_w * 0.52, color(0.65, 0.68, 0.70, 0.45), 48, 2)
-  ImGui.DrawList_AddLine(dl, ear_l.x, ear_l.y + 18, ear_r.x, ear_r.y + 18, COLORS.edge, 1.5)
-  ImGui.DrawList_AddLine(dl, ear_l.x, ear_l.y + 13, ear_l.x, ear_l.y + 23, COLORS.edge, 1.5)
-  ImGui.DrawList_AddLine(dl, ear_r.x, ear_r.y + 13, ear_r.x, ear_r.y + 23, COLORS.edge, 1.5)
-  ImGui.DrawList_AddCircleFilled(dl, ear_l.x, ear_l.y, 7, COLORS.direct, 18)
-  ImGui.DrawList_AddCircleFilled(dl, ear_r.x, ear_r.y, 7, COLORS.direct, 18)
-  ImGui.DrawList_AddRectFilled(dl, spk_l.x - 13, spk_l.y - 13, spk_l.x + 13, spk_l.y + 13, COLORS.speaker)
-  ImGui.DrawList_AddRectFilled(dl, spk_r.x - 13, spk_r.y - 13, spk_r.x + 13, spk_r.y + 13, COLORS.speaker)
-  ImGui.DrawList_AddText(dl, spk_l.x - 5, spk_l.y - 32, COLORS.text, "L")
-  ImGui.DrawList_AddText(dl, spk_r.x - 5, spk_r.y - 32, COLORS.text, "R")
+  ImGui.DrawList_AddLine(dl, ear_l.x, ear_l.y + 18, ear_r.x, ear_r.y + 18, STYLE.edge, 1.5)
+  ImGui.DrawList_AddLine(dl, ear_l.x, ear_l.y + 13, ear_l.x, ear_l.y + 23, STYLE.edge, 1.5)
+  ImGui.DrawList_AddLine(dl, ear_r.x, ear_r.y + 13, ear_r.x, ear_r.y + 23, STYLE.edge, 1.5)
+  ImGui.DrawList_AddCircleFilled(dl, ear_l.x, ear_l.y, 7, STYLE.direct, 18)
+  ImGui.DrawList_AddCircleFilled(dl, ear_r.x, ear_r.y, 7, STYLE.direct, 18)
+  ImGui.DrawList_AddRectFilled(dl, spk_l.x - 13, spk_l.y - 13, spk_l.x + 13, spk_l.y + 13, STYLE.speaker)
+  ImGui.DrawList_AddRectFilled(dl, spk_r.x - 13, spk_r.y - 13, spk_r.x + 13, spk_r.y + 13, STYLE.speaker)
+  ImGui.DrawList_AddText(dl, spk_l.x - 5, spk_l.y - 32, STYLE.text, "L")
+  ImGui.DrawList_AddText(dl, spk_r.x - 5, spk_r.y - 32, STYLE.text, "R")
 
   local cancel_alpha = 0.18 + 0.60 * clamp(amount / 1.4, 0, 1)
   local cancel_thick = 1.0 + 3.0 * clamp(amount / 1.4, 0, 1)
@@ -365,27 +365,27 @@ local function draw_visual(track, fx)
   ImGui.DrawList_AddLine(dl, spk_l.x, spk_l.y, ear_r.x, ear_r.y, color(0.95, 0.58, 0.38, cancel_alpha), cancel_thick)
   ImGui.DrawList_AddLine(dl, spk_r.x, spk_r.y, ear_l.x, ear_l.y, color(0.95, 0.58, 0.38, cancel_alpha), cancel_thick)
 
-  ImGui.DrawList_AddText(dl, x0 + 14, y1 - 58, COLORS.muted, string.format("%s / cancel %.0f%% / angle %.1f deg", MODES[mode + 1] or "Mode", amount * 100, math.deg(angle)))
-  ImGui.DrawList_AddText(dl, x0 + 14, y1 - 36, COLORS.muted, string.format("derived ITD %.3f ms", delay_ms))
-  ImGui.DrawList_AddText(dl, cx - 42, cy + 32, COLORS.muted, string.format("head %.1f cm", head_cm))
-  ImGui.DrawList_AddText(dl, x0 + width - 260, y0 + 14, COLORS.muted, "Best on loudspeakers")
-  ImGui.DrawList_AddText(dl, x0 + width - 260, y0 + 34, COLORS.muted, "Not a headphone binaural processor")
+  ImGui.DrawList_AddText(dl, x0 + 14, y1 - 58, STYLE.muted, string.format("%s / cancel %.0f%% / angle %.1f deg", MODES[mode + 1] or "Mode", amount * 100, math.deg(angle)))
+  ImGui.DrawList_AddText(dl, x0 + 14, y1 - 36, STYLE.muted, string.format("derived ITD %.3f ms", delay_ms))
+  ImGui.DrawList_AddText(dl, cx - 42, cy + 32, STYLE.muted, string.format("head %.1f cm", head_cm))
+  ImGui.DrawList_AddText(dl, x0 + width - 260, y0 + 14, STYLE.muted, "Best on loudspeakers")
+  ImGui.DrawList_AddText(dl, x0 + width - 260, y0 + 34, STYLE.muted, "Not a headphone binaural processor")
 
   local info_x = x0 + width - 260
   local info_y = y0 + 68
   local bar_w = 170
   local function info_bar(label, value, norm, bar_color)
-    ImGui.DrawList_AddText(dl, info_x, info_y, COLORS.muted, label)
-    ImGui.DrawList_AddText(dl, info_x + 92, info_y, COLORS.text, value)
-    ImGui.DrawList_AddRectFilled(dl, info_x, info_y + 18, info_x + bar_w, info_y + 23, COLORS.panel)
+    ImGui.DrawList_AddText(dl, info_x, info_y, STYLE.muted, label)
+    ImGui.DrawList_AddText(dl, info_x + 92, info_y, STYLE.text, value)
+    ImGui.DrawList_AddRectFilled(dl, info_x, info_y + 18, info_x + bar_w, info_y + 23, STYLE.panel)
     ImGui.DrawList_AddRectFilled(dl, info_x, info_y + 18, info_x + bar_w * clamp(norm, 0, 1), info_y + 23, bar_color)
-    ImGui.DrawList_AddRect(dl, info_x, info_y + 18, info_x + bar_w, info_y + 23, COLORS.edge)
+    ImGui.DrawList_AddRect(dl, info_x, info_y + 18, info_x + bar_w, info_y + 23, STYLE.edge)
     info_y = info_y + 38
   end
-  info_bar("HF rolloff", string.format("%.0f Hz", hf_hz), (hf_hz - 1000) / 15000, COLORS.cancel)
-  info_bar("Low protect", string.format("%.0f Hz", low_hz), (low_hz - 20) / 480, color(0.42, 0.74, 0.96, 1))
-  info_bar("Preserve", string.format("%.0f%%", preserve * 100), preserve, COLORS.direct)
-  info_bar("Output", string.format("%.1f dB", out_db), (out_db + 24) / 36, COLORS.meter)
+  info_bar("HF rolloff", string.format("%.0f Hz", hf_hz), (hf_hz - 1000) / 15000, STYLE.cancel)
+  info_bar("Low protect", string.format("%.0f Hz", low_hz), (low_hz - 20) / 480, STYLE.fill)
+  info_bar("Preserve", string.format("%.0f%%", preserve * 100), preserve, STYLE.direct)
+  info_bar("Output", string.format("%.1f dB", out_db), (out_db + 24) / 36, STYLE.meter)
 
   draw_meter(track, x0 + width - 205, y1 - 110, 190, 92)
 end
@@ -409,7 +409,7 @@ local function loop()
         ImGui.Text(ctx, load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " is not on the selected track."))
       else
         resolve_param_indices(track, fx)
-        if param_warning ~= "" then ImGui.TextColored(ctx, color(0.95, 0.70, 0.35, 1), param_warning) end
+        if param_warning ~= "" then theme.status(ImGui, ctx, param_warning, "amber") end
         if not param_ready then
           ImGui.Text(ctx, "Click Repair JSFX to replace the stale effect instance with the current version.")
         else
@@ -433,7 +433,7 @@ local function loop()
             option_buttons(track, fx, "Extra channel output", PARAM.extra, EXTRA, 2)
             slider_param(track, fx, "Output gain", PARAM.output, -24, 12, "%.1f dB")
           end
-          ImGui.TextColored(ctx, COLORS.muted, "Transaural processing is speaker/listener-position dependent; small geometry changes matter.")
+          theme.muted(ImGui, ctx, "Transaural processing is speaker/listener-position dependent; small geometry changes matter.")
         end
       end
     end

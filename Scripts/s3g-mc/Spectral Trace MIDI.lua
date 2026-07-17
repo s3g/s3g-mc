@@ -18,6 +18,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ui_theme = nil
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -26,7 +27,10 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme then
+    ui_theme = _s3g_theme
+    if _s3g_theme.install then _s3g_theme.install(ImGui) end
+  end
 end
 
 
@@ -34,6 +38,16 @@ local TITLE = "Spectral Trace MIDI"
 local ctx = ImGui.CreateContext(TITLE)
 local open = true
 local status = ""
+
+local function ui_slider_int(label, value, min_value, max_value)
+  if ui_theme and ui_theme.slider_int then return ui_theme.slider_int(ImGui, ctx, label, value, min_value, max_value) end
+  return ImGui.SliderInt(ctx, label, value, min_value, max_value)
+end
+
+local function ui_slider_double(label, value, min_value, max_value, format)
+  if ui_theme and ui_theme.slider_double then return ui_theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format) end
+  return ImGui.SliderDouble(ctx, label, value, min_value, max_value, format)
+end
 
 local ROOTS = midi.ROOT_NAMES
 local SCALES = midi.SCALE_NAMES
@@ -110,7 +124,7 @@ local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
+local CANVAS = {
   panel = color(0.055, 0.060, 0.064, 1),
   edge = color(0.30, 0.32, 0.33, 1),
   grid = color(0.48, 0.52, 0.51, 0.20),
@@ -121,10 +135,33 @@ local COLORS = {
   trace3 = color(0.72, 0.48, 1.00, 1),
 }
 
+local function muted_text(value)
+  if ui_theme and ui_theme.muted then
+    ui_theme.muted(ImGui, ctx, value)
+  else
+    ImGui.Text(ctx, value)
+  end
+end
+
 local function combo(label, labels, value, width)
+  if ui_theme and ui_theme.combo_row then return ui_theme.combo_row(ImGui, ctx, label, labels, value, width) end
   ImGui.SetNextItemWidth(ctx, width or 170)
-  local changed, next_value = ImGui.Combo(ctx, label, value - 1, table.concat(labels, "\0") .. "\0")
+  local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), value - 1, table.concat(labels, "\0") .. "\0")
   return changed, next_value + 1
+end
+
+local function ui_input_int(label, value, step, step_fast, width)
+  if ui_theme and ui_theme.input_int_row then return ui_theme.input_int_row(ImGui, ctx, label, value, step, step_fast, width) end
+  return ImGui.InputInt(ctx, "##input_" .. tostring(label or ""), value, step or 1, step_fast or 10)
+end
+
+local function push_soft_panel()
+  if ui_theme and ui_theme.push_soft_panel then return ui_theme.push_soft_panel(ImGui, ctx) end
+  return nil
+end
+
+local function pop_soft_panel(stack)
+  if ui_theme and ui_theme.pop_soft_panel then ui_theme.pop_soft_panel(ImGui, ctx, stack) end
 end
 
 local function parse_plan(path)
@@ -231,22 +268,22 @@ local function draw_preview()
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
   local h = 245
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, COLORS.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, COLORS.edge)
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, COLORS.dim, "SPECTRAL TRACE MIDI")
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, CANVAS.panel)
+  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, CANVAS.edge)
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, CANVAS.dim, "SPECTRAL TRACE MIDI")
   local source_label = entry and
     (entry.name .. "  /  " .. tostring(entry.channels) .. "ch  /  " .. string.format("%.2fs", entry.length or 0)) or
     "No source loaded. Select a WAV item and click Load Selected."
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 28, entry and COLORS.text or COLORS.dim, source_label)
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 28, entry and CANVAS.text or CANVAS.dim, source_label)
 
   local left, top, right, bottom = x + 18, y + 62, x + w - 18, y + h - 34
   for i = 0, 8 do
     local gy = top + (bottom - top) * i / 8
-    ImGui.DrawList_AddLine(draw_list, left, gy, right, gy, COLORS.grid, 1)
+    ImGui.DrawList_AddLine(draw_list, left, gy, right, gy, CANVAS.grid, 1)
   end
   for i = 0, 12 do
     local gx = left + (right - left) * i / 12
-    ImGui.DrawList_AddLine(draw_list, gx, top, gx, bottom, COLORS.grid, 1)
+    ImGui.DrawList_AddLine(draw_list, gx, top, gx, bottom, CANVAS.grid, 1)
   end
 
   local points = 96
@@ -258,7 +295,7 @@ local function draw_preview()
     contour = math.max(0.02, math.min(0.98, contour))
     local px = left + t * (right - left)
     local py = bottom - contour * (bottom - top)
-    if last_x then ImGui.DrawList_AddLine(draw_list, last_x, last_y, px, py, COLORS.trace, 1.4) end
+    if last_x then ImGui.DrawList_AddLine(draw_list, last_x, last_y, px, py, CANVAS.trace, 1.4) end
     last_x, last_y = px, py
   end
 
@@ -268,37 +305,37 @@ local function draw_preview()
     local p = (event.pitch - 24) / 72
     local px = left + math.max(0, math.min(1, t)) * (right - left)
     local py = bottom - math.max(0, math.min(1, p)) * (bottom - top)
-    local col = (event.channel % 3 == 0) and COLORS.trace2 or ((event.channel % 3 == 1) and COLORS.trace or COLORS.trace3)
+    local col = (event.channel % 3 == 0) and CANVAS.trace2 or ((event.channel % 3 == 1) and CANVAS.trace or CANVAS.trace3)
     ImGui.DrawList_AddCircleFilled(draw_list, px, py, 2.8, col)
   end
 
   local caption = string.format("%s / %s / %.1f events-sec / %d lanes",
     MODE_NAMES[state.mode], QUANT_NAMES[state.quantize], state.event_rate, state.lanes)
-  ImGui.DrawList_AddText(draw_list, x + 18, y + h - 23, COLORS.dim, caption)
+  ImGui.DrawList_AddText(draw_list, x + 18, y + h - 23, CANVAS.dim, caption)
   if entry and entry.channels > 16 then
-    ImGui.DrawList_AddText(draw_list, x + w - 210, y + h - 23, COLORS.dim, "first 16 source channels")
+    ImGui.DrawList_AddText(draw_list, x + w - 210, y + h - 23, CANVAS.dim, "first 16 source channels")
   end
   ImGui.SetCursorScreenPos(ctx, x, y + h + 12)
 end
 
 local function draw_footer()
-  ImGui.Separator(ctx)
-  if ImGui.Button(ctx, "Load Selected", 120, 28) then
+  ImGui.Dummy(ctx, 1, 6)
+  if ImGui.Button(ctx, "LOAD SELECTED", 120, 28) then
     if load_selected_source(true) then
       state.duration_beats = math.floor(selected_item_beats() + 0.5)
       last_events = {}
     end
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "New Seed", 100, 28) then state.seed = state.seed + 1 end
+  if ImGui.Button(ctx, "NEW SEED", 100, 28) then state.seed = state.seed + 1 end
   ImGui.SameLine(ctx)
   if not entry then ImGui.BeginDisabled(ctx) end
-  if ImGui.Button(ctx, "Generate MIDI", 140, 28) then generate() end
+  if ImGui.Button(ctx, "GENERATE MIDI", 140, 28) then generate() end
   if not entry then ImGui.EndDisabled(ctx) end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Close", 92, 28) then open = false end
+  if ImGui.Button(ctx, "CLOSE", 92, 28) then open = false end
   ImGui.SameLine(ctx)
-  ImGui.TextColored(ctx, COLORS.dim, status)
+  muted_text(status)
 end
 
 local function loop()
@@ -306,38 +343,42 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    draw_preview()
-    _, state.mode = combo("Trace mode", MODE_NAMES, state.mode, 170)
-    ImGui.SameLine(ctx)
-    _, state.quantize = combo("Pitch mapping", QUANT_NAMES, state.quantize, 150)
-    ImGui.SameLine(ctx)
-    _, state.channel_mode = combo("MIDI channel mode", CHANNEL_NAMES, state.channel_mode, 170)
+    local footer_height = 0
+    local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+    local content_height = math.max(220, avail_h - footer_height)
+    local main_panel_style = push_soft_panel()
+    local child_visible = ImGui.BeginChild(ctx, "##main_content", 0, content_height)
+    if child_visible then
+      draw_preview()
+      _, state.mode = combo("TRACE", MODE_NAMES, state.mode, 170)
+      _, state.quantize = combo("PITCH MAP", QUANT_NAMES, state.quantize, 150)
+      _, state.channel_mode = combo("MIDI MODE", CHANNEL_NAMES, state.channel_mode, 170)
 
-    _, state.fft = combo("FFT size", FFT_NAMES, state.fft, 120)
-    ImGui.SameLine(ctx)
-    _, state.event_rate = ImGui.SliderDouble(ctx, "Events per second", state.event_rate, 0.5, 24.0, "%.1f")
-    _, state.partials = ImGui.SliderInt(ctx, "Partials per event", state.partials, 1, 12)
-    _, state.density = ImGui.SliderDouble(ctx, "Density", state.density, 0.0, 1.0, "%.3f")
-    _, state.floor_db = ImGui.SliderDouble(ctx, "Spectral floor dB", state.floor_db, -90.0, -12.0, "%.1f")
-    _, state.min_hz = ImGui.SliderDouble(ctx, "Minimum Hz", state.min_hz, 20.0, 2000.0, "%.1f")
-    _, state.max_hz = ImGui.SliderDouble(ctx, "Maximum Hz", state.max_hz, math.max(state.min_hz + 20.0, 100.0), 12000.0, "%.1f")
-    _, state.pitch_smooth = ImGui.SliderDouble(ctx, "Pitch smoothing", state.pitch_smooth, 0.0, 0.95, "%.3f")
+      _, state.fft = combo("FFT", FFT_NAMES, state.fft, 120)
+      _, state.event_rate = ui_slider_double("EVENT RATE", state.event_rate, 0.5, 24.0, "%.1f")
+      _, state.partials = ui_slider_int("PARTIALS", state.partials, 1, 12)
+      _, state.density = ui_slider_double("DENS", state.density, 0.0, 1.0, "%.3f")
+      _, state.floor_db = ui_slider_double("FLOOR DB", state.floor_db, -90.0, -12.0, "%.1f")
+      _, state.min_hz = ui_slider_double("MIN HZ", state.min_hz, 20.0, 2000.0, "%.1f")
+      _, state.max_hz = ui_slider_double("MAX HZ", state.max_hz, math.max(state.min_hz + 20.0, 100.0), 12000.0, "%.1f")
+      _, state.pitch_smooth = ui_slider_double("SMOOTH", state.pitch_smooth, 0.0, 0.95, "%.3f")
 
-    ImGui.Separator(ctx)
-    _, state.root = combo("Root", ROOTS, state.root, 90)
-    ImGui.SameLine(ctx)
-    _, state.scale = combo("Scale", SCALES, state.scale, 190)
-    _, state.lanes = ImGui.SliderInt(ctx, "MIDI channels / lanes", state.lanes, 1, 16)
-    _, state.min_note = ImGui.SliderDouble(ctx, "Minimum note beats", state.min_note, 0.03125, 2.0, "%.3f")
-    _, state.max_note = ImGui.SliderDouble(ctx, "Maximum note beats", state.max_note, state.min_note, 8.0, "%.3f")
-    _, state.velocity_floor = ImGui.SliderInt(ctx, "Velocity floor", state.velocity_floor, 1, 127)
-    _, state.velocity_scale = ImGui.SliderInt(ctx, "Velocity range", state.velocity_scale, 1, 127)
-    _, state.follow_item_length = ImGui.Checkbox(ctx, "Follow selected item length", state.follow_item_length)
-    if not state.follow_item_length then
-      _, state.duration_beats = ImGui.SliderInt(ctx, "Duration beats", state.duration_beats, 1, 2048)
+      _, state.root = combo("ROOT", ROOTS, state.root, 90)
+      _, state.scale = combo("SCALE", SCALES, state.scale, 190)
+      _, state.lanes = ui_slider_int("MIDI LANES", state.lanes, 1, 16)
+      _, state.min_note = ui_slider_double("MIN BEATS", state.min_note, 0.03125, 2.0, "%.3f")
+      _, state.max_note = ui_slider_double("MAX BEATS", state.max_note, state.min_note, 8.0, "%.3f")
+      _, state.velocity_floor = ui_slider_int("VFLOOR", state.velocity_floor, 1, 127)
+      _, state.velocity_scale = ui_slider_int("VRNG", state.velocity_scale, 1, 127)
+      _, state.follow_item_length = ImGui.Checkbox(ctx, "FOLLOW SELECTED ITEM LENGTH", state.follow_item_length)
+      if not state.follow_item_length then
+        _, state.duration_beats = ui_slider_int("BEATS", state.duration_beats, 1, 2048)
+      end
+      _, state.seed = ui_input_int("SEED", state.seed, 1, 10, 110)
+      draw_footer()
     end
-    _, state.seed = ImGui.InputInt(ctx, "Seed", state.seed)
-    draw_footer()
+    ImGui.EndChild(ctx)
+    pop_soft_panel(main_panel_style)
   end
   ImGui.End(ctx)
   if open then reaper.defer(loop) end

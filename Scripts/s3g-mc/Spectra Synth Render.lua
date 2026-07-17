@@ -27,7 +27,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
-
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local FX_NAME = "s3g MC Spectra Synth Engine"
 local FX_NAME_CLEAN = "Spectra Synth Engine"
@@ -87,22 +88,22 @@ local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
-  bg = color(0.035, 0.040, 0.043, 1),
-  panel = color(0.060, 0.066, 0.070, 1),
-  panel_soft = color(0.075, 0.078, 0.074, 1),
-  grid = color(0.50, 0.56, 0.56, 0.18),
-  grid_soft = color(0.50, 0.56, 0.56, 0.09),
-  text = color(0.84, 0.88, 0.86, 1),
-  muted = color(0.56, 0.62, 0.60, 1),
-  route = color(0.90, 0.72, 0.32, 1),
-  route_fill = color(0.90, 0.72, 0.32, 0.16),
-  route_alt = color(0.28, 0.78, 0.70, 1),
-  point = color(0.94, 0.88, 0.64, 1),
-  point_selected = color(1.00, 0.96, 0.42, 1),
-  contour = color(0.26, 0.62, 0.58, 0.22),
-  contour_hot = color(0.92, 0.60, 0.28, 0.55),
-  edge = color(0.55, 0.60, 0.58, 0.34),
+local STYLE = {
+  bg = THEME.bg,
+  panel = THEME.panel,
+  panel_soft = THEME.frame,
+  grid = THEME.grid,
+  grid_soft = color(0.50, 0.54, 0.54, 0.09),
+  text = THEME.text,
+  muted = THEME.value,
+  route = THEME.amber,
+  route_fill = color(0.78, 0.62, 0.32, 0.16),
+  route_alt = color(0.42, 0.62, 0.58, 1),
+  point = color(0.72, 0.70, 0.58, 1),
+  point_selected = THEME.amber_hi,
+  contour = color(0.34, 0.52, 0.50, 0.22),
+  contour_hot = color(0.74, 0.52, 0.36, 0.55),
+  edge = THEME.edge,
 }
 
 local function clamp(value, lo, hi)
@@ -689,8 +690,8 @@ local function draw_spectra_map(ctx, route_points, route_enabled, selected_route
   local active = ImGui.IsItemActive(ctx)
   local mx, my = ImGui.GetMousePos(ctx)
 
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, COLORS.bg)
-  ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, COLORS.edge)
+  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, STYLE.bg)
+  ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, STYLE.edge)
 
   local pad = 14
   local px0, py0 = x0 + pad, y0 + 28
@@ -702,11 +703,11 @@ local function draw_spectra_map(ctx, route_points, route_enabled, selected_route
 
   for grid = 0, 8 do
     local gx = px0 + (px1 - px0) * grid / 8
-    ImGui.DrawList_AddLine(draw_list, gx, py0, gx, py1, COLORS.grid_soft, 1)
+    ImGui.DrawList_AddLine(draw_list, gx, py0, gx, py1, STYLE.grid_soft, 1)
   end
   for grid = 0, 4 do
     local gy = py0 + (py1 - py0) * grid / 4
-    ImGui.DrawList_AddLine(draw_list, px0, gy, px1, gy, COLORS.grid_soft, 1)
+    ImGui.DrawList_AddLine(draw_list, px0, gy, px1, gy, STYLE.grid_soft, 1)
   end
 
   local base_norm = clamp((math.log(math.max(20, values.base_freq or 120)) - math.log(20)) /
@@ -761,12 +762,12 @@ local function draw_spectra_map(ctx, route_points, route_enabled, selected_route
   end
 
   ImGui.DrawList_AddRectFilled(draw_list, route_x0, route_y0, route_x1, route_y1, color(0.045, 0.050, 0.052, 0.96))
-  ImGui.DrawList_AddRect(draw_list, route_x0, route_y0, route_x1, route_y1, COLORS.edge)
+  ImGui.DrawList_AddRect(draw_list, route_x0, route_y0, route_x1, route_y1, STYLE.edge)
   for grid = 1, 7 do
     local gx = route_x0 + (route_x1 - route_x0) * grid / 8
-    ImGui.DrawList_AddLine(draw_list, gx, route_y0, gx, route_y1, COLORS.grid_soft, 1)
+    ImGui.DrawList_AddLine(draw_list, gx, route_y0, gx, route_y1, STYLE.grid_soft, 1)
   end
-  ImGui.DrawList_AddText(draw_list, route_x0 + 7, route_y0 + 6, COLORS.muted,
+  ImGui.DrawList_AddText(draw_list, route_x0 + 7, route_y0 + 6, STYLE.muted,
     selected_def and (selected_def.label .. " over time") or "route over time")
 
   if selected_def and selected_points then
@@ -777,7 +778,7 @@ local function draw_spectra_map(ctx, route_points, route_enabled, selected_route
         route_norm(selected_def, current_value_for_key(values, selected_def.key))
       local x = lerp(route_x0, route_x1, u)
       local y = lerp(route_y1, route_y0, y_norm)
-      if last_x then ImGui.DrawList_AddLine(draw_list, last_x, last_y, x, y, COLORS.contour_hot, 2.2) end
+      if last_x then ImGui.DrawList_AddLine(draw_list, last_x, last_y, x, y, STYLE.contour_hot, 2.2) end
       last_x, last_y = x, y
     end
   end
@@ -792,7 +793,7 @@ local function draw_spectra_map(ctx, route_points, route_enabled, selected_route
         nearest, nearest_dist = index, dist
       end
       ImGui.DrawList_AddCircle(draw_list, px, py, index == selected_point and 7.5 or 5.8,
-        index == selected_point and COLORS.point_selected or COLORS.point, 18, 1.5)
+        index == selected_point and STYLE.point_selected or STYLE.point, 18, 1.5)
     end
 
     local route_hovered = hovered and mx >= route_x0 and mx <= route_x1 and my >= route_y0 and my <= route_y1
@@ -831,8 +832,8 @@ local function draw_spectra_map(ctx, route_points, route_enabled, selected_route
     end
   end
 
-  ImGui.DrawList_AddText(draw_list, x0 + 12, y0 + 8, COLORS.text, "Spectra map")
-  ImGui.DrawList_AddText(draw_list, x1 - 230, y0 + 8, COLORS.muted, tostring(channels) .. "ch channel preview")
+  ImGui.DrawList_AddText(draw_list, x0 + 12, y0 + 8, STYLE.text, "Spectra map")
+  ImGui.DrawList_AddText(draw_list, x1 - 230, y0 + 8, STYLE.muted, tostring(channels) .. "ch channel preview")
   return selected_point
 end
 
@@ -852,15 +853,15 @@ local function draw_route_editor(ctx, points, def, selected_index, enabled)
   local active = ImGui.IsItemActive(ctx)
   local mx, my = ImGui.GetMousePos(ctx)
 
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, enabled and COLORS.panel or COLORS.panel_soft)
-  ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, COLORS.edge)
-  ImGui.DrawList_AddText(draw_list, x0 + 10, y0 + 7, enabled and COLORS.text or COLORS.muted, (def and def.label or "Route") .. " route")
+  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, enabled and STYLE.panel or STYLE.panel_soft)
+  ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, STYLE.edge)
+  ImGui.DrawList_AddText(draw_list, x0 + 10, y0 + 7, enabled and STYLE.text or STYLE.muted, (def and def.label or "Route") .. " route")
 
   for grid = 1, 3 do
     local gx = px0 + (px1 - px0) * grid / 4
     local gy = py0 + (py1 - py0) * grid / 4
-    ImGui.DrawList_AddLine(draw_list, gx, py0, gx, py1, COLORS.grid, 1)
-    ImGui.DrawList_AddLine(draw_list, px0, gy, px1, gy, COLORS.grid, 1)
+    ImGui.DrawList_AddLine(draw_list, gx, py0, gx, py1, STYLE.grid, 1)
+    ImGui.DrawList_AddLine(draw_list, px0, gy, px1, gy, STYLE.grid, 1)
   end
 
   local prev_x, prev_y = nil, nil
@@ -868,9 +869,9 @@ local function draw_route_editor(ctx, points, def, selected_index, enabled)
     local px = lerp(px0, px1, point.x)
     local py = lerp(py1, py0, point.y)
     if prev_x then
-      ImGui.DrawList_AddLine(draw_list, prev_x, prev_y, px, py, enabled and COLORS.route or COLORS.muted, 2)
-      ImGui.DrawList_AddTriangleFilled(draw_list, prev_x, py1, px, py1, px, py, COLORS.route_fill)
-      ImGui.DrawList_AddTriangleFilled(draw_list, prev_x, py1, prev_x, prev_y, px, py, COLORS.route_fill)
+      ImGui.DrawList_AddLine(draw_list, prev_x, prev_y, px, py, enabled and STYLE.route or STYLE.muted, 2)
+      ImGui.DrawList_AddTriangleFilled(draw_list, prev_x, py1, px, py1, px, py, STYLE.route_fill)
+      ImGui.DrawList_AddTriangleFilled(draw_list, prev_x, py1, prev_x, prev_y, px, py, STYLE.route_fill)
     end
     prev_x, prev_y = px, py
   end
@@ -884,7 +885,7 @@ local function draw_route_editor(ctx, points, def, selected_index, enabled)
       nearest, nearest_dist = index, dist
     end
     ImGui.DrawList_AddCircleFilled(draw_list, px, py, index == selected_index and 5.8 or 4.4,
-      index == selected_index and COLORS.point_selected or COLORS.point, 18)
+      index == selected_index and STYLE.point_selected or STYLE.point, 18)
   end
 
   if hovered and ImGui.IsMouseClicked(ctx, 0) and nearest and nearest_dist < 13 then
@@ -907,7 +908,7 @@ local function draw_route_editor(ctx, points, def, selected_index, enabled)
   if def and selected_index and points[selected_index] then
     local p = points[selected_index]
     local text = string.format("t %.2f / " .. def.fmt, p.x, route_value(def, p.y))
-    ImGui.DrawList_AddText(draw_list, x1 - 150, y0 + 7, COLORS.muted, text)
+    ImGui.DrawList_AddText(draw_list, x1 - 150, y0 + 7, STYLE.muted, text)
   end
 
   return selected_index
@@ -938,18 +939,18 @@ local function draw_route_overview(ctx, route_points, route_enabled, selected_ro
 
     local bg = is_selected and color(0.075, 0.082, 0.078, 1) or color(0.048, 0.054, 0.056, 1)
     ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, bg)
-    ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, is_selected and COLORS.route or COLORS.edge, 0, 0, is_selected and 1.8 or 1)
+    ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, is_selected and STYLE.route or STYLE.edge, 0, 0, is_selected and 1.8 or 1)
 
     local px0, py0 = x0 + 10, y0 + 20
     local px1, py1 = x1 - 10, y1 - 9
     for grid = 1, 3 do
       local gx = px0 + (px1 - px0) * grid / 4
-      ImGui.DrawList_AddLine(draw_list, gx, py0, gx, py1, COLORS.grid_soft, 1)
+      ImGui.DrawList_AddLine(draw_list, gx, py0, gx, py1, STYLE.grid_soft, 1)
     end
 
-    ImGui.DrawList_AddText(draw_list, x0 + 9, y0 + 5, enabled and COLORS.text or COLORS.muted, def.label)
+    ImGui.DrawList_AddText(draw_list, x0 + 9, y0 + 5, enabled and STYLE.text or STYLE.muted, def.label)
     local value_text = string.format(def.fmt, current_value_for_key(values, def.key))
-    ImGui.DrawList_AddText(draw_list, x1 - 62, y0 + 5, COLORS.muted, value_text)
+    ImGui.DrawList_AddText(draw_list, x1 - 62, y0 + 5, STYLE.muted, value_text)
 
     local nearest, nearest_dist = nil, 999999
     local last_x, last_y = nil, nil
@@ -958,7 +959,7 @@ local function draw_route_overview(ctx, route_points, route_enabled, selected_ro
       local px = lerp(px0, px1, point.x)
       local py = lerp(py1, py0, enabled and point.y or route_norm(def, current_value_for_key(values, def.key)))
       if last_x then
-        ImGui.DrawList_AddLine(draw_list, last_x, last_y, px, py, enabled and COLORS.route or COLORS.muted,
+        ImGui.DrawList_AddLine(draw_list, last_x, last_y, px, py, enabled and STYLE.route or STYLE.muted,
           enabled and 1.8 or 1.2)
       end
       local dist = ((mx - px) ^ 2 + (my - py) ^ 2) ^ 0.5
@@ -967,7 +968,7 @@ local function draw_route_overview(ctx, route_points, route_enabled, selected_ro
       end
       if enabled or is_selected then
         ImGui.DrawList_AddCircleFilled(draw_list, px, py, is_selected and point_index == selected_point and 4.8 or 3.5,
-          is_selected and point_index == selected_point and COLORS.point_selected or COLORS.point, 14)
+          is_selected and point_index == selected_point and STYLE.point_selected or STYLE.point, 14)
       end
       last_x, last_y = px, py
     end

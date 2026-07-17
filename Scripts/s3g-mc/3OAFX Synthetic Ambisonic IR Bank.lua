@@ -24,6 +24,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ui_theme = nil
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -32,20 +33,22 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui); ui_theme = _s3g_theme end
 end
 
 local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 local EXT = "s3g_mc_synthetic_ambi_ir_bank_v1"
-local COLOR_BG = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0)
-local COLOR_EDGE = ImGui.ColorConvertDouble4ToU32(0.34, 0.38, 0.38, 1.0)
-local COLOR_GRID = ImGui.ColorConvertDouble4ToU32(0.60, 0.66, 0.66, 0.16)
-local COLOR_TEXT = ImGui.ColorConvertDouble4ToU32(0.78, 0.83, 0.82, 1.0)
-local COLOR_MUTED = ImGui.ColorConvertDouble4ToU32(0.48, 0.54, 0.54, 1.0)
-local COLOR_DIRECT = ImGui.ColorConvertDouble4ToU32(0.96, 0.68, 0.24, 0.95)
-local COLOR_EARLY = ImGui.ColorConvertDouble4ToU32(0.28, 0.70, 0.95, 0.82)
-local COLOR_LATE = ImGui.ColorConvertDouble4ToU32(0.72, 0.58, 0.98, 0.74)
-local COLOR_FILL = ImGui.ColorConvertDouble4ToU32(0.28, 0.70, 0.95, 0.16)
+local CANVAS = {
+  bg = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0),
+  edge = ImGui.ColorConvertDouble4ToU32(0.34, 0.38, 0.38, 1.0),
+  grid = ImGui.ColorConvertDouble4ToU32(0.60, 0.66, 0.66, 0.16),
+  text = ImGui.ColorConvertDouble4ToU32(0.78, 0.83, 0.82, 1.0),
+  muted = ImGui.ColorConvertDouble4ToU32(0.48, 0.54, 0.54, 1.0),
+  direct = ImGui.ColorConvertDouble4ToU32(0.96, 0.68, 0.24, 0.95),
+  early = ImGui.ColorConvertDouble4ToU32(0.28, 0.70, 0.95, 0.82),
+  late = ImGui.ColorConvertDouble4ToU32(0.72, 0.58, 0.98, 0.74),
+  fill = ImGui.ColorConvertDouble4ToU32(0.28, 0.70, 0.95, 0.16),
+}
 
 local ORDER_NAMES = { "1OA / 4ch", "2OA / 9ch", "3OA / 16ch" }
 local ORDER_VALUES = { 1, 2, 3 }
@@ -202,8 +205,8 @@ local function draw_ir_preview(ctx, settings)
   local x0, y0 = ImGui.GetItemRectMin(ctx)
   local x1, y1 = x0 + width, y0 + height
   local draw_list = ImGui.GetWindowDrawList(ctx)
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, COLOR_BG)
-  ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, COLOR_EDGE)
+  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, CANVAS.bg)
+  ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, CANVAS.edge)
 
   local plot_x0, plot_y0 = x0 + 14, y0 + 34
   local plot_x1, plot_y1 = x1 - 14, y1 - 22
@@ -215,13 +218,13 @@ local function draw_ir_preview(ctx, settings)
   local late_start = math.min(duration * 0.92, settings.pre_delay_ms / 1000.0 + 0.035 + (1.0 - settings.scattering) * 0.080)
   local reflectivity = math.sqrt(math.max(0.0, 1.0 - settings.absorption))
 
-  ImGui.DrawList_AddText(draw_list, x0 + 12, y0 + 10, COLOR_TEXT, "representative IR shape")
-  ImGui.DrawList_AddText(draw_list, x1 - 150, y0 + 10, COLOR_MUTED, string.format("%.2fs / RT %.2fs", duration, decay))
+  ImGui.DrawList_AddText(draw_list, x0 + 12, y0 + 10, CANVAS.text, "representative IR shape")
+  ImGui.DrawList_AddText(draw_list, x1 - 150, y0 + 10, CANVAS.muted, string.format("%.2fs / RT %.2fs", duration, decay))
   for i = 0, 4 do
     local gx = plot_x0 + (plot_x1 - plot_x0) * i / 4
-    ImGui.DrawList_AddLine(draw_list, gx, plot_y0, gx, plot_y1, COLOR_GRID, 1)
+    ImGui.DrawList_AddLine(draw_list, gx, plot_y0, gx, plot_y1, CANVAS.grid, 1)
   end
-  ImGui.DrawList_AddLine(draw_list, plot_x0, mid_y, plot_x1, mid_y, COLOR_GRID, 1)
+  ImGui.DrawList_AddLine(draw_list, plot_x0, mid_y, plot_x1, mid_y, CANVAS.grid, 1)
 
   local function px(time)
     return plot_x0 + (plot_x1 - plot_x0) * clamp(time / duration, 0, 1)
@@ -243,9 +246,9 @@ local function draw_ir_preview(ctx, settings)
     end
     local x, y = px(t), py(env)
     if last_x then
-      ImGui.DrawList_AddLine(draw_list, last_x, last_y, x, y, COLOR_LATE, 1.4)
-      ImGui.DrawList_AddTriangleFilled(draw_list, last_x, mid_y, x, mid_y, x, y, COLOR_FILL)
-      ImGui.DrawList_AddTriangleFilled(draw_list, last_x, mid_y, last_x, last_y, x, y, COLOR_FILL)
+      ImGui.DrawList_AddLine(draw_list, last_x, last_y, x, y, CANVAS.late, 1.4)
+      ImGui.DrawList_AddTriangleFilled(draw_list, last_x, mid_y, x, mid_y, x, y, CANVAS.fill)
+      ImGui.DrawList_AddTriangleFilled(draw_list, last_x, mid_y, last_x, last_y, x, y, CANVAS.fill)
     end
     last_x, last_y = x, y
   end
@@ -253,8 +256,8 @@ local function draw_ir_preview(ctx, settings)
   if direct_t < duration then
     local x = px(direct_t)
     local amp = clamp(settings.direct_gain / math.max(1.0, distance), 0.08, 1.0)
-    ImGui.DrawList_AddLine(draw_list, x, mid_y, x, py(amp), COLOR_DIRECT, 2.4)
-    ImGui.DrawList_AddText(draw_list, x + 4, plot_y0 + 2, COLOR_DIRECT, "direct")
+    ImGui.DrawList_AddLine(draw_list, x, mid_y, x, py(amp), CANVAS.direct, 2.4)
+    ImGui.DrawList_AddText(draw_list, x + 4, plot_y0 + 2, CANVAS.direct, "direct")
   end
 
   local early_count = math.min(40, math.max(0, math.floor(settings.early_reflections + 0.5)))
@@ -267,12 +270,12 @@ local function draw_ir_preview(ctx, settings)
       local amp = (0.18 + 0.46 * frac_noise(settings.seed + 41, i)) * reflectivity * math.exp(-t / math.max(0.05, decay))
       local x = px(t)
       local sign = frac_noise(settings.seed + 83, i) > 0.5 and 1 or -1
-      ImGui.DrawList_AddLine(draw_list, x, mid_y, x, py(amp * sign), COLOR_EARLY, 1.3)
+      ImGui.DrawList_AddLine(draw_list, x, mid_y, x, py(amp * sign), CANVAS.early, 1.3)
     end
   end
 
-  ImGui.DrawList_AddText(draw_list, plot_x0, plot_y1 + 6, COLOR_MUTED, "0")
-  ImGui.DrawList_AddText(draw_list, plot_x1 - 42, plot_y1 + 6, COLOR_MUTED, string.format("%.2fs", duration))
+  ImGui.DrawList_AddText(draw_list, plot_x0, plot_y1 + 6, CANVAS.muted, "0")
+  ImGui.DrawList_AddText(draw_list, plot_x1 - 42, plot_y1 + 6, CANVAS.muted, string.format("%.2fs", duration))
 end
 
 local function insert_ir_item(path, label, position, channel_count)
@@ -442,10 +445,10 @@ local function main()
       if settings.sketch_path and settings.sketch_path ~= "" then
         ImGui.Text(ctx, basename(settings.sketch_path))
       else
-        ImGui.TextColored(ctx, COLOR_MUTED, "optional browser sketch")
+        if ui_theme and ui_theme.muted then ui_theme.muted(ImGui, ctx, "optional browser sketch") else ImGui.Text(ctx, "optional browser sketch") end
       end
       if settings.sketch_path and settings.sketch_path ~= "" then
-        ImGui.TextColored(ctx, COLOR_MUTED, "Imported sketches can add polygon room metadata, chamber timing, and exterior leak.")
+        if ui_theme and ui_theme.muted then ui_theme.muted(ImGui, ctx, "Imported sketches can add polygon room metadata, chamber timing, and exterior leak.") else ImGui.Text(ctx, "Imported sketches can add polygon room metadata, chamber timing, and exterior leak.") end
       end
       ImGui.Spacing(ctx)
       local old_material = settings.material_index

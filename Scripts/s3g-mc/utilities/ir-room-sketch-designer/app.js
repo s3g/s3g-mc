@@ -1074,7 +1074,7 @@ function renderVectorFloorplan(s, projection) {
         .svg-small { fill: #d7d7d7; font-size: 10px; }
         .svg-tiny { font-size: 9px; }
         .svg-muted { fill: #8f9aa0; }
-        .svg-chamber { fill: #78be96; }
+        .svg-chamber { fill: #8f9892; }
         .svg-outside { fill: #c8f5eb; }
         .svg-grid { stroke: rgba(255,255,255,0.09); stroke-width: 1; vector-effect: non-scaling-stroke; }
       </style>
@@ -1125,7 +1125,7 @@ function renderVectorTopView(s) {
   }).join("") : "";
   const pointSvg = points.map((point) => `
     <g>
-      <circle cx="${round(point.p.x, 2)}" cy="${round(point.p.y, 2)}" r="${point.active ? 7 : 4}" fill="${point.active ? "#5aa8c7" : "rgba(90,168,199,0.48)"}" />
+      <circle cx="${round(point.p.x, 2)}" cy="${round(point.p.y, 2)}" r="${point.active ? 7 : 4}" fill="${point.active ? "#8d8d8d" : "rgba(90,168,199,0.48)"}" />
       <text x="${round(point.p.x, 2)}" y="${round(point.p.y + 0.5, 2)}" class="svg-label" fill="${point.active ? "#050607" : "#d7d7d7"}">${point.index + 1}</text>
     </g>
   `).join("");
@@ -1138,7 +1138,7 @@ function renderVectorTopView(s) {
     ${pointSvg}
     <circle cx="${round(lp.x, 2)}" cy="${round(lp.y, 2)}" r="7" fill="#d7d7d7" />
     <text x="${round(lp.x, 2)}" y="${round(lp.y + 0.5, 2)}" class="svg-label" fill="#050607">L</text>
-    <circle cx="${round(sp.x, 2)}" cy="${round(sp.y, 2)}" r="8" fill="#5aa8c7" />
+    <circle cx="${round(sp.x, 2)}" cy="${round(sp.y, 2)}" r="8" fill="#8d8d8d" />
     <text x="${round(sp.x, 2)}" y="${round(sp.y + 0.5, 2)}" class="svg-label" fill="#050607">${selected.index + 1}</text>
     <text x="12" y="20" class="svg-small svg-muted">TOP group ${selected.index + 1}/${selected.count}  ${selected.azimuth} az / ${selected.elevation} el</text>
     <text x="12" y="${ROOM_CANVAS_H - 16}" class="svg-small svg-muted">drag in Top view to move the field; use Bank Map to move mic positions</text>
@@ -1163,7 +1163,7 @@ function renderVectorBankMap(s) {
     return `
       ${active ? `<path d="M ${round(p.x, 2)} ${round(p.y, 2)} Q ${round(p.x + dirUnit.x * 26 - dirUnit.z * 14, 2)} ${round(p.y + dirUnit.z * 26 + dirUnit.x * 14, 2)} ${round(lobeX, 2)} ${round(lobeY, 2)} Q ${round(p.x + dirUnit.x * 26 + dirUnit.z * 14, 2)} ${round(p.y + dirUnit.z * 26 - dirUnit.x * 14, 2)} ${round(p.x, 2)} ${round(p.y, 2)} Z" fill="rgba(216,162,74,0.12)" />
       <line x1="${round(p.x, 2)}" y1="${round(p.y, 2)}" x2="${round(lobeX, 2)}" y2="${round(lobeY, 2)}" stroke="rgba(216,162,74,0.72)" stroke-width="1.2" vector-effect="non-scaling-stroke" />` : ""}
-      <circle cx="${round(p.x, 2)}" cy="${round(p.y, 2)}" r="${round(radius, 2)}" fill="${active ? "#d8a24a" : "rgba(90,168,199,0.72)"}" />
+      <circle cx="${round(p.x, 2)}" cy="${round(p.y, 2)}" r="${round(radius, 2)}" fill="${active ? "#a8a8a8" : "rgba(90,168,199,0.72)"}" />
       <text x="${round(p.x + 11, 2)}" y="${round(p.y + 3, 2)}" class="svg-small">${svgEscape(`G${index + 1}`)}</text>
     `;
   }).join("");
@@ -1345,7 +1345,7 @@ function drawRoom3D(s) {
     const point = groupMapPosition(s, info, profile);
     const projected = project(point);
     const active = index === selected.index;
-    drawPoint(projected.x, projected.y, active ? 7 : 4, active ? "#5aa8c7" : "rgba(90,168,199,0.46)", String(index + 1), active);
+    drawPoint(projected.x, projected.y, active ? 7 : 4, active ? "#8d8d8d" : "rgba(90,168,199,0.46)", String(index + 1), active);
   });
 
   if (s.show_direct) {
@@ -1361,7 +1361,7 @@ function drawRoom3D(s) {
   const lp = project(listenerPoint);
   const sp = project(sourcePoint);
   drawPoint(lp.x, lp.y, 7, "#d7d7d7", "L", true);
-  drawPoint(sp.x, sp.y, 8, "#5aa8c7", String(selected.index + 1), true);
+  drawPoint(sp.x, sp.y, 8, "#8d8d8d", String(selected.index + 1), true);
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
   ctx.fillText(`3D group ${selected.index + 1}/${selected.count}  camera ${s.camera_azimuth} az / ${s.camera_elevation} el / ${round(s.camera_zoom, 2)}x`, 12, 20);
@@ -1449,7 +1449,7 @@ function drawRoomView(s) {
       ctx.lineTo(px(point), py(point));
       ctx.stroke();
     }
-    drawPoint(px(point), py(point), active ? 7 : 4, active ? "#5aa8c7" : "rgba(90,168,199,0.42)", String(index + 1), active);
+    drawPoint(px(point), py(point), active ? 7 : 4, active ? "#8d8d8d" : "rgba(90,168,199,0.42)", String(index + 1), active);
     state.roomHitPoints.push({ x: px(point), y: py(point), r: active ? 18 : 12, index });
   });
 
@@ -1499,7 +1499,7 @@ function drawRoomView(s) {
   }
 
   drawPoint(px(listenerPoint), py(listenerPoint), 7, "#d7d7d7", "L", true);
-  drawPoint(px(sourcePoint), py(sourcePoint), 8, "#5aa8c7", String(selected.index + 1), true);
+  drawPoint(px(sourcePoint), py(sourcePoint), 8, "#8d8d8d", String(selected.index + 1), true);
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
   ctx.fillText(`${state.view.toUpperCase()} group ${selected.index + 1}/${selected.count}  ${selected.azimuth} az / ${selected.elevation} el`, 12, 20);
@@ -1576,7 +1576,7 @@ function drawChamberSide(s, ox, oy, scale, bounds) {
     ctx.fillStyle = "rgba(5, 6, 7, 0.92)";
     ctx.fillRect(openX, oy + s.room_z * 0.24 * scale, Math.max(3, openWidth * scale), s.room_z * 0.56 * scale);
 
-    ctx.fillStyle = "#78be96";
+    ctx.fillStyle = "#8f9892";
     ctx.font = "9px Menlo, monospace";
     ctx.fillText(chamber.level === 0 ? `chamber ${chamber.index + 1}` : `nested ${chamber.level}`, x + 6, yTop + 14);
   });
@@ -1614,7 +1614,7 @@ function drawChamberPlan(s, ox, oy, scale) {
     ctx.lineTo(openX2, openY2);
     ctx.stroke();
     ctx.lineWidth = 1;
-    ctx.fillStyle = "#78be96";
+    ctx.fillStyle = "#8f9892";
     ctx.font = "10px Menlo, monospace";
     ctx.fillText(chamber.level === 0 ? `chamber ${chamber.index + 1}` : `nested ${chamber.level}`, x + 8, y + 16);
     ctx.fillStyle = "#8f9a94";
@@ -1729,7 +1729,7 @@ function drawDirections(s) {
     const radius = active ? Math.max(10, energyRadius) : energyRadius * 0.82;
     state.directionHitPoints.push({ x, y, r: radius + 10, index });
     ctx.globalAlpha = active ? 1 : 0.58;
-    ctx.fillStyle = active ? "#d8a24a" : "#5aa8c7";
+    ctx.fillStyle = active ? "#a8a8a8" : "#8d8d8d";
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
@@ -1828,9 +1828,9 @@ function drawBankMatrix(s) {
 
     const directW = clamp(item.direct_time / maxTime, 0, 1) * 90;
     const firstW = clamp(item.first_reflection_time / maxTime, 0, 1) * 110;
-    drawMetricBar(columns.direct, y + 8, 94, directW, "#5aa8c7", `${Math.round(item.direct_time * 1000)} ms`);
-    drawMetricBar(columns.first, y + 8, 116, firstW, "#d8a24a", `${item.first_reflection_wall} ${Math.round(item.first_reflection_time * 1000)} ms`);
-    drawMetricBar(columns.energy, y + 8, 170, clamp(item.early_energy / maxEnergy, 0, 1) * 170, item.chamber_energy > 0.00001 ? "#78be96" : "#b8d8e8", `${round(item.early_energy, 3)} c${round(item.chamber_energy, 3)}`);
+    drawMetricBar(columns.direct, y + 8, 94, directW, "#8d8d8d", `${Math.round(item.direct_time * 1000)} ms`);
+    drawMetricBar(columns.first, y + 8, 116, firstW, "#a8a8a8", `${item.first_reflection_wall} ${Math.round(item.first_reflection_time * 1000)} ms`);
+    drawMetricBar(columns.energy, y + 8, 170, clamp(item.early_energy / maxEnergy, 0, 1) * 170, item.chamber_energy > 0.00001 ? "#8f9892" : "#b8d8e8", `${round(item.early_energy, 3)} c${round(item.chamber_energy, 3)}`);
   });
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "10px Menlo, monospace";
@@ -1966,7 +1966,7 @@ function drawReflectionLayers(s) {
       ctx.moveTo(directX, imageBase - 8);
       ctx.lineTo(directX, chamberBase + 8);
       ctx.stroke();
-      ctx.fillStyle = "#70dcf4";
+      ctx.fillStyle = "#95bcc2";
       ctx.beginPath();
       ctx.arc(directX, rowMid, active ? 4.6 : 3.4, 0, Math.PI * 2);
       ctx.fill();
@@ -2001,7 +2001,7 @@ function drawReflectionLayers(s) {
           ctx.fill();
         }
         if (active && (event.type === "image" || event.type === "chamber")) {
-          ctx.fillStyle = isChamber ? "#78be96" : "#d8a24a";
+          ctx.fillStyle = isChamber ? "#8f9892" : "#a8a8a8";
           ctx.font = "9px Menlo, monospace";
           ctx.fillText(event.wall, x + 4, isChamber ? chamberBase + h + 8 : imageBase - h - 7);
         }

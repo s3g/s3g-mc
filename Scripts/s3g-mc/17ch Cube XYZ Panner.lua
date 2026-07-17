@@ -17,12 +17,13 @@
 --   position after source + global offset is hard-clamped to +/-2.
 
 if not reaper.APIExists("ImGui_GetVersion") then
-  reaper.MB("ReaImGui is not installed or not loaded.", "17ch Cube XYZ Panner", 0)
+  reaper.MB("ReaImGui is not installed or not loaded.", "17CH CUBE XYZ PANNER", 0)
   return
 end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ui_theme = nil
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -31,15 +32,18 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme then
+    ui_theme = _s3g_theme
+    if _s3g_theme.install then _s3g_theme.install(ImGui) end
+  end
 end
 
 
-local ctx = ImGui.CreateContext("17ch Cube XYZ Panner")
+local ctx = ImGui.CreateContext("17CH CUBE XYZ PANNER")
 local open = true
 local PROJECT = 0
 local FX_NAME = "s3g 17ch Cube XYZ Panner"
-local FX_NAME_CLEAN = "17ch Cube XYZ Panner"
+local FX_NAME_CLEAN = "17CH CUBE XYZ PANNER"
 local FX_NAME_LEGACY = "s3g/17ch Cube XYZ Panner"
 local selected_source = 1
 local view_yaw_deg = -35
@@ -103,7 +107,7 @@ local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
+local CANVAS = {
   bg = color(0.035, 0.04, 0.045, 1),
   shell = color(0.22, 0.23, 0.24, 0.32),
   shell_line = color(0.62, 0.65, 0.68, 0.30),
@@ -116,6 +120,14 @@ local COLORS = {
   selected = color(1.0, 0.95, 0.5, 1),
 }
 
+local function muted_text(value)
+  if ui_theme and ui_theme.muted then
+    ui_theme.muted(ImGui, ctx, value)
+  else
+    ImGui.Text(ctx, value)
+  end
+end
+
 local PARAM = {
   spread = 0,
   focus = 1,
@@ -125,6 +137,13 @@ local PARAM = {
   global_z = 5,
   out_gain = 6,
 }
+
+local function toolbox_header(title, flags)
+  if ui_theme and ui_theme.toolbox_header then return ui_theme.toolbox_header(ImGui, ctx, title, flags) end
+  title = tostring(title or ""):upper()
+  if flags then return ImGui.CollapsingHeader(ctx, title, nil, flags) end
+  return ImGui.CollapsingHeader(ctx, title)
+end
 
 local function source_param(source_index, offset)
   return 9 + ((source_index - 1) * 3) + offset
@@ -292,7 +311,12 @@ end
 
 local function slider_double(track, fx, label, param, lo, hi, fmt, write_enabled)
   local value = get_param(track, fx, param, lo)
-  local changed, new_value = ImGui.SliderDouble(ctx, label, value, lo, hi, fmt or "%.2f")
+  local changed, new_value
+  if ui_theme and ui_theme.slider_row then
+    changed, new_value = ui_theme.slider_row(ImGui, ctx, label, value, lo, hi, fmt or "%.2f", false)
+  else
+    changed, new_value = ImGui.SliderDouble(ctx, label, value, lo, hi, fmt or "%.2f")
+  end
   if changed then set_param(track, fx, param, new_value, write_enabled) end
   return new_value
 end
@@ -654,10 +678,10 @@ local function draw_camera_controls()
   if ImGui.Button(ctx, "3/4##cam", 68, 24) then
     reset_camera(-35, -42)
   end
-  if ImGui.Button(ctx, "top##cam", 68, 24) then
+  if ImGui.Button(ctx, "TOP##cam", 68, 24) then
     reset_camera(0, 0)
   end
-  if ImGui.Button(ctx, "front##cam", 68, 24) then
+  if ImGui.Button(ctx, "FRONT##cam", 68, 24) then
     reset_camera(0, -90)
   end
   ImGui.EndGroup(ctx)
@@ -679,7 +703,7 @@ local function draw_cube(track, fx)
   local canvas_hovered = ImGui.IsItemHovered(ctx)
   local canvas_active = ImGui.IsItemActive(ctx)
 
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + canvas_width, y0 + height, COLORS.bg)
+  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + canvas_width, y0 + height, CANVAS.bg)
 
   local projected = {}
   local projected_by_id = {}
@@ -703,8 +727,8 @@ local function draw_cube(track, fx)
   for _, speaker in ipairs(projected) do
     local front = clamp((speaker.z + 1) * 0.5, 0, 1)
     local size = 2.5 + 2 * front
-    ImGui.DrawList_AddCircleFilled(draw_list, speaker.x, speaker.y, size + 2, COLORS.speaker_back, 18)
-    ImGui.DrawList_AddCircleFilled(draw_list, speaker.x, speaker.y, size, COLORS.speaker, 18)
+    ImGui.DrawList_AddCircleFilled(draw_list, speaker.x, speaker.y, size + 2, CANVAS.speaker_back, 18)
+    ImGui.DrawList_AddCircleFilled(draw_list, speaker.x, speaker.y, size, CANVAS.speaker, 18)
     ImGui.DrawList_AddText(draw_list, speaker.x + size + 3, speaker.y - 6, color(0.82, 0.88, 0.9, 0.48 + 0.36 * front), tostring(speaker.id))
   end
 
@@ -762,18 +786,18 @@ local function draw_cube(track, fx)
   for _, source in ipairs(sources) do
     local front = clamp((source.z + 1) * 0.5, 0, 1)
     local size = source_dot_size(source.distance) + 2 * front
-    local outline = source.id == selected_source and COLORS.selected or source_color(source.id, 0.35)
+    local outline = source.id == selected_source and CANVAS.selected or source_color(source.id, 0.35)
     local alpha = source.audible and 0.92 or 0.22
     local halo_alpha = source.audible and 0.22 or 0.08
     ImGui.DrawList_AddCircleFilled(draw_list, source.x, source.y, size + 7, source_color(source.id, halo_alpha), 32)
     ImGui.DrawList_AddCircleFilled(draw_list, source.x, source.y, size, source_color(source.id, alpha), 32)
-    ImGui.DrawList_AddCircle(draw_list, source.x, source.y, size + 3, source.solo and COLORS.selected or outline, 32, source.id == selected_source and 3 or 1.5)
+    ImGui.DrawList_AddCircle(draw_list, source.x, source.y, size + 3, source.solo and CANVAS.selected or outline, 32, source.id == selected_source and 3 or 1.5)
     ImGui.DrawList_AddText(draw_list, source.x - 4, source.y - 8, color(0.04, 0.045, 0.05, 1), tostring(source.id))
   end
 
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 14, COLORS.text, "17ch Cube XYZ Panner")
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 34, COLORS.muted, "17 speakers / 8 mono sources / distance 1.0 = cube edge")
-  ImGui.DrawList_AddText(draw_list, x0 + canvas_width - 300, y0 + 14, COLORS.muted, "drag source dots to edit position")
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 14, CANVAS.text, "17CH CUBE XYZ PANNER")
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 34, CANVAS.muted, "17 speakers / 8 mono sources / distance 1.0 = cube edge")
+  ImGui.DrawList_AddText(draw_list, x0 + canvas_width - 300, y0 + 14, CANVAS.muted, "drag source dots to edit position")
   if controls_inline then
     ImGui.SameLine(ctx)
     ImGui.Dummy(ctx, control_gap, 1)
@@ -784,7 +808,11 @@ end
 
 local function draw_source_controls(track, fx)
   local changed
-  changed, selected_source = ImGui.SliderInt(ctx, "Selected source", selected_source, 1, 8)
+  if ui_theme and ui_theme.slider_row then
+    changed, selected_source = ui_theme.slider_row(ImGui, ctx, "Selected source", selected_source, 1, 8, nil, true)
+  else
+    changed, selected_source = ImGui.SliderInt(ctx, "Selected source", selected_source, 1, 8)
+  end
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, "Reset positions") then reset_source_positions(track, fx) end
   local base_label = "S" .. tostring(selected_source)
@@ -838,7 +866,7 @@ end
 local function loop()
   ImGui.SetNextWindowSize(ctx, 860, 760, ImGui.Cond_Appearing)
   local visible
-  visible, open = ImGui.Begin(ctx, "17ch Cube XYZ Panner", open)
+  visible, open = ImGui.Begin(ctx, "17CH CUBE XYZ PANNER", open)
   if visible then
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     local fx = find_fx(track)
@@ -860,7 +888,10 @@ local function loop()
       else
         draw_cube(track, fx)
 
-        if ImGui.CollapsingHeader(ctx, "Automation", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        local toolbox_style = ui_theme and ui_theme.push_soft_panel and ui_theme.push_soft_panel(ImGui, ctx) or nil
+        local toolbox_visible = ImGui.BeginChild(ctx, "##panner_toolbox_area", 0, 0)
+        if toolbox_visible then
+        if toolbox_header("AUTOMATION", ImGui.TreeNodeFlags_DefaultOpen) then
           local changed
           local mode_name = automation_mode_name(track)
           ImGui.Text(ctx, "Track automation: " .. mode_name)
@@ -895,16 +926,16 @@ local function loop()
           if ImGui.Button(ctx, "Hide all") then
             automation_status = "Hidden " .. tostring(hide_all_source_spatial(track, fx)) .. " source position lanes"
           end
-          ImGui.TextColored(ctx, COLORS.muted,
+          muted_text(
             write_mode
               and ("Write mode: enabled layers write automation. Spatial " ..
                 (spatial_writes and "on" or "off") .. " / Mix " .. (mix_writes and "on" or "off") .. ".")
               or ("Trim/Read: enabled layers control the JSFX live, but do not write automation. Spatial " ..
                 (spatial_writes and "control" or "safe") .. " / Mix " .. (mix_writes and "control" or "safe") .. "."))
-          if automation_status ~= "" then ImGui.TextColored(ctx, COLORS.muted, automation_status) end
+          if automation_status ~= "" then muted_text(automation_status) end
         end
 
-        if ImGui.CollapsingHeader(ctx, "Global", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        if toolbox_header("GLOBAL", ImGui.TreeNodeFlags_DefaultOpen) then
           slider_double(track, fx, "XYZ spread radius", PARAM.spread, 0.05, 4, "%.2f", spatial_writes)
           slider_double(track, fx, "Focus amount", PARAM.focus, 0, 1, "%.2f", spatial_writes)
           slider_double(track, fx, "Motion smoothing", PARAM.smoothing, 1, 250, "%.0f ms", spatial_writes)
@@ -914,32 +945,51 @@ local function loop()
           slider_double(track, fx, "Output gain", PARAM.out_gain, -48, 24, "%.1f dB", mix_writes)
         end
 
-        if ImGui.CollapsingHeader(ctx, "Selected Source", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        if toolbox_header("SELECTED SOURCE", ImGui.TreeNodeFlags_DefaultOpen) then
           draw_source_controls(track, fx)
         end
 
-        if ImGui.CollapsingHeader(ctx, "Source Mixer", nil, ImGui.TreeNodeFlags_DefaultOpen) then
+        if toolbox_header("SOURCE MIXER", ImGui.TreeNodeFlags_DefaultOpen) then
           draw_source_mixer(track, fx)
         end
 
-        if ImGui.CollapsingHeader(ctx, "View") then
-          if ImGui.Button(ctx, "3/4 view") then
+        if toolbox_header("VIEW") then
+          if ImGui.Button(ctx, "3/4") then
             reset_camera(-35, -42)
           end
           ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "Top") then
+          if ImGui.Button(ctx, "TOP") then
             reset_camera(0, 0)
           end
           ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "Front") then
+          if ImGui.Button(ctx, "FRONT") then
             reset_camera(0, -90)
           end
           local changed
-          changed, view_yaw_deg = ImGui.SliderDouble(ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg")
-          changed, view_pitch_deg = ImGui.SliderDouble(ctx, "Pitch", view_pitch_deg, -180, 180, "%.0f deg")
-          changed, view_roll_deg = ImGui.SliderDouble(ctx, "Roll", view_roll_deg, -180, 180, "%.0f deg")
-          changed, view_zoom = ImGui.SliderDouble(ctx, "Zoom", view_zoom, 0.35, 2.5, "%.2f")
+          if ui_theme and ui_theme.slider_row then
+            changed, view_yaw_deg = ui_theme.slider_row(ImGui, ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg", false)
+          else
+            changed, view_yaw_deg = ImGui.SliderDouble(ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg")
+          end
+          if ui_theme and ui_theme.slider_row then
+            changed, view_pitch_deg = ui_theme.slider_row(ImGui, ctx, "Pitch", view_pitch_deg, -180, 180, "%.0f deg", false)
+          else
+            changed, view_pitch_deg = ImGui.SliderDouble(ctx, "Pitch", view_pitch_deg, -180, 180, "%.0f deg")
+          end
+          if ui_theme and ui_theme.slider_row then
+            changed, view_roll_deg = ui_theme.slider_row(ImGui, ctx, "Roll", view_roll_deg, -180, 180, "%.0f deg", false)
+          else
+            changed, view_roll_deg = ImGui.SliderDouble(ctx, "Roll", view_roll_deg, -180, 180, "%.0f deg")
+          end
+          if ui_theme and ui_theme.slider_row then
+            changed, view_zoom = ui_theme.slider_row(ImGui, ctx, "Zoom", view_zoom, 0.35, 2.5, "%.2f", false)
+          else
+            changed, view_zoom = ImGui.SliderDouble(ctx, "Zoom", view_zoom, 0.35, 2.5, "%.2f")
+          end
         end
+        end
+        ImGui.EndChild(ctx)
+        if ui_theme and ui_theme.pop_soft_panel then ui_theme.pop_soft_panel(ImGui, ctx, toolbox_style) end
       end
     end
 

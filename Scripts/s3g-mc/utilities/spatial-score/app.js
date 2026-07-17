@@ -94,8 +94,8 @@ const ui = {
 const STORAGE_KEY = "s3g-mc-spatial-score-autosave-v1";
 let lastAutosaveJson = "";
 
-const COLORS = ["#6ee7f2", "#f2c56e", "#ff7f6e", "#9de67f", "#b998ff", "#f06eca", "#86a7ff", "#ffffff"];
-const SCENE_COLORS = ["#5aa8c7", "#d8a24a", "#cf695f", "#7ea65a", "#9b83d8", "#cf6bb0", "#7f9bd8", "#d7d7d7"];
+const COLORS = ["#95bcc2", "#f2c56e", "#ff7f6e", "#9de67f", "#a99abd", "#bd8ca8", "#9aa8c5", "#ffffff"];
+const SCENE_COLORS = ["#7f9aa3", "#a99b76", "#b0837d", "#7ea65a", "#9b83d8", "#cf6bb0", "#7f9bd8", "#d7d7d7"];
 const SCENES = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const MOTION_BANKS = [
   "manual",
@@ -2251,7 +2251,7 @@ function renderScenes() {
     const b = document.createElement("button");
     b.type = "button";
     b.dataset.scene = key;
-    b.style.setProperty("--scene-color", SCENE_COLORS[SCENES.indexOf(key)] || "#5aa8c7");
+    b.style.setProperty("--scene-color", SCENE_COLORS[SCENES.indexOf(key)] || "#7f9aa3");
     b.innerHTML = `<span>${key.toUpperCase()}</span>`;
     b.addEventListener("click", () => {
       captureScene(activeBank());

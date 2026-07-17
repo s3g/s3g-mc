@@ -27,7 +27,7 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
-
+local theme = require("s3g-mc ImGui Theme")
 
 local MODES = {
   [1] = "Rotate",
@@ -44,6 +44,7 @@ local function map_for_mode(mode, channel_count, offset)
   if mode == 4 then return mc.interleave_pairs_map(channel_count), "Frame interleave" end
   return mc.swap_halves_map(channel_count), "Frame swap halves"
 end
+local theme = require("s3g-mc ImGui Theme")
 
 local function draw_combo(ctx, label, value)
   if ImGui.BeginCombo(ctx, label, MODES[value]) then
@@ -72,17 +73,17 @@ local function main()
     local visible
     visible, open = ImGui.Begin(ctx, "Frame Shift", open)
     if visible then
-      ImGui.Text(ctx, "Source: " .. mc.item_label(item) .. "  (" .. tostring(channel_count) .. " ch)")
+      theme.muted(ImGui, ctx, "Source: " .. mc.item_label(item) .. "  (" .. tostring(channel_count) .. " ch)")
       ImGui.Spacing(ctx)
       mode = draw_combo(ctx, "Mode", mode)
       if mode == 1 then
         local changed
         changed, offset = ImGui.SliderInt(ctx, "Rotate offset", offset, -channel_count + 1, channel_count - 1)
       else
-        ImGui.Text(ctx, "Rotate offset: not used")
+        theme.muted(ImGui, ctx, "Rotate offset: not used")
       end
       local map, label = map_for_mode(mode, channel_count, offset)
-      ImGui.Text(ctx, "Map: " .. mc.describe_map(map))
+      theme.muted(ImGui, ctx, "Map: " .. mc.describe_map(map))
       ImGui.Spacing(ctx)
       ImGui.Separator(ctx)
       ImGui.Spacing(ctx)

@@ -17,6 +17,7 @@ function M.run(config)
 
   package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
   local ImGui = require("imgui")("0.10")
+  local ui_theme = nil
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -25,21 +26,35 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme then
+    ui_theme = _s3g_theme
+    if _s3g_theme.install then _s3g_theme.install(ImGui) end
+  end
 end
 
   local WINDOW_OPEN_COND = ImGui.Cond_Appearing
   local EXT = config.ext
 
-  local COLOR_BG = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0)
-  local COLOR_PANEL = ImGui.ColorConvertDouble4ToU32(0.060, 0.066, 0.070, 1.0)
-  local COLOR_EDGE = ImGui.ColorConvertDouble4ToU32(0.34, 0.38, 0.38, 1.0)
-  local COLOR_TEXT = ImGui.ColorConvertDouble4ToU32(0.78, 0.83, 0.82, 1.0)
-  local COLOR_MUTED = ImGui.ColorConvertDouble4ToU32(0.48, 0.54, 0.54, 1.0)
-  local COLOR_FLOW = ImGui.ColorConvertDouble4ToU32(0.95, 0.68, 0.25, 0.95)
-  local COLOR_PROFILE = ImGui.ColorConvertDouble4ToU32(0.25, 0.68, 0.90, 0.92)
-  local COLOR_OUTPUT = ImGui.ColorConvertDouble4ToU32(0.30, 0.74, 0.54, 0.95)
-  local COLOR_ERROR = ImGui.ColorConvertDouble4ToU32(1.0, 0.35, 0.22, 1.0)
+  local theme_palette = (ui_theme and ui_theme.palette and ui_theme.palette(ImGui)) or {}
+  local FLOW = {
+    bg = theme_palette.bg_alt or ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0),
+    panel = theme_palette.panel or ImGui.ColorConvertDouble4ToU32(0.060, 0.066, 0.070, 1.0),
+    edge = theme_palette.edge or ImGui.ColorConvertDouble4ToU32(0.34, 0.38, 0.38, 1.0),
+    text = theme_palette.text or ImGui.ColorConvertDouble4ToU32(0.78, 0.83, 0.82, 1.0),
+    muted = theme_palette.muted or ImGui.ColorConvertDouble4ToU32(0.48, 0.54, 0.54, 1.0),
+    flow = ImGui.ColorConvertDouble4ToU32(0.88, 0.70, 0.36, 0.95),
+    profile = ImGui.ColorConvertDouble4ToU32(0.42, 0.62, 0.70, 0.92),
+    output = ImGui.ColorConvertDouble4ToU32(0.46, 0.66, 0.54, 0.95),
+    error = theme_palette.warn or ImGui.ColorConvertDouble4ToU32(1.0, 0.35, 0.22, 1.0),
+  }
+
+  local function status_text(draw_ctx, value, color_name)
+    if ui_theme and ui_theme.status then
+      ui_theme.status(ImGui, draw_ctx, value, color_name or "value")
+    else
+      ImGui.Text(draw_ctx, value)
+    end
+  end
 
   local ORDER_NAMES = { "1OA / 4ch", "2OA / 9ch", "3OA / 16ch" }
   local ORDER_VALUES = { 1, 2, 3 }
@@ -133,10 +148,10 @@ end
   end
 
   local function draw_box(draw_list, x0, y0, x1, y1, title, detail, color)
-    ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, COLOR_PANEL)
-    ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, color or COLOR_EDGE)
-    ImGui.DrawList_AddText(draw_list, x0 + 9, y0 + 9, COLOR_TEXT, title)
-    ImGui.DrawList_AddText(draw_list, x0 + 9, y0 + 30, COLOR_MUTED, detail)
+    ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, FLOW.panel)
+    ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, color or FLOW.edge)
+    ImGui.DrawList_AddText(draw_list, x0 + 9, y0 + 9, FLOW.text, title)
+    ImGui.DrawList_AddText(draw_list, x0 + 9, y0 + 30, FLOW.muted, detail)
   end
 
   local function draw_arrow(draw_list, x0, y0, x1, y1, color)
@@ -151,9 +166,9 @@ end
     local x0, y0 = ImGui.GetItemRectMin(ctx)
     local x1, y1 = x0 + width, y0 + height
     local draw_list = ImGui.GetWindowDrawList(ctx)
-    ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, COLOR_BG)
-    ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, COLOR_EDGE)
-    ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, COLOR_TEXT, string.lower(config.short_title or TITLE))
+    ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, FLOW.bg)
+    ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, FLOW.edge)
+    ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, FLOW.text, string.lower(config.short_title or TITLE))
 
     local margin = 14
     local gap = 16
@@ -169,21 +184,21 @@ end
     local proc_x = mid_x + mid_w + gap
     local out_x = proc_x + proc_w + gap
 
-    draw_box(draw_list, left_x, source_y, left_x + left_w, source_y + box_h, "source HOA", ORDER_NAMES[settings.order_index], COLOR_EDGE)
-    draw_box(draw_list, left_x, profile_y, left_x + left_w, profile_y + box_h, config.profile_box or "profile HOA", config.profile_detail or "reference material", COLOR_PROFILE)
-    draw_box(draw_list, mid_x, source_y, mid_x + mid_w, source_y + box_h, "source directions", tostring(direction_count(settings.order_index)) .. " decoded feeds", COLOR_FLOW)
-    draw_box(draw_list, mid_x, profile_y, mid_x + mid_w, profile_y + box_h, "profile model", config.model_detail or "per-direction spectrum", COLOR_PROFILE)
-    draw_box(draw_list, proc_x, y0 + 83, proc_x + proc_w, y0 + 83 + box_h, config.process_box or "spectral process", config.process_detail or "same direction bins", COLOR_FLOW)
-    draw_box(draw_list, out_x, y0 + 83, out_x + out_w, y0 + 83 + box_h, config.output_box or "output HOA", "re-encoded HOA", COLOR_OUTPUT)
+    draw_box(draw_list, left_x, source_y, left_x + left_w, source_y + box_h, "source HOA", ORDER_NAMES[settings.order_index], FLOW.edge)
+    draw_box(draw_list, left_x, profile_y, left_x + left_w, profile_y + box_h, config.profile_box or "profile HOA", config.profile_detail or "reference material", FLOW.profile)
+    draw_box(draw_list, mid_x, source_y, mid_x + mid_w, source_y + box_h, "source directions", tostring(direction_count(settings.order_index)) .. " decoded feeds", FLOW.flow)
+    draw_box(draw_list, mid_x, profile_y, mid_x + mid_w, profile_y + box_h, "profile model", config.model_detail or "per-direction spectrum", FLOW.profile)
+    draw_box(draw_list, proc_x, y0 + 83, proc_x + proc_w, y0 + 83 + box_h, config.process_box or "spectral process", config.process_detail or "same direction bins", FLOW.flow)
+    draw_box(draw_list, out_x, y0 + 83, out_x + out_w, y0 + 83 + box_h, config.output_box or "output HOA", "re-encoded HOA", FLOW.output)
 
-    draw_arrow(draw_list, left_x + left_w + 3, source_y + box_h * 0.5, mid_x - 5, source_y + box_h * 0.5, COLOR_FLOW)
-    draw_arrow(draw_list, left_x + left_w + 3, profile_y + box_h * 0.5, mid_x - 5, profile_y + box_h * 0.5, COLOR_PROFILE)
-    draw_arrow(draw_list, mid_x + mid_w + 3, source_y + box_h * 0.5, proc_x - 5, y0 + 83 + box_h * 0.5, COLOR_FLOW)
-    ImGui.DrawList_AddLine(draw_list, mid_x + mid_w + 3, profile_y + box_h * 0.5, proc_x - 5, y0 + 83 + box_h * 0.5 + 12, COLOR_PROFILE, 1.4)
-    ImGui.DrawList_AddTriangleFilled(draw_list, proc_x - 5, y0 + 83 + box_h * 0.5 + 12, proc_x - 12, y0 + 83 + box_h * 0.5 + 8, proc_x - 12, y0 + 83 + box_h * 0.5 + 16, COLOR_PROFILE)
-    draw_arrow(draw_list, proc_x + proc_w + 3, y0 + 83 + box_h * 0.5, out_x - 5, y0 + 83 + box_h * 0.5, COLOR_OUTPUT)
+    draw_arrow(draw_list, left_x + left_w + 3, source_y + box_h * 0.5, mid_x - 5, source_y + box_h * 0.5, FLOW.flow)
+    draw_arrow(draw_list, left_x + left_w + 3, profile_y + box_h * 0.5, mid_x - 5, profile_y + box_h * 0.5, FLOW.profile)
+    draw_arrow(draw_list, mid_x + mid_w + 3, source_y + box_h * 0.5, proc_x - 5, y0 + 83 + box_h * 0.5, FLOW.flow)
+    ImGui.DrawList_AddLine(draw_list, mid_x + mid_w + 3, profile_y + box_h * 0.5, proc_x - 5, y0 + 83 + box_h * 0.5 + 12, FLOW.profile, 1.4)
+    ImGui.DrawList_AddTriangleFilled(draw_list, proc_x - 5, y0 + 83 + box_h * 0.5 + 12, proc_x - 12, y0 + 83 + box_h * 0.5 + 8, proc_x - 12, y0 + 83 + box_h * 0.5 + 16, FLOW.profile)
+    draw_arrow(draw_list, proc_x + proc_w + 3, y0 + 83 + box_h * 0.5, out_x - 5, y0 + 83 + box_h * 0.5, FLOW.output)
 
-    ImGui.DrawList_AddText(draw_list, left_x + 4, y1 - 24, COLOR_MUTED, config.flow_note or "The profile item is analyzed; it is not mixed directly into the output.")
+    ImGui.DrawList_AddText(draw_list, left_x + 4, y1 - 24, FLOW.muted, config.flow_note or "The profile item is analyzed; it is not mixed directly into the output.")
   end
 
   local function run_render(source, profile, settings)
@@ -322,7 +337,7 @@ end
       ImGui.Text(ctx, "Source file: " .. basename(source.filename))
       ImGui.Text(ctx, (config.profile_label or "Profile") .. " file: " .. basename(profile.filename))
       if validation then
-        ImGui.TextColored(ctx, COLOR_ERROR, validation)
+        status_text(ctx, validation, "warn")
       else
         ImGui.Text(ctx, "Renders offline from WAV media with NumPy.")
       end

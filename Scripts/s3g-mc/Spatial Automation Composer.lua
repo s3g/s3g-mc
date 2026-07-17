@@ -67,13 +67,13 @@ local settings = {
   clear_existing = true,
 }
 
-local COLORS = {
+local STYLE = {
   bg = THEME.bg,
   panel = THEME.panel,
   edge = THEME.edge,
   text = THEME.text,
   muted = THEME.muted,
-  active = ImGui.ColorConvertDouble4ToU32(0.16, 0.63, 0.38, 1),
+  active = THEME.ok,
   warn = THEME.warn,
 }
 
@@ -143,18 +143,18 @@ end
 
 local function draw_preview_camera_controls()
   ImGui.BeginGroup(ctx)
-  ImGui.Text(ctx, "Camera")
-  nudge_camera("up##motioncam", 68, 24, function() view_pitch_deg = clamp(view_pitch_deg + 4, -180, 180) end)
-  nudge_camera("left##motioncam", 32, 24, function() view_yaw_deg = view_yaw_deg - 4 end)
+  theme.muted(ImGui, ctx, "CAMERA")
+  nudge_camera("UP##motioncam", 68, 24, function() view_pitch_deg = clamp(view_pitch_deg + 4, -180, 180) end)
+  nudge_camera("<##motioncam", 32, 24, function() view_yaw_deg = view_yaw_deg - 4 end)
   ImGui.SameLine(ctx)
-  nudge_camera("right##motioncam", 32, 24, function() view_yaw_deg = view_yaw_deg + 4 end)
-  nudge_camera("down##motioncam", 68, 24, function() view_pitch_deg = clamp(view_pitch_deg - 4, -180, 180) end)
+  nudge_camera(">##motioncam", 32, 24, function() view_yaw_deg = view_yaw_deg + 4 end)
+  nudge_camera("DOWN##motioncam", 68, 24, function() view_pitch_deg = clamp(view_pitch_deg - 4, -180, 180) end)
   nudge_camera("-##motioncamzoom", 32, 24, function() view_zoom = clamp(view_zoom - 0.025, 0.45, 2.5) end)
   ImGui.SameLine(ctx)
   nudge_camera("+##motioncamzoom", 32, 24, function() view_zoom = clamp(view_zoom + 0.025, 0.45, 2.5) end)
   if ImGui.Button(ctx, "3/4##motioncam", 68, 24) then reset_camera(-35, -42) end
-  if ImGui.Button(ctx, "top##motioncam", 68, 24) then reset_camera(0, 0) end
-  if ImGui.Button(ctx, "front##motioncam", 68, 24) then reset_camera(0, -90) end
+  if ImGui.Button(ctx, "TOP##motioncam", 68, 24) then reset_camera(0, 0) end
+  if ImGui.Button(ctx, "FRONT##motioncam", 68, 24) then reset_camera(0, -90) end
   ImGui.EndGroup(ctx)
 end
 
@@ -544,19 +544,18 @@ local function commit_automation(track, fx, spec, start_pos, end_pos)
 end
 
 local function draw_combo(label, index, labels)
-  if ImGui.BeginCombo(ctx, label, labels[index] or labels[1]) then
-    for i, name in ipairs(labels) do
-      local selected = i == index
-      if ImGui.Selectable(ctx, name, selected) then index = i end
-    end
-    ImGui.EndCombo(ctx)
-  end
-  return index
+  local changed, next_index = theme.combo_row(ImGui, ctx, label, labels, index, 190)
+  return changed and next_index or index
 end
 
 local function slider(label, value, lo, hi, fmt)
-  local changed, new_value = ImGui.SliderDouble(ctx, label, value, lo, hi, fmt or "%.2f")
+  local changed, new_value = theme.slider_row(ImGui, ctx, label, value, lo, hi, fmt or "%.2f", false)
   return changed and new_value or value
+end
+
+local function slider_int(label, value, lo, hi)
+  local changed, new_value = theme.slider_row(ImGui, ctx, label, value, lo, hi, nil, true)
+  return changed and math.floor(new_value + 0.5) or value
 end
 
 local function draw_preview(spec, start_pos, end_pos)
@@ -569,11 +568,11 @@ local function draw_preview(spec, start_pos, end_pos)
   local controls_inline = w >= 640
   local canvas_w = controls_inline and math.max(420, w - control_width - control_gap) or w
   ImGui.InvisibleButton(ctx, "##spatial_motion_preview", canvas_w, h)
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + canvas_w, y + h, COLORS.bg)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + canvas_w, y + h, COLORS.edge)
-  ImGui.DrawList_AddText(draw_list, x + 14, y + 12, COLORS.text, "Motion preview")
-  ImGui.DrawList_AddText(draw_list, x + 150, y + 12, COLORS.muted, string.format("%.2fs to %.2fs / %s", start_pos, end_pos, spec.coord))
-  ImGui.DrawList_AddText(draw_list, x + canvas_w - 170, y + 12, COLORS.muted,
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + canvas_w, y + h, STYLE.bg)
+  ImGui.DrawList_AddRect(draw_list, x, y, x + canvas_w, y + h, STYLE.edge)
+  ImGui.DrawList_AddText(draw_list, x + 14, y + 12, STYLE.text, "MOTION PREVIEW")
+  ImGui.DrawList_AddText(draw_list, x + 150, y + 12, STYLE.muted, string.format("%.2fs to %.2fs / %s", start_pos, end_pos, spec.coord))
+  ImGui.DrawList_AddText(draw_list, x + canvas_w - 170, y + 12, STYLE.muted,
     string.format("yaw %.0f / pitch %.0f / zoom %.2f", view_yaw_deg, view_pitch_deg, view_zoom))
 
   local cx, cy = x + canvas_w * 0.5, y + h * 0.56
@@ -621,13 +620,13 @@ end
 
 local function draw_preview_transport()
   local changed
-  changed, preview_t = ImGui.SliderDouble(ctx, "Timeline preview", preview_t, 0, 1, "%.3f")
-  if ImGui.Button(ctx, preview_play and "Stop Preview" or "Play Preview", 130, 26) then
+  changed, preview_t = theme.slider_row(ImGui, ctx, "Timeline preview", preview_t, 0, 1, "%.3f", false)
+  if ImGui.Button(ctx, preview_play and "STOP" or "PLAY", 90, 26) then
     preview_play = not preview_play
   end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Reset Preview", 110, 26) then preview_t = 0 end
-  changed, preview_speed = ImGui.SliderDouble(ctx, "Preview speed", preview_speed, 0.125, 4.0, "%.3fx")
+  if ImGui.Button(ctx, "RESET", 90, 26) then preview_t = 0 end
+  changed, preview_speed = theme.slider_row(ImGui, ctx, "Preview speed", preview_speed, 0.125, 4.0, "%.3fx", false)
 end
 
 local function loop()
@@ -647,26 +646,26 @@ local function loop()
     local footer_h = 68
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(280, avail_h - footer_h)
+    local controls_style = theme.push_soft_panel and theme.push_soft_panel(ImGui, ctx) or nil
     if ImGui.BeginChild(ctx, "##spatial_automation_controls", 0, control_h) then
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     local spec, fx = detect_panner(track)
     if not track then
       ImGui.Text(ctx, "Select a track with an s3g panner.")
     elseif not spec then
-      ImGui.TextColored(ctx, COLORS.warn, "No supported s3g AED/XYZ panner found on the selected track.")
-      ImGui.TextColored(ctx, COLORS.muted, "Supported: Layout, 12ch Dodeca, 17ch Cube XYZ, 25ch Dome panners.")
+      theme.status(ImGui, ctx, "No supported s3g AED/XYZ panner found on the selected track.", "warn")
+      theme.muted(ImGui, ctx, "Supported: Layout, 12ch Dodeca, 17ch Cube XYZ, 25ch Dome panners.")
     else
       local start_pos, end_pos = time_range()
       footer_track, footer_fx, footer_spec, footer_start, footer_end = track, fx, spec, start_pos, end_pos
       ImGui.Text(ctx, "Target: " .. spec.label)
       ImGui.SameLine(ctx)
-      ImGui.TextColored(ctx, COLORS.muted, spec.coord .. " / FX #" .. tostring(fx + 1))
+      theme.muted(ImGui, ctx, spec.coord .. " / FX #" .. tostring(fx + 1))
 
       settings.algorithm = draw_combo("Path method", settings.algorithm, ALGORITHMS)
       settings.target_mode = draw_combo("Source relationship", settings.target_mode, TARGET_MODES)
       if settings.target_mode == 1 then
-        local changed
-        changed, settings.selected_source = ImGui.SliderInt(ctx, "Selected source", settings.selected_source, 1, NUM_SOURCES)
+        settings.selected_source = slider_int("Selected source", settings.selected_source, 1, NUM_SOURCES)
       end
       if settings.target_mode == 4 then
         settings.canon_delay = slider("Canon delay", settings.canon_delay, 0.0, 0.5, "%.3f")
@@ -679,19 +678,17 @@ local function loop()
       settings.continuity = slider("Continuity", settings.continuity, 0, 1, "%.2f")
       settings.tear = slider("Tear / jump chance", settings.tear, 0, 1, "%.2f")
       if settings.algorithm == 6 then
-        local changed
-        changed, settings.graph_nodes = ImGui.SliderInt(ctx, "Graph nodes", settings.graph_nodes, 3, 16)
+        settings.graph_nodes = slider_int("Graph nodes", settings.graph_nodes, 3, 16)
         settings.graph_memory = slider("Graph memory", settings.graph_memory, 0, 1, "%.2f")
       elseif settings.algorithm == 7 then
         settings.hole_radius = slider("Hole radius", settings.hole_radius, 0.02, 0.95, "%.2f")
         settings.boundary_push = slider("Hole repulsion", settings.boundary_push, 0, 1, "%.2f")
       elseif settings.algorithm == 8 or settings.algorithm == 9 then
         settings.boundary_push = slider("Boundary force", settings.boundary_push, 0, 1, "%.2f")
-        local changed
-        changed, settings.graph_nodes = ImGui.SliderInt(ctx, "Path corners", settings.graph_nodes, 4, 16)
+        settings.graph_nodes = slider_int("Path corners", settings.graph_nodes, 4, 16)
       end
       local changed
-      changed, settings.clear_existing = ImGui.Checkbox(ctx, "Clear existing points in range", settings.clear_existing)
+      changed, settings.clear_existing = ImGui.Checkbox(ctx, "CLEAR EXISTING POINTS", settings.clear_existing)
 
       if spec.coord == "XYZ" then
         settings.xyz_radius = slider("XYZ radius", settings.xyz_radius, 0.05, 2, "%.2f")
@@ -703,20 +700,20 @@ local function loop()
         settings.dist_center = slider("Distance center", settings.dist_center, spec.dist_min, spec.dist_max, "%.2f")
         settings.dist_width = slider("Distance range", settings.dist_width, 0, spec.dist_max - spec.dist_min, "%.2f")
       end
-      local seed_changed
-      seed_changed, settings.seed = ImGui.SliderInt(ctx, "Seed", settings.seed, 1, 99999)
+      settings.seed = slider_int("Seed", settings.seed, 1, 99999)
 
       ImGui.Spacing(ctx)
       draw_preview(spec, start_pos, end_pos)
       draw_preview_transport()
       ImGui.Spacing(ctx)
-      ImGui.TextColored(ctx, COLORS.muted, string.format("Will write %d points per parameter over %.2f seconds.", point_count(start_pos, end_pos), end_pos - start_pos))
-      if last_status ~= "" then ImGui.TextColored(ctx, COLORS.muted, last_status) end
+      theme.muted(ImGui, ctx, string.format("Will write %d points per parameter over %.2f seconds.", point_count(start_pos, end_pos), end_pos - start_pos))
+      if last_status ~= "" then theme.muted(ImGui, ctx, last_status) end
     end
     ImGui.EndChild(ctx)
+    if theme.pop_soft_panel then theme.pop_soft_panel(ImGui, ctx, controls_style) end
     end
     if not footer_spec then ImGui.BeginDisabled(ctx) end
-    if ImGui.Button(ctx, "Write automation", 180, 30) and footer_spec then
+    if ImGui.Button(ctx, "WRITE AUTOMATION", 180, 30) and footer_spec then
       local stats = commit_automation(footer_track, footer_fx, footer_spec, footer_start, footer_end)
       local first = stats and stats[1]
       if first then
@@ -733,7 +730,7 @@ local function loop()
     end
     if not footer_spec then ImGui.EndDisabled(ctx) end
     ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Close", 100, 30) then open = false end
+    if ImGui.Button(ctx, "CLOSE", 100, 30) then open = false end
     ImGui.Dummy(ctx, 1, 10)
     ImGui.End(ctx)
   end

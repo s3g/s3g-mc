@@ -17,6 +17,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ui_theme = nil
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -25,7 +26,7 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui); ui_theme = _s3g_theme end
 end
 
 
@@ -33,6 +34,16 @@ local TITLE = "Lattice Drums"
 local ctx = ImGui.CreateContext(TITLE)
 local open = true
 local status = ""
+
+local function ui_slider_int(label, value, min_value, max_value)
+  if ui_theme and ui_theme.slider_int then return ui_theme.slider_int(ImGui, ctx, label, value, min_value, max_value) end
+  return ImGui.SliderInt(ctx, label, value, min_value, max_value)
+end
+
+local function ui_slider_double(label, value, min_value, max_value, format)
+  if ui_theme and ui_theme.slider_double then return ui_theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format) end
+  return ImGui.SliderDouble(ctx, label, value, min_value, max_value, format)
+end
 
 local LENGTHS = { "Use time selection", "1 bar", "2 bars", "4 bars", "8 bars", "16 bars" }
 local LENGTH_BEATS = { 0, 4, 8, 16, 32, 64 }
@@ -130,7 +141,7 @@ local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
+local CANVAS = {
   panel = color(0.055, 0.060, 0.064, 1),
   panel2 = color(0.080, 0.086, 0.088, 1),
   edge = color(0.30, 0.32, 0.33, 1),
@@ -144,7 +155,7 @@ local COLORS = {
   muted = color(0.22, 0.24, 0.25, 1),
 }
 
-local LAYER_COLORS = {
+local LAYER_PALETTE = {
   color(1.00, 0.78, 0.18, 1),
   color(0.08, 0.78, 0.92, 1),
   color(0.96, 0.22, 0.34, 1),
@@ -167,7 +178,25 @@ local LAYER_RGBA = {
 }
 
 local function layer_color(layer)
-  return LAYER_COLORS[((math.max(1, math.floor(layer or 1)) - 1) % #LAYER_COLORS) + 1]
+  return LAYER_PALETTE[((math.max(1, math.floor(layer or 1)) - 1) % #LAYER_PALETTE) + 1]
+end
+
+local function muted_text(value)
+  if ui_theme and ui_theme.muted then ui_theme.muted(ImGui, ctx, value) else ImGui.Text(ctx, value) end
+end
+
+local function toolbox_header(title, flags)
+  if ui_theme and ui_theme.toolbox_header then return ui_theme.toolbox_header(ImGui, ctx, title, flags) end
+  return ImGui.CollapsingHeader(ctx, tostring(title or ""):upper(), nil, flags)
+end
+
+local function push_soft_panel()
+  if ui_theme and ui_theme.push_soft_panel then return ui_theme.push_soft_panel(ImGui, ctx) end
+  return nil
+end
+
+local function pop_soft_panel(stack)
+  if ui_theme and ui_theme.pop_soft_panel then ui_theme.pop_soft_panel(ImGui, ctx, stack) end
 end
 
 local function layer_tint(layer, alpha, scale)
@@ -177,9 +206,55 @@ local function layer_tint(layer, alpha, scale)
 end
 
 local function combo(label, labels, value, width)
+  if ui_theme and ui_theme.combo_row then return ui_theme.combo_row(ImGui, ctx, label, labels, value, width) end
+  width = width or 160
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local draw = ImGui.GetWindowDrawList(ctx)
+  ImGui.DrawList_AddText(draw, x, y + 3, CANVAS.dim, tostring(label or ""):upper())
+  ImGui.SetCursorScreenPos(ctx, x + 82, y)
   ImGui.SetNextItemWidth(ctx, width or 160)
-  local changed, next_value = ImGui.Combo(ctx, label, value - 1, table.concat(labels, "\0") .. "\0")
+  local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), value - 1, table.concat(labels, "\0") .. "\0")
+  ImGui.SetCursorScreenPos(ctx, x, y + 24)
+  ImGui.Dummy(ctx, 1, 1)
   return changed, next_value + 1
+end
+
+local function combo_action_row(label, labels, value, width, button_label, button_width)
+  if ui_theme and ui_theme.combo_action_row then return ui_theme.combo_action_row(ImGui, ctx, label, labels, value, width, button_label, button_width) end
+  width = width or 160
+  button_width = button_width or 86
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local draw = ImGui.GetWindowDrawList(ctx)
+  ImGui.DrawList_AddText(draw, x, y + 3, CANVAS.dim, tostring(label or ""):upper())
+  ImGui.SetCursorScreenPos(ctx, x + 82, y)
+  ImGui.SetNextItemWidth(ctx, width)
+  local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), value - 1, table.concat(labels, "\0") .. "\0")
+  ImGui.SameLine(ctx)
+  local pressed = ImGui.Button(ctx, button_label, button_width, 24)
+  ImGui.SetCursorScreenPos(ctx, x, y + 26)
+  ImGui.Dummy(ctx, 1, 1)
+  return changed, next_value + 1, pressed
+end
+
+local function input_int_row(label, value, step, step_fast, width)
+  if ui_theme and ui_theme.input_int_row then return ui_theme.input_int_row(ImGui, ctx, label, value, step, step_fast, width) end
+  width = width or 110
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 3, CANVAS.dim, tostring(label or ""):upper())
+  ImGui.SetCursorScreenPos(ctx, x + 82, y)
+  ImGui.SetNextItemWidth(ctx, width)
+  local changed, next_value = ImGui.InputInt(ctx, "##input_" .. tostring(label or ""), value, step or 1, step_fast or 10)
+  ImGui.SetCursorScreenPos(ctx, x, y + 24)
+  ImGui.Dummy(ctx, 1, 1)
+  return changed, next_value
+end
+
+local function section_label(label)
+  if ui_theme and ui_theme.section_label then return ui_theme.section_label(ImGui, ctx, label) end
+  ImGui.Dummy(ctx, 1, 4)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y, CANVAS.dim, tostring(label or ""):upper())
+  ImGui.Dummy(ctx, 1, 16)
 end
 
 local function index_of(list, name, fallback)
@@ -553,9 +628,9 @@ local function draw_lattice()
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
   local h = 360
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, COLORS.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, COLORS.edge)
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, COLORS.dim, "GESTURE TEMPLATE TABLE")
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, CANVAS.panel)
+  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, CANVAS.edge)
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, CANVAS.dim, "GESTURE TEMPLATE TABLE")
   local active_event, active_index = current_preview_event()
 
   local table_w = math.min(w * 0.66, h * 1.05)
@@ -613,12 +688,12 @@ local function draw_lattice()
     ImGui.DrawList_AddCircleFilled(draw_list, px + 1.3, py + 1.3, radius + 1.2, color(0, 0, 0, 0.38))
     ImGui.DrawList_AddCircleFilled(draw_list, px, py, radius, event_col)
     if index == active_index then
-      ImGui.DrawList_AddCircleFilled(draw_list, px, py, radius + 5.0, COLORS.panel)
+      ImGui.DrawList_AddCircleFilled(draw_list, px, py, radius + 5.0, CANVAS.panel)
       ImGui.DrawList_AddCircleFilled(draw_list, px, py, radius + 2.6, event_col)
-      ImGui.DrawList_AddCircle(draw_list, px, py, radius + 6.4, COLORS.text, 24, 1.5)
+      ImGui.DrawList_AddCircle(draw_list, px, py, radius + 6.4, CANVAS.text, 24, 1.5)
     end
-    if index == 1 then ImGui.DrawList_AddText(draw_list, px + 7, py - 8, COLORS.ingress, "in") end
-    if index == #preview then ImGui.DrawList_AddText(draw_list, px + 7, py - 8, COLORS.egress, "out") end
+    if index == 1 then ImGui.DrawList_AddText(draw_list, px + 7, py - 8, CANVAS.ingress, "in") end
+    if index == #preview then ImGui.DrawList_AddText(draw_list, px + 7, py - 8, CANVAS.egress, "out") end
     last_x, last_y = px, py
     last_layer = event.layer
   end
@@ -628,15 +703,15 @@ local function draw_lattice()
   local out_x = gx + (state.egress_col - 0.5) * cell
   local out_y = gy + (state.egress_row - 0.5) * cell
   local egress_active = template_uses_egress()
-  ImGui.DrawList_AddCircle(draw_list, in_x, in_y, 9, COLORS.ingress, 16, 2)
-  ImGui.DrawList_AddText(draw_list, in_x + 8, in_y + 6, COLORS.ingress, "ingress")
-  ImGui.DrawList_AddCircle(draw_list, out_x, out_y, 9, egress_active and COLORS.egress or COLORS.muted, 16, 2)
-  ImGui.DrawList_AddText(draw_list, out_x + 8, out_y + 6, egress_active and COLORS.egress or COLORS.dim, "egress")
+  ImGui.DrawList_AddCircle(draw_list, in_x, in_y, 9, CANVAS.ingress, 16, 2)
+  ImGui.DrawList_AddText(draw_list, in_x + 8, in_y + 6, CANVAS.ingress, "ingress")
+  ImGui.DrawList_AddCircle(draw_list, out_x, out_y, 9, egress_active and CANVAS.egress or CANVAS.muted, 16, 2)
+  ImGui.DrawList_AddText(draw_list, out_x + 8, out_y + 6, egress_active and CANVAS.egress or CANVAS.dim, "egress")
 
   local strip_x = gx + grid_w + depth_total_x + 58
   local strip_y = y + 50
   local strip_w = math.max(110, w - (strip_x - x) - 20)
-  ImGui.DrawList_AddText(draw_list, strip_x, y + 10, COLORS.dim, "TRANSLATION LAYERS")
+  ImGui.DrawList_AddText(draw_list, strip_x, y + 10, CANVAS.dim, "TRANSLATION LAYERS")
   for layer = 1, state.layers do
     local ly = strip_y + (layer - 1) * 32
     ImGui.DrawList_AddText(draw_list, strip_x, ly - 7, layer_color(layer), "L" .. tostring(layer) .. " " .. layer_token(layer))
@@ -657,10 +732,10 @@ local function draw_lattice()
       active_event.row,
       active_event.col) or
     "no events"
-  ImGui.DrawList_AddText(draw_list, strip_x, y + h - 58, COLORS.dim,
+  ImGui.DrawList_AddText(draw_list, strip_x, y + h - 58, CANVAS.dim,
     tostring(#preview) .. " events  /  " .. TEMPLATES[state.template])
-  ImGui.DrawList_AddText(draw_list, strip_x, y + h - 40, COLORS.text, active_text)
-  ImGui.DrawList_AddText(draw_list, strip_x, y + h - 22, COLORS.dim,
+  ImGui.DrawList_AddText(draw_list, strip_x, y + h - 40, CANVAS.text, active_text)
+  ImGui.DrawList_AddText(draw_list, strip_x, y + h - 22, CANVAS.dim,
     "ingress " .. state.ingress_row .. "," .. state.ingress_col ..
     "  egress " .. state.egress_row .. "," .. state.egress_col)
 
@@ -669,31 +744,26 @@ local function draw_lattice()
   local tw = w - 36
   ImGui.DrawList_AddLine(draw_list, tx, ty, tx + tw, ty, color(0.55, 0.60, 0.58, 0.32), 1)
   ImGui.DrawList_AddRectFilled(draw_list, tx, ty - 3, tx + tw, ty + 3, color(0.18, 0.42, 0.42, 0.22))
-  ImGui.DrawList_AddCircleFilled(draw_list, tx + tw * preview_t, ty, 3.4, COLORS.hit)
+  ImGui.DrawList_AddCircleFilled(draw_list, tx + tw * preview_t, ty, 3.4, CANVAS.hit)
 
   ImGui.SetCursorScreenPos(ctx, x, y + h + 12)
 end
 
 local function draw_preview_controls()
   local changed
-  changed, preview_t = ImGui.SliderDouble(ctx, "Timeline preview", preview_t, 0, 1, "%.3f")
-  if ImGui.Button(ctx, preview_play and "Stop Preview" or "Play Preview", 130, 26) then
+  changed, preview_t = ui_slider_double("TIMELINE PREVIEW", preview_t, 0, 1, "%.3f")
+  if ImGui.Button(ctx, preview_play and "STOP PREVIEW" or "PLAY PREVIEW", 130, 26) then
     preview_play = not preview_play
     last_time = reaper.time_precise()
   end
   ImGui.SameLine(ctx)
-  changed, preview_sync_project_bpm = ImGui.Checkbox(ctx, "Project BPM", preview_sync_project_bpm)
-  ImGui.SameLine(ctx)
-  ImGui.SetNextItemWidth(ctx, 120)
-  changed, preview_speed = ImGui.SliderDouble(ctx, "Preview speed", preview_speed, 0.125, 4.0, "%.3fx")
+  changed, preview_sync_project_bpm = ImGui.Checkbox(ctx, "PROJECT BPM", preview_sync_project_bpm)
+  changed, preview_speed = ui_slider_double("PREVIEW SPEED", preview_speed, 0.125, 4.0, "%.3fx")
   if not preview_sync_project_bpm then
-    ImGui.SameLine(ctx)
-    ImGui.SetNextItemWidth(ctx, 112)
-    changed, preview_loop_seconds = ImGui.SliderDouble(ctx, "Loop seconds", preview_loop_seconds, 1.0, 30.0, "%.1f")
+    changed, preview_loop_seconds = ui_slider_double("LOOP SECONDS", preview_loop_seconds, 1.0, 30.0, "%.1f")
   else
     local start_qn = current_start_qn()
-    ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, COLORS.dim, string.format("%.1f BPM", tempo_at_qn(start_qn)))
+    muted_text(string.format("%.1f BPM", tempo_at_qn(start_qn)))
   end
 end
 
@@ -724,17 +794,17 @@ end
 generate_preview()
 
 local function draw_footer()
-  ImGui.Separator(ctx)
-  if ImGui.Button(ctx, "Generate MIDI Item", 160, 30) then generate_item() end
+  ImGui.Dummy(ctx, 1, 6)
+  if ImGui.Button(ctx, "GENERATE MIDI", 160, 30) then generate_item() end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "Refresh Preview", 130, 30) then generate_preview() end
+  if ImGui.Button(ctx, "REFRESH", 130, 30) then generate_preview() end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "New Seed", 100, 30) then
+  if ImGui.Button(ctx, "NEW SEED", 100, 30) then
     state.seed = state.seed + 1
     generate_preview()
   end
   ImGui.SameLine(ctx)
-  ImGui.TextColored(ctx, COLORS.dim, status)
+  muted_text(status)
 end
 
 local function loop()
@@ -759,6 +829,7 @@ local function loop()
     local footer_height = 52
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local content_height = math.max(220, avail_h - footer_height)
+    local main_panel_style = push_soft_panel()
     local child_visible = ImGui.BeginChild(ctx, "##main_content", 0, content_height)
     if child_visible then
       draw_lattice()
@@ -766,74 +837,70 @@ local function loop()
       local changed = false
       local c
 
-      if ImGui.CollapsingHeader(ctx, "Gesture", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-        local preset_zero = state.preset - 1
-        ImGui.SetNextItemWidth(ctx, 190)
-        c, preset_zero = ImGui.Combo(ctx, "Linear preset", preset_zero, PRESET_ITEMS)
-        if c then state.preset = preset_zero + 1 end
-        ImGui.SameLine(ctx)
-        if ImGui.Button(ctx, "Apply Preset", 108, 24) then
+      if toolbox_header("GESTURE", ImGui.TreeNodeFlags_DefaultOpen) then
+        local preset_apply
+        c, state.preset, preset_apply = combo_action_row("PSET", PRESET_NAMES, state.preset, 190, "APPLY", 88)
+        changed = changed or c
+        if preset_apply then
           apply_preset(PRESET_NAMES[state.preset] or "Manual")
           changed = false
         end
-        c, state.length = combo("Length", LENGTHS, state.length, 150); changed = changed or c
-        c, state.template = combo("Gesture template", TEMPLATES, state.template, 190); changed = changed or c
-        ImGui.SameLine(ctx)
-        c, state.layer_rule = combo("Layer translation", LAYER_RULES, state.layer_rule, 220); changed = changed or c
+        c, state.length = combo("LENGTH", LENGTHS, state.length, 150); changed = changed or c
+        c, state.template = combo("GESTURE", TEMPLATES, state.template, 190); changed = changed or c
+        c, state.layer_rule = combo("LAYER XLT", LAYER_RULES, state.layer_rule, 220); changed = changed or c
       end
 
-      if ImGui.CollapsingHeader(ctx, "Table", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-        c, state.rows = ImGui.SliderInt(ctx, "Rows", state.rows, 3, 12); changed = changed or c
-        c, state.cols = ImGui.SliderInt(ctx, "Columns", state.cols, 3, 12); changed = changed or c
-        c, state.layers = ImGui.SliderInt(ctx, "Layers", state.layers, 1, 8); changed = changed or c
-        c, state.events = ImGui.SliderInt(ctx, "Events", state.events, 4, 256); changed = changed or c
+      if toolbox_header("TABLE", ImGui.TreeNodeFlags_DefaultOpen) then
+        c, state.rows = ui_slider_int("ROWS", state.rows, 3, 12); changed = changed or c
+        c, state.cols = ui_slider_int("COLS", state.cols, 3, 12); changed = changed or c
+        c, state.layers = ui_slider_int("LAYERS", state.layers, 1, 8); changed = changed or c
+        c, state.events = ui_slider_int("EVENTS", state.events, 4, 256); changed = changed or c
         state.ingress_row = math.min(state.ingress_row, state.rows)
         state.ingress_col = math.min(state.ingress_col, state.cols)
         state.egress_row = math.min(state.egress_row, state.rows)
         state.egress_col = math.min(state.egress_col, state.cols)
-        c, state.ingress_row = ImGui.SliderInt(ctx, "Ingress row", state.ingress_row, 1, state.rows); changed = changed or c
-        c, state.ingress_col = ImGui.SliderInt(ctx, "Ingress column", state.ingress_col, 1, state.cols); changed = changed or c
-        c, state.egress_row = ImGui.SliderInt(ctx, "Egress row", state.egress_row, 1, state.rows); changed = changed or c
-        c, state.egress_col = ImGui.SliderInt(ctx, "Egress column", state.egress_col, 1, state.cols); changed = changed or c
-        ImGui.Separator(ctx)
-        ImGui.Text(ctx, "Layer drum voices")
+        c, state.ingress_row = ui_slider_int("IN ROW", state.ingress_row, 1, state.rows); changed = changed or c
+        c, state.ingress_col = ui_slider_int("IN COL", state.ingress_col, 1, state.cols); changed = changed or c
+        c, state.egress_row = ui_slider_int("OUT ROW", state.egress_row, 1, state.rows); changed = changed or c
+        c, state.egress_col = ui_slider_int("OUT COL", state.egress_col, 1, state.cols); changed = changed or c
+        section_label("Layer drum voices")
         for layer = 1, state.layers do
           ImGui.PushID(ctx, layer)
-          ImGui.TextColored(ctx, layer_color(layer), string.format("L%d", layer))
-          ImGui.SameLine(ctx)
+          local x, y = ImGui.GetCursorScreenPos(ctx)
+          ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 3, layer_color(layer), string.format("L%d", layer))
+          ImGui.SetCursorScreenPos(ctx, x + 34, y)
           local token_index = 0
           for index, token in ipairs(DRUM_TOKENS) do
             if token == layer_token(layer) then token_index = index - 1 break end
           end
-          ImGui.SetNextItemWidth(ctx, 140)
-          c, token_index = ImGui.Combo(ctx, "Drum", token_index, DRUM_TOKEN_ITEMS)
+          ImGui.SetNextItemWidth(ctx, 116)
+          c, token_index = ImGui.Combo(ctx, "##DRUM", token_index, DRUM_TOKEN_ITEMS)
           if c then
             layer_tokens[layer] = DRUM_TOKENS[token_index + 1] or "KIK"
             changed = true
           end
-          if layer % 2 == 1 and layer < state.layers then ImGui.SameLine(ctx) end
+          ImGui.SetCursorScreenPos(ctx, x, y + 24)
+          ImGui.Dummy(ctx, 1, 1)
           ImGui.PopID(ctx)
         end
       end
 
-      if ImGui.CollapsingHeader(ctx, "Output", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-        c, state.density = ImGui.SliderDouble(ctx, "Density", state.density, 0, 1, "%.3f"); changed = changed or c
-        c, state.mutation = ImGui.SliderDouble(ctx, "Gesture mutation", state.mutation, 0, 1, "%.3f"); changed = changed or c
-        c, state.note_len = ImGui.SliderDouble(ctx, "Note length scale", state.note_len, 0.05, 1.5, "%.2f"); changed = changed or c
-        c, state.velocity = ImGui.SliderInt(ctx, "Base velocity", state.velocity, 1, 127); changed = changed or c
-        c, state.accent = ImGui.SliderInt(ctx, "Accent", state.accent, 0, 48); changed = changed or c
-        c, state.velocity_jitter = ImGui.SliderInt(ctx, "Velocity jitter", state.velocity_jitter, 0, 48); changed = changed or c
-        local map_zero = state.map - 1
-        ImGui.SetNextItemWidth(ctx, 150)
-        c, map_zero = ImGui.Combo(ctx, "Drum map", map_zero, MAP_ITEMS); changed = changed or c
-        if c then state.map = map_zero + 1 end
-        c, state.midi_channel = ImGui.SliderInt(ctx, "MIDI channel", state.midi_channel, 1, 16); changed = changed or c
-        c, state.seed = ImGui.InputInt(ctx, "Seed", state.seed); changed = changed or c
+      if toolbox_header("OUTPUT", ImGui.TreeNodeFlags_DefaultOpen) then
+        c, state.density = ui_slider_double("DENS", state.density, 0, 1, "%.3f"); changed = changed or c
+        c, state.mutation = ui_slider_double("MUTATE", state.mutation, 0, 1, "%.3f"); changed = changed or c
+        c, state.note_len = ui_slider_double("NLEN", state.note_len, 0.05, 1.5, "%.2f"); changed = changed or c
+        c, state.velocity = ui_slider_int("VELO", state.velocity, 1, 127); changed = changed or c
+        c, state.accent = ui_slider_int("ACNT", state.accent, 0, 48); changed = changed or c
+        c, state.velocity_jitter = ui_slider_int("VJIT", state.velocity_jitter, 0, 48); changed = changed or c
+        c, state.map = combo("MAP", MAP_NAMES, state.map, 150); changed = changed or c
+        c, state.midi_channel = ui_slider_int("MIDI", state.midi_channel, 1, 16); changed = changed or c
+        c, state.seed = input_int_row("SEED", state.seed, 1, 10, 110); changed = changed or c
       end
 
       if changed then generate_preview() end
     end
     ImGui.EndChild(ctx)
+    pop_soft_panel(main_panel_style)
     draw_footer()
   end
   ImGui.End(ctx)

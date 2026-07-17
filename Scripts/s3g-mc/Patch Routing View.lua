@@ -27,6 +27,8 @@ do
   local ok, theme = pcall(require, "s3g-mc ImGui Theme")
   if ok and theme and theme.install then theme.install(ImGui) end
 end
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local ctx = ImGui.CreateContext(TITLE)
 local open = true
@@ -35,21 +37,21 @@ local function rgba(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
-  bg = rgba(0.030, 0.032, 0.034, 1),
-  panel = rgba(0.060, 0.064, 0.068, 1),
+local STYLE = {
+  bg = THEME.bg,
+  panel = THEME.panel,
   node = rgba(0.105, 0.112, 0.118, 0.96),
-  node_bus = rgba(0.118, 0.135, 0.145, 0.98),
+  node_bus = rgba(0.118, 0.130, 0.136, 0.98),
   node_sel = rgba(0.205, 0.190, 0.135, 0.98),
-  edge = rgba(0.310, 0.325, 0.340, 1),
-  grid = rgba(0.50, 0.54, 0.55, 0.10),
-  text = rgba(0.83, 0.85, 0.86, 1),
-  muted = rgba(0.56, 0.59, 0.60, 1),
-  send = rgba(0.42, 0.70, 0.78, 0.85),
+  edge = THEME.edge,
+  text = THEME.text,
+  muted = THEME.value,
+  send = rgba(0.42, 0.62, 0.66, 0.85),
   receive = rgba(0.58, 0.62, 0.66, 0.65),
-  folder = rgba(0.90, 0.70, 0.36, 0.88),
-  master = rgba(0.42, 0.82, 0.56, 0.78),
-  warn = rgba(0.94, 0.50, 0.34, 0.90),
+  folder = THEME.amber,
+  master = rgba(0.46, 0.58, 0.50, 0.78),
+  warn = THEME.warn,
+  active = THEME.text,
   pin = rgba(0.72, 0.76, 0.78, 1),
 }
 
@@ -583,21 +585,7 @@ local function screen_to_world(x, y, ox, oy)
 end
 
 local function draw_grid(dl, x0, y0, x1, y1)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, COLORS.bg)
-  local step = 64 * zoom
-  if step < 18 then step = step * 2 end
-  local start_x = x0 + (pan_x % step)
-  local start_y = y0 + (pan_y % step)
-  local x = start_x
-  while x < x1 do
-    ImGui.DrawList_AddLine(dl, x, y0, x, y1, COLORS.grid, 1)
-    x = x + step
-  end
-  local y = start_y
-  while y < y1 do
-    ImGui.DrawList_AddLine(dl, x0, y, x1, y, COLORS.grid, 1)
-    y = y + step
-  end
+  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, STYLE.bg)
 end
 
 local function push_canvas_clip(dl, x0, y0, x1, y1)
@@ -677,13 +665,13 @@ local function draw_connections(dl, connections, ox, oy)
   for i, c in ipairs(connections) do
     local sx, sy = node_output(c.source, ox, oy)
     local dx, dy = node_input(c.dest, ox, oy)
-    local color = COLORS.send
+    local color = STYLE.send
     local thick = 2.0
     if c.kind == "folder" then
-      color = COLORS.folder
+      color = STYLE.folder
       thick = 1.8
     elseif c.kind == "master" then
-      color = COLORS.master
+      color = STYLE.master
       thick = 1.4
     end
     if c.mute or (c.source and c.source.muted) then
@@ -696,7 +684,7 @@ local function draw_connections(dl, connections, ox, oy)
     local mx, my = (sx + dx) * 0.5, (sy + dy) * 0.5
     local label_visible = not labels_hover_only or (c.key and (c.key == hovered_connection_key or c.key == selected_connection_key))
     if zoom > 0.72 and c.kind ~= "master" and label_visible then
-      ImGui.DrawList_AddText(dl, mx + 5, my - 7, COLORS.muted, c.label or c.kind)
+      ImGui.DrawList_AddText(dl, mx + 5, my - 7, STYLE.muted, c.label or c.kind)
     end
   end
 end
@@ -704,22 +692,22 @@ end
 local function draw_node(dl, node, ox, oy)
   local x0, y0, x1, y1 = node_rect(node, ox, oy)
   local selected = selected_node_key == node.guid or selected_node_keys[node.guid]
-  local fill = node.master and COLORS.node_bus or COLORS.node
-  if selected then fill = COLORS.node_sel end
+  local fill = node.master and STYLE.node_bus or STYLE.node
+  if selected then fill = STYLE.node_sel end
   if node.solo and not selected then fill = rgba(0.130, 0.125, 0.075, 0.96) end
   if node.muted and not selected then fill = rgba(0.070, 0.074, 0.078, 0.68) end
-  local accent = node.master and COLORS.master or track_color(node.track, 0.92, COLORS.edge)
+  local accent = node.master and STYLE.master or track_color(node.track, 0.92, STYLE.edge)
   if node.solo then accent = rgba(0.95, 0.78, 0.32, 0.95) end
   if node.muted then accent = rgba(0.25, 0.27, 0.28, 0.80) end
   ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, fill)
-  ImGui.DrawList_AddRect(dl, x0, y0, x1, y1, selected and COLORS.text or COLORS.edge, 0, 0, selected and 2.2 or 1.2)
+  ImGui.DrawList_AddRect(dl, x0, y0, x1, y1, selected and STYLE.text or STYLE.edge, 0, 0, selected and 2.2 or 1.2)
   ImGui.DrawList_AddRectFilled(dl, x0, y0, x0 + 5 * zoom, y1, accent)
 
   local in_x, in_y = node_input(node, ox, oy)
   local out_x, out_y = node_output(node, ox, oy)
   local pin = math.max(4, 4 * zoom)
-  ImGui.DrawList_AddRectFilled(dl, in_x - pin, in_y - pin, in_x + pin, in_y + pin, COLORS.pin)
-  ImGui.DrawList_AddRectFilled(dl, out_x - pin, out_y - pin, out_x + pin, out_y + pin, COLORS.pin)
+  ImGui.DrawList_AddRectFilled(dl, in_x - pin, in_y - pin, in_x + pin, in_y + pin, STYLE.pin)
+  ImGui.DrawList_AddRectFilled(dl, out_x - pin, out_y - pin, out_x + pin, out_y + pin, STYLE.pin)
 
   if zoom > 0.42 and not node.master then
     local badge_w = math.max(18, 18 * zoom)
@@ -730,7 +718,7 @@ local function draw_node(dl, node, ox, oy)
       ImGui.DrawList_AddRectFilled(dl, bx, by, bx + badge_w, by + badge_h, color)
       ImGui.DrawList_AddRect(dl, bx, by, bx + badge_w, by + badge_h, rgba(0.02, 0.02, 0.02, 0.55), 0, 0, 1)
       if zoom > 0.58 then
-        ImGui.DrawList_AddText(dl, bx + 5 * zoom, by + 1 * zoom, text_color or COLORS.text, label)
+        ImGui.DrawList_AddText(dl, bx + 5 * zoom, by + 1 * zoom, text_color or STYLE.text, label)
       end
       bx = bx - badge_w - 4 * zoom
     end
@@ -742,18 +730,18 @@ local function draw_node(dl, node, ox, oy)
     local tx = x0 + 12 * zoom
     local ty = y0 + 9 * zoom
     local id_label = node.master and "MASTER" or ("TR" .. tostring(node.index))
-    ImGui.DrawList_AddText(dl, tx, ty, COLORS.text, id_label)
+    ImGui.DrawList_AddText(dl, tx, ty, STYLE.text, id_label)
     local name_label = node.master and "master output" or short_name(node.display_name or "", 13)
     if name_label ~= "" then
-      ImGui.DrawList_AddText(dl, tx, ty + 18 * zoom, COLORS.muted, name_label)
+      ImGui.DrawList_AddText(dl, tx, ty + 18 * zoom, STYLE.muted, name_label)
     end
     local info = string.format("%dch  FX:%d", node.channels or 2, node.fx_count or 0)
-    ImGui.DrawList_AddText(dl, tx, ty + 36 * zoom, COLORS.muted, info)
+    ImGui.DrawList_AddText(dl, tx, ty + 36 * zoom, STYLE.muted, info)
     if not node.master then
-      ImGui.DrawList_AddText(dl, tx, ty + 54 * zoom, COLORS.muted, string.format("Sends: %d", node.send_count or 0))
-      ImGui.DrawList_AddText(dl, tx, ty + 72 * zoom, COLORS.muted, string.format("Receives: %d", node.recv_count or 0))
+      ImGui.DrawList_AddText(dl, tx, ty + 54 * zoom, STYLE.muted, string.format("Sends: %d", node.send_count or 0))
+      ImGui.DrawList_AddText(dl, tx, ty + 72 * zoom, STYLE.muted, string.format("Receives: %d", node.recv_count or 0))
       local route_label = node.parent and "parent on" or (node.master_send and "master on" or "master off")
-      local route_color = (node.parent or node.master_send) and COLORS.master or COLORS.warn
+      local route_color = (node.parent or node.master_send) and STYLE.master or STYLE.warn
       ImGui.DrawList_AddText(dl, tx, ty + 90 * zoom, route_color, route_label)
     end
   end
@@ -765,10 +753,10 @@ local function draw_node(dl, node, ox, oy)
     for i = 1, count do
       local bx0 = x0 + 12 * zoom + (i - 1) * bar_w
       local bx1 = bx0 + math.max(5, bar_w - 2)
-      ImGui.DrawList_AddRectFilled(dl, bx0, y, bx1, y + 4 * zoom, COLORS.folder)
+      ImGui.DrawList_AddRectFilled(dl, bx0, y, bx1, y + 4 * zoom, STYLE.folder)
     end
     if (node.child_count or 0) > count then
-      ImGui.DrawList_AddText(dl, x1 - 26 * zoom, y1 - 17 * zoom, COLORS.folder, "+" .. tostring((node.child_count or 0) - count))
+      ImGui.DrawList_AddText(dl, x1 - 26 * zoom, y1 - 17 * zoom, STYLE.folder, "+" .. tostring((node.child_count or 0) - count))
     end
   end
 end
@@ -919,8 +907,8 @@ local function draw_minimap(dl, nodes, canvas_x0, canvas_y0, canvas_x1, canvas_y
   local over = mx >= mx0 and mx <= mx1 and my >= my0 and my <= my1
   local bg = over and rgba(0.075, 0.080, 0.084, 0.94) or rgba(0.055, 0.060, 0.064, 0.86)
   ImGui.DrawList_AddRectFilled(dl, mx0, my0, mx1, my1, bg)
-  ImGui.DrawList_AddRect(dl, mx0, my0, mx1, my1, COLORS.edge, 0, 0, 1.0)
-  ImGui.DrawList_AddText(dl, mx0 + 8, my0 + 6, COLORS.muted, "map")
+  ImGui.DrawList_AddRect(dl, mx0, my0, mx1, my1, STYLE.edge, 0, 0, 1.0)
+  ImGui.DrawList_AddText(dl, mx0 + 8, my0 + 6, STYLE.muted, "map")
 
   local bx0, by0, bx1, by1 = graph_bounds(nodes)
   local bw, bh = math.max(1, bx1 - bx0), math.max(1, by1 - by0)
@@ -941,7 +929,7 @@ local function draw_minimap(dl, nodes, canvas_x0, canvas_y0, canvas_x1, canvas_y
     local nx0, ny0 = map_point(node.x or 0, node.y or 0)
     local nx1, ny1 = map_point((node.x or 0) + w, (node.y or 0) + h)
     local selected = selected_node_key == node.guid or selected_node_keys[node.guid]
-    local color = selected and COLORS.node_sel or (node.master and COLORS.master or track_color(node.track, 0.68, rgba(0.42, 0.45, 0.46, 0.70)))
+    local color = selected and STYLE.node_sel or (node.master and STYLE.master or track_color(node.track, 0.68, rgba(0.42, 0.45, 0.46, 0.70)))
     if node.solo then color = rgba(0.88, 0.63, 0.20, 0.82) end
     if node.muted then color = rgba(0.42, 0.14, 0.12, 0.78) end
     ImGui.DrawList_AddRectFilled(dl, nx0, ny0, nx1, ny1, color)
@@ -955,7 +943,7 @@ local function draw_minimap(dl, nodes, canvas_x0, canvas_y0, canvas_x1, canvas_y
   local sx1, sy1 = map_point(vx1, vy1)
   sx0, sx1 = clamp(sx0, inner_x0, inner_x1), clamp(sx1, inner_x0, inner_x1)
   sy0, sy1 = clamp(sy0, inner_y0, inner_y1), clamp(sy1, inner_y0, inner_y1)
-  ImGui.DrawList_AddRect(dl, sx0, sy0, sx1, sy1, COLORS.text, 0, 0, 1.2)
+  ImGui.DrawList_AddRect(dl, sx0, sy0, sx1, sy1, STYLE.text, 0, 0, 1.2)
 
   if over and not dragging_key and not patch_drag and not marquee_drag and ImGui.IsMouseDown(ctx, 0) then
     local wx = bx0 + ((mx - off_x) / scale)
@@ -976,7 +964,7 @@ local function draw_canvas(nodes, connections)
   local x1, y1 = ImGui.GetItemRectMax(ctx)
   local dl = ImGui.GetWindowDrawList(ctx)
   draw_grid(dl, x0, y0, x1, y1)
-  ImGui.DrawList_AddRect(dl, x0, y0, x1, y1, COLORS.edge, 0, 0, 1.2)
+  ImGui.DrawList_AddRect(dl, x0, y0, x1, y1, STYLE.edge, 0, 0, 1.2)
 
   local clipped = push_canvas_clip(dl, x0 + 1, y0 + 1, x1 - 1, y1 - 1)
   if not wires_front then draw_connections(dl, connections, x0, y0) end
@@ -1018,7 +1006,7 @@ local function draw_canvas(nodes, connections)
     else
       sx, sy = node_output(patch_drag.source, x0, y0)
     end
-    bezier(dl, sx, sy, mx, my, COLORS.warn, 2.4)
+    bezier(dl, sx, sy, mx, my, STYLE.warn, 2.4)
     local target = patch_drag.kind == "receive"
       and hit_output_pin(nodes, mx, my, x0, y0, false)
       or hit_input_pin(nodes, mx, my, x0, y0, patch_drag.source)
@@ -1038,14 +1026,14 @@ local function draw_canvas(nodes, connections)
         ImGui.DrawList_AddRectFilled(dl, nx0, ny1 - 18 * zoom, nx1, ny1 + 4 * zoom, rgba(0.94, 0.50, 0.34, 0.18))
       end
       ImGui.DrawList_AddRectFilled(dl, tx - halo, ty - halo, tx + halo, ty + halo, rgba(0.94, 0.50, 0.34, 0.28))
-      ImGui.DrawList_AddRectFilled(dl, tx - pin, ty - pin, tx + pin, ty + pin, COLORS.warn)
+      ImGui.DrawList_AddRectFilled(dl, tx - pin, ty - pin, tx + pin, ty + pin, STYLE.warn)
     end
   end
   if marquee_drag then
     marquee_drag.x1, marquee_drag.y1 = mx, my
     local rx0, ry0, rx1, ry1 = marquee_bounds(marquee_drag)
     ImGui.DrawList_AddRectFilled(dl, rx0, ry0, rx1, ry1, rgba(0.62, 0.69, 0.72, 0.13))
-    ImGui.DrawList_AddRect(dl, rx0, ry0, rx1, ry1, COLORS.active or COLORS.text, 0, 0, 1.2)
+    ImGui.DrawList_AddRect(dl, rx0, ry0, rx1, ry1, STYLE.active or STYLE.text, 0, 0, 1.2)
   end
   pop_canvas_clip(dl, clipped)
   local minimap_hovered = draw_minimap(dl, nodes, x0, y0, x1, y1, mx, my)
@@ -1193,7 +1181,7 @@ local function draw_canvas(nodes, connections)
   if zoom > 0.55 then
     local help = edit_mode and "Edit: drag send > receive or receive > send. Shift-click toggles. Blank drag selects."
       or "View: drag nodes. Shift-click toggles. Blank drag selects. Right-drag pans. Wheel zooms."
-    ImGui.DrawList_AddText(dl, x0 + 10, y1 - 22, COLORS.muted, help)
+    ImGui.DrawList_AddText(dl, x0 + 10, y1 - 22, STYLE.muted, help)
   end
 end
 
@@ -1215,7 +1203,7 @@ end
 local function draw_send_editor(connection)
   if not (connection and connection.kind == "send") then return end
   ImGui.Text(ctx, "Selected Send")
-  ImGui.TextColored(ctx, COLORS.muted, connection.source.name .. " > " .. connection.dest.name)
+  theme.muted(ImGui, ctx, connection.source.name .. " > " .. connection.dest.name)
   ImGui.Separator(ctx)
 
   local changed, vol = ImGui.SliderDouble(ctx, "Level##selected_send_level", connection.vol or 1, 0.0, 2.0, "%.3f")
@@ -1224,7 +1212,7 @@ local function draw_send_editor(connection)
     status = "Send level: " .. db_label(vol)
   end
   ImGui.SameLine(ctx)
-  ImGui.TextColored(ctx, COLORS.muted, db_label(vol))
+  theme.muted(ImGui, ctx, db_label(vol))
 
   local mute = connection.mute or false
   changed, mute = ImGui.Checkbox(ctx, "Mute send##selected_send_mute", mute)
@@ -1320,11 +1308,11 @@ local function draw_wire_key()
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local function key_line(offset_y, color, label)
     ImGui.DrawList_AddRectFilled(dl, x, y + offset_y + 5, x + 34, y + offset_y + 9, color)
-    ImGui.DrawList_AddText(dl, x + 42, y + offset_y, COLORS.muted, label)
+    ImGui.DrawList_AddText(dl, x + 42, y + offset_y, STYLE.muted, label)
   end
-  key_line(0, COLORS.send, "send / receive")
-  key_line(18, COLORS.folder, "folder: child / parent")
-  key_line(36, COLORS.master, "master send")
+  key_line(0, STYLE.send, "send / receive")
+  key_line(18, STYLE.folder, "folder: child / parent")
+  key_line(36, STYLE.master, "master send")
   ImGui.Dummy(ctx, 1, 58)
 end
 
@@ -1338,7 +1326,7 @@ local function draw_inspector(node, connections, entries)
     ImGui.Separator(ctx)
   end
   if not node then
-    ImGui.TextColored(ctx, COLORS.muted, "Select a node.")
+    theme.muted(ImGui, ctx, "Select a node.")
     ImGui.TextWrapped(ctx, edit_mode and "Edit mode: drag send to receive, or receive to send, to create a track send." or "View mode: select tracks, inspect routing, and arrange nodes without changing routing.")
     ImGui.Spacing(ctx)
     ImGui.Separator(ctx)
@@ -1346,7 +1334,7 @@ local function draw_inspector(node, connections, entries)
     return
   end
   ImGui.Text(ctx, node.name)
-  ImGui.TextColored(ctx, COLORS.muted, node.master and "Master track" or ("Track " .. tostring(node.index)))
+  theme.muted(ImGui, ctx, node.master and "Master track" or ("Track " .. tostring(node.index)))
   ImGui.Separator(ctx)
   ImGui.Text(ctx, string.format("Channels: %d", node.channels or 2))
     ImGui.Text(ctx, string.format("FX: %d", node.fx_count or 0))
@@ -1390,12 +1378,12 @@ local function draw_inspector(node, connections, entries)
   if (node.parent or #children > 0) and ImGui.CollapsingHeader(ctx, "Folder", ImGui.TreeNodeFlags_DefaultOpen or 32) then
     if node.parent then
       ImGui.Text(ctx, "Parent")
-      ImGui.TextColored(ctx, COLORS.muted, "  " .. node_label(node.parent, 24))
+      theme.muted(ImGui, ctx, "  " .. node_label(node.parent, 24))
     end
     if #children > 0 then
       ImGui.Text(ctx, "Children")
       for _, child in ipairs(children) do
-        ImGui.TextColored(ctx, COLORS.muted, "  " .. node_label(child, 24))
+        theme.muted(ImGui, ctx, "  " .. node_label(child, 24))
       end
     end
   end
@@ -1410,7 +1398,7 @@ local function draw_inspector(node, connections, entries)
         if c.kind == "send" and c.vol then text = text .. "  " .. db_label(c.vol) end
         ImGui.TextWrapped(ctx, text)
         if c.kind == "send" then
-          ImGui.TextColored(ctx, COLORS.muted, "  " .. (c.label or ""))
+          theme.muted(ImGui, ctx, "  " .. (c.label or ""))
           ImGui.SameLine(ctx)
           if ImGui.Button(ctx, "Select##" .. c.key, 58, 22) then
             selected_connection_key = c.key
@@ -1532,7 +1520,7 @@ local function loop()
 
     ImGui.Text(ctx, "Patch Routing View")
     ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, COLORS.muted, status)
+    theme.muted(ImGui, ctx, status)
 
     ImGui.SetNextItemWidth(ctx, 160)
     local changed_search

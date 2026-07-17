@@ -17,6 +17,7 @@ function M.run(config)
 
   package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
   local ImGui = require("imgui")("0.10")
+local ui_theme = nil
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -25,21 +26,23 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui); ui_theme = _s3g_theme end
 end
 
   local WINDOW_OPEN_COND = ImGui.Cond_Appearing
   local EXT = config.ext
 
-  local COLOR_BG = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0)
-  local COLOR_PANEL = ImGui.ColorConvertDouble4ToU32(0.060, 0.066, 0.070, 1.0)
-  local COLOR_EDGE = ImGui.ColorConvertDouble4ToU32(0.34, 0.38, 0.38, 1.0)
-  local COLOR_TEXT = ImGui.ColorConvertDouble4ToU32(0.78, 0.83, 0.82, 1.0)
-  local COLOR_MUTED = ImGui.ColorConvertDouble4ToU32(0.48, 0.54, 0.54, 1.0)
-  local COLOR_FLOW = ImGui.ColorConvertDouble4ToU32(0.95, 0.68, 0.25, 0.95)
-  local COLOR_PROFILE = ImGui.ColorConvertDouble4ToU32(0.25, 0.68, 0.90, 0.92)
-  local COLOR_OUTPUT = ImGui.ColorConvertDouble4ToU32(0.30, 0.74, 0.54, 0.95)
-  local COLOR_ERROR = ImGui.ColorConvertDouble4ToU32(1.0, 0.35, 0.22, 1.0)
+  local FLOW = {
+    bg = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1.0),
+    panel = ImGui.ColorConvertDouble4ToU32(0.060, 0.066, 0.070, 1.0),
+    edge = ImGui.ColorConvertDouble4ToU32(0.34, 0.38, 0.38, 1.0),
+    text = ImGui.ColorConvertDouble4ToU32(0.78, 0.83, 0.82, 1.0),
+    muted = ImGui.ColorConvertDouble4ToU32(0.48, 0.54, 0.54, 1.0),
+    flow = ImGui.ColorConvertDouble4ToU32(0.95, 0.68, 0.25, 0.95),
+    profile = ImGui.ColorConvertDouble4ToU32(0.25, 0.68, 0.90, 0.92),
+    output = ImGui.ColorConvertDouble4ToU32(0.30, 0.74, 0.54, 0.95),
+    error = ImGui.ColorConvertDouble4ToU32(1.0, 0.35, 0.22, 1.0),
+  }
 
   local PROFILE_NAMES = { "Median profile", "Mean profile" }
   local PROFILE_KEYS = { "median", "mean" }
@@ -112,10 +115,10 @@ end
   end
 
   local function draw_box(draw_list, x0, y0, x1, y1, title, detail, color)
-    ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, COLOR_PANEL)
-    ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, color or COLOR_EDGE)
-    ImGui.DrawList_AddText(draw_list, x0 + 9, y0 + 9, COLOR_TEXT, title)
-    ImGui.DrawList_AddText(draw_list, x0 + 9, y0 + 30, COLOR_MUTED, detail)
+    ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, FLOW.panel)
+    ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, color or FLOW.edge)
+    ImGui.DrawList_AddText(draw_list, x0 + 9, y0 + 9, FLOW.text, title)
+    ImGui.DrawList_AddText(draw_list, x0 + 9, y0 + 30, FLOW.muted, detail)
   end
 
   local function draw_arrow(draw_list, x0, y0, x1, y1, color)
@@ -130,9 +133,9 @@ end
     local x0, y0 = ImGui.GetItemRectMin(ctx)
     local x1, y1 = x0 + width, y0 + height
     local draw_list = ImGui.GetWindowDrawList(ctx)
-    ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, COLOR_BG)
-    ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, COLOR_EDGE)
-    ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, COLOR_TEXT, string.lower(config.short_title or TITLE))
+    ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x1, y1, FLOW.bg)
+    ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, FLOW.edge)
+    ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, FLOW.text, string.lower(config.short_title or TITLE))
 
     local margin = 14
     local gap = 16
@@ -140,13 +143,13 @@ end
     local box_w = (width - margin * 2 - gap * 3) / 4
     local bx = x0 + margin
     local by = y0 + 58
-    draw_box(draw_list, bx, by, bx + box_w, by + box_h, "source", tostring(source.channels) .. " channels", COLOR_EDGE)
-    draw_box(draw_list, bx + (box_w + gap), by, bx + (box_w + gap) + box_w, by + box_h, config.profile_box or "profile", tostring(profile.channels) .. " channels", COLOR_PROFILE)
-    draw_box(draw_list, bx + (box_w + gap) * 2, by, bx + (box_w + gap) * 2 + box_w, by + box_h, config.process_box or "profile process", CHANNEL_NAMES[settings.channel_index], COLOR_FLOW)
-    draw_box(draw_list, bx + (box_w + gap) * 3, by, bx + (box_w + gap) * 3 + box_w, by + box_h, config.output_box or "output", "source channel count", COLOR_OUTPUT)
-    draw_arrow(draw_list, bx + box_w + 3, by + box_h * 0.5, bx + box_w + gap - 5, by + box_h * 0.5, COLOR_PROFILE)
-    draw_arrow(draw_list, bx + (box_w + gap) * 2 + box_w + 3, by + box_h * 0.5, bx + (box_w + gap) * 3 - 5, by + box_h * 0.5, COLOR_OUTPUT)
-    ImGui.DrawList_AddText(draw_list, bx + 4, y1 - 24, COLOR_MUTED, config.flow_note or "No ambisonic decode is used; source channel layout is preserved.")
+    draw_box(draw_list, bx, by, bx + box_w, by + box_h, "source", tostring(source.channels) .. " channels", FLOW.edge)
+    draw_box(draw_list, bx + (box_w + gap), by, bx + (box_w + gap) + box_w, by + box_h, config.profile_box or "profile", tostring(profile.channels) .. " channels", FLOW.profile)
+    draw_box(draw_list, bx + (box_w + gap) * 2, by, bx + (box_w + gap) * 2 + box_w, by + box_h, config.process_box or "profile process", CHANNEL_NAMES[settings.channel_index], FLOW.flow)
+    draw_box(draw_list, bx + (box_w + gap) * 3, by, bx + (box_w + gap) * 3 + box_w, by + box_h, config.output_box or "output", "source channel count", FLOW.output)
+    draw_arrow(draw_list, bx + box_w + 3, by + box_h * 0.5, bx + box_w + gap - 5, by + box_h * 0.5, FLOW.profile)
+    draw_arrow(draw_list, bx + (box_w + gap) * 2 + box_w + 3, by + box_h * 0.5, bx + (box_w + gap) * 3 - 5, by + box_h * 0.5, FLOW.output)
+    ImGui.DrawList_AddText(draw_list, bx + 4, y1 - 24, FLOW.muted, config.flow_note or "No ambisonic decode is used; source channel layout is preserved.")
   end
 
   local function run_render(source, profile, settings)
@@ -281,7 +284,7 @@ end
       ImGui.Text(ctx, "Source file: " .. basename(source.filename))
       ImGui.Text(ctx, (config.profile_label or "Profile") .. " file: " .. basename(profile.filename))
       if validation then
-        ImGui.TextColored(ctx, COLOR_ERROR, validation)
+        if ui_theme and ui_theme.status then ui_theme.status(ImGui, ctx, validation, "warn") else ImGui.Text(ctx, validation) end
       else
         ImGui.Text(ctx, "Renders offline from WAV media with NumPy.")
       end

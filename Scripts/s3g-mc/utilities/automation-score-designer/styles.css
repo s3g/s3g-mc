@@ -8,8 +8,8 @@
   --line-soft: #292929;
   --text: #d8d8d8;
   --muted: #969696;
-  --accent: #5aa8c7;
-  --accent-2: #d8a24a;
+  --accent: #8d8d8d;
+  --accent-2: #a8a8a8;
 }
 
 * { box-sizing: border-box; }
@@ -185,7 +185,7 @@ button {
 button:hover,
 button.active {
   border-color: var(--accent);
-  color: #ecffff;
+  color: #f0f0f0;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -232,7 +232,7 @@ button.active {
   .custom-select-button:hover,
   .custom-select.open .custom-select-button {
     border-color: var(--accent);
-    background: #242424;
+    background: #232323;
     color: #f0f0f0;
   }
 
@@ -257,8 +257,8 @@ button.active {
 
   .custom-select-option:hover,
   .custom-select-option.active {
-    background: #193035;
-    color: #ecffff;
+    background: #282828;
+    color: #f0f0f0;
   }
 }
 
@@ -270,7 +270,7 @@ button.active {
 
 #exportJson {
   border-color: #555;
-  background: #171f21;
+  background: #202020;
 }
 
 #field {
@@ -360,7 +360,7 @@ input[type="range"] {
     border: 1px solid #4b4b4b;
     border-radius: 0;
     background:
-      linear-gradient(90deg, #8d8d8d 0 var(--fill, 50%), #242424 var(--fill, 50%) 100%);
+      linear-gradient(90deg, #8d8d8d 0 var(--fill, 50%), #232323 var(--fill, 50%) 100%);
     box-shadow: 0 0 0 1px #080808 inset;
   }
 
@@ -458,7 +458,7 @@ input[type="color"] {
 .section-button.active {
   border-color: var(--accent-2);
   color: var(--text);
-  background: #241e14;
+  background: #202020;
 }
 
 .lane-swatch {

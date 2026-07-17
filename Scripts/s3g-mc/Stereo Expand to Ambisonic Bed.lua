@@ -28,7 +28,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
-
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local TITLE = "Stereo Expand to Ambisonic Bed"
 local EXT = "s3g_mc_stereo_expand_ambisonic_bed_v1"
@@ -73,18 +74,18 @@ local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
-  bg = color(0.035, 0.039, 0.042, 1),
-  grid = color(0.58, 0.63, 0.63, 0.17),
-  ring = color(0.58, 0.63, 0.63, 0.27),
-  text = color(0.76, 0.80, 0.78, 1),
-  muted = color(0.50, 0.56, 0.56, 1),
-  left = color(0.95, 0.58, 0.38, 0.92),
-  right = color(0.42, 0.74, 0.96, 0.92),
-  mid = color(0.98, 0.78, 0.32, 0.92),
-  side = color(0.36, 0.88, 0.68, 0.82),
-  rear = color(0.73, 0.56, 0.96, 0.72),
-  height = color(0.92, 0.92, 0.72, 0.72),
+local STYLE = {
+  bg = THEME.bg,
+  grid = THEME.grid,
+  ring = THEME.edge,
+  text = THEME.text,
+  muted = THEME.value,
+  left = color(0.82, 0.54, 0.42, 0.92),
+  right = color(0.54, 0.62, 0.66, 0.92),
+  mid = THEME.amber,
+  side = color(0.52, 0.62, 0.56, 0.82),
+  rear = color(0.58, 0.54, 0.64, 0.72),
+  height = color(0.72, 0.72, 0.62, 0.72),
 }
 
 local function draw_node(draw_list, cx, cy, r, az_deg, radius, col, size)
@@ -103,36 +104,36 @@ local function draw_preview()
   local cx = x0 + w * 0.50
   local cy = y0 + h * 0.56
   local r = math.min(w * 0.35, h * 0.35)
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + w, y0 + h, COLORS.bg)
-  ImGui.DrawList_AddRect(draw_list, x0, y0, x0 + w, y0 + h, COLORS.grid)
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, COLORS.text, "Stereo source to ambisonic bed")
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 32, COLORS.muted, MODE_LABELS[settings.mode] .. " / " .. ORDER_LABELS[settings.output_order])
-  ImGui.DrawList_AddCircle(draw_list, cx, cy, r, COLORS.ring, 96, 1.5)
-  ImGui.DrawList_AddCircle(draw_list, cx, cy, r * 0.55, COLORS.grid, 96, 1)
-  ImGui.DrawList_AddLine(draw_list, cx - r, cy, cx + r, cy, COLORS.grid, 1)
-  ImGui.DrawList_AddLine(draw_list, cx, cy - r, cx, cy + r, COLORS.grid, 1)
-  ImGui.DrawList_AddText(draw_list, cx - 9, cy - r - 20, COLORS.muted, "F")
-  ImGui.DrawList_AddText(draw_list, cx - 9, cy + r + 6, COLORS.muted, "R")
+  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + w, y0 + h, STYLE.bg)
+  ImGui.DrawList_AddRect(draw_list, x0, y0, x0 + w, y0 + h, STYLE.grid)
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, STYLE.text, "Stereo source to ambisonic bed")
+  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 32, STYLE.muted, MODE_LABELS[settings.mode] .. " / " .. ORDER_LABELS[settings.output_order])
+  ImGui.DrawList_AddCircle(draw_list, cx, cy, r, STYLE.ring, 96, 1.5)
+  ImGui.DrawList_AddCircle(draw_list, cx, cy, r * 0.55, STYLE.grid, 96, 1)
+  ImGui.DrawList_AddLine(draw_list, cx - r, cy, cx + r, cy, STYLE.grid, 1)
+  ImGui.DrawList_AddLine(draw_list, cx, cy - r, cx, cy + r, STYLE.grid, 1)
+  ImGui.DrawList_AddText(draw_list, cx - 9, cy - r - 20, STYLE.muted, "F")
+  ImGui.DrawList_AddText(draw_list, cx - 9, cy + r + 6, STYLE.muted, "R")
 
   local angle = 30 + settings.stereo_width * 35
   local spread_r = 0.62 + math.min(0.28, settings.source_spread * 0.35)
-  draw_node(draw_list, cx, cy, r, angle, spread_r, COLORS.left, 8)
-  draw_node(draw_list, cx, cy, r, -angle, spread_r, COLORS.right, 8)
-  draw_node(draw_list, cx, cy, r, 0, 0.36, COLORS.mid, 6 + settings.center_amount * 3)
-  draw_node(draw_list, cx, cy, r, 90, 0.72, COLORS.side, 4 + settings.side_amount * 3)
-  draw_node(draw_list, cx, cy, r, -90, 0.72, COLORS.side, 4 + settings.side_amount * 3)
-  draw_node(draw_list, cx, cy, r, 180, 0.58 + settings.rear_amount * 0.22, COLORS.rear, 4 + settings.rear_amount * 4)
+  draw_node(draw_list, cx, cy, r, angle, spread_r, STYLE.left, 8)
+  draw_node(draw_list, cx, cy, r, -angle, spread_r, STYLE.right, 8)
+  draw_node(draw_list, cx, cy, r, 0, 0.36, STYLE.mid, 6 + settings.center_amount * 3)
+  draw_node(draw_list, cx, cy, r, 90, 0.72, STYLE.side, 4 + settings.side_amount * 3)
+  draw_node(draw_list, cx, cy, r, -90, 0.72, STYLE.side, 4 + settings.side_amount * 3)
+  draw_node(draw_list, cx, cy, r, 180, 0.58 + settings.rear_amount * 0.22, STYLE.rear, 4 + settings.rear_amount * 4)
   if settings.height_amount > 0.01 then
-    ImGui.DrawList_AddCircle(draw_list, cx, cy, r * (0.20 + settings.height_amount * 0.38), COLORS.height, 48, 2)
-    draw_node(draw_list, cx, cy, r, 0, 0.12, COLORS.height, 4 + settings.height_amount * 5)
+    ImGui.DrawList_AddCircle(draw_list, cx, cy, r * (0.20 + settings.height_amount * 0.38), STYLE.height, 48, 2)
+    draw_node(draw_list, cx, cy, r, 0, 0.12, STYLE.height, 4 + settings.height_amount * 5)
   end
 
   local bx = x0 + 16
   local by = y0 + h - 34
   local bw = w - 32
-  ImGui.DrawList_AddRect(draw_list, bx, by, bx + bw, by + 12, COLORS.grid)
-  ImGui.DrawList_AddRectFilled(draw_list, bx, by, bx + bw * math.min(1, settings.decorrelation), by + 12, COLORS.rear)
-  ImGui.DrawList_AddText(draw_list, bx, by + 15, COLORS.muted, "decorrelation / diffuse support")
+  ImGui.DrawList_AddRect(draw_list, bx, by, bx + bw, by + 12, STYLE.grid)
+  ImGui.DrawList_AddRectFilled(draw_list, bx, by, bx + bw * math.min(1, settings.decorrelation), by + 12, STYLE.rear)
+  ImGui.DrawList_AddText(draw_list, bx, by + 15, STYLE.muted, "decorrelation / diffuse support")
   ImGui.Dummy(ctx, w, h + 8)
 end
 

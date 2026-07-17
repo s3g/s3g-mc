@@ -18,6 +18,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ui_theme = nil
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -26,7 +27,7 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui); ui_theme = _s3g_theme end
 end
 
 
@@ -34,6 +35,16 @@ local TITLE = "Form Learner"
 local ctx = ImGui.CreateContext(TITLE)
 local open = true
 local status = ""
+
+local function ui_slider_int(label, value, min_value, max_value)
+  if ui_theme and ui_theme.slider_int then return ui_theme.slider_int(ImGui, ctx, label, value, min_value, max_value) end
+  return ImGui.SliderInt(ctx, label, value, min_value, max_value)
+end
+
+local function ui_slider_double(label, value, min_value, max_value, format)
+  if ui_theme and ui_theme.slider_double then return ui_theme.slider_double(ImGui, ctx, label, value, min_value, max_value, format) end
+  return ImGui.SliderDouble(ctx, label, value, min_value, max_value, format)
+end
 
 local STRATEGY_NAMES = { "Channel canon", "Drift variation", "Expanded return", "Fragmented blocks", "Source echo", "Terrain hybrid" }
 local STRATEGY_KEYS = { "channel_canon", "drift_variation", "expanded_return", "fragmented_blocks", "source_echo", "terrain_hybrid" }
@@ -62,7 +73,7 @@ local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
 
-local COLORS = {
+local CANVAS = {
   panel = color(0.055, 0.060, 0.064, 1),
   edge = color(0.30, 0.32, 0.33, 1),
   grid = color(0.48, 0.52, 0.51, 0.22),
@@ -73,10 +84,29 @@ local COLORS = {
   section = color(0.22, 0.30, 0.32, 1),
 }
 
+local function muted_text(value)
+  if ui_theme and ui_theme.muted then ui_theme.muted(ImGui, ctx, value) else ImGui.Text(ctx, value) end
+end
+
 local function combo(label, labels, value, width)
+  if ui_theme and ui_theme.combo_row then return ui_theme.combo_row(ImGui, ctx, label, labels, value, width) end
   ImGui.SetNextItemWidth(ctx, width or 180)
-  local changed, next_value = ImGui.Combo(ctx, label, value - 1, table.concat(labels, "\0") .. "\0")
+  local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), value - 1, table.concat(labels, "\0") .. "\0")
   return changed, next_value + 1
+end
+
+local function ui_input_int(label, value, step, step_fast, width)
+  if ui_theme and ui_theme.input_int_row then return ui_theme.input_int_row(ImGui, ctx, label, value, step, step_fast, width) end
+  return ImGui.InputInt(ctx, "##input_" .. tostring(label or ""), value, step or 1, step_fast or 10)
+end
+
+local function push_soft_panel()
+  if ui_theme and ui_theme.push_soft_panel then return ui_theme.push_soft_panel(ImGui, ctx) end
+  return nil
+end
+
+local function pop_soft_panel(stack)
+  if ui_theme and ui_theme.pop_soft_panel then ui_theme.pop_soft_panel(ImGui, ctx, stack) end
 end
 
 local function selected_midi_notes()
@@ -246,22 +276,22 @@ local function draw_preview()
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
   local h = 260
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, COLORS.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, COLORS.edge)
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, COLORS.dim, "MIDI FORM LEARNER")
+  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, CANVAS.panel)
+  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, CANVAS.edge)
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, CANVAS.dim, "MIDI FORM LEARNER")
   local info = "Select MIDI notes as source vocabulary"
   if stats then
     info = string.format("%d selected source notes / %.1f source beats", stats.count, stats.span)
   end
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 30, COLORS.text, info)
+  ImGui.DrawList_AddText(draw_list, x + 12, y + 30, CANVAS.text, info)
 
   local left, top, right = x + 18, y + 66, x + w - 18
   local source_top, source_bottom = top, top + 70
   local form_top, form_bottom = top + 110, y + h - 32
-  ImGui.DrawList_AddText(draw_list, left, source_top - 18, COLORS.dim, "SOURCE DENSITY / REGISTER")
-  ImGui.DrawList_AddText(draw_list, left, form_top - 18, COLORS.dim, "GENERATED FORM INTENTION")
-  ImGui.DrawList_AddRect(draw_list, left, source_top, right, source_bottom, COLORS.grid)
-  ImGui.DrawList_AddRect(draw_list, left, form_top, right, form_bottom, COLORS.grid)
+  ImGui.DrawList_AddText(draw_list, left, source_top - 18, CANVAS.dim, "SOURCE DENSITY / REGISTER")
+  ImGui.DrawList_AddText(draw_list, left, form_top - 18, CANVAS.dim, "GENERATED FORM INTENTION")
+  ImGui.DrawList_AddRect(draw_list, left, source_top, right, source_bottom, CANVAS.grid)
+  ImGui.DrawList_AddRect(draw_list, left, form_top, right, form_bottom, CANVAS.grid)
 
   if stats and #notes > 0 then
     local low, high = 127, 0
@@ -274,7 +304,7 @@ local function draw_preview()
       local px = left + (note.start / math.max(0.03125, stats.span)) * (right - left)
       local py = source_bottom - ((note.pitch - low) / span) * (source_bottom - source_top - 8) - 4
       local pw = math.max(2, note.duration / math.max(0.25, stats.span) * (right - left))
-      ImGui.DrawList_AddRectFilled(draw_list, px, py - 2, px + pw, py + 2, COLORS.source)
+      ImGui.DrawList_AddRectFilled(draw_list, px, py - 2, px + pw, py + 2, CANVAS.source)
     end
   end
 
@@ -293,13 +323,13 @@ local function draw_preview()
     else energy = (section % 3 == 1) and 0.85 or (0.36 + 0.45 * math.sin(math.pi * t)) end
     energy = math.max(0.08, math.min(1, energy * state.density_scale))
     local sy = form_bottom - energy * (form_bottom - form_top)
-    ImGui.DrawList_AddRectFilled(draw_list, sx0, sy, sx1, form_bottom, COLORS.section)
-    ImGui.DrawList_AddRect(draw_list, sx0, form_top, sx1, form_bottom, COLORS.grid)
-    ImGui.DrawList_AddText(draw_list, sx0 + 5, form_bottom + 7, COLORS.dim, tostring(section))
+    ImGui.DrawList_AddRectFilled(draw_list, sx0, sy, sx1, form_bottom, CANVAS.section)
+    ImGui.DrawList_AddRect(draw_list, sx0, form_top, sx1, form_bottom, CANVAS.grid)
+    ImGui.DrawList_AddText(draw_list, sx0 + 5, form_bottom + 7, CANVAS.dim, tostring(section))
   end
   local line_y = form_top + (1 - state.source_influence) * (form_bottom - form_top)
-  ImGui.DrawList_AddLine(draw_list, left, line_y, right, line_y, COLORS.learned, 1.4)
-  ImGui.DrawList_AddText(draw_list, left, y + h - 18, COLORS.dim,
+  ImGui.DrawList_AddLine(draw_list, left, line_y, right, line_y, CANVAS.learned, 1.4)
+  ImGui.DrawList_AddText(draw_list, left, y + h - 18, CANVAS.dim,
     string.format("%s / %.0f beats / %d lanes", STRATEGY_NAMES[state.strategy], state.duration_beats, state.lanes))
   ImGui.SetCursorScreenPos(ctx, x, y + h + 12)
 end
@@ -309,26 +339,34 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    draw_preview()
-    _, state.strategy = combo("Learning strategy", STRATEGY_NAMES, state.strategy, 210)
-    _, state.duration_beats = ImGui.SliderInt(ctx, "Duration beats", state.duration_beats, 16, 4096)
-    _, state.sections = ImGui.SliderInt(ctx, "Sections", state.sections, 1, 32)
-    _, state.lanes = ImGui.SliderInt(ctx, "MIDI channels / lanes", state.lanes, 1, 16)
-    _, state.bar_beats = ImGui.SliderDouble(ctx, "Bar beats", state.bar_beats, 1, 16, "%.2f")
-    ImGui.Separator(ctx)
-    _, state.density_scale = ImGui.SliderDouble(ctx, "Density scale", state.density_scale, 0.05, 2.5, "%.3f")
-    _, state.source_influence = ImGui.SliderDouble(ctx, "Source influence", state.source_influence, 0, 1, "%.3f")
-    _, state.variation = ImGui.SliderDouble(ctx, "Variation", state.variation, 0, 1, "%.3f")
-    _, state.recurrence = ImGui.SliderDouble(ctx, "Motif recurrence", state.recurrence, 0, 1, "%.3f")
-    _, state.time_warp = ImGui.SliderDouble(ctx, "Timing warp", state.time_warp, 0, 1, "%.3f")
-    _, state.transpose_range = ImGui.SliderInt(ctx, "Transpose range", state.transpose_range, 0, 36)
-    _, state.seed = ImGui.InputInt(ctx, "Seed", state.seed)
-    _, state.add_markers = ImGui.Checkbox(ctx, "Add project markers for sections", state.add_markers)
-    if ImGui.Button(ctx, "New Seed", 100, 28) then state.seed = state.seed + 1 end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "Generate Learned Form", 190, 28) then generate() end
-    ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, COLORS.dim, status)
+    local footer_height = 0
+    local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+    local content_height = math.max(220, avail_h - footer_height)
+    local main_panel_style = push_soft_panel()
+    local child_visible = ImGui.BeginChild(ctx, "##main_content", 0, content_height)
+    if child_visible then
+      draw_preview()
+      _, state.strategy = combo("STRATEGY", STRATEGY_NAMES, state.strategy, 210)
+      _, state.duration_beats = ui_slider_int("BEATS", state.duration_beats, 16, 4096)
+      _, state.sections = ui_slider_int("SECTIONS", state.sections, 1, 32)
+      _, state.lanes = ui_slider_int("MIDI LANES", state.lanes, 1, 16)
+      _, state.bar_beats = ui_slider_double("BAR BEATS", state.bar_beats, 1, 16, "%.2f")
+      _, state.density_scale = ui_slider_double("DENS", state.density_scale, 0.05, 2.5, "%.3f")
+      _, state.source_influence = ui_slider_double("SRC", state.source_influence, 0, 1, "%.3f")
+      _, state.variation = ui_slider_double("VAR", state.variation, 0, 1, "%.3f")
+      _, state.recurrence = ui_slider_double("RECUR", state.recurrence, 0, 1, "%.3f")
+      _, state.time_warp = ui_slider_double("WARP", state.time_warp, 0, 1, "%.3f")
+      _, state.transpose_range = ui_slider_int("XPOSE", state.transpose_range, 0, 36)
+      _, state.seed = ui_input_int("SEED", state.seed, 1, 10, 110)
+      _, state.add_markers = ImGui.Checkbox(ctx, "ADD MARKERS", state.add_markers)
+      if ImGui.Button(ctx, "NEW SEED", 100, 28) then state.seed = state.seed + 1 end
+      ImGui.SameLine(ctx)
+      if ImGui.Button(ctx, "GENERATE MIDI", 190, 28) then generate() end
+      ImGui.SameLine(ctx)
+      muted_text(status)
+    end
+    ImGui.EndChild(ctx)
+    pop_soft_panel(main_panel_style)
   end
   ImGui.End(ctx)
   if open then reaper.defer(loop) end

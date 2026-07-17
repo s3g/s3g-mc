@@ -5,8 +5,8 @@
   --line: #323939;
   --muted: #899393;
   --text: #d8dddd;
-  --cyan: #5eb9cf;
-  --amber: #d9a84d;
+  --cyan: #8d8d8d;
+  --amber: #a8a8a8;
   --orange: #df7348;
 }
 
@@ -176,8 +176,8 @@ button:disabled:hover {
 
 button.active {
   border-color: var(--cyan);
-  background: #193038;
-  color: #ecffff;
+  background: #282828;
+  color: #f0f0f0;
 }
 
 #field {
@@ -354,8 +354,8 @@ input[type="range"] {
   .custom-select-button:hover,
   .custom-select.open .custom-select-button {
     border-color: var(--cyan);
-    background: #172326;
-    color: #ecffff;
+    background: #202020;
+    color: #f0f0f0;
   }
 
   .custom-select-menu {
@@ -379,8 +379,8 @@ input[type="range"] {
 
   .custom-select-option:hover,
   .custom-select-option.active {
-    background: #193038;
-    color: #ecffff;
+    background: #282828;
+    color: #f0f0f0;
   }
 }
 

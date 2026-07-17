@@ -18,6 +18,7 @@ end
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
+local ui_theme = nil
 do
   local _s3g_theme_path = ({ reaper.get_action_context() })[2]
   if not _s3g_theme_path or _s3g_theme_path == "" then
@@ -26,7 +27,10 @@ do
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
-  if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
+  if _s3g_theme_ok and _s3g_theme then
+    ui_theme = _s3g_theme
+    if _s3g_theme.install then _s3g_theme.install(ImGui) end
+  end
 end
 
 
@@ -38,7 +42,7 @@ local FFT_NAMES = { "1024", "2048", "4096", "8192" }
 local FFT_VALUES = { 1024, 2048, 4096, 8192 }
 local ORDER_NAMES = { "1OA / 4ch", "2OA / 9ch", "3OA / 16ch" }
 
-local COLORS = {
+local CANVAS = {
   bg = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1),
   panel = ImGui.ColorConvertDouble4ToU32(0.055, 0.062, 0.064, 1),
   edge = ImGui.ColorConvertDouble4ToU32(0.35, 0.39, 0.39, 1),
@@ -49,6 +53,14 @@ local COLORS = {
   amber = ImGui.ColorConvertDouble4ToU32(0.92, 0.67, 0.26, 0.95),
   violet = ImGui.ColorConvertDouble4ToU32(0.66, 0.54, 0.92, 0.80),
 }
+
+local function muted_wrapped_text(value)
+  if ui_theme and ui_theme.wrapped_text and ui_theme.palette then
+    ui_theme.wrapped_text(ImGui, ctx, value, ui_theme.palette(ImGui).muted, 560)
+  else
+    ImGui.TextWrapped(ctx, value)
+  end
+end
 
 local function getn(key, default)
   return tonumber(reaper.GetExtState(EXT, key)) or default
@@ -133,43 +145,43 @@ local function draw_preview()
   local w = math.max(420, ImGui.GetContentRegionAvail(ctx))
   local h = 168
   ImGui.InvisibleButton(ctx, "##freeze_trace_preview", w, h)
-  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + h, COLORS.bg)
-  ImGui.DrawList_AddRect(dl, x, y, x + w, y + h, COLORS.edge)
-  ImGui.DrawList_AddText(dl, x + 12, y + 10, COLORS.text, "spatial spectral imprint")
-  ImGui.DrawList_AddText(dl, x + 12, y + 29, COLORS.muted, MODES[settings.mode] .. " / " .. ORDER_NAMES[settings.order])
+  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + h, CANVAS.bg)
+  ImGui.DrawList_AddRect(dl, x, y, x + w, y + h, CANVAS.edge)
+  ImGui.DrawList_AddText(dl, x + 12, y + 10, CANVAS.text, "spatial spectral imprint")
+  ImGui.DrawList_AddText(dl, x + 12, y + 29, CANVAS.muted, MODES[settings.mode] .. " / " .. ORDER_NAMES[settings.order])
   local gx = x + 24
   local gy = y + 62
   local gw = w - 48
   local gh = 68
-  ImGui.DrawList_AddRect(dl, gx, gy, gx + gw, gy + gh, COLORS.grid)
+  ImGui.DrawList_AddRect(dl, gx, gy, gx + gw, gy + gh, CANVAS.grid)
   for i = 0, 8 do
     local px = gx + gw * i / 8
-    ImGui.DrawList_AddLine(dl, px, gy, px, gy + gh, COLORS.grid, 1)
+    ImGui.DrawList_AddLine(dl, px, gy, px, gy + gh, CANVAS.grid, 1)
   end
   for i = 0, 5 do
     local py = gy + gh * i / 5
-    ImGui.DrawList_AddLine(dl, gx, py, gx + gw, py, COLORS.grid, 1)
+    ImGui.DrawList_AddLine(dl, gx, py, gx + gw, py, CANVAS.grid, 1)
   end
   local center = gx + gw * settings.freeze_pos
   local half = gw * settings.trace_width * 0.5
-  ImGui.DrawList_AddRectFilled(dl, math.max(gx, center - half), gy, math.min(gx + gw, center + half), gy + gh, COLORS.violet)
-  ImGui.DrawList_AddLine(dl, center, gy - 8, center, gy + gh + 8, COLORS.amber, 2.2)
+  ImGui.DrawList_AddRectFilled(dl, math.max(gx, center - half), gy, math.min(gx + gw, center + half), gy + gh, CANVAS.violet)
+  ImGui.DrawList_AddLine(dl, center, gy - 8, center, gy + gh + 8, CANVAS.amber, 2.2)
   local last_x, last_y
   for i = 0, 80 do
     local u = i / 80
     local px = gx + gw * u
     local py = gy + gh * (0.55 - 0.30 * math.sin(u * math.pi * 5.0 + settings.amount * 2.0) * (0.25 + settings.amount * 0.75))
-    if last_x then ImGui.DrawList_AddLine(dl, last_x, last_y, px, py, COLORS.cyan, 1.5) end
+    if last_x then ImGui.DrawList_AddLine(dl, last_x, last_y, px, py, CANVAS.cyan, 1.5) end
     last_x, last_y = px, py
   end
   local yaw_a = x + 24
   local yaw_b = x + 24 + (w - 48) * 0.5
   local yaw_c = x + w - 24
   local yy = y + h - 22
-  ImGui.DrawList_AddText(dl, yaw_a, yy, COLORS.muted, string.format("yaw %.0f", settings.yaw_start))
-  ImGui.DrawList_AddLine(dl, yaw_b - 56, yy + 6, yaw_b + 56, yy + 6, COLORS.amber, 1.5)
-  ImGui.DrawList_AddTriangleFilled(dl, yaw_b + 56, yy + 6, yaw_b + 47, yy + 1, yaw_b + 47, yy + 11, COLORS.amber)
-  ImGui.DrawList_AddText(dl, yaw_c - 58, yy, COLORS.muted, string.format("%.0f", settings.yaw_end))
+  ImGui.DrawList_AddText(dl, yaw_a, yy, CANVAS.muted, string.format("yaw %.0f", settings.yaw_start))
+  ImGui.DrawList_AddLine(dl, yaw_b - 56, yy + 6, yaw_b + 56, yy + 6, CANVAS.amber, 1.5)
+  ImGui.DrawList_AddTriangleFilled(dl, yaw_b + 56, yy + 6, yaw_b + 47, yy + 1, yaw_b + 47, yy + 11, CANVAS.amber)
+  ImGui.DrawList_AddText(dl, yaw_c - 58, yy, CANVAS.muted, string.format("%.0f", settings.yaw_end))
 end
 
 local function render()
@@ -260,7 +272,7 @@ local function loop()
         changed, settings.normalize_db = ImGui.SliderDouble(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f")
       end
       ImGui.Separator(ctx)
-      ImGui.TextWrapped(ctx, "The same spectral frame or trace path is applied across all encoded channels, keeping the ambisonic channel set coherent.")
+      muted_wrapped_text("The same spectral frame or trace path is applied across all encoded channels, keeping the ambisonic channel set coherent.")
       ImGui.EndChild(ctx)
     end
     if ImGui.Button(ctx, "Render", 104, 28) then should_render = true end

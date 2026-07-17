@@ -22,7 +22,8 @@ do
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
-
+local theme = require("s3g-mc ImGui Theme")
+local THEME = theme.palette(ImGui)
 
 local PROJECT = 0
 local FX_NAME = "s3g Ambisonic Stereo Decoder"
@@ -139,23 +140,21 @@ local view_zoom = 1.0
 local load_error = ""
 local param_warning = ""
 
-local COLORS = {
-  bg = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1),
-  panel = ImGui.ColorConvertDouble4ToU32(0.060, 0.066, 0.070, 1),
-  edge = ImGui.ColorConvertDouble4ToU32(0.30, 0.33, 0.34, 1),
-  text = ImGui.ColorConvertDouble4ToU32(0.78, 0.82, 0.84, 1),
-  muted = ImGui.ColorConvertDouble4ToU32(0.48, 0.52, 0.54, 1),
-  speaker = ImGui.ColorConvertDouble4ToU32(0.25, 0.70, 0.92, 1),
-  pickup_l = ImGui.ColorConvertDouble4ToU32(0.95, 0.58, 0.38, 1),
-  pickup_r = ImGui.ColorConvertDouble4ToU32(0.42, 0.74, 0.96, 1),
-  meter = ImGui.ColorConvertDouble4ToU32(0.46, 0.86, 0.56, 1),
-  active = ImGui.ColorConvertDouble4ToU32(0.16, 0.63, 0.38, 1),
-  button = ImGui.ColorConvertDouble4ToU32(0.12, 0.13, 0.14, 1),
-}
-
 local function color(r, g, b, a)
   return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
 end
+
+local STYLE = {
+  bg = THEME.bg,
+  panel = THEME.panel,
+  edge = THEME.edge,
+  text = THEME.text,
+  muted = THEME.value,
+  speaker = THEME.fill,
+  pickup_l = color(0.82, 0.54, 0.42, 1),
+  pickup_r = color(0.54, 0.62, 0.66, 1),
+  meter = THEME.ok,
+}
 
 local function clamp(value, lo, hi)
   if value < lo then return lo end
@@ -266,14 +265,13 @@ local function option_buttons(track, fx, title, param, labels, columns)
   local norm = fx >= 0 and reaper.TrackFX_GetParamNormalized(track, fx, param) or 0
   local current = math.floor(norm * (#labels - 1) + 0.5) + 1
   columns = columns or #labels
-  ImGui.TextColored(ctx, COLORS.muted, title)
+  theme.muted(ImGui, ctx, title)
   for index, label in ipairs(labels) do
     if index > 1 and ((index - 1) % columns) ~= 0 then ImGui.SameLine(ctx) end
-    ImGui.PushStyleColor(ctx, ImGui.Col_Button, current == index and COLORS.active or COLORS.button)
-    if ImGui.Button(ctx, label .. "##" .. title .. tostring(index)) then
+    local shown = current == index and ("> " .. label) or label
+    if ImGui.Button(ctx, shown .. "##" .. title .. tostring(index)) then
       reaper.TrackFX_SetParamNormalized(track, fx, param, (index - 1) / math.max(1, #labels - 1))
     end
-    ImGui.PopStyleColor(ctx)
   end
 end
 
@@ -292,7 +290,7 @@ local function apply_preset(track, fx, preset)
 end
 
 local function draw_presets(track, fx)
-  ImGui.TextColored(ctx, COLORS.muted, "Starting points")
+  theme.muted(ImGui, ctx, "Starting points")
   for index, preset in ipairs(PRESETS) do
     if index > 1 and (index - 1) % 4 ~= 0 then ImGui.SameLine(ctx) end
     if ImGui.Button(ctx, preset.name .. "##preset" .. tostring(index), 132, 26) then
@@ -445,14 +443,14 @@ end
 
 local function draw_ms_lobes(dl, cx, cy, radius, rotation, mic_el, directivity)
   draw_pickup_lobe(dl, cx, cy, radius, rotation, 0, mic_el, directivity, 0, color(0.95, 0.58, 0.38, 0.50), 1)
-  draw_pickup_lobe(dl, cx, cy, radius, rotation, 90, mic_el, 1, 3, color(0.42, 0.74, 0.96, 0.48), 1)
+  draw_pickup_lobe(dl, cx, cy, radius, rotation, 90, mic_el, 1, 3, color(0.54, 0.62, 0.66, 0.48), 1)
   local mid = project_point(rotation, mic_el, cx, cy, radius * 0.34)
   local side_l = project_point(rotation + 90, mic_el, cx, cy, radius * 0.27)
   local side_r = project_point(rotation - 90, mic_el, cx, cy, radius * 0.27)
-  ImGui.DrawList_AddText(dl, mid.x + 6, mid.y - 8, COLORS.pickup_l, "M")
-  ImGui.DrawList_AddText(dl, side_l.x + 6, side_l.y - 8, COLORS.pickup_r, "S+")
-  ImGui.DrawList_AddText(dl, side_r.x + 6, side_r.y - 8, COLORS.pickup_r, "S-")
-  ImGui.DrawList_AddLine(dl, side_l.x, side_l.y, side_r.x, side_r.y, color(0.42, 0.74, 0.96, 0.28), 1.5)
+  ImGui.DrawList_AddText(dl, mid.x + 6, mid.y - 8, STYLE.pickup_l, "M")
+  ImGui.DrawList_AddText(dl, side_l.x + 6, side_l.y - 8, STYLE.pickup_r, "S+")
+  ImGui.DrawList_AddText(dl, side_r.x + 6, side_r.y - 8, STYLE.pickup_r, "S-")
+  ImGui.DrawList_AddLine(dl, side_l.x, side_l.y, side_r.x, side_r.y, color(0.54, 0.62, 0.66, 0.28), 1.5)
 end
 
 local function draw_custom_weight_controls(track, fx)
@@ -460,7 +458,7 @@ local function draw_custom_weight_controls(track, fx)
   local mode = math.floor(get_param(track, fx, PARAM.weighting, 1) + 0.5)
   ImGui.Separator(ctx)
   ImGui.Text(ctx, "Custom band weights")
-  ImGui.TextColored(ctx, COLORS.muted, mode == 3 and "Custom weighting is active" or "Move a slider to switch Decode weighting to Custom")
+  theme.muted(ImGui, ctx, mode == 3 and "Custom weighting is active" or "Move a slider to switch Decode weighting to Custom")
   local labels = { "W", "1st", "2nd", "3rd" }
   local params = { PARAM.custom_w, PARAM.custom_o1, PARAM.custom_o2, PARAM.custom_o3 }
   for band = 0, 3 do
@@ -503,9 +501,9 @@ local function draw_visual(track, fx)
   local cx, cy = x0 + canvas_width * 0.5, y0 + height * 0.57
   local radius = math.min(canvas_width, height) * 0.35
   local dl = ImGui.GetWindowDrawList(ctx)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, COLORS.bg)
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 14, COLORS.text, "Ambisonic Stereo Decoder")
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 34, COLORS.muted, "virtual speaker field -> stereo pickup")
+  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, STYLE.bg)
+  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 14, STYLE.text, "Ambisonic Stereo Decoder")
+  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 34, STYLE.muted, "virtual speaker field -> stereo pickup")
 
   local layout = math.floor(get_param(track, fx, PARAM.field, 3) + 0.5)
   local rotation = get_param(track, fx, PARAM.rotation, 0)
@@ -549,7 +547,7 @@ local function draw_visual(track, fx)
   if method == 2 then
     draw_ms_lobes(dl, cx, cy, radius, rotation, mic_el, directivity)
     ImGui.DrawList_AddCircleFilled(dl, cx, cy, 4, color(0.82, 0.84, 0.84, 0.55), 16)
-    ImGui.DrawList_AddText(dl, cx + 12, cy + 10, COLORS.muted, "L = M + S / R = M - S")
+    ImGui.DrawList_AddText(dl, cx + 12, cy + 10, STYLE.muted, "L = M + S / R = M - S")
   else
     local capsule_offset = (method == 1 or method == 4) and radius * (0.05 + 0.06 * width_scale) or 0
     local left_origin = project_point(rotation + 90, mic_el, cx, cy, capsule_offset)
@@ -557,44 +555,44 @@ local function draw_visual(track, fx)
     local left_mic = project_point(rotation + visual_angle, mic_el, left_origin.x, left_origin.y, pickup_radius)
     local right_mic = project_point(rotation - visual_angle, mic_el, right_origin.x, right_origin.y, pickup_radius)
     draw_pickup_lobe(dl, left_origin.x, left_origin.y, radius, rotation, visual_angle, mic_el, directivity, method, color(0.95, 0.58, 0.38, 0.46), 1)
-    draw_pickup_lobe(dl, right_origin.x, right_origin.y, radius, rotation, -visual_angle, mic_el, directivity, method, color(0.42, 0.74, 0.96, 0.46), -1)
+    draw_pickup_lobe(dl, right_origin.x, right_origin.y, radius, rotation, -visual_angle, mic_el, directivity, method, color(0.54, 0.62, 0.66, 0.46), -1)
     ImGui.DrawList_AddLine(dl, left_mic.x, left_mic.y, right_mic.x, right_mic.y, color(0.86, 0.78, 0.42, 0.22), 1.5)
-    ImGui.DrawList_AddLine(dl, left_origin.x, left_origin.y, left_mic.x, left_mic.y, COLORS.pickup_l, 2)
-    ImGui.DrawList_AddLine(dl, right_origin.x, right_origin.y, right_mic.x, right_mic.y, COLORS.pickup_r, 2)
+    ImGui.DrawList_AddLine(dl, left_origin.x, left_origin.y, left_mic.x, left_mic.y, STYLE.pickup_l, 2)
+    ImGui.DrawList_AddLine(dl, right_origin.x, right_origin.y, right_mic.x, right_mic.y, STYLE.pickup_r, 2)
     ImGui.DrawList_AddCircleFilled(dl, cx, cy, 4, color(0.82, 0.84, 0.84, 0.55), 16)
-    ImGui.DrawList_AddCircleFilled(dl, left_origin.x, left_origin.y, 3.5, COLORS.pickup_l, 16)
-    ImGui.DrawList_AddCircleFilled(dl, right_origin.x, right_origin.y, 3.5, COLORS.pickup_r, 16)
-    ImGui.DrawList_AddText(dl, left_mic.x + 6, left_mic.y - 8, COLORS.pickup_l, "L")
-    ImGui.DrawList_AddText(dl, right_mic.x + 6, right_mic.y - 8, COLORS.pickup_r, "R")
+    ImGui.DrawList_AddCircleFilled(dl, left_origin.x, left_origin.y, 3.5, STYLE.pickup_l, 16)
+    ImGui.DrawList_AddCircleFilled(dl, right_origin.x, right_origin.y, 3.5, STYLE.pickup_r, 16)
+    ImGui.DrawList_AddText(dl, left_mic.x + 6, left_mic.y - 8, STYLE.pickup_l, "L")
+    ImGui.DrawList_AddText(dl, right_mic.x + 6, right_mic.y - 8, STYLE.pickup_r, "R")
   end
 
   local bar_x = x0 + 14
   local bar_y = y0 + height - 28
   local bar_w = 170
   local bar_h = 8
-  ImGui.DrawList_AddText(dl, bar_x, bar_y - 18, COLORS.muted, string.format("width %.0f%% / rot %.0f%% / el %.0f", stereo_width, rotation_image, mic_el))
+  ImGui.DrawList_AddText(dl, bar_x, bar_y - 18, STYLE.muted, string.format("width %.0f%% / rot %.0f%% / el %.0f", stereo_width, rotation_image, mic_el))
   ImGui.DrawList_AddRectFilled(dl, bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, color(0.10, 0.11, 0.12, 1))
   ImGui.DrawList_AddRectFilled(dl, bar_x, bar_y, bar_x + bar_w * clamp(width_scale / 2, 0, 1), bar_y + bar_h, color(0.86, 0.78, 0.42, 0.74))
   ImGui.DrawList_AddLine(dl, bar_x + bar_w * 0.5, bar_y - 3, bar_x + bar_w * 0.5, bar_y + bar_h + 3, color(0.82, 0.86, 0.88, 0.40), 1)
   local dir_x = bar_x + bar_w + 22
   ImGui.DrawList_AddRectFilled(dl, dir_x, bar_y, dir_x + bar_w, bar_y + bar_h, color(0.10, 0.11, 0.12, 1))
   ImGui.DrawList_AddRectFilled(dl, dir_x, bar_y, dir_x + bar_w * directivity, bar_y + bar_h, color(0.52, 0.78, 0.86, 0.70))
-  ImGui.DrawList_AddText(dl, dir_x, bar_y - 18, COLORS.muted, directivity < 0.25 and "omni" or directivity > 0.85 and "cardioid" or "subcardioid")
+  ImGui.DrawList_AddText(dl, dir_x, bar_y - 18, STYLE.muted, directivity < 0.25 and "omni" or directivity > 0.85 and "cardioid" or "subcardioid")
 
   for _, p in ipairs(pts) do
     local front = clamp((p.z + 1) * 0.5, 0, 1)
     local size = 2.5 + 2.5 * front
     ImGui.DrawList_AddCircleFilled(dl, p.x, p.y, size + 2, color(0.04, 0.045, 0.05, 0.80), 18)
-    ImGui.DrawList_AddCircleFilled(dl, p.x, p.y, size, COLORS.speaker, 18)
+    ImGui.DrawList_AddCircleFilled(dl, p.x, p.y, size, STYLE.speaker, 18)
     if p.id <= 32 then
       ImGui.DrawList_AddText(dl, p.x + size + 3, p.y - 6, color(0.82, 0.88, 0.90, 0.35 + 0.40 * front), tostring(p.id))
     end
   end
 
-  ImGui.DrawList_AddText(dl, x0 + canvas_width - 255, y0 + 14, COLORS.muted, FIELD[layout + 1] or FIELD[4])
-  ImGui.DrawList_AddText(dl, x0 + canvas_width - 255, y0 + 34, COLORS.muted, METHOD[method + 1] or METHOD[1])
-  ImGui.DrawList_AddText(dl, x0 + canvas_width - 255, y0 + 54, COLORS.muted, "spk 1 right-front / clockwise")
-  ImGui.DrawList_AddText(dl, x0 + canvas_width - 255, y0 + 74, COLORS.muted, "stereo output on channels 1-2")
+  ImGui.DrawList_AddText(dl, x0 + canvas_width - 255, y0 + 14, STYLE.muted, FIELD[layout + 1] or FIELD[4])
+  ImGui.DrawList_AddText(dl, x0 + canvas_width - 255, y0 + 34, STYLE.muted, METHOD[method + 1] or METHOD[1])
+  ImGui.DrawList_AddText(dl, x0 + canvas_width - 255, y0 + 54, STYLE.muted, "spk 1 right-front / clockwise")
+  ImGui.DrawList_AddText(dl, x0 + canvas_width - 255, y0 + 74, STYLE.muted, "stereo output on channels 1-2")
 
   if controls_inline then
     ImGui.SameLine(ctx)
@@ -609,16 +607,16 @@ local function draw_stereo_meter(track, fx)
   local w, h = ImGui.GetContentRegionAvail(ctx), 80
   local dl = ImGui.GetWindowDrawList(ctx)
   ImGui.InvisibleButton(ctx, "##ambisonic_stereo_meter", w, h)
-  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + h, COLORS.panel)
-  ImGui.DrawList_AddRect(dl, x, y, x + w, y + h, COLORS.edge)
-  ImGui.DrawList_AddText(dl, x + 12, y + 10, COLORS.text, "Stereo output")
+  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + h, STYLE.panel)
+  ImGui.DrawList_AddRect(dl, x, y, x + w, y + h, STYLE.edge)
+  ImGui.DrawList_AddText(dl, x + 12, y + 10, STYLE.text, "Stereo output")
   for ch = 0, 1 do
     local mx = x + 128 + ch * 42
     local norm = peak_to_norm(reaper.Track_GetPeakInfo(track, ch) or 0)
-    ImGui.DrawList_AddRectFilled(dl, mx, y + 16, mx + 24, y + h - 18, COLORS.bg)
-    ImGui.DrawList_AddRectFilled(dl, mx, y + 16 + (h - 34) * (1 - norm), mx + 24, y + h - 18, COLORS.meter)
-    ImGui.DrawList_AddRect(dl, mx, y + 16, mx + 24, y + h - 18, COLORS.edge)
-    ImGui.DrawList_AddText(dl, mx + 7, y + h - 16, COLORS.muted, ch == 0 and "L" or "R")
+    ImGui.DrawList_AddRectFilled(dl, mx, y + 16, mx + 24, y + h - 18, STYLE.bg)
+    ImGui.DrawList_AddRectFilled(dl, mx, y + 16 + (h - 34) * (1 - norm), mx + 24, y + h - 18, STYLE.meter)
+    ImGui.DrawList_AddRect(dl, mx, y + 16, mx + 24, y + h - 18, STYLE.edge)
+    ImGui.DrawList_AddText(dl, mx + 7, y + h - 16, STYLE.muted, ch == 0 and "L" or "R")
   end
 end
 
@@ -642,7 +640,7 @@ local function loop()
       else
         resolve_param_indices(track, fx)
         if param_warning ~= "" then
-          ImGui.TextColored(ctx, color(0.95, 0.70, 0.35, 1), param_warning)
+          theme.status(ImGui, ctx, param_warning, "amber")
         end
         reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", math.max(16, reaper.GetMediaTrackInfo_Value(track, "I_NCHAN")))
         draw_visual(track, fx)
@@ -678,7 +676,7 @@ local function loop()
           slider_param(track, fx, "Bass mono below", PARAM.bass_mono, 0, 300, "%.0f Hz")
           slider_param(track, fx, "Output gain", PARAM.output, -24, 24, "%.1f dB")
         end
-        ImGui.TextColored(ctx, COLORS.muted, "Stereo decoder for loudspeaker monitoring or renders; not a binaural headphone decoder.")
+        theme.muted(ImGui, ctx, "Stereo decoder for loudspeaker monitoring or renders; not a binaural headphone decoder.")
       end
     end
     ImGui.End(ctx)
