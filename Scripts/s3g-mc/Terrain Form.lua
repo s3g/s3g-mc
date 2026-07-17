@@ -224,13 +224,14 @@ local function generate()
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 820, 760, ImGui.Cond_Appearing)
+  local body_target_h = 548
+  ImGui.SetNextWindowSize(ctx, 820, body_target_h + 72, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    local footer_height = 0
+    local footer_height = 48
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
-    local content_height = math.max(220, avail_h - footer_height)
+    local content_height = math.min(body_target_h, math.max(300, (avail_h or body_target_h + footer_height) - footer_height))
     local main_panel_style = push_soft_panel()
     local child_visible = ImGui.BeginChild(ctx, "##main_content", 0, content_height)
     if child_visible then
@@ -254,14 +255,16 @@ local function loop()
       _, state.velocity_range = ui_slider_int("VRNG", state.velocity_range, 0, 80)
       _, state.seed = ui_input_int("SEED", state.seed, 1, 10, 110)
       _, state.add_markers = ImGui.Checkbox(ctx, "ADD MARKERS", state.add_markers)
-      if ImGui.Button(ctx, "NEW SEED", 100, 28) then state.seed = state.seed + 1 end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "GENERATE MIDI", 170, 28) then generate() end
-      ImGui.SameLine(ctx)
-      if status ~= "" then theme.muted(ImGui, ctx, status) end
     end
     ImGui.EndChild(ctx)
     pop_soft_panel(main_panel_style)
+    local new_seed, generate_midi = theme.footer_buttons(ImGui, ctx, "NEW SEED", "GENERATE MIDI", 104, 148)
+    if new_seed then state.seed = state.seed + 1 end
+    if generate_midi then generate() end
+    if status ~= "" then
+      ImGui.SameLine(ctx)
+      theme.muted(ImGui, ctx, status)
+    end
   end
   ImGui.End(ctx)
   if open then reaper.defer(loop) end

@@ -515,18 +515,6 @@ local function draw_downmix_map(track, fx, width)
     ImGui.DrawList_AddText(draw_list, map_left - 38, map_y + 47, STYLE.muted, "LOW")
   end
 
-  local weight_norm = clamp(weight_percent / 100, 0, 1)
-  local atten_norm = clamp(attenuation_percent / 100, 0, 1)
-  local rail_y = y + h - 67
-  local rail_x = map_left
-  local rail_w = map_w
-  ImGui.DrawList_AddText(draw_list, rail_x, rail_y - 26, STYLE.muted, "LAYOUT WEIGHT")
-  ImGui.DrawList_AddRect(draw_list, rail_x, rail_y - 9, rail_x + rail_w * 0.45, rail_y - 2, color(0.54, 0.60, 0.62, 0.20))
-  ImGui.DrawList_AddRectFilled(draw_list, rail_x, rail_y - 9, rail_x + rail_w * 0.45 * weight_norm, rail_y - 2, color(0.24, 0.58, 0.66, 0.65))
-  ImGui.DrawList_AddText(draw_list, rail_x + rail_w * 0.52, rail_y - 26, STYLE.muted, "3D ATTENUATION")
-  ImGui.DrawList_AddRect(draw_list, rail_x + rail_w * 0.52, rail_y - 9, rail_x + rail_w * 0.97, rail_y - 2, color(0.54, 0.60, 0.62, 0.20))
-  ImGui.DrawList_AddRectFilled(draw_list, rail_x + rail_w * 0.52, rail_y - 9, rail_x + rail_w * (0.52 + 0.45 * atten_norm), rail_y - 2, color(0.95, 0.46, 0.34, 0.58))
-
   for index = 1, input_count do
     local pan, projection_gain = pan_gain_for_channel(index, input_count, width_percent, rotation_deg, layout, weight_percent, attenuation_percent)
     local reference_pan = pan_gain_for_channel(index, input_count, width_percent, rotation_deg, layout, 100, 0)
@@ -603,7 +591,8 @@ local function draw_output_gain(track, fx, width)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, CONTENT_W + 18, 760, ImGui.Cond_Always)
+  local window_h = 572
+  ImGui.SetNextWindowSize(ctx, CONTENT_W + 18, window_h, ImGui.Cond_Always)
   local visible
   visible, open = ImGui.Begin(ctx, "MC to Stereo Autogain", open)
 
@@ -636,7 +625,7 @@ local function loop()
         ImGui.Spacing(ctx)
         ImGui.BeginGroup(ctx)
           local panel_stack = theme.push_soft_panel(ImGui, ctx)
-          ImGui.BeginChild(ctx, "##autogain_controls", CONTROL_W, 220)
+          ImGui.BeginChild(ctx, "##autogain_controls", CONTROL_W, 196)
           slider_param(track, fx, "Input channels", PARAM.input_channels, 2, MAX_CH, "%.0f")
           slider_param(track, fx, "Spread / width", PARAM.width, 0, 200, "%.0f%%")
           slider_param(track, fx, "Rotation", PARAM.rotation, -180, 180, "%.0f deg")
@@ -644,12 +633,6 @@ local function loop()
           slider_param(track, fx, "Layout weighting", PARAM.weight, 0, 100, "%.0f%%")
           slider_param(track, fx, "3D attenuation", PARAM.attenuation, 0, 100, "%.0f%%")
           combo_param(track, fx, "Autogain", PARAM.autogain, AUTOGAIN)
-          ImGui.Spacing(ctx)
-          if ImGui.Button(ctx, "-6 DB") then set_param(track, fx, PARAM.output_gain, -6) end
-          ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "UNITY") then set_param(track, fx, PARAM.output_gain, 0) end
-          ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "+3 DB") then set_param(track, fx, PARAM.output_gain, 3) end
           ImGui.EndChild(ctx)
           theme.pop_soft_panel(ImGui, ctx, panel_stack)
         ImGui.EndGroup(ctx)

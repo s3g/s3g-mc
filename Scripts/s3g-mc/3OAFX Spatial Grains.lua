@@ -124,12 +124,14 @@ local function render()
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 640, 760, ImGui.Cond_Appearing)
+  local spatial_h = settings.normalize and 198 or 176
+  local body_target_h = 22 + (123 + 10) + (246 + 10) + (136 + 10) + (spatial_h + 10) + 22
+  ImGui.SetNextWindowSize(ctx, 640, body_target_h + 70, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "3OAFX Spatial Grains", open)
   if visible then
-    local footer_h = 40
-    local body_h = math.max(360, ImGui.GetContentRegionAvail(ctx) - footer_h)
+    local footer_h = 48
+    local body_h = math.min(body_target_h, math.max(360, ImGui.GetContentRegionAvail(ctx) - footer_h))
     if ImGui.BeginChild(ctx, "##spatial_grains_body", 0, body_h) then
       theme.status_row(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)", "muted")
       local changed
@@ -158,7 +160,7 @@ local function loop()
       changed, settings.yaw_start = theme.slider_double(ImGui, ctx, "Yaw start deg", settings.yaw_start, -360.0, 360.0, "%.1f")
       theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Spatial / Output", settings.normalize and 224 or 199)
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Spatial / Output", spatial_h)
       changed, settings.yaw_end = theme.slider_double(ImGui, ctx, "Yaw end deg", settings.yaw_end, -360.0, 360.0, "%.1f")
       changed, settings.yaw_scatter = theme.slider_double(ImGui, ctx, "Per-grain yaw scatter", settings.yaw_scatter, 0.0, 180.0, "%.1f")
       changed, settings.higher_order_weight = theme.slider_double(ImGui, ctx, "Higher-order weight", settings.higher_order_weight, 0.0, 2.0, "%.2f")

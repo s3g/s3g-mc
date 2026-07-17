@@ -307,7 +307,9 @@ local function draw_meter(track, x, y, w, h)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 780, 760, ImGui.Cond_Appearing)
+  local tool_area_h = 366
+  local window_h = 536
+  ImGui.SetNextWindowSize(ctx, 780, window_h, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Transaural Crosstalk Canceller", open)
   if visible then
@@ -335,7 +337,7 @@ local function loop()
           draw_meter(track, meter_x, meter_y, 220, 92)
           ImGui.Dummy(ctx, 220, 102)
           local tool_panel = theme.push_soft_panel(ImGui, ctx)
-          if ImGui.BeginChild(ctx, "##transaural_tool_area", 0, 0, 0) then
+          if ImGui.BeginChild(ctx, "##transaural_tool_area", 0, tool_area_h, 0) then
           if theme.toolbox_header(ImGui, ctx, "CANCELLATION", ImGui.TreeNodeFlags_DefaultOpen) then
             combo_option(track, fx, "Cancellation mode", PARAM.mode, MODES)
             slider_param(track, fx, "Cancellation amount", PARAM.amount, 0, 140, "%.0f %%")

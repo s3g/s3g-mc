@@ -470,61 +470,68 @@ local function main()
   local status = ""
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 440, 520, ImGui.Cond_Appearing)
+    local settings_h = 238
+    local status_h = 32
+    local body_target_h = 22 + 8 + (settings_h + 10) + status_h
+    ImGui.SetNextWindowSize(ctx, 440, body_target_h + 72, ImGui.Cond_Appearing)
     local visible
     visible, open = ImGui.Begin(ctx, "Shred / Slice", open)
 
     if visible then
-      theme.muted(ImGui, ctx, "Source: " .. mc.item_label(item) .. "  (" .. tostring(source_channels) .. " ch)")
-      ImGui.Spacing(ctx)
-      local changed
-      local sx, sy, sh, stack = section(ctx, "Settings", 238)
-      changed, slice_mode = draw_combo(ctx, "Slice", slice_mode, SLICE_MODE_NAMES, SLICE_EQUAL, SLICE_MARKERS)
-      changed, motion_mode = draw_combo(ctx, "Motion", motion_mode, MOTION_MODE_NAMES, MODE_ORDERED_MONO, MODE_RANDOM_ROTATE)
+      local can_render = true
+      local footer_h = 48
+      local avail_h = ImGui.GetContentRegionAvail(ctx)
+      local body_h = math.min(body_target_h, math.max(260, (avail_h or body_target_h + footer_h) - footer_h))
+      if ImGui.BeginChild(ctx, "##shred_slice_controls", 0, body_h, 0) then
+        theme.muted(ImGui, ctx, "Source: " .. mc.item_label(item) .. "  (" .. tostring(source_channels) .. " ch)")
+        ImGui.Spacing(ctx)
+        local changed
+        local sx, sy, sh, stack = section(ctx, "Settings", settings_h)
+        changed, slice_mode = draw_combo(ctx, "Slice", slice_mode, SLICE_MODE_NAMES, SLICE_EQUAL, SLICE_MARKERS)
+        changed, motion_mode = draw_combo(ctx, "Motion", motion_mode, MOTION_MODE_NAMES, MODE_ORDERED_MONO, MODE_RANDOM_ROTATE)
 
-      local mono_motion = is_mono_motion(motion_mode)
-      source_channel = clamp_value(source_channel, 1, source_channels)
-      if slice_mode == SLICE_EQUAL then
-        changed, slice_count = draw_custom_slider(ctx, "Slices", slice_count, 2, 256, nil, true)
-      else
-        theme.muted(ImGui, ctx, "Slices follow project or active-take markers inside item.")
+        local mono_motion = is_mono_motion(motion_mode)
+        source_channel = clamp_value(source_channel, 1, source_channels)
+        if slice_mode == SLICE_EQUAL then
+          changed, slice_count = draw_custom_slider(ctx, "Slices", slice_count, 2, 256, nil, true)
+        else
+          theme.muted(ImGui, ctx, "Slices follow project or active-take markers inside item.")
+        end
+
+        if mono_motion then
+          changed, output_channels = draw_custom_slider(ctx, "Output channels", output_channels, 2, mc.MAX_REAPER_TRACK_CHANNELS, nil, true)
+          changed, source_channel = draw_custom_slider(ctx, "Source channel", source_channel, 1, source_channels, nil, true)
+        else
+          output_channels = source_channels
+          theme.muted(ImGui, ctx, "Output channels: " .. tostring(output_channels) .. " (matches source)")
+          theme.muted(ImGui, ctx, "Source: all channels")
+        end
+
+        changed, fade_seconds = draw_custom_slider(ctx, "Fade seconds", fade_seconds, 0, 0.1, "%.4f", false)
+        finish_section(ctx, sx, sy, sh, stack)
+
+        can_render = mono_motion or source_channels >= 2
+        if not can_render then
+          theme.status(ImGui, ctx, "Multichannel motion needs a multichannel source item.", "warn")
+        elseif status ~= "" then
+          theme.status(ImGui, ctx, status, "warn")
+        elseif slice_mode == SLICE_MARKERS then
+          theme.muted(ImGui, ctx, "Uses markers inside the selected item as slice boundaries.")
+        else
+          theme.muted(ImGui, ctx, "Uses " .. tostring(slice_count) .. " equal slices.")
+        end
+        ImGui.EndChild(ctx)
       end
 
-      if mono_motion then
-        changed, output_channels = draw_custom_slider(ctx, "Output channels", output_channels, 2, mc.MAX_REAPER_TRACK_CHANNELS, nil, true)
-        changed, source_channel = draw_custom_slider(ctx, "Source channel", source_channel, 1, source_channels, nil, true)
-      else
-        output_channels = source_channels
-        theme.muted(ImGui, ctx, "Output channels: " .. tostring(output_channels) .. " (matches source)")
-        theme.muted(ImGui, ctx, "Source: all channels")
-      end
-
-      changed, fade_seconds = draw_custom_slider(ctx, "Fade seconds", fade_seconds, 0, 0.1, "%.4f", false)
-      finish_section(ctx, sx, sy, sh, stack)
-      ImGui.Spacing(ctx)
-      ImGui.Separator(ctx)
-      ImGui.Spacing(ctx)
-
-      local can_render = mono_motion or source_channels >= 2
-      if not can_render then
-        theme.status(ImGui, ctx, "Multichannel motion needs a multichannel source item.", "warn")
-      elseif status ~= "" then
-        theme.status(ImGui, ctx, status, "warn")
-      elseif slice_mode == SLICE_MARKERS then
-        theme.muted(ImGui, ctx, "Uses markers inside the selected item as slice boundaries.")
-      else
-        theme.muted(ImGui, ctx, "Uses " .. tostring(slice_count) .. " equal slices.")
-      end
-
-      if ImGui.Button(ctx, "RENDER", 92, 26) then
+      local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+      if render_pressed then
         if can_render then
           should_render = true
         else
           status = "Choose a mono motion mode, or select a multichannel item."
         end
       end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "CANCEL", 92, 26) then
+      if cancel_pressed then
         open = false
       end
       ImGui.End(ctx)

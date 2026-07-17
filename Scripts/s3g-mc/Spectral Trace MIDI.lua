@@ -264,7 +264,11 @@ local function draw_footer()
   ImGui.SameLine(ctx)
   if ImGui.Button(ctx, "CLOSE", 92, 28) then open = false end
   ImGui.SameLine(ctx)
-  muted_text(status)
+  if ui_theme and ui_theme.muted then
+    ui_theme.muted(ImGui, ctx, status)
+  else
+    ImGui.Text(ctx, status)
+  end
 end
 
 local function loop()
