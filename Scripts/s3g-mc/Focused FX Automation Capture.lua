@@ -70,6 +70,9 @@ local STYLE = {
 }
 
 local ROW_H = 25
+local PARAM_LIST_ROWS = 6
+local ROW_LEFT_PAD = 12
+local ROW_LABEL_W = 96
 
 local LABEL_ABBR = {
   ["PARAMETERS"] = "PARAMS",
@@ -92,18 +95,38 @@ local function row_label_text(label)
   return LABEL_ABBR[upper] or upper
 end
 
-local function labeled_status_row(label, value, kind)
+local function custom_row_metrics(fallback_width)
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local avail = ImGui.GetContentRegionAvail(ctx)
-  if type(avail) ~= "number" then avail = 640 end
-  local control_x = x + 82
+  if type(avail) ~= "number" then avail = fallback_width or 520 end
+  local label_x = x + ROW_LEFT_PAD
+  local control_x = label_x + ROW_LABEL_W
+  return x, y, avail, label_x, control_x
+end
+
+local function labeled_status_row(label, value, kind)
+  local x, y, avail, label_x, control_x = custom_row_metrics(520)
   local color = kind == "warn" and STYLE.warn or (kind == "ok" and STYLE.ok or STYLE.muted)
   local draw = ImGui.GetWindowDrawList(ctx)
-  ImGui.DrawList_AddText(draw, x, y + 2, STYLE.label, row_label_text(label))
+  ImGui.DrawList_AddText(draw, label_x, y + 2, STYLE.label, row_label_text(label))
   ImGui.DrawList_AddText(draw, control_x, y + 2, color, tostring(value or ""))
   ImGui.SetCursorScreenPos(ctx, x, y)
   ImGui.Dummy(ctx, avail, 22)
   ImGui.SetCursorScreenPos(ctx, x, y + 22)
+end
+
+local function wrapped_status_box(label, value, kind, height)
+  local x, y, avail, label_x, box_x = custom_row_metrics(520)
+  local box_w = math.max(180, avail - ROW_LEFT_PAD - ROW_LABEL_W)
+  local box_h = height or 48
+  local color = kind == "warn" and STYLE.warn or (kind == "ok" and STYLE.ok or STYLE.muted)
+  local draw = ImGui.GetWindowDrawList(ctx)
+
+  ImGui.DrawList_AddText(draw, label_x, y + 5, STYLE.label, row_label_text(label))
+  ImGui.DrawList_AddRectFilled(draw, box_x, y, box_x + box_w, y + box_h, STYLE.panel)
+  ImGui.SetCursorScreenPos(ctx, box_x + 8, y + 6)
+  theme.wrapped_text(ImGui, ctx, value, color, box_w - 16)
+  ImGui.SetCursorScreenPos(ctx, x, y + box_h + 2)
 end
 
 local function status_kind()
@@ -114,6 +137,13 @@ local function status_kind()
     return "warn"
   end
   return "muted"
+end
+
+local function short_text(text, limit)
+  text = tostring(text or "")
+  limit = limit or 84
+  if #text <= limit then return text end
+  return text:sub(1, math.max(1, limit - 3)) .. "..."
 end
 
 local function lower(s)
@@ -420,6 +450,26 @@ local function ensure_envelope(track, fx, param)
   return env
 end
 
+local function set_envelope_chunk_visibility(env, visible)
+  if not env or not reaper.GetEnvelopeStateChunk or not reaper.SetEnvelopeStateChunk then return false end
+  local ok, chunk = reaper.GetEnvelopeStateChunk(env, "", false)
+  if not ok or chunk == "" then return false end
+  local vis = visible and "1" or "0"
+  local changed = false
+  chunk = chunk:gsub("(\nVIS%s+)%d", function(prefix)
+    changed = true
+    return prefix .. vis
+  end, 1)
+  if not changed then
+    chunk = chunk:gsub("^(VIS%s+)%d", function(prefix)
+      changed = true
+      return prefix .. vis
+    end, 1)
+  end
+  if not changed then return false end
+  return reaper.SetEnvelopeStateChunk(env, chunk, false)
+end
+
 local function configure_envelope(env)
   if not env then return false end
   if reaper.SetEnvelopeInfo_Value then
@@ -428,6 +478,18 @@ local function configure_envelope(env)
     pcall(reaper.SetEnvelopeInfo_Value, env, "B_ARM", arm_lanes and 1 or 0)
     pcall(reaper.SetEnvelopeInfo_Value, env, "I_TCPH", show_lanes and lane_height or 0)
   end
+  set_envelope_chunk_visibility(env, show_lanes)
+  return true
+end
+
+local function hide_envelope(env)
+  if not env then return false end
+  if reaper.SetEnvelopeInfo_Value then
+    pcall(reaper.SetEnvelopeInfo_Value, env, "B_VISIBLE", 0)
+    pcall(reaper.SetEnvelopeInfo_Value, env, "B_ARM", 0)
+    pcall(reaper.SetEnvelopeInfo_Value, env, "I_TCPH", 0)
+  end
+  set_envelope_chunk_visibility(env, false)
   return true
 end
 
@@ -512,16 +574,28 @@ local function show_selected_lanes()
 end
 
 local function hide_selected_lanes()
-  local previous_show = show_lanes
-  show_lanes = false
-  local lanes = apply_selected_lane_settings(false)
-  show_lanes = previous_show
-  status = string.format("Hid %d existing selected lanes.", lanes)
+  local track, fx, err = target_track_fx()
+  if err then status = err return end
+  local lanes = 0
+  reaper.Undo_BeginBlock()
+  for _, p in ipairs(params) do
+    if selected[p.index] then
+      local env = reaper.GetFXEnvelope(track, fx, p.index, false)
+      if hide_envelope(env) then lanes = lanes + 1 end
+    end
+  end
+  reaper.Undo_EndBlock("Focused FX Automation Capture Hide Lanes", -1)
+  refresh_arrange()
+  if lanes > 0 then
+    status = string.format("Hid %d existing selected lanes.", lanes)
+  else
+    status = "No existing selected lanes to hide."
+  end
 end
 
 local function loop()
-  local body_h = show_params and 658 or 448
-  set_next_window_size(820, body_h + 48, ImGui.Cond_Appearing)
+  local body_h = show_params and 632 or 408
+  set_next_window_size(640, body_h + 48, ImGui.Cond_Always)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
@@ -530,24 +604,19 @@ local function loop()
     if ImGui.BeginChild(ctx, "##focused_fx_tool_area", 0, body_h, 0) then
       local changed
 
-      local px, py, ph, stack = theme.begin_section(ImGui, ctx, "Step 1 - Lock FX", 128)
+      local px, py, ph, stack = theme.begin_section(ImGui, ctx, "Step 1 - Lock FX", 100)
       if err then
         labeled_status_row("Target", err, "warn")
       else
-        labeled_status_row("Target", track_name(track) .. " / " .. fx_name(track, fx), "muted")
+        labeled_status_row("Target", short_text(track_name(track) .. " / " .. fx_name(track, fx), 64), "muted")
       end
       local lock_action = theme.button_row(ImGui, ctx, {
         { label = "LOCK FOCUSED FX", width = 136 },
       })
       if lock_action == 1 then refresh_params(true) end
-      if focused_err then
-        theme.note_row(ImGui, ctx, "Focus or touch a plugin parameter, then lock.")
-      elseif focused_track and focused_fx >= 0 then
-        theme.note_row(ImGui, ctx, "Focused: " .. track_name(focused_track) .. " / " .. fx_name(focused_track, focused_fx))
-      end
       theme.finish_section(ImGui, ctx, px, py, ph, stack)
 
-      px, py, ph, stack = theme.begin_section(ImGui, ctx, "Step 2 - Choose Params", 154)
+      px, py, ph, stack = theme.begin_section(ImGui, ctx, "Step 2 - Choose Params", 128)
       changed, filter_text = theme.input_text_row(ImGui, ctx, "Filter", filter_text)
       labeled_status_row("Selected", tostring(selected_count()) .. " of " .. tostring(#params), "muted")
       local select_action = theme.button_row(ImGui, ctx, {
@@ -560,10 +629,9 @@ local function loop()
       if select_action == 2 then select_visible(false) end
       if select_action == 3 then invert_visible() end
       if select_action == 4 then show_params = not show_params end
-      changed, skip_empty = theme.checkbox_row(ImGui, ctx, "Skip empty names", skip_empty)
       theme.finish_section(ImGui, ctx, px, py, ph, stack)
 
-      px, py, ph, stack = theme.begin_section(ImGui, ctx, "Step 3 - Cursor Point", 128)
+      px, py, ph, stack = theme.begin_section(ImGui, ctx, "Step 3 - Cursor Point", 150)
       local lane_changed
       lane_changed, lane_height = theme.slider_int(ImGui, ctx, "Lane height", lane_height, 32, 160)
       if lane_changed then
@@ -578,12 +646,14 @@ local function loop()
       if capture_action == 1 then save_point_at_cursor() end
       if capture_action == 2 then show_selected_lanes() end
       if capture_action == 3 then hide_selected_lanes() end
-      labeled_status_row("Status", status ~= "" and status or "Ready.", status ~= "" and status_kind() or "muted")
+      local status_x, status_y = ImGui.GetCursorScreenPos(ctx)
+      ImGui.SetCursorScreenPos(ctx, status_x, status_y + 6)
+      wrapped_status_box("Status", status ~= "" and status or "Ready.", status ~= "" and status_kind() or "muted", 48)
       theme.finish_section(ImGui, ctx, px, py, ph, stack)
 
       if show_params then
         px, py = ImGui.GetCursorScreenPos(ctx)
-        ph = 294
+        ph = 214
         local pw = ImGui.GetContentRegionAvail(ctx)
         if type(pw) ~= "number" then pw = 760 end
         local draw_panel = ImGui.GetWindowDrawList(ctx)
@@ -599,7 +669,7 @@ local function loop()
         for _, p in ipairs(params) do
           if visible_param(p) then
             visible_total = visible_total + 1
-            if row_i < 8 then
+            if row_i < PARAM_LIST_ROWS then
               local row_x, row_y = ImGui.GetCursorScreenPos(ctx)
               local row_w = math.max(1, pw - 24)
               local bg = (row_i % 2 == 0) and STYLE.panel or STYLE.panel_soft
