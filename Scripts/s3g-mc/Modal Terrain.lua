@@ -51,18 +51,6 @@ local ENV_DEFS = {
   { key = "motion", label = "Motion", min = 0.0, max = 1.0, default = 0.28, fmt = "%.2f" },
   { key = "spatial_width", label = "Spatial width", min = 0.02, max = 8.0, default = 0.65, fmt = "%.2f" },
 }
-
-local COLORS = {
-  bg = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1),
-  edge = ImGui.ColorConvertDouble4ToU32(0.34, 0.38, 0.38, 1),
-  grid = ImGui.ColorConvertDouble4ToU32(0.55, 0.62, 0.62, 0.16),
-  text = ImGui.ColorConvertDouble4ToU32(0.78, 0.83, 0.82, 1),
-  muted = ImGui.ColorConvertDouble4ToU32(0.50, 0.56, 0.56, 1),
-  cyan = ImGui.ColorConvertDouble4ToU32(0.24, 0.72, 0.86, 0.95),
-  amber = ImGui.ColorConvertDouble4ToU32(0.92, 0.67, 0.26, 0.92),
-  violet = ImGui.ColorConvertDouble4ToU32(0.62, 0.52, 0.92, 0.70),
-}
-
 local function getn(key, default)
   return tonumber(reaper.GetExtState(EXT, key)) or default
 end
@@ -208,6 +196,7 @@ end
 local function finish_section(x, y, height, stack)
   theme.pop_soft_panel(ImGui, ctx, stack)
   ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
+  ImGui.Dummy(ctx, 1, 1)
 end
 
 local function combo(label, index, names)
@@ -301,46 +290,6 @@ local function persist()
   be.save_extstate(EXT, ENV_DEFS, env_points, env_enabled)
 end
 
-local function draw_preview()
-  local dl = ImGui.GetWindowDrawList(ctx)
-  local x, y = ImGui.GetCursorScreenPos(ctx)
-  local w = math.max(420, ImGui.GetContentRegionAvail(ctx))
-  local h = 166
-  ImGui.InvisibleButton(ctx, "##modal_terrain_preview", w, h)
-  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + h, COLORS.bg)
-  ImGui.DrawList_AddRect(dl, x, y, x + w, y + h, COLORS.edge)
-  ImGui.DrawList_AddText(dl, x + 12, y + 10, COLORS.text, "modal terrain")
-  ImGui.DrawList_AddText(dl, x + 12, y + 29, COLORS.muted, FREQ_LABELS[settings.frequency_model] .. " / " .. EXCITER_LABELS[settings.exciter])
-  local cx, cy = x + w * 0.30, y + 96
-  local r = 48
-  ImGui.DrawList_AddCircle(dl, cx, cy, r, COLORS.grid, 64, 1)
-  ImGui.DrawList_AddCircle(dl, cx, cy, r * 0.58, COLORS.grid, 64, 1)
-  local count = math.min(72, math.max(12, math.floor(settings.mode_count / 16)))
-  for i = 1, count do
-    local a = i * 2.399963 + settings.seed * 0.17
-    local rr = r * math.sqrt(i / count)
-    local px = cx + math.cos(a) * rr
-    local py = cy + math.sin(a) * rr * 0.72
-    local col = (i % 3 == 0) and COLORS.amber or ((i % 3 == 1) and COLORS.cyan or COLORS.violet)
-    ImGui.DrawList_AddCircleFilled(dl, px, py, 2.0 + (i % 5) * 0.35, col, 10)
-  end
-  local gx = x + w * 0.52
-  local gy = y + 64
-  local gw = w * 0.40
-  local gh = 70
-  ImGui.DrawList_AddRect(dl, gx, gy, gx + gw, gy + gh, COLORS.grid)
-  local lx, ly
-  for i = 0, 96 do
-    local u = i / 96
-    local curve = math.exp(-u * (1.2 + settings.brightness * 3.0)) * (0.35 + 0.65 * math.sin(u * math.pi * 8.0 + settings.detune * 2.0) ^ 2)
-    local px = gx + gw * u
-    local py = gy + gh * (1.0 - curve)
-    if lx then ImGui.DrawList_AddLine(dl, lx, ly, px, py, COLORS.cyan, 1.4) end
-    lx, ly = px, py
-  end
-  ImGui.DrawList_AddText(dl, gx, y + h - 24, COLORS.muted, tostring(math.floor(settings.mode_count)) .. " modes")
-  ImGui.DrawList_AddText(dl, gx + 118, y + h - 24, COLORS.muted, tostring(math.floor(settings.events)) .. " events")
-end
 
 local function output_channels()
   if OUTPUT_KEYS[settings.output_mode] == "ring" then return math.floor(settings.channels) end
@@ -410,7 +359,8 @@ local function loop()
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(280, (avail_h or env_opts.compact_window_h) - 44)
     if ImGui.BeginChild(ctx, "##modal_terrain_controls", 0, control_h) then
-      draw_preview()
+      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
+      ImGui.Separator(ctx)
       local sx, sy, sh, stack = section("Preset", 98)
       settings.preset = combo("Preset", settings.preset, PRESET_LABELS)
       if ImGui.Button(ctx, "APPLY PRESET", 112, 24) then apply_preset(settings.preset) end
@@ -457,8 +407,6 @@ local function loop()
       settings.mode_count = clamp(math.floor(settings.mode_count), 8, 4096)
       settings.events = clamp(math.floor(settings.events), 1, 6000)
       settings.modes_per_event = clamp(math.floor(settings.modes_per_event), 1, 96)
-      ImGui.Separator(ctx)
-      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
       ImGui.EndChild(ctx)
     end
     if ImGui.Button(ctx, "RENDER", 104, 28) then should_render = true end

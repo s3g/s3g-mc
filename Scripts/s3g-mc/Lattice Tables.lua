@@ -657,7 +657,9 @@ end
 local function draw_preview_controls()
   local changed
   changed, preview_t = ui_slider_double("TIMELINE PREVIEW", preview_t, 0, 1, "%.3f")
-  if ImGui.Button(ctx, preview_play and "STOP PREVIEW" or "PLAY PREVIEW", 130, 26) then
+  local bx, by = ImGui.GetCursorScreenPos(ctx)
+  ImGui.SetCursorScreenPos(ctx, bx + 10, by)
+  if ImGui.Button(ctx, preview_play and "STOP" or "PLAY", 86, 26) then
     preview_play = not preview_play
     last_time = reaper.time_precise()
   end
@@ -704,11 +706,13 @@ generate_preview()
 
 local function draw_footer()
   ImGui.Dummy(ctx, 1, 6)
-  if ImGui.Button(ctx, "GENERATE MIDI", 160, 30) then generate_item() end
+  local bx, by = ImGui.GetCursorScreenPos(ctx)
+  ImGui.SetCursorScreenPos(ctx, bx + 10, by)
+  if ImGui.Button(ctx, "GENERATE", 104, 30) then generate_item() end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "REFRESH", 130, 30) then generate_preview() end
+  if ImGui.Button(ctx, "REFRESH", 86, 30) then generate_preview() end
   ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "NEW SEED", 100, 30) then
+  if ImGui.Button(ctx, "SEED", 70, 30) then
     state.seed = state.seed + 1
     generate_preview()
   end

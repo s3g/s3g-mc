@@ -19,6 +19,7 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
@@ -231,17 +232,17 @@ end
 local function draw_camera_controls()
   ImGui.BeginGroup(ctx)
   theme.muted(ImGui, ctx, "CAMERA")
-  nudge_camera("up##decodercam", 68, 24, function()
+  nudge_camera("UP##decodercam", 68, 24, function()
     view_pitch_deg = clamp(view_pitch_deg + 4, -180, 180)
   end)
-  nudge_camera("left##decodercam", 32, 24, function()
+  nudge_camera("L##decodercam", 32, 24, function()
     view_yaw_deg = view_yaw_deg - 4
   end)
   ImGui.SameLine(ctx)
-  nudge_camera("right##decodercam", 32, 24, function()
+  nudge_camera("R##decodercam", 32, 24, function()
     view_yaw_deg = view_yaw_deg + 4
   end)
-  nudge_camera("down##decodercam", 68, 24, function()
+  nudge_camera("DN##decodercam", 68, 24, function()
     view_pitch_deg = clamp(view_pitch_deg - 4, -180, 180)
   end)
   nudge_camera("-##decoderzoom", 32, 24, function()
@@ -252,8 +253,8 @@ local function draw_camera_controls()
     view_zoom = clamp(view_zoom + 0.025, 0.5, 2.2)
   end)
   if ImGui.Button(ctx, "3/4##decodercam", 68, 24) then reset_camera(-35, -42) end
-  if ImGui.Button(ctx, "top##decodercam", 68, 24) then reset_camera(0, 0) end
-  if ImGui.Button(ctx, "front##decodercam", 68, 24) then reset_camera(0, -90) end
+  if ImGui.Button(ctx, "TOP##decodercam", 68, 24) then reset_camera(0, 0) end
+  if ImGui.Button(ctx, "FRONT##decodercam", 68, 24) then reset_camera(0, -90) end
   ImGui.EndGroup(ctx)
 end
 
@@ -343,9 +344,7 @@ local function draw_speaker_controls(track, fx)
   changed, selected_speaker = theme.slider_int(ImGui, ctx, "Selected speaker", selected_speaker, 1, #SPEAKERS)
   local speaker = SPEAKERS[selected_speaker]
   local d = DEFAULT_LAYOUT[selected_speaker]
-  theme.muted(ImGui, ctx, "SPEAKER " .. tostring(selected_speaker) .. " / " .. speaker.name:upper())
-  ImGui.SameLine(ctx)
-  theme.muted(ImGui, ctx, "default " .. tostring(d.az) .. " / " .. tostring(d.el))
+  theme.note_row(ImGui, ctx, "SPEAKER " .. tostring(selected_speaker) .. " / " .. speaker.name:upper() .. "  default " .. tostring(d.az) .. " / " .. tostring(d.el))
   slider_actual(track, fx, speaker.name .. " azimuth", speaker.az_param, -180, 180, "%.1f deg")
   slider_actual(track, fx, speaker.name .. " elevation", speaker.el_param, -90, 90, "%.1f deg")
 end
@@ -371,11 +370,18 @@ local function migrate_old_default_layout(track, fx)
 end
 
 local function draw_default_layout_summary()
-  theme.muted(ImGui, ctx, "Default layout:")
+  theme.note_row(ImGui, ctx, "Default layout:")
   for i, speaker in ipairs(SPEAKERS) do
     local d = DEFAULT_LAYOUT[i]
-    theme.muted(ImGui, ctx, string.format("%d %s  AZ %g  EL %g", i, speaker.name:upper(), d.az, d.el))
-    if i % 3 ~= 0 and i < #SPEAKERS then ImGui.SameLine(ctx, 0, 18) end
+    if i % 2 == 1 then
+      local other = SPEAKERS[i + 1]
+      local od = DEFAULT_LAYOUT[i + 1]
+      local text = string.format("%d %s  AZ %g  EL %g", i, speaker.name:upper(), d.az, d.el)
+      if other and od then
+        text = text .. string.format("    %d %s  AZ %g  EL %g", i + 1, other.name:upper(), od.az, od.el)
+      end
+      theme.note_row(ImGui, ctx, text)
+    end
   end
 end
 
@@ -387,41 +393,46 @@ local function loop()
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     local fx = find_fx(track)
     if not track then
-      theme.muted(ImGui, ctx, "SELECT THE TARGET TRACK.")
+      theme.status_row(ImGui, ctx, "SELECT THE TARGET TRACK.", "muted")
     else
       local _, name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
-      theme.muted(ImGui, ctx, "TARGET: " .. (name ~= "" and name or "(UNNAMED)"))
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "REPAIR JSFX") then fx = maybe_load(track, true) end
+      theme.status_row(ImGui, ctx, "TARGET: " .. (name ~= "" and name or "(UNNAMED)"), "muted")
+      if theme.action_row(ImGui, ctx, "REPAIR JSFX") then fx = maybe_load(track, true) end
       if fx < 0 then fx = maybe_load(track, false) end
       if fx < 0 then
-        theme.muted(ImGui, ctx, load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " IS NOT ON THE SELECTED TRACK."))
+        theme.status_row(ImGui, ctx, load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " IS NOT ON THE SELECTED TRACK."), "warn")
       else
         reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", math.max(16, reaper.GetMediaTrackInfo_Value(track, "I_NCHAN")))
         resolve_param_indices(track, fx)
         migrate_old_default_layout(track, fx)
         draw_layout(track, fx)
-        if ImGui.CollapsingHeader(ctx, "Decode / Routing", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-          combo_param(track, fx, "Input mode", 0, MODE_NAMES)
-          combo_param(track, fx, "Ambisonic order", 1, ORDER_NAMES)
-          combo_param(track, fx, "Decode weighting", 2, WEIGHT_NAMES)
-          combo_param(track, fx, "Extra channel output", 4, EXTRA_NAMES)
-          slider_actual(track, fx, "Output gain", 3, -24, 24, "%.1f dB")
-          slider_actual(track, fx, "Direct input mix", 5, 0, 150, "%.0f %%")
-          slider_actual(track, fx, "Ambisonic decode mix", 6, 0, 150, "%.0f %%")
-        end
-        if ImGui.CollapsingHeader(ctx, "Speaker Coordinates", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-          if ImGui.Button(ctx, "RESET 6CH LAYOUT") then reset_layout(track, fx) end
-          ImGui.SameLine(ctx)
-          if ImGui.Button(ctx, "SHOW JSFX") then reaper.TrackFX_Show(track, fx, 3) end
+        local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Decode / Routing", 224)
+        combo_param(track, fx, "Input mode", 0, MODE_NAMES)
+        combo_param(track, fx, "Ambisonic order", 1, ORDER_NAMES)
+        combo_param(track, fx, "Decode weighting", 2, WEIGHT_NAMES)
+        combo_param(track, fx, "Extra channel output", 4, EXTRA_NAMES)
+        slider_actual(track, fx, "Output gain", 3, -24, 24, "%.1f dB")
+        slider_actual(track, fx, "Direct input mix", 5, 0, 150, "%.0f %%")
+        slider_actual(track, fx, "Ambisonic decode mix", 6, 0, 150, "%.0f %%")
+        theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+        sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Speaker Coordinates", 282)
+          local action = theme.button_row(ImGui, ctx, {
+            { label = "RESET 6CH LAYOUT" },
+            { label = "SHOW JSFX" },
+          })
+          if action == 1 then reset_layout(track, fx) end
+          if action == 2 then reaper.TrackFX_Show(track, fx, 3) end
           draw_default_layout_summary()
           draw_speaker_controls(track, fx)
+          local speaker_labels = {}
           for i, speaker in ipairs(SPEAKERS) do
-            if ImGui.Button(ctx, tostring(i) .. " " .. speaker.name .. "##spkselect" .. tostring(i), 72, 24) then selected_speaker = i end
-            if i < #SPEAKERS then ImGui.SameLine(ctx) end
+            speaker_labels[i] = tostring(i) .. " " .. speaker.name
           end
-        end
-        theme.muted(ImGui, ctx, "Monitor decoder for sketching. For formal calibrated playback, use a measured decoder such as IEM AllRADecoder.")
+          local speaker_changed, next_speaker = theme.combo_row(ImGui, ctx, "Speaker", speaker_labels, selected_speaker)
+          if speaker_changed then selected_speaker = next_speaker end
+        theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+        theme.note_row(ImGui, ctx, "Monitor decoder for sketching. For formal calibrated playback, use a measured decoder such as IEM AllRADecoder.")
       end
     end
     ImGui.End(ctx)

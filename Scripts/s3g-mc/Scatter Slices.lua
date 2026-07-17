@@ -86,18 +86,25 @@ local SHAPE_NAMES = {
   [SHAPE_REVERSE_PULL] = "Reverse pull",
 }
 
-local COLOR_BG = ImGui.ColorConvertDouble4ToU32(0.08, 0.085, 0.09, 1)
-local COLOR_GRID = ImGui.ColorConvertDouble4ToU32(0.40, 0.43, 0.45, 0.22)
-local COLOR_LINE = ImGui.ColorConvertDouble4ToU32(0.34, 0.78, 0.86, 1)
-local COLOR_FILL = ImGui.ColorConvertDouble4ToU32(0.25, 0.58, 0.66, 0.22)
-local COLOR_POINT = ImGui.ColorConvertDouble4ToU32(0.93, 0.86, 0.54, 1)
-local COLOR_POINT_SELECTED = ImGui.ColorConvertDouble4ToU32(1.00, 0.54, 0.24, 1)
+local COLOR_BG = ImGui.ColorConvertDouble4ToU32(0.040, 0.043, 0.046, 1)
+local COLOR_GRID = ImGui.ColorConvertDouble4ToU32(0.56, 0.59, 0.60, 0.14)
+local COLOR_LINE = ImGui.ColorConvertDouble4ToU32(0.66, 0.70, 0.72, 1)
+local COLOR_FILL = ImGui.ColorConvertDouble4ToU32(0.66, 0.70, 0.72, 0.14)
+local COLOR_POINT = ImGui.ColorConvertDouble4ToU32(0.70, 0.74, 0.76, 1)
+local COLOR_POINT_SELECTED = ImGui.ColorConvertDouble4ToU32(0.92, 0.94, 0.94, 1)
+local COLOR_POINT_EDGE = ImGui.ColorConvertDouble4ToU32(0.08, 0.09, 0.10, 1)
 local COLOR_TEXT_DIM = ImGui.ColorConvertDouble4ToU32(0.78, 0.82, 0.84, 0.60)
 
 local function clamp(value, lo, hi)
   if value < lo then return lo end
   if value > hi then return hi end
   return value
+end
+
+local function draw_square_handle(draw_list, cx, cy, size, fill)
+  local half = size * 0.5
+  ImGui.DrawList_AddRectFilled(draw_list, cx - half, cy - half, cx + half, cy + half, fill)
+  ImGui.DrawList_AddRect(draw_list, cx - half, cy - half, cx + half, cy + half, COLOR_POINT_EDGE, 0, 0, 1)
 end
 
 local ROW_H = 25
@@ -311,6 +318,7 @@ end
 local function finish_section(ctx, x, y, height, stack)
   theme.pop_soft_panel(ImGui, ctx, stack)
   ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
+  ImGui.Dummy(ctx, 1, 1)
 end
 
 local function sort_density_points(points)
@@ -427,7 +435,7 @@ local function draw_density_editor(ctx, points, selected_index)
     ImGui.DrawList_AddLine(draw_list, plot_x0, gy, plot_x1, gy, COLOR_GRID, 1)
   end
   ImGui.DrawList_AddRect(draw_list, x0, y0, x1, y1, COLOR_GRID)
-  ImGui.DrawList_AddText(draw_list, x0 + 8, y0 + 6, COLOR_TEXT_DIM, "density envelope")
+  ImGui.DrawList_AddText(draw_list, x0 + 8, y0 + 6, COLOR_TEXT_DIM, "DENSITY ENVELOPE")
 
   local prev_x, prev_y = nil, nil
   for index, point in ipairs(points) do
@@ -452,11 +460,26 @@ local function draw_density_editor(ctx, points, selected_index)
       nearest_dist = dist
     end
     local color = index == selected_index and COLOR_POINT_SELECTED or COLOR_POINT
-    ImGui.DrawList_AddCircleFilled(draw_list, px, py, 4.5, color, 16)
+    draw_square_handle(draw_list, px, py, index == selected_index and 10.5 or 8.0, color)
   end
 
-  if hovered and ImGui.IsMouseClicked(ctx, 0) and nearest and nearest_dist < 12 then
-    selected_index = nearest
+  if hovered and ImGui.IsMouseClicked(ctx, 0) then
+    if nearest and nearest_dist < 12 then
+      selected_index = nearest
+    elseif #points < 12 and mx >= plot_x0 and mx <= plot_x1 and my >= plot_y0 and my <= plot_y1 then
+      local new_point = {
+        x = clamp((mx - plot_x0) / math.max(1, plot_x1 - plot_x0), 0, 1),
+        y = clamp((plot_y1 - my) / math.max(1, plot_y1 - plot_y0), 0.01, 1),
+      }
+      points[#points + 1] = new_point
+      sort_density_points(points)
+      for index, candidate in ipairs(points) do
+        if candidate == new_point then
+          selected_index = index
+          break
+        end
+      end
+    end
   end
   if selected_index and active and ImGui.IsMouseDown(ctx, 0) then
     local point = points[selected_index]
@@ -988,7 +1011,12 @@ local function main()
       ImGui.Spacing(ctx)
 
       local changed
-      local sx, sy, sh, stack = section(ctx, "Render Setup", 98)
+      local sx, sy, sh, stack = section(ctx, "Density Envelope", 268)
+        ImGui.Spacing(ctx)
+        selected_density_point = draw_density_editor(ctx, density_points, selected_density_point)
+        changed, density_contrast = draw_custom_slider(ctx, "Density contrast", density_contrast, 0, 4, "%.2f", false)
+      finish_section(ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = section(ctx, "Render Setup", 98)
         changed, target_duration = draw_custom_slider(ctx, "Target duration sec", target_duration, 0.1, math.max(0.1, total_length * 4), "%.3f", false)
         changed, output_channels = draw_custom_slider(ctx, "Output channels", output_channels, 2, mc.MAX_REAPER_TRACK_CHANNELS, nil, true)
       finish_section(ctx, sx, sy, sh, stack)
@@ -1026,12 +1054,6 @@ local function main()
         changed, zero_window = draw_custom_slider(ctx, "Zero-cross search", zero_window, 0, 0.02, "%.4f", false)
         changed, seed = draw_int_input(ctx, "Seed (0=random)", seed)
       finish_section(ctx, sx, sy, sh, stack)
-      sx, sy, sh, stack = section(ctx, "Density Envelope", 268)
-        ImGui.Spacing(ctx)
-        selected_density_point = draw_density_editor(ctx, density_points, selected_density_point)
-        changed, density_contrast = draw_custom_slider(ctx, "Density contrast", density_contrast, 0, 4, "%.2f", false)
-      finish_section(ctx, sx, sy, sh, stack)
-
       ImGui.Spacing(ctx)
       ImGui.Separator(ctx)
       ImGui.Spacing(ctx)

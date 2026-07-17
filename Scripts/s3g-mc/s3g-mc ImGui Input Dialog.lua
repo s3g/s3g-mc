@@ -56,6 +56,7 @@ function M.prompt_csv(title, labels_csv, defaults_csv, on_submit, opts)
   if not ImGui then return false end
   local ok_theme, theme = pcall(require, "s3g-mc ImGui Theme")
   if not ok_theme then theme = nil end
+  if theme and theme.install then theme.install(ImGui) end
 
   local labels = type(labels_csv) == "table" and labels_csv or split_csv(labels_csv)
   local values = type(defaults_csv) == "table" and defaults_csv or split_csv(defaults_csv)
@@ -67,8 +68,10 @@ function M.prompt_csv(title, labels_csv, defaults_csv, on_submit, opts)
   local theme_font = theme and theme.attach_font(ImGui, ctx, 11) or nil
   local open = true
   local submitted = false
-  local window_height = math.min(730, math.max(190, 126 + #labels * 42))
-  local window_width = opts.width or 460
+  local row_h = 25
+  local section_h = 40 + #labels * row_h
+  local window_height = math.min(730, math.max(210, 118 + section_h))
+  local window_width = opts.width or 520
   local button_label = opts.button_label or "Run"
 
   local function finish()
@@ -87,16 +90,25 @@ function M.prompt_csv(title, labels_csv, defaults_csv, on_submit, opts)
     local visible
     visible, open = ImGui.Begin(ctx, title or "s3g-mc Input", open)
     if visible then
-      local label_w = opts.label_width or 190
-      local input_w = opts.input_width or math.max(160, window_width - label_w - 54)
-      for index, label in ipairs(labels) do
-        ImGui.AlignTextToFramePadding(ctx)
-        if theme and theme.muted then theme.muted(ImGui, ctx, tostring(label):upper()) else ImGui.TextColored(ctx, 0x9a9a9aff, tostring(label):upper()) end
-        ImGui.SameLine(ctx, label_w)
-        ImGui.PushItemWidth(ctx, input_w)
-        local changed, value = ImGui.InputText(ctx, "##field" .. tostring(index), values[index] or "")
-        if changed then values[index] = value end
-        ImGui.PopItemWidth(ctx)
+      if theme and theme.begin_section then
+        local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Parameters", section_h)
+        for index, label in ipairs(labels) do
+          local changed, value = theme.input_text_row(ImGui, ctx, label, values[index] or "")
+          if changed then values[index] = value end
+        end
+        theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+      else
+        local label_w = opts.label_width or 190
+        local input_w = opts.input_width or math.max(160, window_width - label_w - 54)
+        for index, label in ipairs(labels) do
+          ImGui.AlignTextToFramePadding(ctx)
+          ImGui.TextColored(ctx, 0x9a9a9aff, tostring(label):upper())
+          ImGui.SameLine(ctx, label_w)
+          ImGui.PushItemWidth(ctx, input_w)
+          local changed, value = ImGui.InputText(ctx, "##field" .. tostring(index), values[index] or "")
+          if changed then values[index] = value end
+          ImGui.PopItemWidth(ctx)
+        end
       end
 
       ImGui.Spacing(ctx)

@@ -206,6 +206,7 @@ end
 local function finish_section(ctx, x, y, height, stack)
   theme.pop_soft_panel(ImGui, ctx, stack)
   ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
+  ImGui.Dummy(ctx, 1, 1)
 end
 
 local function valid_output_channels(value, fallback)
@@ -393,6 +394,9 @@ local function main()
       theme.muted(ImGui, ctx, "Source: " .. (entry.name or entry.filename))
       local changed
       ImGui.Spacing(ctx)
+      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
+        selected_env_point, settings, env_opts)
+      ImGui.Separator(ctx)
       local sx, sy, sh, stack = section(ctx, "Analysis", 252)
       changed, settings.duration = draw_custom_slider(ctx, "Render duration sec", settings.duration, 0.1, 300.0, "%.2f", false)
       settings.channels = combo_value(ctx, "Output channels", math.floor(settings.channels), OUTPUT_CHANNELS)
@@ -431,9 +435,6 @@ local function main()
       settings.channels = valid_output_channels(settings.channels, default_channels)
       settings.hop = clamp(math.floor(settings.hop), 16, math.floor(settings.fft_size))
       settings.min_track_frames = clamp(math.floor(settings.min_track_frames), 2, 64)
-      ImGui.Separator(ctx)
-      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
-        selected_env_point, settings, env_opts)
         ImGui.EndChild(ctx)
       end
       if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end

@@ -242,7 +242,7 @@ end
   end
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 720, config.window_height or 690, WINDOW_OPEN_COND)
+    ImGui.SetNextWindowSize(ctx, 720, config.window_height or 760, WINDOW_OPEN_COND)
     local visible
     visible, open = ImGui.Begin(ctx, TITLE, open)
     if visible then
@@ -253,7 +253,8 @@ end
       draw_flow(ctx, source, profile, settings)
       ImGui.Spacing(ctx)
 
-      local panel = ui_theme.push_soft_panel(ImGui, ctx)
+      local controls_h = settings.normalize and 348 or 323
+      local sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Spectral Process", controls_h)
       settings.channel_index = combo(ctx, "Channel mode", settings.channel_index, CHANNEL_NAMES)
       settings.profile_index = combo(ctx, "Profile statistic", settings.profile_index, PROFILE_NAMES)
       local changed
@@ -271,10 +272,9 @@ end
       if settings.normalize then
         changed, settings.normalize_db = ui_theme.slider_double(ImGui, ctx, "Normalize peak dB", settings.normalize_db, -24.0, 0.0, "%.1f")
       end
-      ui_theme.pop_soft_panel(ImGui, ctx, panel)
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      ImGui.Spacing(ctx)
-      ImGui.Separator(ctx)
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Output", validation and 148 or 123)
       ui_theme.muted(ImGui, ctx, "OUTPUT CHANNELS: " .. tostring(source.channels))
       ui_theme.muted(ImGui, ctx, "SOURCE FILE: " .. basename(source.filename))
       ui_theme.muted(ImGui, ctx, (config.profile_label or "Profile"):upper() .. " FILE: " .. basename(profile.filename))
@@ -283,6 +283,7 @@ end
       else
         ui_theme.muted(ImGui, ctx, "RENDERS OFFLINE FROM WAV MEDIA WITH NUMPY.")
       end
+      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
       ImGui.Spacing(ctx)
       if ImGui.Button(ctx, "RENDER", 104, 28) and not validation then should_render = true end
       ImGui.SameLine(ctx)

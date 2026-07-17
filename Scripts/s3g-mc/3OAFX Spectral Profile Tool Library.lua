@@ -25,6 +25,7 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme then
     ui_theme = _s3g_theme
@@ -53,6 +54,14 @@ end
       ui_theme.status(ImGui, draw_ctx, value, color_name or "value")
     else
       ImGui.Text(draw_ctx, value)
+    end
+  end
+
+  local function status_row(draw_ctx, value, color_name)
+    if ui_theme and ui_theme.status_row then
+      ui_theme.status_row(ImGui, draw_ctx, value, color_name or "value")
+    else
+      status_text(draw_ctx, value, color_name)
     end
   end
 
@@ -297,60 +306,66 @@ end
   end
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 760, config.window_height or 735, WINDOW_OPEN_COND)
+    ImGui.SetNextWindowSize(ctx, 760, config.window_height or 760, WINDOW_OPEN_COND)
     local visible
     visible, open = ImGui.Begin(ctx, TITLE, open)
     if visible then
       local validation = validate(source, profile, settings)
-      status_text(ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)", "muted")
-      status_text(ctx, (config.profile_label or "Profile") .. ": " .. profile.name .. "  (" .. tostring(profile.channels) .. " ch)", "muted")
-      ImGui.Spacing(ctx)
-      draw_flow(ctx, settings)
-      ImGui.Spacing(ctx)
+      local footer_h = 40
+      local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+      if type(avail_h) ~= "number" then avail_h = (config.window_height or 760) - 72 end
+      local body_h = math.max(320, avail_h - footer_h)
+      if ImGui.BeginChild(ctx, "##spectral_profile_body", 0, body_h) then
+        status_row(ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)", "muted")
+        status_row(ctx, (config.profile_label or "Profile") .. ": " .. profile.name .. "  (" .. tostring(profile.channels) .. " ch)", "muted")
+        ImGui.Spacing(ctx)
+        draw_flow(ctx, settings)
+        ImGui.Spacing(ctx)
 
-      local changed
-      local sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Routing", 98)
-      settings.order_index = combo(ctx, "Ambisonic order", settings.order_index, ORDER_NAMES)
-      settings.profile_index = combo(ctx, "Profile statistic", settings.profile_index, PROFILE_NAMES)
-      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+        local changed
+        local sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Routing", 98)
+        settings.order_index = combo(ctx, "Ambisonic order", settings.order_index, ORDER_NAMES)
+        settings.profile_index = combo(ctx, "Profile statistic", settings.profile_index, PROFILE_NAMES)
+        ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Profile", 114)
-      changed, settings.reduction_amount = ui_theme.slider_double(ImGui, ctx, config.amount_label or "Amount", settings.reduction_amount, 0.0, 1.0, "%.2f")
-      changed, settings.spectral_floor = ui_theme.slider_double(ImGui, ctx, config.floor_label or "Spectral floor", settings.spectral_floor, 0.0, 0.75, "%.2f")
-      changed, settings.profile_sensitivity = ui_theme.slider_double(ImGui, ctx, config.sensitivity_label or "Profile sensitivity", settings.profile_sensitivity, 0.25, 4.0, "%.2f")
-      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+        sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Profile", 114)
+        changed, settings.reduction_amount = ui_theme.slider_double(ImGui, ctx, config.amount_label or "Amount", settings.reduction_amount, 0.0, 1.0, "%.2f")
+        changed, settings.spectral_floor = ui_theme.slider_double(ImGui, ctx, config.floor_label or "Spectral floor", settings.spectral_floor, 0.0, 0.75, "%.2f")
+        changed, settings.profile_sensitivity = ui_theme.slider_double(ImGui, ctx, config.sensitivity_label or "Profile sensitivity", settings.profile_sensitivity, 0.25, 4.0, "%.2f")
+        ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Analysis", 158)
-      changed, settings.frequency_smoothing_bins = ui_theme.slider_int(ImGui, ctx, "Frequency smoothing bins", math.floor(settings.frequency_smoothing_bins), 0, 24)
-      changed, settings.temporal_smoothing = ui_theme.slider_double(ImGui, ctx, "Temporal smoothing", settings.temporal_smoothing, 0.0, 0.95, "%.2f")
-      settings.fft_index = combo(ctx, "FFT size", settings.fft_index, FFT_NAMES)
-      changed, settings.overlap = ui_theme.slider_int(ImGui, ctx, "Overlap", math.floor(settings.overlap), 2, 8)
-      settings.overlap = clamp(math.floor(settings.overlap), 2, 8)
-      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+        sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Analysis", 158)
+        changed, settings.frequency_smoothing_bins = ui_theme.slider_int(ImGui, ctx, "Frequency smoothing bins", math.floor(settings.frequency_smoothing_bins), 0, 24)
+        changed, settings.temporal_smoothing = ui_theme.slider_double(ImGui, ctx, "Temporal smoothing", settings.temporal_smoothing, 0.0, 0.95, "%.2f")
+        settings.fft_index = combo(ctx, "FFT size", settings.fft_index, FFT_NAMES)
+        changed, settings.overlap = ui_theme.slider_int(ImGui, ctx, "Overlap", math.floor(settings.overlap), 2, 8)
+        settings.overlap = clamp(math.floor(settings.overlap), 2, 8)
+        ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Output", settings.normalize and 148 or 123)
-      changed, settings.dc_protect = ui_theme.checkbox_row(ImGui, ctx, "DC protect", settings.dc_protect)
-      changed, settings.soft_limit = ui_theme.checkbox_row(ImGui, ctx, "Soft limit before normalize", settings.soft_limit)
-      changed, settings.normalize = ui_theme.checkbox_row(ImGui, ctx, "Peak normalize output", settings.normalize)
-      if settings.normalize then
-        changed, settings.normalize_db = ui_theme.slider_double(ImGui, ctx, "Normalize peak dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+        sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Output", settings.normalize and 148 or 123)
+        changed, settings.dc_protect = ui_theme.checkbox_row(ImGui, ctx, "DC protect", settings.dc_protect)
+        changed, settings.soft_limit = ui_theme.checkbox_row(ImGui, ctx, "Soft limit before normalize", settings.soft_limit)
+        changed, settings.normalize = ui_theme.checkbox_row(ImGui, ctx, "Peak normalize output", settings.normalize)
+        if settings.normalize then
+          changed, settings.normalize_db = ui_theme.slider_double(ImGui, ctx, "Normalize peak dB", settings.normalize_db, -24.0, 0.0, "%.1f")
+        end
+        ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+        sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Render Info", validation and 173 or 148)
+        status_row(ctx, "Required channels per ambisonic item: " .. tostring(order_channels(settings.order_index)), "muted")
+        status_row(ctx, "Directional feeds: " .. tostring(direction_count(settings.order_index)), "muted")
+        status_row(ctx, "Source file: " .. basename(source.filename), "muted")
+        status_row(ctx, (config.profile_label or "Profile") .. " file: " .. basename(profile.filename), "muted")
+        if validation then
+          status_row(ctx, validation, "warn")
+        end
+        ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
       end
-      ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
-
+      ImGui.EndChild(ctx)
       ImGui.Spacing(ctx)
-      status_text(ctx, "Required channels per ambisonic item: " .. tostring(order_channels(settings.order_index)), "muted")
-      status_text(ctx, "Directional feeds: " .. tostring(direction_count(settings.order_index)), "muted")
-      status_text(ctx, "Source file: " .. basename(source.filename), "muted")
-      status_text(ctx, (config.profile_label or "Profile") .. " file: " .. basename(profile.filename), "muted")
-      if validation then
-        status_text(ctx, validation, "warn")
-      else
-        status_text(ctx, "Renders offline from WAV media with NumPy.", "muted")
-      end
-      ImGui.Spacing(ctx)
-      if ImGui.Button(ctx, "RENDER", 104, 28) and not validation then should_render = true end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "CANCEL", 104, 28) then open = false end
+      local render_pressed, cancel_pressed = ui_theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+      if render_pressed and not validation then should_render = true end
+      if cancel_pressed then open = false end
       ImGui.End(ctx)
     end
 

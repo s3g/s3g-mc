@@ -46,7 +46,7 @@ local swap = false
 local should_render = false
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 540, 450, ImGui.Cond_Appearing)
+    ImGui.SetNextWindowSize(ctx, 540, 520, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Cross Synthesis", open)
   if visible then

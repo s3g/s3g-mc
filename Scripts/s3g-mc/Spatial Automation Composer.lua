@@ -662,6 +662,11 @@ local function loop()
       ImGui.SameLine(ctx)
       theme.muted(ImGui, ctx, spec.coord .. " / FX #" .. tostring(fx + 1))
 
+      ImGui.Spacing(ctx)
+      draw_preview(spec, start_pos, end_pos)
+      draw_preview_transport()
+      ImGui.Spacing(ctx)
+
       settings.algorithm = draw_combo("Path method", settings.algorithm, ALGORITHMS)
       settings.target_mode = draw_combo("Source relationship", settings.target_mode, TARGET_MODES)
       if settings.target_mode == 1 then
@@ -702,10 +707,6 @@ local function loop()
       end
       settings.seed = slider_int("Seed", settings.seed, 1, 99999)
 
-      ImGui.Spacing(ctx)
-      draw_preview(spec, start_pos, end_pos)
-      draw_preview_transport()
-      ImGui.Spacing(ctx)
       theme.muted(ImGui, ctx, string.format("Will write %d points per parameter over %.2f seconds.", point_count(start_pos, end_pos), end_pos - start_pos))
       if last_status ~= "" then theme.muted(ImGui, ctx, last_status) end
     end

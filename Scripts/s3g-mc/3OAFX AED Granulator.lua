@@ -23,6 +23,7 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme then
     theme = _s3g_theme
@@ -51,7 +52,6 @@ local ENV_DEFS = {
 local function getn(k, d) return tonumber(reaper.GetExtState(EXT, k)) or d end
 local function getb(k, d) local v = reaper.GetExtState(EXT, k); if v == "" then return d end; return v ~= "0" end
 local function set(k, v) reaper.SetExtState(EXT, k, type(v) == "boolean" and (v and "1" or "0") or tostring(v), true) end
-local function rgba(r, g, b, a) return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1) end
 local function combo(ctx, label, idx, names)
   local _, next_idx = theme.combo_row(ImGui, ctx, label, names, idx)
   return next_idx
@@ -93,49 +93,6 @@ local settings = {
   seed = math.floor(getn("seed", 1)),
 }
 
-local function draw_diagram(ctx)
-  local w = math.max(420, ImGui.GetContentRegionAvail(ctx) - 2)
-  local h = 150
-  ImGui.InvisibleButton(ctx, "##aed_granulator_diagram", w, h)
-  local x0, y0 = ImGui.GetItemRectMin(ctx)
-  local x1, y1 = ImGui.GetItemRectMax(ctx)
-  local dl = ImGui.GetWindowDrawList(ctx)
-  local c_bg = rgba(0.035, 0.038, 0.040, 1)
-  local c_grid = rgba(0.55, 0.60, 0.58, 0.12)
-  local c_text = rgba(0.76, 0.79, 0.76, 1)
-  local c_dim = rgba(0.54, 0.58, 0.56, 1)
-  local c_a = rgba(0.98, 0.74, 0.25, 1)
-  local c_b = rgba(0.34, 0.72, 0.86, 1)
-  local c_c = rgba(0.80, 0.62, 0.95, 1)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, c_bg)
-  ImGui.DrawList_AddRect(dl, x0, y0, x1, y1, rgba(0.45, 0.50, 0.48, 0.38), 0, 0, 1)
-  local left = x0 + 24
-  local cx = x0 + w * 0.62
-  local cy = y0 + h * 0.56
-  ImGui.DrawList_AddText(dl, left, y0 + 10, c_text, "source channels")
-  ImGui.DrawList_AddText(dl, x0 + w * 0.36, y0 + 10, c_text, "voice grains")
-  ImGui.DrawList_AddText(dl, cx - 34, y0 + 10, c_text, "AED / 3OA")
-  for ch = 1, math.min(8, entry.channels) do
-    local yy = y0 + 36 + (ch - 1) * 10
-    ImGui.DrawList_AddRect(dl, left, yy, left + 102, yy + 6, c_dim, 0, 0, 1)
-    ImGui.DrawList_AddLine(dl, left + 108, yy + 3, x0 + w * 0.36, y0 + 34 + ((ch * 17) % 72), c_grid, 1)
-  end
-  for v = 1, math.min(16, settings.voices) do
-    local px = x0 + w * 0.34 + (v % 4) * 20
-    local py = y0 + 44 + math.floor((v - 1) / 4) * 14
-    ImGui.DrawList_AddCircleFilled(dl, px, py, 3.0 + settings.window_shape * 2.0, (v % 2 == 0) and c_a or c_b)
-    ImGui.DrawList_AddLine(dl, px + 8, py, cx - 58, cy + math.sin(v) * 42, c_grid, 1)
-  end
-  for i = 1, 3 do ImGui.DrawList_AddCircle(dl, cx, cy, 18 + i * 16, c_grid, 0, 1) end
-  local spread = math.rad(settings.az_width)
-  local center = math.rad(settings.az_center)
-  local a0 = center - spread * 0.5
-  local a1 = center + spread * 0.5
-  ImGui.DrawList_AddLine(dl, cx, cy, cx + math.cos(a0) * 58, cy - math.sin(a0) * 58, c_c, 2)
-  ImGui.DrawList_AddLine(dl, cx, cy, cx + math.cos(a1) * 58, cy - math.sin(a1) * 58, c_a, 2)
-  ImGui.DrawList_AddCircleFilled(dl, cx + math.cos(center) * 46, cy - math.sin(center) * 46, 4.5, c_a)
-  ImGui.DrawList_AddText(dl, left, y1 - 24, c_dim, "each grain is a mono object with its own generated AED position, then encoded to 3OA")
-end
 
 local ctx = ImGui.CreateContext(TITLE)
 local open, should_render = true, false
@@ -201,14 +158,14 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    draw_diagram(ctx)
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(440, (avail_h or 820) - 44)
     if ImGui.BeginChild(ctx, "##aed_granulator_controls", 0, control_h) then
       local changed
       theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
       theme.muted(ImGui, ctx, "Output: 3OA ACN/SN3D (16 ch)")
-
+      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
+      ImGui.Separator(ctx)
       local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Source", 98)
       settings.trajectory = combo(ctx, "AED trajectory", settings.trajectory, TRAJECTORY_LABELS)
       settings.source_mode = combo(ctx, "Source channel mode", settings.source_mode, SOURCE_MODE_LABELS)
@@ -253,12 +210,11 @@ local function loop()
       changed, settings.seed = theme.input_int_row(ImGui, ctx, "Seed", math.floor(settings.seed))
       theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL")
+    if render_pressed then should_render = true end
+    if cancel_pressed then open = false end
     ImGui.End(ctx)
   end
   persist()

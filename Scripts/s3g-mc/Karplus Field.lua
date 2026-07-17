@@ -145,6 +145,7 @@ end
 local function finish_section(x, y, height, stack)
   theme.pop_soft_panel(ImGui, ctx, stack)
   ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
+  ImGui.Dummy(ctx, 1, 1)
 end
 
 local function render()
@@ -158,7 +159,7 @@ local function render()
   mc.print_plan("Karplus Field",{"Output: "..output_path,string.format("NumPy time: %.2f sec",elapsed),log})
 end
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 520, 470, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 520, 560, ImGui.Cond_Appearing)
   local vis
   vis, open = ImGui.Begin(ctx, "Karplus Field", open)
   if vis then

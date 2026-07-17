@@ -67,7 +67,6 @@ local function getn(k, d) return tonumber(reaper.GetExtState(EXT, k)) or d end
 local function gets(k, d) local v = reaper.GetExtState(EXT, k); if v == "" then return d end; return v end
 local function getb(k, d) local v = reaper.GetExtState(EXT, k); if v == "" then return d end; return v ~= "0" end
 local function set(k, v) reaper.SetExtState(EXT, k, type(v) == "boolean" and (v and "1" or "0") or tostring(v), true) end
-local function rgba(r, g, b, a) return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1) end
 local function clamp(value, lo, hi)
   if value < lo then return lo end
   if value > hi then return hi end
@@ -225,6 +224,7 @@ end
 local function finish_section(ctx, x, y, height, stack)
   theme.pop_soft_panel(ImGui, ctx, stack)
   ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
+  ImGui.Dummy(ctx, 1, 1)
 end
 
 local function combo(ctx, label, idx, names)
@@ -306,58 +306,6 @@ local function output_channels()
   return CHANNEL_VALUES[settings.channels_index] or 8
 end
 
-local function draw_diagram(ctx)
-  local w = math.max(420, ImGui.GetContentRegionAvail(ctx) - 2)
-  local h = 148
-  ImGui.InvisibleButton(ctx, "##evp_diagram", w, h)
-  local x0, y0 = ImGui.GetItemRectMin(ctx)
-  local x1, y1 = ImGui.GetItemRectMax(ctx)
-  local dl = ImGui.GetWindowDrawList(ctx)
-  local c_bg = rgba(0.035, 0.038, 0.040, 1)
-  local c_grid = rgba(0.55, 0.60, 0.58, 0.12)
-  local c_text = rgba(0.76, 0.79, 0.76, 1)
-  local c_dim = rgba(0.54, 0.58, 0.56, 1)
-  local c_a = rgba(0.98, 0.74, 0.25, 1)
-  local c_b = rgba(0.34, 0.72, 0.86, 1)
-  local c_c = rgba(0.80, 0.62, 0.95, 1)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, c_bg)
-  ImGui.DrawList_AddRect(dl, x0, y0, x1, y1, rgba(0.45, 0.50, 0.48, 0.38), 0, 0, 1)
-  local left = x0 + 22
-  local mid = x0 + w * 0.43
-  local right = x0 + w * 0.78
-  local cy = y0 + h * 0.56
-  ImGui.DrawList_AddText(dl, left, y0 + 10, c_text, "text / phoneme seed")
-  ImGui.DrawList_AddText(dl, mid - 42, y0 + 10, c_text, "formant voices")
-  ImGui.DrawList_AddText(dl, right - 46, y0 + 10, c_text, OUTPUT_LABELS[settings.output])
-  for i = 1, math.min(18, #settings.text) do
-    local yy = y0 + 36 + ((i - 1) % 6) * 12
-    local xx = left + math.floor((i - 1) / 6) * 22
-    ImGui.DrawList_AddText(dl, xx, yy, (i % 3 == 0) and c_b or c_dim, settings.text:sub(i, i))
-  end
-  for i = 1, 5 do
-    local yy = y0 + 40 + i * 13
-    ImGui.DrawList_AddLine(dl, mid - 60, yy, mid + 55, yy + math.sin(i + settings.mouth_size) * 8, (i % 2 == 0) and c_a or c_b, 1.6)
-    ImGui.DrawList_AddCircleFilled(dl, mid - 64, yy, 2.7 + settings.breath * 2.5, c_a)
-  end
-  ImGui.DrawList_AddLine(dl, left + 98, cy - 20, mid - 74, cy - 4, c_grid, 1)
-  ImGui.DrawList_AddLine(dl, mid + 68, cy, right - 62, cy, c_grid, 1)
-  if OUTPUT_KEYS[settings.output] == "3oa" then
-    for i = 1, 3 do ImGui.DrawList_AddCircle(dl, right, cy, 17 + i * 14, c_grid, 0, 1) end
-    ImGui.DrawList_AddText(dl, right - 15, cy - 7, c_c, "3OA")
-  else
-    local n = math.min(32, output_channels())
-    for i = 1, n do
-      local a = -math.pi / 4 - (i - 1) * 2 * math.pi / n
-      local rr = 46
-      ImGui.DrawList_AddCircleFilled(dl, right + math.cos(a) * rr, cy - math.sin(a) * rr, 2.5, c_c)
-    end
-  end
-  local a0 = math.rad(-settings.az_width * 0.5)
-  local a1 = math.rad(settings.az_width * 0.5)
-  ImGui.DrawList_AddLine(dl, right, cy, right + math.cos(a0) * 55, cy - math.sin(a0) * 55, c_a, 1.8)
-  ImGui.DrawList_AddLine(dl, right, cy, right + math.cos(a1) * 55, cy - math.sin(a1) * 55, c_b, 1.8)
-  ImGui.DrawList_AddText(dl, left, y1 - 23, c_dim, "letters seed speech-like formants; events move through the selected spatial output")
-end
 
 local ctx = ImGui.CreateContext(TITLE)
 local open, should_render = true, false
@@ -457,11 +405,12 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    draw_diagram(ctx)
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(460, (avail_h or 860) - 44)
     if ImGui.BeginChild(ctx, "##evp_controls", 0, control_h) then
       local changed
+      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
+      ImGui.Separator(ctx)
       local sx, sy, sh, stack = section(ctx, "Text / Output", OUTPUT_KEYS[settings.output] ~= "3oa" and 252 or 200)
       changed, settings.text = ImGui.InputTextMultiline(ctx, "##Text seed", settings.text, math.max(360, ImGui.GetContentRegionAvail(ctx)), 76)
       ImGui.SetCursorScreenPos(ctx, sx + 12, select(2, ImGui.GetCursorScreenPos(ctx)))
@@ -546,7 +495,6 @@ local function loop()
       if settings.normalize then changed, settings.normalize_db = draw_custom_slider(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f", false) end
       changed, settings.seed = draw_int_input(ctx, "Seed", settings.seed)
       finish_section(ctx, sx, sy, sh, stack)
-      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
       ImGui.EndChild(ctx)
     end
     if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end

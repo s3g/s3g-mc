@@ -41,6 +41,10 @@ local FX_NAME_OLD = "s3g Stereo Autogain"
 local FX_NAME_OLDER = "s3g MC Stereo Autogain"
 local FX_NAME_CLEAN = "MC Stereo Autogain"
 local FX_NAME_LEGACY = "s3g/MC Stereo Autogain"
+local CONTENT_W = 640
+local CONTROL_W = 420
+local OUTPUT_W = 92
+local METER_W = 112
 
 local PARAM = {
   input_channels = 0,
@@ -249,20 +253,6 @@ local function set_param(track, fx, param, value)
   if not min_value or not max_value or max_value == min_value then return end
   value = clamp(value, min_value, max_value)
   reaper.TrackFX_SetParamNormalized(track, fx, param, (value - min_value) / (max_value - min_value))
-end
-
-local function option_buttons(track, fx, title, param, labels, columns)
-  local current = math.floor(get_param(track, fx, param, 0) + 0.5)
-  columns = columns or #labels
-  theme.muted(ImGui, ctx, title)
-  for index, label in ipairs(labels) do
-    if index > 1 and ((index - 1) % columns) ~= 0 then ImGui.SameLine(ctx) end
-    local value = index - 1
-    local shown = current == value and ("> " .. label) or label
-    if ImGui.Button(ctx, shown .. "##" .. title .. tostring(index)) then
-      set_param(track, fx, param, value)
-    end
-  end
 end
 
 local function slider_param(track, fx, label, param, min_value, max_value, fmt)
@@ -480,10 +470,10 @@ local function autogain_label(mode, count)
   return "x 1.000"
 end
 
-local function draw_downmix_map(track, fx)
+local function draw_downmix_map(track, fx, width)
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x, y = ImGui.GetCursorScreenPos(ctx)
-  local w = math.max(520, ImGui.GetContentRegionAvail(ctx))
+  local w = width or math.max(520, ImGui.GetContentRegionAvail(ctx))
   local h = 220
   local input_count = math.floor(get_param(track, fx, PARAM.input_channels, 8) + 0.5)
   local width_percent = get_param(track, fx, PARAM.width, 100)
@@ -580,10 +570,10 @@ local function draw_downmix_map(track, fx)
   ImGui.DrawList_AddText(draw_list, map_left + map_w - 8, map_y + 30, STYLE.muted, "R")
 end
 
-local function draw_output_gain(track, fx)
+local function draw_output_gain(track, fx, width)
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x, y = ImGui.GetCursorScreenPos(ctx)
-  local w, h = 88, 220
+  local w, h = width or OUTPUT_W, 220
   local db = get_param(track, fx, PARAM.output_gain, 0)
   local norm = db_to_norm(db)
 
@@ -613,7 +603,7 @@ local function draw_output_gain(track, fx)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 820, 720, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, CONTENT_W + 18, 760, ImGui.Cond_Always)
   local visible
   visible, open = ImGui.Begin(ctx, "MC to Stereo Autogain", open)
 
@@ -642,9 +632,11 @@ local function loop()
         theme.muted(ImGui, ctx, "Input channels: " .. tostring(input_ch))
 
         ImGui.Separator(ctx)
+        draw_downmix_map(track, fx, CONTENT_W)
+        ImGui.Spacing(ctx)
         ImGui.BeginGroup(ctx)
           local panel_stack = theme.push_soft_panel(ImGui, ctx)
-          ImGui.BeginChild(ctx, "##autogain_controls", 380, 220)
+          ImGui.BeginChild(ctx, "##autogain_controls", CONTROL_W, 220)
           slider_param(track, fx, "Input channels", PARAM.input_channels, 2, MAX_CH, "%.0f")
           slider_param(track, fx, "Spread / width", PARAM.width, 0, 200, "%.0f%%")
           slider_param(track, fx, "Rotation", PARAM.rotation, -180, 180, "%.0f deg")
@@ -664,15 +656,13 @@ local function loop()
 
         ImGui.SameLine(ctx)
         ImGui.BeginGroup(ctx)
-          draw_output_gain(track, fx)
+          draw_output_gain(track, fx, OUTPUT_W)
         ImGui.EndGroup(ctx)
 
         ImGui.SameLine(ctx)
         local x, y = ImGui.GetCursorScreenPos(ctx)
-        draw_stereo_meter(track, x, y, 112, 220)
-        ImGui.Dummy(ctx, 112, 220)
-        ImGui.Spacing(ctx)
-        draw_downmix_map(track, fx)
+        draw_stereo_meter(track, x, y, METER_W, 220)
+        ImGui.Dummy(ctx, METER_W, 220)
       end
     end
     ImGui.End(ctx)

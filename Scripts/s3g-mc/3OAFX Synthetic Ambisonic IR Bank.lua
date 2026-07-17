@@ -32,6 +32,7 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui); ui_theme = _s3g_theme end
 end
@@ -435,7 +436,7 @@ local function main()
       ImGui.Spacing(ctx)
       draw_ir_preview(ctx, settings)
       ImGui.Spacing(ctx)
-      if ImGui.Button(ctx, "LOAD ROOM SKETCH JSON", 190, 26) then choose_room_sketch(settings) end
+      if ui_theme.action_button(ImGui, ctx, "LOAD ROOM SKETCH JSON") then choose_room_sketch(settings) end
       if settings.sketch_path and settings.sketch_path ~= "" then
         ui_theme.muted(ImGui, ctx, basename(settings.sketch_path))
       else
@@ -463,10 +464,10 @@ local function main()
       changed, settings.scattering = ui_theme.slider_double(ImGui, ctx, "Wall scattering", settings.scattering, 0.0, 1.0, "%.2f")
       ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Reverb", settings.auto_decay and 202 or 224)
+      sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Reverb", 230)
       changed, settings.auto_decay = ui_theme.checkbox_row(ImGui, ctx, "Estimate decay from room/material", settings.auto_decay)
       if settings.auto_decay then
-        ui_theme.muted(ImGui, ctx, string.format("Estimated decay: %.2f sec", estimated_rt60(settings)))
+        ui_theme.note_row(ImGui, ctx, string.format("Estimated decay: %.2f sec", estimated_rt60(settings)))
       else
         changed, settings.decay = ui_theme.slider_double(ImGui, ctx, "Manual decay sec", settings.decay, 0.05, 8.0, "%.2f")
       end
@@ -497,15 +498,15 @@ local function main()
       ImGui.Spacing(ctx)
       ImGui.EndChild(ctx)
       end
-      if ImGui.Button(ctx, "RENDER IR BANK", 148, 28) then
+      local render_pressed, cancel_pressed = ui_theme.footer_buttons(ImGui, ctx, "RENDER IR BANK", "CANCEL", 148, 104)
+      if render_pressed then
         if settings.output_mode_index == 2 and stacked_channel_count(settings) > mc.MAX_REAPER_TRACK_CHANNELS then
           mc.show_error("This stacked bank would need " .. tostring(stacked_channel_count(settings)) .. " channels. REAPER tracks are limited to 128 channels, so use separate ambisonic WAVs for this order/layout.")
         else
           should_render = true
         end
       end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "CANCEL", 104, 28) then open = false end
+      if cancel_pressed then open = false end
       ImGui.Dummy(ctx, 1, 10)
       ImGui.End(ctx)
     end

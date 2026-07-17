@@ -46,7 +46,7 @@ local normalize_db = -6.0
 local should_render = false
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 520, 450, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 520, 520, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Spectral Accumulate", open)
   if visible then

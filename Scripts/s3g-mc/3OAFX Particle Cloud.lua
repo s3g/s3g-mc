@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category 3OAFX
 -- @render Yes; NumPy-backed offline ambisonic particle-cloud render.
--- @method Select one or more WAV-backed media items. Ambisonic sources are processed coherently across encoded channels; non-ambisonic sources can be placed onto the 3OAFX directional layer before rendering. A diagram previews source flow, grain cloud behavior, and ambisonic output. Breakpoint curves can vary amplitude, density, grain duration, playback rate, scan position, yaw, and higher-order blur.
+-- @method Select one or more WAV-backed media items. Ambisonic sources are processed coherently across encoded channels; non-ambisonic sources can be placed onto the 3OAFX directional layer before rendering. Breakpoint curves can vary amplitude, density, grain duration, playback rate, scan position, yaw, and higher-order blur.
 
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
@@ -23,6 +23,7 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme then
     theme = _s3g_theme
@@ -52,58 +53,12 @@ local function getb(k, d) local v = reaper.GetExtState(EXT, k); if v == "" then 
 local function set(k, v) reaper.SetExtState(EXT, k, type(v) == "boolean" and (v and "1" or "0") or tostring(v), true) end
 local function order_for(ch) if ch >= 16 then return 3 elseif ch >= 9 then return 2 else return 1 end end
 local function order_channels(order) return (order + 1) * (order + 1) end
-local function rgba(r, g, b, a) return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1) end
 local settings
 local function combo(ctx, label, idx, names)
   local _, next_idx = theme.combo_row(ImGui, ctx, label, names, idx)
   return next_idx
 end
 
-local function draw_diagram(ctx, source_entries)
-  local w = math.max(420, ImGui.GetContentRegionAvail(ctx) - 2)
-  local h = 136
-  ImGui.InvisibleButton(ctx, "##particle_diagram", w, h)
-  local x0, y0 = ImGui.GetItemRectMin(ctx)
-  local x1, y1 = ImGui.GetItemRectMax(ctx)
-  local dl = ImGui.GetWindowDrawList(ctx)
-  local c_bg = rgba(0.035, 0.038, 0.040, 1)
-  local c_grid = rgba(0.55, 0.60, 0.58, 0.11)
-  local c_text = rgba(0.76, 0.79, 0.76, 1)
-  local c_dim = rgba(0.54, 0.58, 0.56, 1)
-  local c_a = rgba(0.98, 0.74, 0.25, 1)
-  local c_b = rgba(0.34, 0.72, 0.86, 1)
-  local c_c = rgba(0.80, 0.62, 0.95, 1)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, c_bg)
-  ImGui.DrawList_AddRect(dl, x0, y0, x1, y1, rgba(0.45, 0.50, 0.48, 0.38), 0, 0, 1)
-  for i = 1, 5 do
-    local gx = x0 + w * i / 6
-    ImGui.DrawList_AddLine(dl, gx, y0 + 12, gx, y1 - 12, c_grid, 1)
-  end
-  local left = x0 + 24
-  local midx = x0 + w * 0.50
-  local right = x0 + w * 0.80
-  local cy = y0 + h * 0.55
-  ImGui.DrawList_AddText(dl, left, y0 + 10, c_text, "selected media")
-  ImGui.DrawList_AddText(dl, midx - 48, y0 + 10, c_text, "grain cloud")
-  ImGui.DrawList_AddText(dl, right - 42, y0 + 10, c_text, tostring(settings.order) .. "OA")
-  for i = 1, math.min(5, #source_entries) do
-    local yy = y0 + 38 + (i - 1) * 13
-    ImGui.DrawList_AddRect(dl, left, yy, left + 106, yy + 8, c_dim, 0, 0, 1)
-    ImGui.DrawList_AddLine(dl, left + 112, yy + 4, midx - 62, cy + math.sin(i * 1.7) * 28, c_grid, 1.2)
-  end
-  local dot_count = math.max(16, math.min(58, math.floor(settings.density / 4)))
-  for i = 1, dot_count do
-    local px = midx - 54 + (i % 8) * 15 + math.sin(i * 2.1) * settings.asynchronicity * 5
-    local py = cy - 36 + math.floor((i - 1) / 8) * 11 + math.cos(i * 1.3) * settings.intermittency * 14
-    local r = 1.5 + math.min(4.0, settings.grain_ms / 260.0)
-    ImGui.DrawList_AddCircleFilled(dl, px, py, r, (i % 3 == 0) and c_b or c_a)
-  end
-  for i = 1, 3 do ImGui.DrawList_AddCircle(dl, right, cy, 16 + i * 13, c_grid, 0, 1) end
-  local yaw = math.rad(settings.yaw_end)
-  ImGui.DrawList_AddLine(dl, right, cy, right + math.cos(yaw) * 50, cy - math.sin(yaw) * 50, c_c, 2)
-  ImGui.DrawList_AddCircleFilled(dl, right + math.cos(yaw) * 50, cy - math.sin(yaw) * 50, 4, c_c)
-  ImGui.DrawList_AddText(dl, left, y1 - 22, c_dim, "sources become coherent grains, then rotate and blur inside the ambisonic field")
-end
 
 local entries = nr.selected_entries()
 local entry = entries[1]
@@ -211,13 +166,14 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    draw_diagram(ctx, entries)
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(420, (avail_h or 780) - 44)
     if ImGui.BeginChild(ctx, "##particle_controls", 0, control_h) then
       theme.muted(ImGui, ctx, "Selected sources: " .. tostring(#entries))
       theme.muted(ImGui, ctx, "First: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
       local changed
+      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
+      ImGui.Separator(ctx)
       local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Source", 180)
       changed, settings.order = theme.slider_int(ImGui, ctx, "Ambisonic order", math.floor(settings.order), 1, 3)
       changed, settings.duration = theme.slider_double(ImGui, ctx, "Output duration sec", settings.duration, 0.25, 240.0, "%.2f")
@@ -259,12 +215,11 @@ local function loop()
       changed, settings.seed = theme.input_int_row(ImGui, ctx, "Seed", math.floor(settings.seed))
       theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL")
+    if render_pressed then should_render = true end
+    if cancel_pressed then open = false end
     ImGui.End(ctx)
   end
   persist()

@@ -20,6 +20,7 @@ end
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
 package.path = script_dir .. "?.lua;" .. package.path
+package.loaded["s3g-mc ImGui Theme"] = nil
 local theme = require("s3g-mc ImGui Theme")
 local WINDOW_OPEN_COND = ImGui.Cond_Appearing
 local EXT = "s3g_mc_3oafx_offline_renderer_v1"
@@ -491,6 +492,11 @@ function main()
       if ImGui.BeginChild(ctx, "##3oafx_offline_controls", 0, control_h) then
       theme.muted(ImGui, ctx, "Source: " .. entry.name .. "  (" .. tostring(entry.channels) .. " ch)")
       theme.muted(ImGui, ctx, "Input convention: ACN/SN3D ambisonics")
+      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
+        selected_env_point, settings, env_opts)
+      theme.section_label(ImGui, ctx, "PREVIEW")
+      draw_preview(settings, env_points, env_enabled, entry)
+      ImGui.Separator(ctx)
       local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Render Setup", 73)
         settings.order_index = draw_combo("Ambisonic order", settings.order_index, ORDER_NAMES)
         local needed = order_channels(settings.order_index)
@@ -533,16 +539,11 @@ function main()
       theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
       theme.muted(ImGui, ctx, "Dry remaining at focus sets how much dry signal stays under the moving effect mask before re-encoding.")
-      theme.section_label(ImGui, ctx, "PREVIEW")
-      draw_preview(settings, env_points, env_enabled, entry)
-      theme.section_label(ImGui, ctx, "BREAKPOINTS")
-      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
-        selected_env_point, settings, env_opts)
         ImGui.EndChild(ctx)
       end
-      if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
+      local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL")
+      if render_pressed then should_render = true end
+      if cancel_pressed then open = false end
       ImGui.End(ctx)
     end
     theme.pop_font(ImGui, ctx, font_pushed)

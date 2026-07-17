@@ -19,7 +19,7 @@ function M.palette(ImGui)
     panel = color(ImGui, 0.113, 0.113, 0.113, 1.0),    -- #1d1d1d
     panel_soft = color(ImGui, 0.145, 0.145, 0.145, 1.0),
     frame = color(ImGui, 0.074, 0.074, 0.074, 1.0),
-    frame_hover = color(ImGui, 0.145, 0.145, 0.145, 1.0),
+    frame_hover = color(ImGui, 0.074, 0.074, 0.074, 1.0),
     frame_active = color(ImGui, 0.195, 0.195, 0.195, 1.0),
     title = color(ImGui, 0.047, 0.047, 0.047, 1.0),
     title_active = color(ImGui, 0.074, 0.074, 0.074, 1.0),
@@ -47,9 +47,9 @@ function M.palette(ImGui)
   p.cellBg = p.panel
   p.grid = p.edge
   p.dim = p.muted
-  p.button = p.frame
-  p.button_hover = p.frame_hover
-  p.button_active = p.frame_active
+  p.button = color(ImGui, 0.045, 0.045, 0.045, 1.0)
+  p.button_hover = color(ImGui, 0.064, 0.064, 0.064, 1.0)
+  p.button_active = color(ImGui, 0.102, 0.102, 0.102, 1.0)
   p.selected = p.active
   p.selection = color(ImGui, 0.720, 0.720, 0.720, 0.22)
   p.send = color(ImGui, 0.620, 0.690, 0.720, 0.70)
@@ -63,8 +63,8 @@ local function push_style_color(ImGui, ctx, name, value)
   local ok, key = pcall(function() return ImGui["Col_" .. name] end)
   if not ok then return 0 end
   if key then
-    ImGui.PushStyleColor(ctx, key, value)
-    return 1
+    local pushed = pcall(ImGui.PushStyleColor, ctx, key, value)
+    return pushed and 1 or 0
   end
   return 0
 end
@@ -73,8 +73,8 @@ local function push_style_var(ImGui, ctx, name, ...)
   local ok, key = pcall(function() return ImGui["StyleVar_" .. name] end)
   if not ok then return 0 end
   if key then
-    ImGui.PushStyleVar(ctx, key, ...)
-    return 1
+    local pushed = pcall(ImGui.PushStyleVar, ctx, key, ...)
+    return pushed and 1 or 0
   end
   return 0
 end
@@ -325,6 +325,159 @@ local SLIDER_ABBR = {
   ["DRY LEVEL"] = "DRY",
   ["MAX TAIL SEC"] = "TAIL",
   ["RANDOM SEED"] = "SEED",
+  ["EFFECT REGION"] = "REGION",
+  ["EFFECT AMOUNT / GAIN"] = "AMOUNT",
+  ["DAMPING / SMOOTHING"] = "DAMP",
+  ["WET AMOUNT"] = "WET",
+  ["OUTPUT AMP"] = "OUT",
+  ["MOVE WET ACROSS VIRTUAL SPEAKER ARRAY"] = "MOVE",
+  ["DRY REMAINING AT FOCUS"] = "DRY FOC",
+  ["SOURCE OBJECT SPREAD"] = "SRC OBJ",
+  ["OBJECT CLARITY"] = "CLARITY",
+  ["DRY OBJECT LEVEL"] = "DRY",
+  ["SPACE AMOUNT"] = "SPACE",
+  ["SPATIAL SPREAD DEG"] = "SPREAD",
+  ["SPATIAL MOTION"] = "MOTION",
+  ["RESONANCE HZ"] = "RES",
+  ["RESONANT FEEDBACK"] = "FDBK",
+  ["SPECTRAL SMEAR"] = "SMEAR",
+  ["INPUT MODE"] = "INPUT",
+  ["OUTPUT FORMAT"] = "FORMAT",
+  ["MATERIAL PRESET"] = "MAT",
+  ["ROOM LENGTH M"] = "ROOM X",
+  ["ROOM WIDTH M"] = "ROOM Y",
+  ["ROOM HEIGHT M"] = "ROOM Z",
+  ["SOURCE DISTANCE M"] = "SRC D",
+  ["PRE-DELAY MS"] = "PRE",
+  ["SURFACE ABSORPTION"] = "ABSORB",
+  ["WALL SCATTERING"] = "SCATTER",
+  ["ESTIMATE DECAY FROM ROOM/MATERIAL"] = "AUTO RT",
+  ["MANUAL DECAY SEC"] = "DECAY",
+  ["IR DURATION SEC"] = "IR DUR",
+  ["DIRECTIONAL SPREAD DEG"] = "SPREAD",
+  ["DIRECT GAIN"] = "DIRECT",
+  ["EARLY REFLECTIONS PER IR"] = "EARLY",
+  ["LATE DIFFUSE TAPS PER IR"] = "DIFFUSE",
+  ["AIR / TAIL DAMPING"] = "DAMP",
+  ["NORMALIZE EACH IR DB"] = "NORM",
+  ["INSERT GENERATED IR ITEMS"] = "INSERT",
+  ["COLOR MODEL"] = "COLOR",
+  ["ELEVATION SOURCE"] = "EL SRC",
+  ["UNIFORM ELEVATION"] = "EL",
+  ["ELEVATION SPREAD"] = "EL RNG",
+  ["FREQUENCY SCALE"] = "FREQ",
+  ["TIME COLUMNS"] = "COLS",
+  ["FREQUENCY ROWS"] = "ROWS",
+  ["MAX ACTIVE ROWS PER COLUMN"] = "MAX ROW",
+  ["MIN FREQUENCY"] = "MIN F",
+  ["MAX FREQUENCY"] = "MAX F",
+  ["AMPLITUDE THRESHOLD"] = "THRESH",
+  ["AMPLITUDE CURVE"] = "CURVE",
+  ["COLUMN OVERLAP"] = "OVERLAP",
+  ["HYBRID NOISE BLEND"] = "NOISE",
+  ["ADDITIVE SMOOTHING"] = "SMOOTH",
+  ["ADDITIVE SUSTAIN"] = "SUSTAIN",
+  ["ADDITIVE ATTACK"] = "ATTACK",
+  ["SPECTRAL BLUR"] = "BLUR",
+  ["SPECTRAL BAND WIDTH"] = "BAND W",
+  ["SPECTRAL INERTIA"] = "INERTIA",
+  ["PARTIAL ATTACK"] = "ATTACK",
+  ["GRAIN DURATION"] = "GRAIN",
+  ["GRAIN DENSITY"] = "DENS",
+  ["GRAIN PITCH SPREAD"] = "PITCH",
+  ["IMAGE PITCH DEPTH"] = "IMG P",
+  ["SOURCE ITEM"] = "SRC",
+  ["SOURCE SCAN"] = "SCAN",
+  ["SOURCE JITTER"] = "JITTER",
+  ["SOURCE CHANNEL"] = "SRC CH",
+  ["GRAIN TAPER"] = "TAPER",
+  ["AZIMUTH OFFSET"] = "AZ OFF",
+  ["MIN DISTANCE"] = "MIN D",
+  ["MAX DISTANCE"] = "MAX D",
+  ["INVERT DISTANCE"] = "INV D",
+  ["RING SPATIAL WIDTH"] = "WIDTH",
+  ["SOFT DRIVE"] = "DRIVE",
+  ["ADAPT LOWER-ORDER IRS TO OUTPUT ORDER"] = "ADAPT",
+  ["ALLOW SPARSE 4-DIRECTION FOA BANK"] = "SPARSE",
+  ["NORMALIZE EACH IR BEFORE CONVOLUTION"] = "IR NORM",
+  ["SOURCE ORDER"] = "SRC ORD",
+  ["KERNEL ORDER"] = "KER ORD",
+  ["KERNEL LAYOUT"] = "LAYOUT",
+  ["KERNEL MODE"] = "KERNEL",
+  ["CONVOLUTION MODE"] = "CONV",
+  ["LOCK SEND AND RETURN AZ/EL"] = "LOCK AZ",
+  ["LOCK MASK SHAPE"] = "LOCK",
+  ["LINKED AZIMUTH (+L / -R)"] = "AZ",
+  ["LINKED ELEVATION"] = "EL",
+  ["MASK WIDTH"] = "WIDTH",
+  ["MASK SHARPNESS"] = "SHARP",
+  ["MASK GAIN"] = "GAIN",
+  ["SEND GAIN"] = "SEND",
+  ["RETURN GAIN"] = "RETURN",
+  ["DRY SEND"] = "DRY",
+  ["WET RETURN"] = "WET",
+  ["SEND AZIMUTH"] = "S AZ",
+  ["SEND ELEVATION"] = "S EL",
+  ["RETURN AZIMUTH"] = "R AZ",
+  ["RETURN ELEVATION"] = "R EL",
+  ["YAW"] = "YAW",
+  ["PITCH"] = "PITCH",
+  ["NAVIGATION MODE"] = "NAV",
+  ["DENSITY GRAINS/SEC"] = "DENS",
+  ["GRAIN SIZE MS"] = "GRAIN",
+  ["SCAN MOTION"] = "SCAN",
+  ["AZIMUTH MOTION"] = "AZ MOT",
+  ["ELEVATION MOTION"] = "EL MOT",
+  ["SPATIAL BLUR"] = "BLUR",
+  ["FREEZE POSITION"] = "FREEZE",
+  ["FREEZE/TRACE AMOUNT"] = "AMOUNT",
+  ["WET MIX"] = "WET",
+  ["SPECTRAL SMOOTHING BINS"] = "SMOOTH",
+  ["ENVELOPE FLOOR"] = "FLOOR",
+  ["REGION WIDTH DEG"] = "WIDTH",
+  ["DIRECTION LAYER"] = "LAYER",
+  ["KERNEL ASSIGNMENT"] = "ASSIGN",
+  ["OUTPUT LENGTH"] = "LENGTH",
+  ["CONVOLUTION METHOD"] = "METHOD",
+  ["PEAK NORMALIZE OUTPUT"] = "PEAK",
+  ["SOFT LIMIT BEFORE NORMALIZE"] = "LIMIT",
+  ["PEAK NORMALIZE"] = "PEAK",
+  ["NORMALIZE PEAK DB"] = "NORM",
+  ["ADAPT MIXED-ORDER KERNELS"] = "ADAPT",
+  ["NORMALIZE EACH KERNEL WINDOW"] = "K NORM",
+  ["SOURCE FORMAT"] = "FORMAT",
+  ["OUTPUT ORDER"] = "ORDER",
+  ["SPATIAL OCCUPATION"] = "OCCUPY",
+  ["SOURCE POOL"] = "POOL",
+  ["STEREO SUM/DIFFERENCE EXPANSION"] = "STEREO",
+  ["HEAD ORIENTATION"] = "HEAD",
+  ["LISTENER X"] = "L X",
+  ["LISTENER Y"] = "L Y",
+  ["LISTENER Z"] = "L Z",
+  ["ROLL DEG"] = "ROLL",
+  ["PITCH DEG"] = "PITCH",
+  ["YAW DEG"] = "YAW",
+  ["TIME"] = "TIME",
+  ["SOFT LIMIT"] = "LIMIT",
+  ["AMPLITUDE SOURCE"] = "AMP SRC",
+  ["SYNTHESIS"] = "SYNTH",
+  ["ELEVATION"] = "EL",
+  ["DURATION SEC"] = "DUR",
+  ["CAMERA AZIM"] = "CAM AZ",
+  ["CAMERA ELEV"] = "CAM EL",
+  ["PREVIEW TIME"] = "TIME",
+  ["GLOBAL NODE RADIUS"] = "RADIUS",
+  ["DISTANCE FALLOFF"] = "FALLOFF",
+  ["BLEND SHARPNESS"] = "BLEND",
+  ["PERSPECTIVE ROTATION"] = "ROTATE",
+  ["NEAR-FIELD BLUR"] = "N BLUR",
+  ["HEIGHT SENSITIVITY"] = "HEIGHT",
+  ["SOURCE LOOP CROSSFADE MS"] = "XFADE",
+  ["OUTPUT GAIN DB"] = "OUT",
+  ["NODE X"] = "NODE X",
+  ["NODE Y"] = "NODE Y",
+  ["NODE Z"] = "NODE Z",
+  ["NODE RADIUS"] = "RADIUS",
 }
 
 local MAX_SLIDER_LABEL_CHARS = 8
@@ -367,20 +520,46 @@ local function display_slider_value(value, format, integer)
   return string.format("%.3f", value)
 end
 
+local function text_width(ImGui, ctx, text)
+  text = tostring(text or "")
+  if ImGui.CalcTextSize then
+    local ok, width = pcall(ImGui.CalcTextSize, ctx, text)
+    if ok and type(width) == "number" then return width end
+  end
+  return #text * 7
+end
+
+local function visible_text(text)
+  return tostring(text or ""):gsub("##.*$", "")
+end
+
+local function combo_width(ImGui, ctx, labels, current, max_width)
+  local width = text_width(ImGui, ctx, labels[current or 1] or "") + 38
+  for _, label in ipairs(labels or {}) do
+    width = math.max(width, text_width(ImGui, ctx, label) + 38)
+  end
+  return math.max(80, math.min(max_width or width, width))
+end
+
 local function row_metrics(ImGui, ctx, width)
-  local x, y = ImGui.GetCursorScreenPos(ctx)
+  local outer_x, y = ImGui.GetCursorScreenPos(ctx)
   local avail = width or ImGui.GetContentRegionAvail(ctx)
   if type(avail) ~= "number" then avail = 220 end
   avail = math.max(220, avail)
+  local left_pad = 0
+  local x = outer_x + left_pad
+  local content_avail = math.max(180, avail - left_pad)
   local label_w = 82
   local value_w = 76
   local control_x = x + label_w
-  local control_w = math.max(52, avail - label_w - value_w - 8)
+  local control_w = math.max(52, content_avail - label_w - value_w - 8)
   local value_x = control_x + control_w + 8
   return {
+    outer_x = outer_x,
     x = x,
     y = y,
     avail = avail,
+    content_avail = content_avail,
     label_w = label_w,
     value_w = value_w,
     control_x = control_x,
@@ -404,9 +583,9 @@ local function pop_borderless_frame(ImGui, ctx, vars)
 end
 
 local function finish_row(ImGui, ctx, row)
-  ImGui.SetCursorScreenPos(ctx, row.x, row.y)
+  ImGui.SetCursorScreenPos(ctx, row.outer_x or row.x, row.y)
   ImGui.Dummy(ctx, row.avail, row.h)
-  ImGui.SetCursorScreenPos(ctx, row.x, row.y + row.h)
+  ImGui.SetCursorScreenPos(ctx, row.outer_x or row.x, row.y + row.h)
 end
 
 function M.slider_row(ImGui, ctx, label, value, min_value, max_value, format, integer, width)
@@ -449,6 +628,7 @@ function M.slider_row(ImGui, ctx, label, value, min_value, max_value, format, in
   local hx = clamp(track_x + track_w * norm - 1.5, track_x + 1, track_x + track_w - 4)
   ImGui.DrawList_AddRectFilled(draw, hx, track_y - 2, hx + 3, track_y + track_h + 2, handle_col)
   ImGui.DrawList_AddText(draw, value_x, y + 2, p.value, display_slider_value(value, format, integer))
+  ImGui.SetCursorScreenPos(ctx, row.outer_x or row.x, row.y + row.h)
   return changed, value
 end
 
@@ -462,12 +642,12 @@ end
 
 function M.combo_row(ImGui, ctx, label, labels, value, width)
   labels = labels or {}
-  local row = row_metrics(ImGui, ctx)
+  local row = row_metrics(ImGui, ctx, width)
   local x, y = row.x, row.y
   local p = M.palette(ImGui)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
   ImGui.SetCursorScreenPos(ctx, row.control_x, y)
-  ImGui.SetNextItemWidth(ctx, row.control_w)
+  ImGui.SetNextItemWidth(ctx, combo_width(ImGui, ctx, labels, value, row.control_w))
   local border_vars = push_borderless_frame(ImGui, ctx)
   local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), (value or 1) - 1, table.concat(labels, "\0") .. "\0")
   pop_borderless_frame(ImGui, ctx, border_vars)
@@ -478,12 +658,12 @@ end
 function M.combo_action_row(ImGui, ctx, label, labels, value, width, button_label, button_width)
   labels = labels or {}
   button_width = button_width or 88
-  local row = row_metrics(ImGui, ctx)
+  local row = row_metrics(ImGui, ctx, width)
   local x, y = row.x, row.y
   local p = M.palette(ImGui)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
   ImGui.SetCursorScreenPos(ctx, row.control_x, y)
-  ImGui.SetNextItemWidth(ctx, math.max(52, row.control_w - button_width - 8))
+  ImGui.SetNextItemWidth(ctx, combo_width(ImGui, ctx, labels, value, math.max(52, row.control_w - button_width - 8)))
   local border_vars = push_borderless_frame(ImGui, ctx)
   local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), (value or 1) - 1, table.concat(labels, "\0") .. "\0")
   pop_borderless_frame(ImGui, ctx, border_vars)
@@ -494,7 +674,7 @@ function M.combo_action_row(ImGui, ctx, label, labels, value, width, button_labe
 end
 
 function M.input_int_row(ImGui, ctx, label, value, step, step_fast, width)
-  local row = row_metrics(ImGui, ctx)
+  local row = row_metrics(ImGui, ctx, width)
   local x, y = row.x, row.y
   local p = M.palette(ImGui)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
@@ -508,7 +688,7 @@ function M.input_int_row(ImGui, ctx, label, value, step, step_fast, width)
 end
 
 function M.input_double_row(ImGui, ctx, label, value, step, step_fast, format, width)
-  local row = row_metrics(ImGui, ctx)
+  local row = row_metrics(ImGui, ctx, width)
   local x, y = row.x, row.y
   local p = M.palette(ImGui)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
@@ -522,7 +702,7 @@ function M.input_double_row(ImGui, ctx, label, value, step, step_fast, format, w
 end
 
 function M.input_text_row(ImGui, ctx, label, value, width)
-  local row = row_metrics(ImGui, ctx)
+  local row = row_metrics(ImGui, ctx, width)
   local x, y = row.x, row.y
   local p = M.palette(ImGui)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
@@ -544,6 +724,66 @@ function M.checkbox_row(ImGui, ctx, label, value, width)
   local changed, next_value = ImGui.Checkbox(ctx, "##check_" .. tostring(label or ""), value)
   finish_row(ImGui, ctx, row)
   return changed, next_value
+end
+
+function M.note_row(ImGui, ctx, text, width)
+  local row = row_metrics(ImGui, ctx, width)
+  local p = M.palette(ImGui)
+  local draw = ImGui.GetWindowDrawList(ctx)
+  ImGui.DrawList_AddText(draw, row.control_x, row.y + 2, p.muted, tostring(text or ""))
+  finish_row(ImGui, ctx, row)
+end
+
+function M.status_row(ImGui, ctx, text, color_name, width)
+  local row = row_metrics(ImGui, ctx, width)
+  local p = M.palette(ImGui)
+  local draw = ImGui.GetWindowDrawList(ctx)
+  ImGui.DrawList_AddText(draw, row.control_x, row.y + 2, p[color_name or "value"] or p.value, tostring(text or ""))
+  finish_row(ImGui, ctx, row)
+end
+
+function M.footer_buttons(ImGui, ctx, primary_label, secondary_label, primary_w, secondary_w)
+  local x, y = ImGui.GetCursorScreenPos(ctx)
+  ImGui.SetCursorScreenPos(ctx, x + 12, y)
+  local primary = ImGui.Button(ctx, tostring(primary_label or "OK"):upper(), primary_w or 96, 28)
+  local secondary = false
+  if secondary_label and secondary_label ~= "" then
+    ImGui.SameLine(ctx)
+    secondary = ImGui.Button(ctx, tostring(secondary_label):upper(), secondary_w or primary_w or 96, 28)
+  end
+  return primary, secondary
+end
+
+function M.action_button(ImGui, ctx, label, width, height)
+  label = tostring(label or ""):upper()
+  local avail = ImGui.GetContentRegionAvail(ctx)
+  if type(avail) ~= "number" then avail = 220 end
+  local button_w = width or math.max(96, math.min(avail, text_width(ImGui, ctx, visible_text(label)) + 28))
+  return ImGui.Button(ctx, label, button_w, height or 26)
+end
+
+function M.action_row(ImGui, ctx, label, width, height)
+  local row = row_metrics(ImGui, ctx)
+  local button_label = tostring(label or ""):upper()
+  local button_w = width or math.max(80, math.min(row.control_w, text_width(ImGui, ctx, visible_text(button_label)) + 28))
+  ImGui.SetCursorScreenPos(ctx, row.control_x, row.y)
+  local pressed = ImGui.Button(ctx, button_label, button_w, height or 24)
+  finish_row(ImGui, ctx, row)
+  return pressed
+end
+
+function M.button_row(ImGui, ctx, buttons, height)
+  local row = row_metrics(ImGui, ctx)
+  ImGui.SetCursorScreenPos(ctx, row.control_x, row.y)
+  local pressed = nil
+  for index, button in ipairs(buttons or {}) do
+    local label = tostring(button.label or button[1] or ""):upper()
+    local width = button.width or button[2] or math.max(64, text_width(ImGui, ctx, visible_text(label)) + 24)
+    if index > 1 then ImGui.SameLine(ctx) end
+    if ImGui.Button(ctx, label, width, height or 24) then pressed = index end
+  end
+  finish_row(ImGui, ctx, row)
+  return pressed
 end
 
 function M.section_label(ImGui, ctx, label)
@@ -586,7 +826,7 @@ function M.push_soft_panel(ImGui, ctx)
   local title_hover = rgba(0.078, 0.080, 0.083, 1.0)
   local title_active = rgba(0.094, 0.096, 0.098, 1.0)
   local control = rgba(0.052, 0.054, 0.056, 1.0)
-  local control_hover = rgba(0.070, 0.072, 0.074, 1.0)
+  local control_hover = control
   local control_active = rgba(0.088, 0.090, 0.092, 1.0)
   if ImGui.Col_ChildBg then ImGui.PushStyleColor(ctx, ImGui.Col_ChildBg, body); colors = colors + 1 end
   if ImGui.Col_Border then ImGui.PushStyleColor(ctx, ImGui.Col_Border, rgba(0.10, 0.11, 0.12, 0.16)); colors = colors + 1 end
@@ -597,9 +837,9 @@ function M.push_soft_panel(ImGui, ctx)
   if ImGui.Col_FrameBg then ImGui.PushStyleColor(ctx, ImGui.Col_FrameBg, control); colors = colors + 1 end
   if ImGui.Col_FrameBgHovered then ImGui.PushStyleColor(ctx, ImGui.Col_FrameBgHovered, control_hover); colors = colors + 1 end
   if ImGui.Col_FrameBgActive then ImGui.PushStyleColor(ctx, ImGui.Col_FrameBgActive, control_active); colors = colors + 1 end
-  if ImGui.Col_Button then ImGui.PushStyleColor(ctx, ImGui.Col_Button, rgba(0.064, 0.066, 0.068, 1.0)); colors = colors + 1 end
-  if ImGui.Col_ButtonHovered then ImGui.PushStyleColor(ctx, ImGui.Col_ButtonHovered, rgba(0.084, 0.086, 0.088, 1.0)); colors = colors + 1 end
-  if ImGui.Col_ButtonActive then ImGui.PushStyleColor(ctx, ImGui.Col_ButtonActive, rgba(0.110, 0.112, 0.114, 1.0)); colors = colors + 1 end
+  if ImGui.Col_Button then ImGui.PushStyleColor(ctx, ImGui.Col_Button, rgba(0.045, 0.045, 0.045, 1.0)); colors = colors + 1 end
+  if ImGui.Col_ButtonHovered then ImGui.PushStyleColor(ctx, ImGui.Col_ButtonHovered, rgba(0.064, 0.064, 0.064, 1.0)); colors = colors + 1 end
+  if ImGui.Col_ButtonActive then ImGui.PushStyleColor(ctx, ImGui.Col_ButtonActive, rgba(0.102, 0.102, 0.102, 1.0)); colors = colors + 1 end
   if ImGui.Col_CheckMark then ImGui.PushStyleColor(ctx, ImGui.Col_CheckMark, rgba(0.62, 0.64, 0.64, 1.0)); colors = colors + 1 end
   if ImGui.Col_SliderGrab then ImGui.PushStyleColor(ctx, ImGui.Col_SliderGrab, rgba(0.42, 0.43, 0.43, 1.0)); colors = colors + 1 end
   if ImGui.Col_SliderGrabActive then ImGui.PushStyleColor(ctx, ImGui.Col_SliderGrabActive, rgba(0.64, 0.65, 0.64, 1.0)); colors = colors + 1 end
@@ -711,9 +951,9 @@ function M.push(ImGui, ctx)
   colors = colors + push_style_color(ImGui, ctx, "FrameBg", p.frame)
   colors = colors + push_style_color(ImGui, ctx, "FrameBgHovered", p.frame_hover)
   colors = colors + push_style_color(ImGui, ctx, "FrameBgActive", p.frame_active)
-  colors = colors + push_style_color(ImGui, ctx, "Button", p.frame)
-  colors = colors + push_style_color(ImGui, ctx, "ButtonHovered", p.frame_hover)
-  colors = colors + push_style_color(ImGui, ctx, "ButtonActive", p.frame_active)
+  colors = colors + push_style_color(ImGui, ctx, "Button", p.button)
+  colors = colors + push_style_color(ImGui, ctx, "ButtonHovered", p.button_hover)
+  colors = colors + push_style_color(ImGui, ctx, "ButtonActive", p.button_active)
   colors = colors + push_style_color(ImGui, ctx, "Header", p.frame)
   colors = colors + push_style_color(ImGui, ctx, "HeaderHovered", p.frame_hover)
   colors = colors + push_style_color(ImGui, ctx, "HeaderActive", p.frame_active)
@@ -745,7 +985,6 @@ function M.install(ImGui)
 
   local original_begin = ImGui.Begin
   local original_end = ImGui.End
-  local original_set_next_window_size = ImGui.SetNextWindowSize
   local stacks_by_ctx = setmetatable({}, { __mode = "k" })
   local fonts_by_ctx = setmetatable({}, { __mode = "k" })
   local unpack_fn = table.unpack or unpack
@@ -783,15 +1022,9 @@ function M.install(ImGui)
     end
   end
 
-  local function themed_set_next_window_size(ctx, width, height, ...)
-    if type(height) == "number" and height > 0 then height = height + 10 end
-    return original_set_next_window_size(ctx, width, height, ...)
-  end
-
   local ok = pcall(function()
     ImGui.Begin = themed_begin
     ImGui.End = themed_end
-    if original_set_next_window_size then ImGui.SetNextWindowSize = themed_set_next_window_size end
   end)
   if ok then installed[ImGui] = true end
   return ok

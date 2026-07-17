@@ -19,6 +19,7 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
@@ -134,6 +135,8 @@ local PRESETS = {
 
 local ctx = ImGui.CreateContext("Ambisonic Stereo Decoder")
 local open = true
+local preset_index = 1
+local custom_weight_preset_index = 1
 local view_yaw_deg = -35
 local view_pitch_deg = -42
 local view_zoom = 1.0
@@ -260,17 +263,12 @@ local function set_weighting_mode(track, fx, mode)
   reaper.TrackFX_SetParamNormalized(track, fx, PARAM.weighting, mode / (#WEIGHTING - 1))
 end
 
-local function option_buttons(track, fx, title, param, labels, columns)
+local function combo_option(track, fx, title, param, labels)
   local norm = fx >= 0 and reaper.TrackFX_GetParamNormalized(track, fx, param) or 0
   local current = math.floor(norm * (#labels - 1) + 0.5) + 1
-  columns = columns or #labels
-  theme.muted(ImGui, ctx, title)
-  for index, label in ipairs(labels) do
-    if index > 1 and ((index - 1) % columns) ~= 0 then ImGui.SameLine(ctx) end
-    local shown = current == index and ("> " .. label) or label
-    if ImGui.Button(ctx, shown .. "##" .. title .. tostring(index)) then
-      reaper.TrackFX_SetParamNormalized(track, fx, param, (index - 1) / math.max(1, #labels - 1))
-    end
+  local changed, next_index = theme.combo_row(ImGui, ctx, title, labels, current)
+  if changed then
+    reaper.TrackFX_SetParamNormalized(track, fx, param, (next_index - 1) / math.max(1, #labels - 1))
   end
 end
 
@@ -289,12 +287,14 @@ local function apply_preset(track, fx, preset)
 end
 
 local function draw_presets(track, fx)
-  theme.muted(ImGui, ctx, "Starting points")
+  local labels = {}
   for index, preset in ipairs(PRESETS) do
-    if index > 1 and (index - 1) % 4 ~= 0 then ImGui.SameLine(ctx) end
-    if ImGui.Button(ctx, preset.name .. "##preset" .. tostring(index), 132, 26) then
-      apply_preset(track, fx, preset)
-    end
+    labels[index] = preset.name
+  end
+  local changed, next_index = theme.combo_row(ImGui, ctx, "Preset", labels, preset_index)
+  if changed and PRESETS[next_index] then
+    preset_index = next_index
+    apply_preset(track, fx, PRESETS[preset_index])
   end
 end
 
@@ -394,11 +394,11 @@ end
 local function draw_camera_controls()
   ImGui.BeginGroup(ctx)
   theme.muted(ImGui, ctx, "CAMERA")
-  nudge_camera("up##ambstcam", 68, 24, function() view_pitch_deg = clamp(view_pitch_deg + 4, -180, 180) end)
-  nudge_camera("left##ambstcam", 32, 24, function() view_yaw_deg = view_yaw_deg - 4 end)
+  nudge_camera("UP##ambstcam", 68, 24, function() view_pitch_deg = clamp(view_pitch_deg + 4, -180, 180) end)
+  nudge_camera("L##ambstcam", 32, 24, function() view_yaw_deg = view_yaw_deg - 4 end)
   ImGui.SameLine(ctx)
-  nudge_camera("right##ambstcam", 32, 24, function() view_yaw_deg = view_yaw_deg + 4 end)
-  nudge_camera("down##ambstcam", 68, 24, function() view_pitch_deg = clamp(view_pitch_deg - 4, -180, 180) end)
+  nudge_camera("R##ambstcam", 32, 24, function() view_yaw_deg = view_yaw_deg + 4 end)
+  nudge_camera("DN##ambstcam", 68, 24, function() view_pitch_deg = clamp(view_pitch_deg - 4, -180, 180) end)
   nudge_camera("-##ambstzoom", 32, 24, function() view_zoom = clamp(view_zoom - 0.025, 0.5, 2.2) end)
   ImGui.SameLine(ctx)
   nudge_camera("+##ambstzoom", 32, 24, function() view_zoom = clamp(view_zoom + 0.025, 0.5, 2.2) end)
@@ -455,9 +455,8 @@ end
 local function draw_custom_weight_controls(track, fx)
   local order = math.floor(get_param(track, fx, PARAM.order, 2) + 0.5) + 1
   local mode = math.floor(get_param(track, fx, PARAM.weighting, 1) + 0.5)
-  ImGui.Separator(ctx)
-  theme.muted(ImGui, ctx, "CUSTOM BAND WEIGHTS")
-  theme.muted(ImGui, ctx, mode == 3 and "Custom weighting is active" or "Move a slider to switch Decode weighting to Custom")
+  theme.note_row(ImGui, ctx, "CUSTOM BAND WEIGHTS")
+  theme.note_row(ImGui, ctx, mode == 3 and "Custom weighting is active" or "Move a slider to switch Decode weighting to Custom")
   local labels = { "W", "1st", "2nd", "3rd" }
   local params = { PARAM.custom_w, PARAM.custom_o1, PARAM.custom_o2, PARAM.custom_o3 }
   for band = 0, 3 do
@@ -470,15 +469,18 @@ local function draw_custom_weight_controls(track, fx)
     end
     if not active and ImGui.EndDisabled then ImGui.EndDisabled(ctx) end
   end
-  if ImGui.Button(ctx, "FLAT##custom_weights") then
+  local preset_labels = { "Flat", "Max-rE-ish" }
+  local changed, next_preset = theme.combo_row(ImGui, ctx, "Weight preset", preset_labels, custom_weight_preset_index)
+  if changed and next_preset == 1 then
+    custom_weight_preset_index = next_preset
     set_param(track, fx, PARAM.custom_w, 100)
     set_param(track, fx, PARAM.custom_o1, 100)
     set_param(track, fx, PARAM.custom_o2, 100)
     set_param(track, fx, PARAM.custom_o3, 100)
     set_weighting_mode(track, fx, 3)
   end
-  ImGui.SameLine(ctx)
-  if ImGui.Button(ctx, "MAX-RE-ISH##custom_weights") then
+  if changed and next_preset == 2 then
+    custom_weight_preset_index = next_preset
     set_param(track, fx, PARAM.custom_w, 100)
     set_param(track, fx, PARAM.custom_o1, 100)
     set_param(track, fx, PARAM.custom_o2, 82)
@@ -627,15 +629,14 @@ local function loop()
     local track = reaper.GetSelectedTrack(PROJECT, 0)
     local fx = find_fx(track)
     if not track then
-      theme.muted(ImGui, ctx, "SELECT THE TARGET TRACK.")
+      theme.status_row(ImGui, ctx, "SELECT THE TARGET TRACK.", "muted")
     else
       local _, name = reaper.GetSetMediaTrackInfo_String(track, "P_NAME", "", false)
-      theme.muted(ImGui, ctx, "TARGET: " .. (name ~= "" and name or "(UNNAMED)"))
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "REPAIR JSFX") then fx = maybe_load(track, true) end
+      theme.status_row(ImGui, ctx, "TARGET: " .. (name ~= "" and name or "(UNNAMED)"), "muted")
+      if theme.action_row(ImGui, ctx, "REPAIR JSFX") then fx = maybe_load(track, true) end
       if fx < 0 then fx = maybe_load(track, false) end
       if fx < 0 then
-        theme.muted(ImGui, ctx, load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " IS NOT ON THE SELECTED TRACK."))
+        theme.status_row(ImGui, ctx, load_error ~= "" and load_error or ("JS: " .. FX_NAME .. " IS NOT ON THE SELECTED TRACK."), "warn")
       else
         resolve_param_indices(track, fx)
         if param_warning ~= "" then
@@ -644,38 +645,41 @@ local function loop()
         reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", math.max(16, reaper.GetMediaTrackInfo_Value(track, "I_NCHAN")))
         draw_visual(track, fx)
         draw_stereo_meter(track, fx)
-        if ImGui.CollapsingHeader(ctx, "Presets", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-          draw_presets(track, fx)
-        end
-        if ImGui.CollapsingHeader(ctx, "Ambisonic Decode", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-          option_buttons(track, fx, "Ambisonic order", PARAM.order, ORDER, 3)
-          option_buttons(track, fx, "Virtual speaker field", PARAM.field, FIELD, 3)
-          option_buttons(track, fx, "Decode weighting", PARAM.weighting, WEIGHTING, 4)
-          draw_custom_weight_controls(track, fx)
-        end
-        if ImGui.CollapsingHeader(ctx, "Stereo Pickup", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-          option_buttons(track, fx, "Stereo method", PARAM.method, METHOD, 3)
-          slider_param(track, fx, "Stereo width", PARAM.width, 0, 200, "%.0f %%")
-          slider_param(track, fx, "Mic angle", PARAM.angle, 20, 140, "%.0f deg")
-          slider_param(track, fx, "Listening rotation", PARAM.rotation, -180, 180, "%.1f deg")
-          slider_param(track, fx, "Rotation image", PARAM.rotation_image, 0, 200, "%.0f %%")
-          slider_param(track, fx, "Mic elevation", PARAM.mic_elevation, -90, 90, "%.1f deg")
-          slider_param(track, fx, "Directivity", PARAM.directivity, 0, 100, "%.0f %%")
-          slider_param(track, fx, "Rear rejection", PARAM.rear, 0, 100, "%.0f %%")
-          slider_param(track, fx, "Front/rear balance", PARAM.front_rear, -100, 100, "%.0f %%")
-          option_buttons(track, fx, "Rear fold", PARAM.rear_mode, REAR_MODE, 3)
-          slider_param(track, fx, "Height fold", PARAM.height, 0, 100, "%.0f %%")
-          option_buttons(track, fx, "Height image", PARAM.height_mode, HEIGHT_MODE, 4)
-          slider_param(track, fx, "Diffuse blend", PARAM.diffuse, 0, 100, "%.0f %%")
-          slider_param(track, fx, "A/B spacing", PARAM.ab_spacing, 0, 120, "%.0f cm")
-        end
-        if ImGui.CollapsingHeader(ctx, "Output", nil, ImGui.TreeNodeFlags_DefaultOpen) then
-          option_buttons(track, fx, "Autogain", PARAM.autogain, AUTOGAIN, 3)
-          option_buttons(track, fx, "Extra channel output", PARAM.extra, EXTRA, 2)
-          slider_param(track, fx, "Bass mono below", PARAM.bass_mono, 0, 300, "%.0f Hz")
-          slider_param(track, fx, "Output gain", PARAM.output, -24, 24, "%.1f dB")
-        end
-        theme.muted(ImGui, ctx, "Stereo decoder for loudspeaker monitoring or renders; not a binaural headphone decoder.")
+        local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Presets", 74)
+        draw_presets(track, fx)
+        theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+        sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Ambisonic Decode", 276)
+        combo_option(track, fx, "Ambisonic order", PARAM.order, ORDER)
+        combo_option(track, fx, "Virtual speaker field", PARAM.field, FIELD)
+        combo_option(track, fx, "Decode weighting", PARAM.weighting, WEIGHTING)
+        draw_custom_weight_controls(track, fx)
+        theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+        sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Stereo Pickup", 400)
+        combo_option(track, fx, "Stereo method", PARAM.method, METHOD)
+        slider_param(track, fx, "Stereo width", PARAM.width, 0, 200, "%.0f %%")
+        slider_param(track, fx, "Mic angle", PARAM.angle, 20, 140, "%.0f deg")
+        slider_param(track, fx, "Listening rotation", PARAM.rotation, -180, 180, "%.1f deg")
+        slider_param(track, fx, "Rotation image", PARAM.rotation_image, 0, 200, "%.0f %%")
+        slider_param(track, fx, "Mic elevation", PARAM.mic_elevation, -90, 90, "%.1f deg")
+        slider_param(track, fx, "Directivity", PARAM.directivity, 0, 100, "%.0f %%")
+        slider_param(track, fx, "Rear rejection", PARAM.rear, 0, 100, "%.0f %%")
+        slider_param(track, fx, "Front/rear balance", PARAM.front_rear, -100, 100, "%.0f %%")
+        combo_option(track, fx, "Rear fold", PARAM.rear_mode, REAR_MODE)
+        slider_param(track, fx, "Height fold", PARAM.height, 0, 100, "%.0f %%")
+        combo_option(track, fx, "Height image", PARAM.height_mode, HEIGHT_MODE)
+        slider_param(track, fx, "Diffuse blend", PARAM.diffuse, 0, 100, "%.0f %%")
+        slider_param(track, fx, "A/B spacing", PARAM.ab_spacing, 0, 120, "%.0f cm")
+        theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+
+        sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Output", 158)
+        combo_option(track, fx, "Autogain", PARAM.autogain, AUTOGAIN)
+        combo_option(track, fx, "Extra channel output", PARAM.extra, EXTRA)
+        slider_param(track, fx, "Bass mono below", PARAM.bass_mono, 0, 300, "%.0f Hz")
+        slider_param(track, fx, "Output gain", PARAM.output, -24, 24, "%.1f dB")
+        theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
+        theme.note_row(ImGui, ctx, "Stereo decoder for loudspeaker monitoring or renders; not a binaural headphone decoder.")
       end
     end
     ImGui.End(ctx)

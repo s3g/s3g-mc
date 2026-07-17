@@ -25,9 +25,11 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+package.loaded["s3g-mc ImGui Theme"] = nil
 local theme = require("s3g-mc ImGui Theme")
 
 
@@ -281,9 +283,9 @@ local function loop()
     theme.muted(ImGui, ctx, "Stereo expansion seeds front, rear, and side occupation before ACN/SN3D encoding.")
     ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL")
+    if render_pressed then should_render = true end
+    if cancel_pressed then open = false end
     ImGui.Dummy(ctx, 1, 10)
     ImGui.End(ctx)
   end

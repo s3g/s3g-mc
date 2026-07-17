@@ -171,6 +171,7 @@ end
 local function finish_section(ctx, x, y, height, stack)
   theme.pop_soft_panel(ImGui, ctx, stack)
   ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
+  ImGui.Dummy(ctx, 1, 1)
 end
 
 local function render(entry, settings, env_points, env_enabled)
@@ -272,6 +273,9 @@ local function main()
       theme.muted(ImGui, ctx, "Source: " .. entry.name .. "  (" .. tostring(entry.channels) .. " ch)")
       local changed
       ImGui.Spacing(ctx)
+      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
+        selected_env_point, settings, env_opts)
+      ImGui.Separator(ctx)
       local sx, sy, sh, stack = section(ctx, "Render", 148)
       changed, settings.duration = draw_custom_slider(ctx, "Duration sec", settings.duration, 0.25, 300.0, "%.2f", false)
       changed, settings.channels = draw_custom_slider(ctx, "Output channels", math.floor(settings.channels), 1, mc.MAX_REAPER_TRACK_CHANNELS, nil, true)
@@ -297,9 +301,6 @@ local function main()
       changed, settings.seed = draw_int_input(ctx, "Seed", settings.seed)
       finish_section(ctx, sx, sy, sh, stack)
       settings.channels = clamp(math.floor(settings.channels), 1, mc.MAX_REAPER_TRACK_CHANNELS)
-      ImGui.Separator(ctx)
-      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env,
-        selected_env_point, settings, env_opts)
         ImGui.EndChild(ctx)
       end
       if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end

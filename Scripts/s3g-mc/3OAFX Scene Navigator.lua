@@ -28,9 +28,11 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+package.loaded["s3g-mc ImGui Theme"] = nil
 local theme = require("s3g-mc ImGui Theme")
 local THEME = theme.palette(ImGui)
 
@@ -40,10 +42,12 @@ local MODE_KEYS = { "blend", "nearest" }
 local ORIENTATION_LABELS = { "Face trajectory", "Manual AED" }
 local ORIENTATION_KEYS = { "path", "manual" }
 local VIEW_LABELS = { "3/4", "TOP", "SIDE" }
+local PATH_PRESET_LABELS = { "Line", "Orbit", "Head scan" }
 local ctx
 local open = true
 local selected_node = 1
 local selected_point = 1
+local path_preset_index = 1
 local drag_kind = nil
 local drag_index = 0
 local preview_playing = false
@@ -451,6 +455,12 @@ local function draw_node_field(draw_list, cx, cy, radius, selected)
   ImGui.DrawList_AddCircle(draw_list, cx, cy, radius, color(base_r, base_g, base_b, selected and 0.40 or 0.22), 72, selected and 1.8 or 1.1)
 end
 
+local function draw_square_handle(draw_list, cx, cy, size, fill, edge, stroke)
+  local half = size * 0.5
+  ImGui.DrawList_AddRectFilled(draw_list, cx - half, cy - half, cx + half, cy + half, fill)
+  ImGui.DrawList_AddRect(draw_list, cx - half, cy - half, cx + half, cy + half, edge or STYLE.edge, 0, 0, stroke or 1)
+end
+
 local function draw_top_map(nodes, path, settings, preview_row)
   local draw_list = ImGui.GetWindowDrawList(ctx)
   local x0, y0 = ImGui.GetCursorScreenPos(ctx)
@@ -486,8 +496,8 @@ local function draw_top_map(nodes, path, settings, preview_row)
     if settings.orientation_mode == 1 then
       display = oriented_path_row(path, point[7] or 0, settings.orientation_mode)
     end
-    ImGui.DrawList_AddCircleFilled(draw_list, px, py, i == selected_point and 8 or 5, i == selected_point and STYLE.listener or STYLE.path, 20)
-    ImGui.DrawList_AddCircle(draw_list, px, py, 18, STYLE.path_soft, 28, 1.2)
+    draw_square_handle(draw_list, px, py, i == selected_point and 13 or 9, i == selected_point and STYLE.listener or STYLE.path)
+    ImGui.DrawList_AddRect(draw_list, px - 18, py - 18, px + 18, py + 18, STYLE.path_soft, 0, 0, 1.2)
     local yaw = math.rad(display[4] or 0)
     local tick_col = i == selected_point and STYLE.listener or STYLE.path
     local tick_len = i == selected_point and 22 or 18
@@ -555,7 +565,7 @@ local function draw_side_view(nodes, path, preview_row)
   end
   for i, point in ipairs(path) do
     local x, y = world_to_side(point[1], point[3], x0, y0, w, h)
-    ImGui.DrawList_AddCircleFilled(draw_list, x, y, i == selected_point and 7 or 4, i == selected_point and STYLE.listener or STYLE.path, 18)
+    draw_square_handle(draw_list, x, y, i == selected_point and 11 or 8, i == selected_point and STYLE.listener or STYLE.path)
   end
   if preview_row then
     local x, y = world_to_side(preview_row[1], preview_row[3], x0, y0, w, h)
@@ -608,9 +618,9 @@ local function draw_orientation_breakpoints(path, orientation_mode)
   end
   local left, right = x0 + 70, x0 + w - 18
   local lanes = {
-    { label = "Yaw", index = 4, min = -180, max = 180, col = color(0.98, 0.42, 0.28, 1) },
-    { label = "Pitch", index = 5, min = -90, max = 90, col = color(0.25, 0.68, 0.90, 1) },
-    { label = "Roll", index = 6, min = -180, max = 180, col = color(0.90, 0.56, 0.95, 1) },
+    { label = "Yaw", index = 4, min = -180, max = 180, col = color(0.76, 0.78, 0.78, 1) },
+    { label = "Pitch", index = 5, min = -90, max = 90, col = color(0.66, 0.69, 0.70, 1) },
+    { label = "Roll", index = 6, min = -180, max = 180, col = color(0.86, 0.88, 0.88, 1) },
   }
   for li, lane in ipairs(lanes) do
     local cy = y0 + 60 + (li - 1) * 34
@@ -636,7 +646,7 @@ local function draw_orientation_breakpoints(path, orientation_mode)
       local v = p[lane.index]
       if orientation_mode == 1 then v = oriented_path_row(path, p[7] or 0, orientation_mode)[lane.index] end
       local py = cy - ((clamp(v, lane.min, lane.max) - lane.min) / (lane.max - lane.min) - 0.5) * 24
-      ImGui.DrawList_AddCircleFilled(draw_list, px, py, i == selected_point and 5.5 or 3.5, i == selected_point and STYLE.node_sel or lane.col, 14)
+      draw_square_handle(draw_list, px, py, i == selected_point and 9.5 or 6.5, i == selected_point and STYLE.text or lane.col)
     end
   end
   local play_x = left + preview_t * (right - left)
@@ -833,7 +843,7 @@ local function loop()
     draw_top_map(nodes, path_points, settings, preview_row)
     draw_orientation_breakpoints(path_points, settings.orientation_mode)
 
-    local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Render", 334)
+    local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Render", 356)
     settings.source_order = combo("Source order", settings.source_order, ORDER_LABELS)
     settings.output_order = combo("Output order", settings.output_order, ORDER_LABELS)
     settings.mode = combo("Navigation mode", settings.mode, MODE_LABELS)
@@ -851,36 +861,40 @@ local function loop()
     changed, settings.output_gain_db = theme.slider_double(ImGui, ctx, "Output gain dB", settings.output_gain_db, -24.0, 24.0, "%.1f")
     theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Selected Node", 158)
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Selected Node", 180)
       selected_node = clamp(selected_node, 1, #nodes)
-      theme.muted(ImGui, ctx, entries[selected_node] and entries[selected_node].name or ("Node " .. tostring(selected_node)))
+      theme.note_row(ImGui, ctx, entries[selected_node] and entries[selected_node].name or ("Node " .. tostring(selected_node)))
       changed, nodes[selected_node][1] = theme.slider_double(ImGui, ctx, "Node X", nodes[selected_node][1], -2.0, 2.0, "%.3f")
       changed, nodes[selected_node][2] = theme.slider_double(ImGui, ctx, "Node Y", nodes[selected_node][2], -2.0, 2.0, "%.3f")
       changed, nodes[selected_node][3] = theme.slider_double(ImGui, ctx, "Node Z", nodes[selected_node][3], -2.0, 2.0, "%.3f")
       nodes[selected_node][4] = nodes[selected_node][4] or 1.0
       changed, nodes[selected_node][4] = theme.slider_double(ImGui, ctx, "Node radius", nodes[selected_node][4], 0.10, 3.00, "%.2f")
-      theme.muted(ImGui, ctx, string.format("Effective radius: %.2f", settings.influence_radius * nodes[selected_node][4]))
+      theme.note_row(ImGui, ctx, string.format("Effective radius: %.2f", settings.influence_radius * nodes[selected_node][4]))
     theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Listener Path", settings.orientation_mode == 1 and 202 or 268)
+    sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Listener Path", settings.orientation_mode == 1 and 224 or 290)
       selected_point = clamp(selected_point, 1, #path_points)
-      if ImGui.Button(ctx, "LINE") then preset_line(path_points) end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "ORBIT") then preset_orbit(path_points) end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "HEAD SCAN") then preset_head_scan(path_points) end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "ADD POINT") then add_path_point(path_points) end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "REMOVE POINT") then remove_path_point(path_points) end
-      theme.muted(ImGui, ctx, "Point " .. tostring(selected_point) .. " / " .. tostring(#path_points))
+      local preset_changed, next_preset = theme.combo_row(ImGui, ctx, "Path preset", PATH_PRESET_LABELS, path_preset_index)
+      if preset_changed then
+        path_preset_index = next_preset
+        if path_preset_index == 1 then preset_line(path_points)
+        elseif path_preset_index == 2 then preset_orbit(path_points)
+        elseif path_preset_index == 3 then preset_head_scan(path_points) end
+      end
+      local action = theme.button_row(ImGui, ctx, {
+        { label = "ADD", width = 52 },
+        { label = "REMOVE", width = 76 },
+      })
+      if action == 1 then add_path_point(path_points)
+      elseif action == 2 then remove_path_point(path_points) end
+      theme.note_row(ImGui, ctx, "Point " .. tostring(selected_point) .. " / " .. tostring(#path_points))
       local p = path_points[selected_point]
       changed, p[1] = theme.slider_double(ImGui, ctx, "Listener X", p[1], -2.0, 2.0, "%.3f")
       changed, p[2] = theme.slider_double(ImGui, ctx, "Listener Y", p[2], -2.0, 2.0, "%.3f")
       changed, p[3] = theme.slider_double(ImGui, ctx, "Listener Z", p[3], -2.0, 2.0, "%.3f")
       if settings.orientation_mode == 1 then
         local o = oriented_path_row(path_points, p[7] or 0, settings.orientation_mode)
-        theme.muted(ImGui, ctx, string.format("Head faces path: yaw %.1f / pitch %.1f / roll %.1f", o[4], o[5], o[6]))
+        theme.note_row(ImGui, ctx, string.format("Head faces path: yaw %.1f / pitch %.1f / roll %.1f", o[4], o[5], o[6]))
       else
         changed, p[4] = theme.slider_double(ImGui, ctx, "Yaw deg", p[4], -360.0, 360.0, "%.1f")
         changed, p[5] = theme.slider_double(ImGui, ctx, "Pitch deg", p[5], -90.0, 90.0, "%.1f")
@@ -899,9 +913,9 @@ local function loop()
     theme.wrapped_text(ImGui, ctx, "This is a scene-interpolation / perspective traversal renderer. It navigates between selected soundfield nodes.", STYLE.muted, 720)
     ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "RENDER", 110, 30) then render() end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 110, 30) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 110, 110)
+    if render_pressed then render() end
+    if cancel_pressed then open = false end
     ImGui.Dummy(ctx, 1, 10)
     ImGui.End(ctx)
   end

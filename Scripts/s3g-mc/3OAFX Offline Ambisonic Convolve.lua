@@ -33,6 +33,7 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme then
     ui_theme = _s3g_theme
@@ -625,16 +626,15 @@ local function main()
       if validation then
         ui_theme.status(ImGui, ctx, validation, "warn")
       else
-        ui_theme.muted(ImGui, ctx, "Renders offline from WAV media with NumPy.")
       end
       ImGui.Spacing(ctx)
       ImGui.EndChild(ctx)
       end
-      if ImGui.Button(ctx, "RENDER", 104, 28) and not validation then
+      local render_pressed, cancel_pressed = ui_theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+      if render_pressed and not validation then
         should_render = true
       end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "CANCEL", 104, 28) then open = false end
+      if cancel_pressed then open = false end
       ImGui.Dummy(ctx, 1, 10)
       ImGui.End(ctx)
     end

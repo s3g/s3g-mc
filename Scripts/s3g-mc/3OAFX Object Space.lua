@@ -26,6 +26,7 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme then
     theme = _s3g_theme
@@ -73,98 +74,6 @@ end
 local function combo(label, idx, labels)
   local _, next_idx = theme.combo_row(ImGui, ctx, label, labels, idx)
   return next_idx
-end
-
-local function color(r, g, b, a)
-  return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
-end
-
-local COLORS = {
-  bg = color(0.035, 0.039, 0.042, 1),
-  grid = color(0.58, 0.63, 0.63, 0.16),
-  ring = color(0.58, 0.63, 0.63, 0.26),
-  text = color(0.76, 0.80, 0.78, 1),
-  muted = color(0.50, 0.56, 0.56, 1),
-  object = color(0.98, 0.72, 0.25, 0.96),
-  object_soft = color(0.98, 0.72, 0.25, 0.20),
-  field = color(0.20, 0.72, 0.95, 0.70),
-  field_soft = color(0.20, 0.72, 0.95, 0.16),
-  motion = color(0.72, 0.58, 0.98, 0.82),
-  side = color(0.36, 0.88, 0.68, 0.72),
-}
-
-local function draw_node(draw_list, cx, cy, r, az_deg, radius, col, size)
-  local az = math.rad(az_deg - 90)
-  local x = cx + math.cos(az) * radius * r
-  local y = cy + math.sin(az) * radius * r
-  ImGui.DrawList_AddCircleFilled(draw_list, x, y, size or 4, col, 18)
-  return x, y
-end
-
-local function draw_preview()
-  local draw_list = ImGui.GetWindowDrawList(ctx)
-  local x0, y0 = ImGui.GetCursorScreenPos(ctx)
-  local w = math.max(420, ImGui.GetContentRegionAvail(ctx))
-  local h = 235
-  local cx = x0 + w * 0.50
-  local cy = y0 + h * 0.55
-  local r = math.min(w * 0.36, h * 0.36)
-  ImGui.DrawList_AddRectFilled(draw_list, x0, y0, x0 + w, y0 + h, COLORS.bg)
-  ImGui.DrawList_AddRect(draw_list, x0, y0, x0 + w, y0 + h, COLORS.grid)
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 12, COLORS.text, "Object / Space Field")
-  ImGui.DrawList_AddText(draw_list, x0 + 14, y0 + 32, COLORS.muted, MODE_LABELS[settings.mode] .. " / " .. ORDER_LABELS[settings.output_order])
-  ImGui.DrawList_AddCircle(draw_list, cx, cy, r, COLORS.ring, 96, 1.5)
-  ImGui.DrawList_AddCircle(draw_list, cx, cy, r * 0.58, COLORS.grid, 96, 1)
-  ImGui.DrawList_AddLine(draw_list, cx - r, cy, cx + r, cy, COLORS.grid, 1)
-  ImGui.DrawList_AddLine(draw_list, cx, cy - r, cx, cy + r, COLORS.grid, 1)
-
-  local dirs = { 0, 45, 90, 135, 180, -135, -90, -45 }
-  for _, az in ipairs(dirs) do
-    draw_node(draw_list, cx, cy, r, az, 1.0, COLORS.grid, 3)
-  end
-
-  local object_r = 0.18 + 0.34 * (1.0 - math.min(1.0, settings.source_spread))
-  local halo = r * (0.16 + 0.52 * math.min(1.0, settings.spread_deg / 180.0)) * math.max(0.15, settings.space_amount)
-  local ox, oy = draw_node(draw_list, cx, cy, r, -25, object_r, COLORS.object, 6 + 5 * settings.object_clarity)
-  ImGui.DrawList_AddCircle(draw_list, ox, oy, halo, COLORS.field_soft, 64, 2)
-  ImGui.DrawList_AddCircleFilled(draw_list, ox, oy, 18 + 28 * settings.object_clarity, COLORS.object_soft, 48)
-  ImGui.DrawList_AddCircleFilled(draw_list, ox, oy, 5 + 5 * settings.object_clarity, COLORS.object, 24)
-
-  local mode = MODES[settings.mode]
-  if mode == "motion_counterpoint" then
-    for i = 0, 4 do
-      local a0 = -150 + i * 58
-      local x1, y1 = draw_node(draw_list, cx, cy, r, a0, 0.35 + i * 0.11, COLORS.motion, 3)
-      local x2, y2 = draw_node(draw_list, cx, cy, r, a0 + 55 + settings.motion * 90, 0.45 + i * 0.08, COLORS.field, 4)
-      ImGui.DrawList_AddLine(draw_list, x1, y1, x2, y2, COLORS.motion, 1.7)
-    end
-  elseif mode == "spatial_occupation" then
-    for i = 1, 18 do
-      local az = (i * 137 + settings.seed * 19) % 360
-      local rr = 0.22 + ((i * 29) % 70) / 100
-      draw_node(draw_list, cx, cy, r, az, rr, i % 3 == 0 and COLORS.side or COLORS.field, 2.5 + settings.space_amount * 2)
-    end
-  elseif mode == "spatial_allusion" then
-    for i = 1, 4 do
-      ImGui.DrawList_AddCircle(draw_list, cx, cy, r * (0.18 + i * 0.17), i % 2 == 0 and COLORS.field_soft or COLORS.object_soft, 96, 2)
-    end
-    draw_node(draw_list, cx, cy, r, 160, 0.82, COLORS.side, 6)
-    draw_node(draw_list, cx, cy, r, -110, 0.70, COLORS.field, 5)
-  else
-    for i = 1, 5 do
-      ImGui.DrawList_AddCircle(draw_list, ox, oy, halo * i / 5, i % 2 == 0 and COLORS.field_soft or COLORS.object_soft, 72, 1.5)
-    end
-    draw_node(draw_list, cx, cy, r, 180, 0.82, COLORS.field, 7)
-  end
-
-  local bar_x = x0 + 16
-  local bar_y = y0 + h - 28
-  local bar_w = w - 32
-  ImGui.DrawList_AddRect(draw_list, bar_x, bar_y, bar_x + bar_w, bar_y + 10, COLORS.grid)
-  ImGui.DrawList_AddRectFilled(draw_list, bar_x, bar_y, bar_x + bar_w * math.min(1.0, settings.object_clarity), bar_y + 10, COLORS.object_soft)
-  ImGui.DrawList_AddRectFilled(draw_list, bar_x + bar_w * (1.0 - math.min(1.0, settings.space_amount / 2.0)), bar_y, bar_x + bar_w, bar_y + 10, COLORS.field_soft)
-  ImGui.DrawList_AddText(draw_list, bar_x, bar_y + 13, COLORS.muted, "object clarity / spatial field")
-  ImGui.Dummy(ctx, w, h + 8)
 end
 
 local entries = nr.selected_entries()
@@ -254,7 +163,6 @@ local function loop()
     local control_h = math.max(260, avail_h - footer_h)
     if ImGui.BeginChild(ctx, "##object_space_controls", 0, control_h) then
       theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
-      draw_preview()
       local changed
       local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Routing", 123)
       settings.mode = combo("Mode", settings.mode, MODE_LABELS)
@@ -288,9 +196,9 @@ local function loop()
       theme.muted(ImGui, ctx, "Auto treats 4ch, 10ch, and 16ch as ACN/SN3D; 9ch WAVs are accepted as 2OA.")
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL")
+    if render_pressed then should_render = true end
+    if cancel_pressed then open = false end
     ImGui.Dummy(ctx, 1, 10)
     ImGui.End(ctx)
   end

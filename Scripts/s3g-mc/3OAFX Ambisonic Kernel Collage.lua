@@ -27,9 +27,11 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme and _s3g_theme.install then _s3g_theme.install(ImGui) end
 end
+package.loaded["s3g-mc ImGui Theme"] = nil
 local theme = require("s3g-mc ImGui Theme")
 local THEME = theme.palette(ImGui)
 
@@ -537,10 +539,10 @@ local function main()
       settings.tail_index = combo(ctx, "Output length", settings.tail_index, TAIL_NAMES)
       theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Kernels", settings.adapt_mixed_order_kernels and 180 or 158)
+      sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Kernels", settings.adapt_mixed_order_kernels and 148 or 126)
       changed, settings.adapt_mixed_order_kernels = theme.checkbox_row(ImGui, ctx, "Adapt mixed-order kernels", settings.adapt_mixed_order_kernels)
       if settings.adapt_mixed_order_kernels then
-        theme.muted(ImGui, ctx, "1OA/2OA/3OA kernels are adapted to the selected output order.")
+        theme.note_row(ImGui, ctx, "1OA/2OA/3OA kernels adapt to output order.")
       end
       changed, settings.max_kernel_seconds = theme.slider_double(ImGui, ctx, "Max kernel window sec", settings.max_kernel_seconds, 0.05, 30.0, "%.2f")
       changed, settings.kernel_fade_ms = theme.slider_double(ImGui, ctx, "Kernel fade ms", settings.kernel_fade_ms, 0.0, 500.0, "%.1f")
@@ -575,14 +577,13 @@ local function main()
       if validation then
         theme.status(ImGui, ctx, validation, "warn")
       else
-        theme.muted(ImGui, ctx, "Renders offline from WAV media with NumPy.")
       end
       ImGui.Spacing(ctx)
       ImGui.EndChild(ctx)
       end
-      if ImGui.Button(ctx, "RENDER", 104, 28) and not validation then should_render = true end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "CANCEL", 104, 28) then open = false end
+      local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+      if render_pressed and not validation then should_render = true end
+      if cancel_pressed then open = false end
       ImGui.Dummy(ctx, 1, 10)
       ImGui.End(ctx)
     end

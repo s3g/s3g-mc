@@ -434,6 +434,7 @@ end
 local function finish_section(ctx, x, y, height, stack)
   theme.pop_soft_panel(ImGui, ctx, stack)
   ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
+  ImGui.Dummy(ctx, 1, 1)
 end
 
 local function main()
@@ -452,7 +453,7 @@ local function main()
   local status = ""
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 440, 380, ImGui.Cond_Appearing)
+    ImGui.SetNextWindowSize(ctx, 440, 520, ImGui.Cond_Appearing)
     local visible
     visible, open = ImGui.Begin(ctx, "Shred / Slice", open)
 

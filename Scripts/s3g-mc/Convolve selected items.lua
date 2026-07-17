@@ -659,7 +659,7 @@ local function main()
   local should_render = false
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 560, 440, ImGui.Cond_Appearing)
+    ImGui.SetNextWindowSize(ctx, 560, 520, ImGui.Cond_Appearing)
     local visible
     visible, open = ImGui.Begin(ctx, "Convolve selected items", open)
     if visible then
@@ -680,12 +680,10 @@ local function main()
       end
       sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
       sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Summary", 110)
-      theme.muted(ImGui, ctx, "Convolution paths: " .. tostring(#plan))
-      theme.muted(ImGui, ctx, "Output channels: " .. tostring(output_channels))
+      sol_ui.draw_value(ImGui, ctx, "Paths", tostring(#plan))
+      sol_ui.draw_value(ImGui, ctx, "Out ch", tostring(output_channels))
       if output_channels > mc.MAX_REAPER_TRACK_CHANNELS then
-        theme.status(ImGui, ctx, "Too many output channels for REAPER.", "warn")
-      else
-        theme.muted(ImGui, ctx, "Renders offline from WAV media with NumPy.")
+        sol_ui.draw_value(ImGui, ctx, "Status", "Too many output channels for REAPER.", "warn")
       end
       sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
       if ImGui.Button(ctx, "RENDER", 92, 26) and output_channels <= mc.MAX_REAPER_TRACK_CHANNELS then

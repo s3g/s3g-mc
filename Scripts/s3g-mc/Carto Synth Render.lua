@@ -97,15 +97,21 @@ local COLORS = {
   grid_soft = color(0.50, 0.56, 0.56, 0.09),
   text = color(0.84, 0.88, 0.86, 1),
   muted = color(0.56, 0.62, 0.60, 1),
-  route = color(0.90, 0.72, 0.32, 1),
-  route_fill = color(0.90, 0.72, 0.32, 0.16),
+  route = color(0.68, 0.70, 0.70, 1),
+  route_fill = color(0.70, 0.72, 0.72, 0.14),
   route_alt = color(0.28, 0.78, 0.70, 1),
-  point = color(0.94, 0.88, 0.64, 1),
-  point_selected = color(1.00, 0.96, 0.42, 1),
+  point = color(0.70, 0.72, 0.72, 1),
+  point_selected = color(0.92, 0.94, 0.94, 1),
   contour = color(0.26, 0.62, 0.58, 0.22),
-  contour_hot = color(0.92, 0.60, 0.28, 0.55),
+  contour_hot = color(0.78, 0.80, 0.80, 0.55),
   edge = color(0.55, 0.60, 0.58, 0.34),
 }
+
+local function draw_square_handle(draw_list, cx, cy, size, fill, edge, stroke)
+  local half = size * 0.5
+  ImGui.DrawList_AddRectFilled(draw_list, cx - half, cy - half, cx + half, cy + half, fill)
+  ImGui.DrawList_AddRect(draw_list, cx - half, cy - half, cx + half, cy + half, edge or COLORS.edge, 0, 0, stroke or 1)
+end
 
 local function clamp(value, lo, hi)
   if value < lo then return lo end
@@ -804,8 +810,8 @@ local function draw_carto_map(ctx, route_points, route_enabled, selected_route, 
       if dist < nearest_dist then
         nearest, nearest_dist = index, dist
       end
-      ImGui.DrawList_AddCircle(draw_list, px, py, index == selected_point and 7.5 or 5.8,
-        index == selected_point and COLORS.point_selected or COLORS.point, 18, 1.5)
+      draw_square_handle(draw_list, px, py, index == selected_point and 10.5 or 8.0,
+        index == selected_point and COLORS.point_selected or COLORS.point, COLORS.edge, 1.4)
     end
 
     local route_hovered = hovered and mx >= route_x0 and mx <= route_x1 and my >= route_y0 and my <= route_y1
@@ -896,8 +902,8 @@ local function draw_route_editor(ctx, points, def, selected_index, enabled)
     if dist < nearest_dist then
       nearest, nearest_dist = index, dist
     end
-    ImGui.DrawList_AddCircleFilled(draw_list, px, py, index == selected_index and 5.8 or 4.4,
-      index == selected_index and COLORS.point_selected or COLORS.point, 18)
+    draw_square_handle(draw_list, px, py, index == selected_index and 10.5 or 8.0,
+      index == selected_index and COLORS.point_selected or COLORS.point)
   end
 
   if hovered and ImGui.IsMouseClicked(ctx, 0) and nearest and nearest_dist < 13 then
@@ -979,8 +985,8 @@ local function draw_route_overview(ctx, route_points, route_enabled, selected_ro
         nearest, nearest_dist = point_index, dist
       end
       if enabled or is_selected then
-        ImGui.DrawList_AddCircleFilled(draw_list, px, py, is_selected and point_index == selected_point and 4.8 or 3.5,
-          is_selected and point_index == selected_point and COLORS.point_selected or COLORS.point, 14)
+        draw_square_handle(draw_list, px, py, is_selected and point_index == selected_point and 8.5 or 6.5,
+          is_selected and point_index == selected_point and COLORS.point_selected or COLORS.point)
       end
       last_x, last_y = px, py
     end
@@ -1212,43 +1218,6 @@ local function loop()
     selected_route, selected_route_point = draw_route_overview(ctx, route_points, route_enabled, selected_route,
       selected_route_point, values)
     ImGui.Separator(ctx)
-    changed, start_pos = input_double_row("Start time", start_pos, 0.1, 1.0, "%.3f")
-    changed, duration = input_double_row("Duration", duration, 1.0, 10.0, "%.3f")
-    duration = math.max(0.1, duration)
-    changed, channel_index = combo(ctx, "Output channels", CH_NAMES, channel_index)
-    changed, algorithm = combo(ctx, "Algorithm", ALGO_NAMES, algorithm)
-    changed, form = combo(ctx, "Map preset", FORM_NAMES, form)
-    if ImGui.Button(ctx, "LOAD PRESET") then
-      apply_route_preset(route_points, route_enabled, form, carto_values())
-      selected_route_point = nil
-    end
-    changed, random_point_count = theme.slider_int(ImGui, ctx, "Random points", random_point_count, 4, MAX_ROUTE_POINTS)
-    changed, random_amount = theme.slider_double(ImGui, ctx, "Amount", random_amount, 0, 1, "%.2f")
-    changed, random_smooth = theme.slider_double(ImGui, ctx, "Smooth", random_smooth, 0, 1, "%.2f")
-    changed, random_dispersion = theme.slider_double(ImGui, ctx, "Dispersion", random_dispersion, 0, 1, "%.2f")
-    if ImGui.Button(ctx, "RANDOMIZE SELECTED") then
-      randomize_route_set(route_points, route_enabled, carto_values(), selected_route, "selected",
-        random_amount, random_point_count, random_smooth, random_dispersion)
-      selected_route_point = nil
-    end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "RANDOMIZE ALL") then
-      randomize_route_set(route_points, route_enabled, carto_values(), selected_route, "all",
-        random_amount, random_point_count, random_smooth, random_dispersion)
-      selected_route_point = nil
-    end
-    ImGui.Separator(ctx)
-    changed, rate = theme.slider_double(ImGui, ctx, "Rate", rate, 0, 1, "%.3f")
-    changed, base_freq = theme.slider_double(ImGui, ctx, "Base frequency", base_freq, 20, 4000, "%.1f Hz")
-    changed, density = theme.slider_double(ImGui, ctx, "Density / chaos", density, 0, 1, "%.3f")
-    changed, brightness = theme.slider_double(ImGui, ctx, "Brightness", brightness, 0, 1, "%.3f")
-    changed, decay = theme.slider_double(ImGui, ctx, "Decay / sustain", decay, 0, 1, "%.3f")
-    ImGui.Separator(ctx)
-    changed, spread = theme.slider_double(ImGui, ctx, "Field spread", spread, 0, 1, "%.3f")
-    changed, correlation = theme.slider_double(ImGui, ctx, "Channel correlation", correlation, 0, 1, "%.3f")
-    changed, drift = theme.slider_double(ImGui, ctx, "Drift", drift, 0, 1, "%.3f")
-    changed, crush = theme.slider_double(ImGui, ctx, "Crush / decimate", crush, 0, 1, "%.3f")
-    ImGui.Separator(ctx)
     local route_editor_open = theme.toolbox_header(ImGui, ctx, "DETAILED ROUTE EDITOR")
     if route_editor_open ~= route_editor_was_open then
       resize_current_window(route_editor_open and route_expanded_window_h or route_compact_window_h)
@@ -1291,6 +1260,42 @@ local function loop()
       end
     end
     ImGui.Separator(ctx)
+    changed, start_pos = input_double_row("Start time", start_pos, 0.1, 1.0, "%.3f")
+    changed, duration = input_double_row("Duration", duration, 1.0, 10.0, "%.3f")
+    duration = math.max(0.1, duration)
+    changed, channel_index = combo(ctx, "Output channels", CH_NAMES, channel_index)
+    changed, algorithm = combo(ctx, "Algorithm", ALGO_NAMES, algorithm)
+    changed, form = combo(ctx, "Map preset", FORM_NAMES, form)
+    if ImGui.Button(ctx, "LOAD PRESET") then
+      apply_route_preset(route_points, route_enabled, form, carto_values())
+      selected_route_point = nil
+    end
+    changed, random_point_count = theme.slider_int(ImGui, ctx, "Random points", random_point_count, 4, MAX_ROUTE_POINTS)
+    changed, random_amount = theme.slider_double(ImGui, ctx, "Amount", random_amount, 0, 1, "%.2f")
+    changed, random_smooth = theme.slider_double(ImGui, ctx, "Smooth", random_smooth, 0, 1, "%.2f")
+    changed, random_dispersion = theme.slider_double(ImGui, ctx, "Dispersion", random_dispersion, 0, 1, "%.2f")
+    if ImGui.Button(ctx, "RANDOMIZE SELECTED") then
+      randomize_route_set(route_points, route_enabled, carto_values(), selected_route, "selected",
+        random_amount, random_point_count, random_smooth, random_dispersion)
+      selected_route_point = nil
+    end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "RANDOMIZE ALL") then
+      randomize_route_set(route_points, route_enabled, carto_values(), selected_route, "all",
+        random_amount, random_point_count, random_smooth, random_dispersion)
+      selected_route_point = nil
+    end
+    ImGui.Separator(ctx)
+    changed, rate = theme.slider_double(ImGui, ctx, "Rate", rate, 0, 1, "%.3f")
+    changed, base_freq = theme.slider_double(ImGui, ctx, "Base frequency", base_freq, 20, 4000, "%.1f Hz")
+    changed, density = theme.slider_double(ImGui, ctx, "Density / chaos", density, 0, 1, "%.3f")
+    changed, brightness = theme.slider_double(ImGui, ctx, "Brightness", brightness, 0, 1, "%.3f")
+    changed, decay = theme.slider_double(ImGui, ctx, "Decay / sustain", decay, 0, 1, "%.3f")
+    ImGui.Separator(ctx)
+    changed, spread = theme.slider_double(ImGui, ctx, "Field spread", spread, 0, 1, "%.3f")
+    changed, correlation = theme.slider_double(ImGui, ctx, "Channel correlation", correlation, 0, 1, "%.3f")
+    changed, drift = theme.slider_double(ImGui, ctx, "Drift", drift, 0, 1, "%.3f")
+    changed, crush = theme.slider_double(ImGui, ctx, "Crush / decimate", crush, 0, 1, "%.3f")
     changed, gain_db = theme.slider_double(ImGui, ctx, "Print gain", gain_db, -60, 0, "%.1f dB")
     changed, normalize = ImGui.Checkbox(ctx, "PEAK NORMALIZE", normalize)
     if normalize then

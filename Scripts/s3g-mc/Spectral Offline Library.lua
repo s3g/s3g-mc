@@ -106,7 +106,7 @@ local function palette(ImGui)
   return {
     panel_soft = color(0.145, 0.145, 0.145, 1.0),
     frame = color(0.074, 0.074, 0.074, 1.0),
-    frame_hover = color(0.145, 0.145, 0.145, 1.0),
+    frame_hover = color(0.074, 0.074, 0.074, 1.0),
     frame_active = color(0.195, 0.195, 0.195, 1.0),
     active = color(0.720, 0.720, 0.720, 1.0),
     active_hover = color(0.790, 0.790, 0.790, 1.0),
@@ -293,6 +293,14 @@ function M.draw_checkbox(ImGui, ctx, label, value)
   local changed, next_value = ImGui.Checkbox(ctx, "##" .. tostring(label or ""), value)
   finish_row(ImGui, ctx, x, y, avail)
   return changed, next_value
+end
+
+function M.draw_value(ImGui, ctx, label, value, color_name)
+  local x, y, avail, control_x = row_layout(ImGui, ctx)
+  local p = palette(ImGui)
+  draw_label(ImGui, ctx, x, y, label)
+  ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), control_x, y + 2, p[color_name or "value"] or p.value, tostring(value or ""))
+  finish_row(ImGui, ctx, x, y, avail)
 end
 
 local function value_text(value, fmt, integer)

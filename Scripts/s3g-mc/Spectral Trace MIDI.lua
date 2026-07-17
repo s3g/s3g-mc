@@ -117,26 +117,6 @@ local state = {
 local last_events = {}
 load_selected_source(false)
 if entry then state.duration_beats = math.floor(selected_item_beats() + 0.5) end
-
-local function color(r, g, b, a)
-  return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
-end
-
-local CANVAS = {
-  panel = color(0.055, 0.060, 0.064, 1),
-  edge = color(0.30, 0.32, 0.33, 1),
-  grid = color(0.48, 0.52, 0.51, 0.20),
-  text = color(0.80, 0.84, 0.82, 1),
-  dim = color(0.50, 0.55, 0.54, 1),
-  trace = color(0.30, 0.78, 0.72, 1),
-  trace2 = color(0.95, 0.74, 0.28, 1),
-  trace3 = color(0.72, 0.48, 1.00, 1),
-}
-
-local function muted_text(value)
-  ui_theme.muted(ImGui, ctx, value)
-end
-
 local function combo(label, labels, value, width)
   if ui_theme and ui_theme.combo_row then return ui_theme.combo_row(ImGui, ctx, label, labels, value, width) end
   ImGui.SetNextItemWidth(ctx, width or 170)
@@ -257,60 +237,6 @@ local function generate()
   reaper.ShowConsoleMsg("\n[Spectral Trace MIDI]\n" .. log .. "\n")
 end
 
-local function draw_preview()
-  local draw_list = ImGui.GetWindowDrawList(ctx)
-  local x, y = ImGui.GetCursorScreenPos(ctx)
-  local w = ImGui.GetContentRegionAvail(ctx)
-  local h = 245
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, CANVAS.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, CANVAS.edge)
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, CANVAS.dim, "SPECTRAL TRACE MIDI")
-  local source_label = entry and
-    (entry.name .. "  /  " .. tostring(entry.channels) .. "ch  /  " .. string.format("%.2fs", entry.length or 0)) or
-    "No source loaded. Select a WAV item and click Load Selected."
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 28, entry and CANVAS.text or CANVAS.dim, source_label)
-
-  local left, top, right, bottom = x + 18, y + 62, x + w - 18, y + h - 34
-  for i = 0, 8 do
-    local gy = top + (bottom - top) * i / 8
-    ImGui.DrawList_AddLine(draw_list, left, gy, right, gy, CANVAS.grid, 1)
-  end
-  for i = 0, 12 do
-    local gx = left + (right - left) * i / 12
-    ImGui.DrawList_AddLine(draw_list, gx, top, gx, bottom, CANVAS.grid, 1)
-  end
-
-  local points = 96
-  local last_x, last_y
-  for i = 0, points do
-    local t = i / points
-    local contour = 0.52 + 0.32 * math.sin(t * math.pi * (2.0 + state.partials * 0.42) + state.seed * 0.07)
-    contour = contour + 0.12 * math.sin(t * math.pi * 13.0)
-    contour = math.max(0.02, math.min(0.98, contour))
-    local px = left + t * (right - left)
-    local py = bottom - contour * (bottom - top)
-    if last_x then ImGui.DrawList_AddLine(draw_list, last_x, last_y, px, py, CANVAS.trace, 1.4) end
-    last_x, last_y = px, py
-  end
-
-  for i = 1, math.min(160, #last_events) do
-    local event = last_events[i]
-    local t = event.start / math.max(0.25, state.follow_item_length and selected_item_beats() or state.duration_beats)
-    local p = (event.pitch - 24) / 72
-    local px = left + math.max(0, math.min(1, t)) * (right - left)
-    local py = bottom - math.max(0, math.min(1, p)) * (bottom - top)
-    local col = (event.channel % 3 == 0) and CANVAS.trace2 or ((event.channel % 3 == 1) and CANVAS.trace or CANVAS.trace3)
-    ImGui.DrawList_AddCircleFilled(draw_list, px, py, 2.8, col)
-  end
-
-  local caption = string.format("%s / %s / %.1f events-sec / %d lanes",
-    MODE_NAMES[state.mode], QUANT_NAMES[state.quantize], state.event_rate, state.lanes)
-  ImGui.DrawList_AddText(draw_list, x + 18, y + h - 23, CANVAS.dim, caption)
-  if entry and entry.channels > 16 then
-    ImGui.DrawList_AddText(draw_list, x + w - 210, y + h - 23, CANVAS.dim, "first 16 source channels")
-  end
-  ImGui.SetCursorScreenPos(ctx, x, y + h + 12)
-end
 
 local function draw_footer()
   ImGui.Dummy(ctx, 1, 6)
@@ -333,7 +259,7 @@ local function draw_footer()
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 860, 760, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 860, 600, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
@@ -343,7 +269,6 @@ local function loop()
     local main_panel_style = push_soft_panel()
     local child_visible = ImGui.BeginChild(ctx, "##main_content", 0, content_height)
     if child_visible then
-      draw_preview()
       _, state.mode = combo("TRACE", MODE_NAMES, state.mode, 170)
       _, state.quantize = combo("PITCH MAP", QUANT_NAMES, state.quantize, 150)
       _, state.channel_mode = combo("MIDI MODE", CHANNEL_NAMES, state.channel_mode, 170)

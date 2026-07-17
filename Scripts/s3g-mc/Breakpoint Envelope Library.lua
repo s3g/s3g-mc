@@ -199,7 +199,7 @@ local function palette(ImGui)
   return {
     panel_soft = color(ImGui, 0.145, 0.145, 0.145, 1.0),
     frame = color(ImGui, 0.074, 0.074, 0.074, 1.0),
-    frame_hover = color(ImGui, 0.145, 0.145, 0.145, 1.0),
+    frame_hover = color(ImGui, 0.074, 0.074, 0.074, 1.0),
     frame_active = color(ImGui, 0.195, 0.195, 0.195, 1.0),
     active = color(ImGui, 0.720, 0.720, 0.720, 1.0),
     active_hover = color(ImGui, 0.790, 0.790, 0.790, 1.0),
@@ -235,6 +235,23 @@ local function finish_row(ImGui, ctx, x, y, avail)
   ImGui.SetCursorScreenPos(ctx, x, y + ROW_H)
 end
 
+local function text_width(ImGui, ctx, text)
+  text = tostring(text or "")
+  if ImGui.CalcTextSize then
+    local ok, width = pcall(ImGui.CalcTextSize, ctx, text)
+    if ok and type(width) == "number" then return width end
+  end
+  return #text * 7
+end
+
+local function combo_width(ImGui, ctx, names, current, max_width)
+  local width = text_width(ImGui, ctx, names[current or 1] or "") + 38
+  for _, name in ipairs(names or {}) do
+    width = math.max(width, text_width(ImGui, ctx, name) + 38)
+  end
+  return math.max(80, math.min(max_width or width, width))
+end
+
 local function draw_row_label(ImGui, ctx, x, y, label)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, palette(ImGui).label, row_label(label))
 end
@@ -243,7 +260,7 @@ local function draw_combo(ImGui, ctx, label, current, names)
   local x, y, avail, control_x, control_w = row_layout(ImGui, ctx)
   draw_row_label(ImGui, ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, combo_width(ImGui, ctx, names, current, control_w))
   if ImGui.BeginCombo(ctx, "##" .. tostring(label or ""), names[current] or "") then
     for index, name in ipairs(names) do
       local selected = index == current
@@ -343,7 +360,11 @@ local function draw_overview(ImGui, ctx, defs, points, enabled, selected, select
   local width = math.max(320, ImGui.GetContentRegionAvail(ctx) - 2)
   local lane_h = opts.overview_lane_h or 54
   local gap = 6
-  local height = #defs * lane_h + math.max(0, #defs - 1) * gap
+  local columns = opts.overview_columns or (#defs > 5 and 2 or 1)
+  columns = math.max(1, math.min(columns, #defs))
+  local rows = math.ceil(#defs / columns)
+  local lane_w = math.max(150, (width - gap * (columns - 1)) / columns)
+  local height = rows * lane_h + math.max(0, rows - 1) * gap
   ImGui.InvisibleButton(ctx, "##breakpoint_overview", width, height)
   local x0, y0 = ImGui.GetItemRectMin(ctx)
   local x1, _y1 = ImGui.GetItemRectMax(ctx)
@@ -359,15 +380,23 @@ local function draw_overview(ImGui, ctx, defs, points, enabled, selected, select
   local c_inactive = color(ImGui, 0.42, 0.45, 0.46, 0.52)
   local c_handle_edge = color(ImGui, 0.08, 0.09, 0.10, 1)
   local c_text = color(ImGui, 0.70, 0.74, 0.75, 1)
-  local plot_x0 = x0 + 118
-  local plot_x1 = x1 - 10
   local drag_env = opts.overview_drag_env
   local drag_point = opts.overview_drag_point
 
-  local function move_point(index, point_index, lane_y0, lane_y1)
+  local function lane_rect(index)
+    local col = (index - 1) % columns
+    local row = math.floor((index - 1) / columns)
+    local lx0 = x0 + col * (lane_w + gap)
+    local ly0 = y0 + row * (lane_h + gap)
+    return lx0, ly0, lx0 + lane_w, ly0 + lane_h
+  end
+
+  local function move_point(index, point_index, lane_x0, lane_y0, lane_x1, lane_y1)
     local p = points[index]
     local point = p and p[point_index]
     if not point then return selected, selected_point end
+    local plot_x0 = lane_x0 + 118
+    local plot_x1 = lane_x1 - 10
     if point_index > 1 and point_index < #p then
       point.x = M.clamp((mx - plot_x0) / math.max(1, plot_x1 - plot_x0), 0, 1)
     end
@@ -377,17 +406,18 @@ local function draw_overview(ImGui, ctx, defs, points, enabled, selected, select
   end
 
   for index, def in ipairs(defs) do
-    local ly0 = y0 + (index - 1) * (lane_h + gap)
-    local ly1 = ly0 + lane_h
+    local lx0, ly0, lx1, ly1 = lane_rect(index)
+    local plot_x0 = lx0 + 118
+    local plot_x1 = lx1 - 10
     local active = enabled[index]
     local is_selected = index == selected
-    ImGui.DrawList_AddRectFilled(dl, x0, ly0, x1, ly1, active and c_bg_active or c_bg)
-    ImGui.DrawList_AddRect(dl, x0, ly0, x1, ly1, is_selected and c_selected or c_edge, 0, 0, is_selected and 2 or 1)
+    ImGui.DrawList_AddRectFilled(dl, lx0, ly0, lx1, ly1, active and c_bg_active or c_bg)
+    ImGui.DrawList_AddRect(dl, lx0, ly0, lx1, ly1, is_selected and c_selected or c_edge, 0, 0, is_selected and 2 or 1)
     for grid = 1, 3 do
       local gx = M.lerp(plot_x0, plot_x1, grid / 4)
       ImGui.DrawList_AddLine(dl, gx, ly0 + 5, gx, ly1 - 5, c_grid, 1)
     end
-    ImGui.DrawList_AddText(dl, x0 + 8, ly0 + 8, c_text, def.label)
+    ImGui.DrawList_AddText(dl, lx0 + 8, ly0 + 8, c_text, def.label)
 
     local p = points[index]
     if not active then
@@ -415,7 +445,7 @@ local function draw_overview(ImGui, ctx, defs, points, enabled, selected, select
       end
     end
 
-    if hovered and mx >= x0 and mx <= x1 and my >= ly0 and my <= ly1 and ImGui.IsMouseClicked(ctx, 0) then
+    if hovered and mx >= lx0 and mx <= lx1 and my >= ly0 and my <= ly1 and ImGui.IsMouseClicked(ctx, 0) then
       selected = index
       selected_point = nil
       enabled[index] = true
@@ -448,16 +478,15 @@ local function draw_overview(ImGui, ctx, defs, points, enabled, selected, select
       drag_env = selected
       drag_point = selected_point
       if selected_point then
-        selected, selected_point = move_point(selected, selected_point, ly0, ly1)
+        selected, selected_point = move_point(selected, selected_point, lx0, ly0, lx1, ly1)
       end
     end
   end
 
   if drag_env and drag_point and ImGui.IsMouseDown(ctx, 0) then
     local index = drag_env
-    local ly0 = y0 + (index - 1) * (lane_h + gap)
-    local ly1 = ly0 + lane_h
-    selected, selected_point = move_point(index, drag_point, ly0, ly1)
+    local lx0, ly0, lx1, ly1 = lane_rect(index)
+    selected, selected_point = move_point(index, drag_point, lx0, ly0, lx1, ly1)
   elseif not ImGui.IsMouseDown(ctx, 0) then
     opts.overview_drag_env = nil
     opts.overview_drag_point = nil
@@ -476,7 +505,7 @@ function M.draw(ImGui, ctx, defs, points, enabled, selected, selected_point, cur
   selected, selected_point = draw_overview(ImGui, ctx, defs, points, enabled, selected, selected_point, current_values, opts)
 
   local editor_open = true
-  if opts.collapse_editor then
+  if opts.collapse_editor ~= false then
     local was_open = opts._editor_was_open
     editor_open = ImGui.CollapsingHeader(ctx, clean_label(opts.editor_label or "Detailed Breakpoint Editor"))
     if was_open ~= nil and was_open ~= editor_open then

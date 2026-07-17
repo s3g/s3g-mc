@@ -152,6 +152,7 @@ end
 local function finish_section(ctx, x, y, height, stack)
   theme.pop_soft_panel(ImGui, ctx, stack)
   ImGui.SetCursorScreenPos(ctx, x, y + height + 10)
+  ImGui.Dummy(ctx, 1, 1)
 end
 
 local function channel_for_voice(slice_index, voice_index, output_channels, path)
@@ -233,7 +234,7 @@ local function main()
   local should_render = false
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 450, 410, ImGui.Cond_Appearing)
+    ImGui.SetNextWindowSize(ctx, 450, 520, ImGui.Cond_Appearing)
     local visible
     visible, open = ImGui.Begin(ctx, "Fracture", open)
     if visible then

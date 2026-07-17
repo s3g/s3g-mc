@@ -27,6 +27,7 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme then
     ui_theme = _s3g_theme
@@ -129,6 +130,10 @@ end
 local function combo(label, value, items)
   local _, next_value = ui_theme.combo_row(ImGui, ctx, label, items, value)
   return next_value
+end
+
+local function aligned_button(label, id, width, height)
+  return ui_theme.action_row(ImGui, ctx, label .. "##" .. id, width, height)
 end
 
 local function choose_png(title, current)
@@ -479,11 +484,11 @@ local function loop()
       local changed
       local sx, sy, sh, stack = ui_theme.begin_section(ImGui, ctx, "Images", settings.amp_source == #AMP_SOURCES and 180 or 136)
       changed, settings.image_path = ui_theme.input_text_row(ImGui, ctx, "Color image", settings.image_path)
-      if ImGui.Button(ctx, "CHOOSE##image", 96, 24) then settings.image_path = choose_png("Choose color PNG", settings.image_path) end
+      if aligned_button("CHOOSE", "image", 96, 24) then settings.image_path = choose_png("Choose color PNG", settings.image_path) end
       settings.amp_source = combo("Amplitude source", settings.amp_source, AMP_SOURCES)
       if settings.amp_source == #AMP_SOURCES then
         changed, settings.amp_image_path = ui_theme.input_text_row(ImGui, ctx, "Amplitude image", settings.amp_image_path)
-        if ImGui.Button(ctx, "CHOOSE##amp", 96, 24) then settings.amp_image_path = choose_png("Choose amplitude PNG", settings.amp_image_path) end
+        if aligned_button("CHOOSE", "amp", 96, 24) then settings.amp_image_path = choose_png("Choose amplitude PNG", settings.amp_image_path) end
       end
       ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
@@ -512,7 +517,7 @@ local function loop()
       end
       settings.freq_mode = combo("Frequency scale", settings.freq_mode, FREQ_MODES)
       local read_label = settings.transpose_read and "Read: vertical time / horizontal frequency" or "Read: horizontal time / vertical frequency"
-      if ImGui.Button(ctx, read_label:upper(), -1, 26) then
+      if ui_theme.action_button(ImGui, ctx, read_label) then
         settings.transpose_read = not settings.transpose_read
       end
       ui_theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
@@ -577,9 +582,9 @@ local function loop()
       ui_theme.muted(ImGui, ctx, "PNG only in this first version. Alpha amplitude uses the image alpha channel; edge contrast uses local structure.")
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "RENDER", 110, 30) then run = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 100, 30) then open = false end
+    local render_pressed, cancel_pressed = ui_theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 110, 100)
+    if render_pressed then run = true end
+    if cancel_pressed then open = false end
     ImGui.End(ctx)
   end
   persist()

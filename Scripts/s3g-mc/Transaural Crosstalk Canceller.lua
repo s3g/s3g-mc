@@ -139,6 +139,7 @@ local open = true
 local load_error = ""
 local param_warning = ""
 local param_ready = true
+local active_preset = 2
 
 local STYLE = {
   bg = THEME.bg,
@@ -152,10 +153,6 @@ local STYLE = {
   meter = THEME.ok,
   fill = THEME.fill,
 }
-
-local function color(r, g, b, a)
-  return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1)
-end
 
 local function clamp(value, lo, hi)
   if value < lo then return lo end
@@ -254,7 +251,7 @@ local function slider_param(track, fx, label, param, min_value, max_value, fmt)
   return new_value or value
 end
 
-local function option_buttons(track, fx, title, param, labels, columns)
+local function combo_option(track, fx, title, param, labels)
   local norm = fx >= 0 and reaper.TrackFX_GetParamNormalized(track, fx, param) or 0
   local current = math.floor(norm * (#labels - 1) + 0.5) + 1
   local changed, next_value = theme.combo_row(ImGui, ctx, title, labels, current, 210)
@@ -279,12 +276,12 @@ local function apply_preset(track, fx, preset)
 end
 
 local function draw_presets(track, fx)
-  theme.muted(ImGui, ctx, "Presets")
-  for index, preset in ipairs(PRESETS) do
-    if index > 1 and index ~= 4 then ImGui.SameLine(ctx) end
-    if ImGui.Button(ctx, preset.name .. "##preset" .. index) then
-      apply_preset(track, fx, preset)
-    end
+  local labels = {}
+  for index, preset in ipairs(PRESETS) do labels[index] = preset.name end
+  local changed, next_preset = theme.combo_row(ImGui, ctx, "Preset", labels, active_preset, 260)
+  if changed and PRESETS[next_preset] then
+    active_preset = next_preset
+    apply_preset(track, fx, PRESETS[active_preset])
   end
 end
 
@@ -307,81 +304,6 @@ local function draw_meter(track, x, y, w, h)
     ImGui.DrawList_AddRect(dl, mx, y + 16, mx + 24, y + h - 18, STYLE.edge)
     ImGui.DrawList_AddText(dl, mx + 7, y + h - 16, STYLE.muted, ch == 0 and "L" or "R")
   end
-end
-
-local function draw_visual(track, fx)
-  local width = math.max(620, ImGui.GetContentRegionAvail(ctx) - 2)
-  local height = 330
-  ImGui.InvisibleButton(ctx, "##transaural_visual", width, height)
-  local x0, y0 = ImGui.GetItemRectMin(ctx)
-  local x1, y1 = x0 + width, y0 + height
-  local cx, cy = x0 + width * 0.43, y0 + height * 0.58
-  local r = math.min(width, height) * 0.30
-  local dl = ImGui.GetWindowDrawList(ctx)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, STYLE.bg)
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 14, STYLE.text, "Transaural Crosstalk Canceller")
-  ImGui.DrawList_AddText(dl, x0 + 14, y0 + 34, STYLE.muted, "speaker playback / opposite-channel cancellation")
-
-  local amount = get_param(track, fx, PARAM.amount, 100) / 100
-  local mode = math.floor(get_param(track, fx, PARAM.mode, 1) + 0.5)
-  local angle = math.rad(get_param(track, fx, PARAM.angle, 30))
-  local head_cm = get_param(track, fx, PARAM.head, 18)
-  local trim_ms = get_param(track, fx, PARAM.trim, 0)
-  local hf_hz = get_param(track, fx, PARAM.hf, 6500)
-  local low_hz = get_param(track, fx, PARAM.low, 120)
-  local preserve = get_param(track, fx, PARAM.center, 0) / 100
-  local out_db = get_param(track, fx, PARAM.output, -6)
-  local delay_ms = head_cm * 0.01 * math.sin(angle) / 343 * 1000 + trim_ms
-
-  local head_norm = clamp((head_cm - 12) / 12, 0, 1)
-  local head_w = r * (0.34 + head_norm * 0.28)
-  local ear_l = { x = cx - head_w * 0.5, y = cy }
-  local ear_r = { x = cx + head_w * 0.5, y = cy }
-  local spk_dist = r * 1.45
-  local spk_l = { x = cx - math.sin(angle) * spk_dist, y = cy - math.cos(angle) * spk_dist }
-  local spk_r = { x = cx + math.sin(angle) * spk_dist, y = cy - math.cos(angle) * spk_dist }
-
-  ImGui.DrawList_AddCircle(dl, cx, cy, head_w * 0.52, color(0.65, 0.68, 0.70, 0.45), 48, 2)
-  ImGui.DrawList_AddLine(dl, ear_l.x, ear_l.y + 18, ear_r.x, ear_r.y + 18, STYLE.edge, 1.5)
-  ImGui.DrawList_AddLine(dl, ear_l.x, ear_l.y + 13, ear_l.x, ear_l.y + 23, STYLE.edge, 1.5)
-  ImGui.DrawList_AddLine(dl, ear_r.x, ear_r.y + 13, ear_r.x, ear_r.y + 23, STYLE.edge, 1.5)
-  ImGui.DrawList_AddCircleFilled(dl, ear_l.x, ear_l.y, 7, STYLE.direct, 18)
-  ImGui.DrawList_AddCircleFilled(dl, ear_r.x, ear_r.y, 7, STYLE.direct, 18)
-  ImGui.DrawList_AddRectFilled(dl, spk_l.x - 13, spk_l.y - 13, spk_l.x + 13, spk_l.y + 13, STYLE.speaker)
-  ImGui.DrawList_AddRectFilled(dl, spk_r.x - 13, spk_r.y - 13, spk_r.x + 13, spk_r.y + 13, STYLE.speaker)
-  ImGui.DrawList_AddText(dl, spk_l.x - 5, spk_l.y - 32, STYLE.text, "L")
-  ImGui.DrawList_AddText(dl, spk_r.x - 5, spk_r.y - 32, STYLE.text, "R")
-
-  local cancel_alpha = 0.18 + 0.60 * clamp(amount / 1.4, 0, 1)
-  local cancel_thick = 1.0 + 3.0 * clamp(amount / 1.4, 0, 1)
-  ImGui.DrawList_AddLine(dl, spk_l.x, spk_l.y, ear_l.x, ear_l.y, color(0.46, 0.86, 0.56, 0.72), 2.0)
-  ImGui.DrawList_AddLine(dl, spk_r.x, spk_r.y, ear_r.x, ear_r.y, color(0.46, 0.86, 0.56, 0.72), 2.0)
-  ImGui.DrawList_AddLine(dl, spk_l.x, spk_l.y, ear_r.x, ear_r.y, color(0.95, 0.58, 0.38, cancel_alpha), cancel_thick)
-  ImGui.DrawList_AddLine(dl, spk_r.x, spk_r.y, ear_l.x, ear_l.y, color(0.95, 0.58, 0.38, cancel_alpha), cancel_thick)
-
-  ImGui.DrawList_AddText(dl, x0 + 14, y1 - 58, STYLE.muted, string.format("%s / cancel %.0f%% / angle %.1f deg", MODES[mode + 1] or "Mode", amount * 100, math.deg(angle)))
-  ImGui.DrawList_AddText(dl, x0 + 14, y1 - 36, STYLE.muted, string.format("derived ITD %.3f ms", delay_ms))
-  ImGui.DrawList_AddText(dl, cx - 42, cy + 32, STYLE.muted, string.format("head %.1f cm", head_cm))
-  ImGui.DrawList_AddText(dl, x0 + width - 260, y0 + 14, STYLE.muted, "Best on loudspeakers")
-  ImGui.DrawList_AddText(dl, x0 + width - 260, y0 + 34, STYLE.muted, "Not a headphone binaural processor")
-
-  local info_x = x0 + width - 260
-  local info_y = y0 + 68
-  local bar_w = 170
-  local function info_bar(label, value, norm, bar_color)
-    ImGui.DrawList_AddText(dl, info_x, info_y, STYLE.muted, label)
-    ImGui.DrawList_AddText(dl, info_x + 92, info_y, STYLE.text, value)
-    ImGui.DrawList_AddRectFilled(dl, info_x, info_y + 18, info_x + bar_w, info_y + 23, STYLE.panel)
-    ImGui.DrawList_AddRectFilled(dl, info_x, info_y + 18, info_x + bar_w * clamp(norm, 0, 1), info_y + 23, bar_color)
-    ImGui.DrawList_AddRect(dl, info_x, info_y + 18, info_x + bar_w, info_y + 23, STYLE.edge)
-    info_y = info_y + 38
-  end
-  info_bar("HF rolloff", string.format("%.0f Hz", hf_hz), (hf_hz - 1000) / 15000, STYLE.cancel)
-  info_bar("Low protect", string.format("%.0f Hz", low_hz), (low_hz - 20) / 480, STYLE.fill)
-  info_bar("Preserve", string.format("%.0f%%", preserve * 100), preserve, STYLE.direct)
-  info_bar("Output", string.format("%.1f dB", out_db), (out_db + 24) / 36, STYLE.meter)
-
-  draw_meter(track, x0 + width - 205, y1 - 110, 190, 92)
 end
 
 local function loop()
@@ -408,12 +330,14 @@ local function loop()
           theme.muted(ImGui, ctx, "CLICK REPAIR JSFX TO REPLACE THE STALE EFFECT INSTANCE.")
         else
           reaper.SetMediaTrackInfo_Value(track, "I_NCHAN", math.max(2, reaper.GetMediaTrackInfo_Value(track, "I_NCHAN")))
-          draw_visual(track, fx)
           draw_presets(track, fx)
+          local meter_x, meter_y = ImGui.GetCursorScreenPos(ctx)
+          draw_meter(track, meter_x, meter_y, 220, 92)
+          ImGui.Dummy(ctx, 220, 102)
           local tool_panel = theme.push_soft_panel(ImGui, ctx)
           if ImGui.BeginChild(ctx, "##transaural_tool_area", 0, 0, 0) then
           if theme.toolbox_header(ImGui, ctx, "CANCELLATION", ImGui.TreeNodeFlags_DefaultOpen) then
-            option_buttons(track, fx, "Cancellation mode", PARAM.mode, MODES, 2)
+            combo_option(track, fx, "Cancellation mode", PARAM.mode, MODES)
             slider_param(track, fx, "Cancellation amount", PARAM.amount, 0, 140, "%.0f %%")
             slider_param(track, fx, "Stereo preserve", PARAM.center, 0, 100, "%.0f %%")
           end
@@ -425,8 +349,8 @@ local function loop()
           if theme.toolbox_header(ImGui, ctx, "TONE / SAFETY", ImGui.TreeNodeFlags_DefaultOpen) then
             slider_param(track, fx, "Cancel HF rolloff", PARAM.hf, 1000, 16000, "%.0f Hz")
             slider_param(track, fx, "Low protect", PARAM.low, 20, 500, "%.0f Hz")
-            option_buttons(track, fx, "Safety limiter", PARAM.limiter, LIMITER, 2)
-            option_buttons(track, fx, "Extra channel output", PARAM.extra, EXTRA, 2)
+            combo_option(track, fx, "Safety limiter", PARAM.limiter, LIMITER)
+            combo_option(track, fx, "Extra channel output", PARAM.extra, EXTRA)
             slider_param(track, fx, "Output gain", PARAM.output, -24, 12, "%.1f dB")
           end
           theme.muted(ImGui, ctx, "Transaural processing is speaker/listener-position dependent; small geometry changes matter.")

@@ -15,7 +15,6 @@ if not reaper.APIExists("ImGui_GetVersion") then
   reaper.MB("ReaImGui is not installed.", "3OAFX Spatial Freeze Trace", 0)
   return
 end
-local theme = ui_theme or require("s3g-mc ImGui Theme")
 
 package.path = reaper.ImGui_GetBuiltinPath() .. "/?.lua"
 local ImGui = require("imgui")("0.10")
@@ -27,12 +26,14 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme then
     ui_theme = _s3g_theme
     if _s3g_theme.install then _s3g_theme.install(ImGui) end
   end
 end
+local theme = ui_theme or require("s3g-mc ImGui Theme")
 
 
 local TITLE = "3OAFX Spatial Freeze Trace"
@@ -43,17 +44,6 @@ local FFT_NAMES = { "1024", "2048", "4096", "8192" }
 local FFT_VALUES = { 1024, 2048, 4096, 8192 }
 local ORDER_NAMES = { "1OA / 4ch", "2OA / 9ch", "3OA / 16ch" }
 
-local CANVAS = {
-  bg = ImGui.ColorConvertDouble4ToU32(0.035, 0.039, 0.042, 1),
-  panel = ImGui.ColorConvertDouble4ToU32(0.055, 0.062, 0.064, 1),
-  edge = ImGui.ColorConvertDouble4ToU32(0.35, 0.39, 0.39, 1),
-  grid = ImGui.ColorConvertDouble4ToU32(0.55, 0.62, 0.62, 0.18),
-  text = ImGui.ColorConvertDouble4ToU32(0.78, 0.83, 0.82, 1),
-  muted = ImGui.ColorConvertDouble4ToU32(0.50, 0.56, 0.56, 1),
-  cyan = ImGui.ColorConvertDouble4ToU32(0.24, 0.72, 0.86, 0.95),
-  amber = ImGui.ColorConvertDouble4ToU32(0.92, 0.67, 0.26, 0.95),
-  violet = ImGui.ColorConvertDouble4ToU32(0.66, 0.54, 0.92, 0.80),
-}
 
 local function muted_wrapped_text(value)
   if ui_theme and ui_theme.wrapped_text and ui_theme.palette then
@@ -132,50 +122,6 @@ local function persist()
   for key, value in pairs(settings) do setv(key, value) end
 end
 
-local function draw_preview()
-  local dl = ImGui.GetWindowDrawList(ctx)
-  local x, y = ImGui.GetCursorScreenPos(ctx)
-  local w = math.max(420, ImGui.GetContentRegionAvail(ctx))
-  local h = 168
-  ImGui.InvisibleButton(ctx, "##freeze_trace_preview", w, h)
-  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + h, CANVAS.bg)
-  ImGui.DrawList_AddRect(dl, x, y, x + w, y + h, CANVAS.edge)
-  ImGui.DrawList_AddText(dl, x + 12, y + 10, CANVAS.text, "spatial spectral imprint")
-  ImGui.DrawList_AddText(dl, x + 12, y + 29, CANVAS.muted, MODES[settings.mode] .. " / " .. ORDER_NAMES[settings.order])
-  local gx = x + 24
-  local gy = y + 62
-  local gw = w - 48
-  local gh = 68
-  ImGui.DrawList_AddRect(dl, gx, gy, gx + gw, gy + gh, CANVAS.grid)
-  for i = 0, 8 do
-    local px = gx + gw * i / 8
-    ImGui.DrawList_AddLine(dl, px, gy, px, gy + gh, CANVAS.grid, 1)
-  end
-  for i = 0, 5 do
-    local py = gy + gh * i / 5
-    ImGui.DrawList_AddLine(dl, gx, py, gx + gw, py, CANVAS.grid, 1)
-  end
-  local center = gx + gw * settings.freeze_pos
-  local half = gw * settings.trace_width * 0.5
-  ImGui.DrawList_AddRectFilled(dl, math.max(gx, center - half), gy, math.min(gx + gw, center + half), gy + gh, CANVAS.violet)
-  ImGui.DrawList_AddLine(dl, center, gy - 8, center, gy + gh + 8, CANVAS.amber, 2.2)
-  local last_x, last_y
-  for i = 0, 80 do
-    local u = i / 80
-    local px = gx + gw * u
-    local py = gy + gh * (0.55 - 0.30 * math.sin(u * math.pi * 5.0 + settings.amount * 2.0) * (0.25 + settings.amount * 0.75))
-    if last_x then ImGui.DrawList_AddLine(dl, last_x, last_y, px, py, CANVAS.cyan, 1.5) end
-    last_x, last_y = px, py
-  end
-  local yaw_a = x + 24
-  local yaw_b = x + 24 + (w - 48) * 0.5
-  local yaw_c = x + w - 24
-  local yy = y + h - 22
-  ImGui.DrawList_AddText(dl, yaw_a, yy, CANVAS.muted, string.format("yaw %.0f", settings.yaw_start))
-  ImGui.DrawList_AddLine(dl, yaw_b - 56, yy + 6, yaw_b + 56, yy + 6, CANVAS.amber, 1.5)
-  ImGui.DrawList_AddTriangleFilled(dl, yaw_b + 56, yy + 6, yaw_b + 47, yy + 1, yaw_b + 47, yy + 11, CANVAS.amber)
-  ImGui.DrawList_AddText(dl, yaw_c - 58, yy, CANVAS.muted, string.format("%.0f", settings.yaw_end))
-end
 
 local function render()
   local needed = order_channels(settings.order)
@@ -241,7 +187,6 @@ local function loop()
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     if ImGui.BeginChild(ctx, "##body", 0, math.max(280, avail_h - footer_h)) then
       theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
-      draw_preview()
       local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Mode", 123)
       settings.order = combo("Ambisonic order", settings.order, ORDER_NAMES)
       settings.mode = combo("Mode", settings.mode, MODES)
@@ -272,9 +217,9 @@ local function loop()
       muted_wrapped_text("The same spectral frame or trace path is applied across all encoded channels, keeping the ambisonic channel set coherent.")
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "RENDER", 104, 28) then should_render = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 104, 28) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+    if render_pressed then should_render = true end
+    if cancel_pressed then open = false end
     ImGui.End(ctx)
   end
   persist()

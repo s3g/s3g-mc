@@ -290,7 +290,7 @@ local function custom_slider_row(label, value, min_value, max_value, format, int
   local draw = ImGui.GetWindowDrawList(ctx)
   local label_col = rgba(0.66, 0.66, 0.66, 1.0)
   local value_col = rgba(0.57, 0.57, 0.57, 1.0)
-  local track_col = active and rgba(0.070, 0.072, 0.074, 1.0) or (hovered and rgba(0.060, 0.062, 0.064, 1.0) or rgba(0.044, 0.046, 0.048, 1.0))
+  local track_col = active and rgba(0.070, 0.072, 0.074, 1.0) or rgba(0.044, 0.046, 0.048, 1.0)
   local fill_col = active and rgba(0.58, 0.59, 0.58, 1.0) or rgba(0.40, 0.41, 0.41, 1.0)
   local handle_col = active and rgba(0.78, 0.78, 0.76, 1.0) or rgba(0.62, 0.63, 0.62, 1.0)
   ImGui.DrawList_AddText(draw, x, y + 2, label_col, slider_label(label))
@@ -1061,7 +1061,9 @@ end
 local function draw_preview_controls()
   local changed
   changed, preview_t = custom_slider_row("Timeline preview", preview_t, 0, 1, "%.3f", false)
-  if ImGui.Button(ctx, preview_play and "STOP PREVIEW" or "PLAY PREVIEW", 130, 26) then
+  local bx, by = ImGui.GetCursorScreenPos(ctx)
+  ImGui.SetCursorScreenPos(ctx, bx + 10, by)
+  if ImGui.Button(ctx, preview_play and "STOP" or "PLAY", 86, 26) then
     preview_play = not preview_play
     last_time = reaper.time_precise()
   end

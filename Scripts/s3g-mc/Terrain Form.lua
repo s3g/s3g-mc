@@ -214,49 +214,6 @@ local function generate()
   reaper.ShowConsoleMsg("\n[Terrain Form]\n" .. log .. "\n")
 end
 
-local function draw_preview()
-  local draw_list = ImGui.GetWindowDrawList(ctx)
-  local x, y = ImGui.GetCursorScreenPos(ctx)
-  local w = ImGui.GetContentRegionAvail(ctx)
-  local h = 250
-  ImGui.DrawList_AddRectFilled(draw_list, x, y, x + w, y + h, STYLE.panel)
-  ImGui.DrawList_AddRect(draw_list, x, y, x + w, y + h, STYLE.edge)
-  ImGui.DrawList_AddText(draw_list, x + 12, y + 10, STYLE.dim, "MIDI TERRAIN FORM")
-  local left, top, right, bottom = x + 18, y + 48, x + w - 18, y + h - 30
-  local section_w = (right - left) / math.max(1, state.sections)
-  for section = 1, state.sections do
-    local sx0 = left + (section - 1) * section_w
-    local sx1 = sx0 + section_w - 2
-    local t = (section - 0.5) / math.max(1, state.sections)
-    local energy
-    if FORM_KEYS[state.form] == "arc" then energy = math.sin(math.pi * t)
-    elseif FORM_KEYS[state.form] == "cascade" then energy = t
-    elseif FORM_KEYS[state.form] == "drift" then energy = 0.25 + 0.7 * t
-    elseif FORM_KEYS[state.form] == "return" then energy = (section % 3 == 1) and 0.8 or (0.35 + 0.45 * math.sin(math.pi * t))
-    else energy = 0.35 + 0.5 * ((section * 37 + state.seed) % 11) / 10 end
-    local sy = bottom - energy * (bottom - top)
-    ImGui.DrawList_AddRectFilled(draw_list, sx0, sy, sx1, bottom, STYLE.section)
-    ImGui.DrawList_AddRect(draw_list, sx0, top, sx1, bottom, STYLE.grid)
-    ImGui.DrawList_AddText(draw_list, sx0 + 5, bottom + 7, STYLE.dim, tostring(section))
-  end
-  local last_x, last_y
-  local points = 96
-  for i = 0, points do
-    local t = i / points
-    local terrain = 0.5 + 0.45 * math.sin(2 * math.pi * (t * (1 + state.contrast * 4) + state.seed * 0.013))
-    if TERRAIN_KEYS[state.terrain] == "ridge" then terrain = math.exp(-((t - 0.5) ^ 2) / 0.08)
-    elseif TERRAIN_KEYS[state.terrain] == "basin" then terrain = 1 - math.exp(-((t - 0.5) ^ 2) / 0.08)
-    elseif TERRAIN_KEYS[state.terrain] == "fault" then terrain = t > 0.45 and 0.88 or 0.22 end
-    local px = left + t * (right - left)
-    local py = bottom - terrain * (bottom - top)
-    if last_x then ImGui.DrawList_AddLine(draw_list, last_x, last_y, px, py, STYLE.line, 1.4) end
-    last_x, last_y = px, py
-  end
-  ImGui.DrawList_AddText(draw_list, x + 18, y + h - 20, STYLE.dim,
-    string.format("%s / %s / %d beats / %d lanes", FORM_NAMES[state.form], TERRAIN_NAMES[state.terrain], state.duration_beats, state.lanes))
-  ImGui.SetCursorScreenPos(ctx, x, y + h + 12)
-end
-
 local function loop()
   ImGui.SetNextWindowSize(ctx, 820, 760, ImGui.Cond_Appearing)
   local visible
@@ -268,7 +225,6 @@ local function loop()
     local main_panel_style = push_soft_panel()
     local child_visible = ImGui.BeginChild(ctx, "##main_content", 0, content_height)
     if child_visible then
-      draw_preview()
       _, state.form = combo("FORM", FORM_NAMES, state.form, 170)
       _, state.terrain = combo("TERRAIN", TERRAIN_NAMES, state.terrain, 170)
       _, state.duration_beats = ui_slider_int("BEATS", state.duration_beats, 16, 4096)

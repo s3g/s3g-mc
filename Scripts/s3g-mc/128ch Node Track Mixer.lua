@@ -921,6 +921,26 @@ local function loop()
     local stack_pos = get_param(bus, fx, STACK_POSITION_PARAM, 1)
     if stack_pos > node_count then set_param(bus, fx, STACK_POSITION_PARAM, node_count) end
 
+    if ImGui.Button(ctx, "3/4", 48, 24) then view_azim_deg, view_elev_deg = -38, -28 end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "TOP", 48, 24) then view_azim_deg, view_elev_deg = 0, 0 end
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, "SIDE", 48, 24) then view_azim_deg, view_elev_deg = 0, -89 end
+    ImGui.SameLine(ctx)
+    nudge("AZ -", 44, 24, function() view_azim_deg = view_azim_deg - 2 end)
+    ImGui.SameLine(ctx)
+    nudge("AZ +", 44, 24, function() view_azim_deg = view_azim_deg + 2 end)
+    ImGui.SameLine(ctx)
+    nudge("EL +", 44, 24, function() view_elev_deg = clamp(view_elev_deg + 2, -89, 89) end)
+    ImGui.SameLine(ctx)
+    nudge("EL -", 44, 24, function() view_elev_deg = clamp(view_elev_deg - 2, -89, 89) end)
+    ImGui.SameLine(ctx)
+    nudge("-", 28, 24, function() view_zoom = clamp(view_zoom * 0.975, 0.35, 3.0) end)
+    ImGui.SameLine(ctx)
+    nudge("+", 28, 24, function() view_zoom = clamp(view_zoom * 1.025, 0.35, 3.0) end)
+
+    draw_view(layout, out_ch, node_count, mix_mode)
+
     if theme.toolbox_header(ImGui, ctx, "AUTOMATION", ImGui.TreeNodeFlags_DefaultOpen) then
       local mode_name = automation_mode_name(bus)
       theme.muted(ImGui, ctx, "TRACK AUTOMATION: " .. mode_name:upper())
@@ -999,26 +1019,6 @@ local function loop()
       theme.muted(ImGui, ctx, "Radius sets reach, focus shapes the curve, gate cuts distant node weights to zero. Use influence 1.0 for full silence outside the gate.")
       theme.muted(ImGui, ctx, "Automate these JSFX parameters in REAPER to compose the movement/mix.")
     end
-
-    if ImGui.Button(ctx, "3/4", 48, 24) then view_azim_deg, view_elev_deg = -38, -28 end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "TOP", 48, 24) then view_azim_deg, view_elev_deg = 0, 0 end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "SIDE", 48, 24) then view_azim_deg, view_elev_deg = 0, -89 end
-    ImGui.SameLine(ctx)
-    nudge("AZ -", 44, 24, function() view_azim_deg = view_azim_deg - 2 end)
-    ImGui.SameLine(ctx)
-    nudge("AZ +", 44, 24, function() view_azim_deg = view_azim_deg + 2 end)
-    ImGui.SameLine(ctx)
-    nudge("EL +", 44, 24, function() view_elev_deg = clamp(view_elev_deg + 2, -89, 89) end)
-    ImGui.SameLine(ctx)
-    nudge("EL -", 44, 24, function() view_elev_deg = clamp(view_elev_deg - 2, -89, 89) end)
-    ImGui.SameLine(ctx)
-    nudge("-", 28, 24, function() view_zoom = clamp(view_zoom * 0.975, 0.35, 3.0) end)
-    ImGui.SameLine(ctx)
-    nudge("+", 28, 24, function() view_zoom = clamp(view_zoom * 1.025, 0.35, 3.0) end)
-
-    draw_view(layout, out_ch, node_count, mix_mode)
 
     if theme.toolbox_header(ImGui, ctx, "SELECTED NODE", ImGui.TreeNodeFlags_DefaultOpen) then
       theme.muted(ImGui, ctx, "NODE " .. tostring(selected_node) .. ": " .. node_name(selected_node))

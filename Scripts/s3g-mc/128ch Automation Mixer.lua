@@ -68,7 +68,7 @@ local COLOR_CELL_EDGE = ImGui.ColorConvertDouble4ToU32(0.29, 0.31, 0.33, 1)
 local COLOR_TEXT = THEME.text
 local COLOR_TEXT_DIM = THEME.value
 local COLOR_FADER_BG = THEME.frame
-local COLOR_FADER_FILL = ImGui.ColorConvertDouble4ToU32(0.24, 0.58, 0.66, 1)
+local COLOR_FADER_FILL = ImGui.ColorConvertDouble4ToU32(0.48, 0.50, 0.50, 1)
 local COLOR_FADER_TICK = ImGui.ColorConvertDouble4ToU32(0.055, 0.060, 0.065, 0.82)
 local COLOR_UNITY_TICK = ImGui.ColorConvertDouble4ToU32(0.72, 0.76, 0.70, 0.92)
 local COLOR_GROUP_SELECT = ImGui.ColorConvertDouble4ToU32(0.22, 0.72, 0.52, 1)
@@ -659,7 +659,6 @@ local function draw_channel_controls(track, fx, active_ch)
     local fader_pos = db_to_fader_pos(level_db)
     local fill_h = fader_h * fader_pos
     local fill_top = fader_top + fader_h - fill_h
-    local tick_db = {-48, -36, -24, -18, -12, -6, 0, 6}
 
     ImGui.DrawList_AddRectFilled(draw_list, strip_x + 2, y0 + 2, strip_x + strip_w - 2, y0 + canvas_h - 2, COLOR_PANEL_BG)
     ImGui.DrawList_AddRect(draw_list, strip_x + 2, y0 + 2, strip_x + strip_w - 2, y0 + canvas_h - 2, selected and COLOR_GROUP_SELECT or COLOR_CELL_EDGE)
@@ -669,11 +668,8 @@ local function draw_channel_controls(track, fx, active_ch)
     if fill_h > 0 then
       ImGui.DrawList_AddRectFilled(draw_list, fader_x, fill_top, fader_x + slider_w, fader_top + fader_h, COLOR_FADER_FILL)
     end
-    for _, db in ipairs(tick_db) do
-      local tick_y = fader_top + fader_h * (1 - db_to_fader_pos(db))
-      local tick_color = db == 0 and COLOR_UNITY_TICK or COLOR_FADER_TICK
-      ImGui.DrawList_AddLine(draw_list, fader_x + 1, tick_y, fader_x + slider_w - 1, tick_y, tick_color)
-    end
+    local unity_y = fader_top + fader_h * (1 - db_to_fader_pos(0))
+    ImGui.DrawList_AddLine(draw_list, fader_x + 1, unity_y, fader_x + slider_w - 1, unity_y, COLOR_UNITY_TICK)
     ImGui.DrawList_AddRect(draw_list, fader_x, fader_top, fader_x + slider_w, fader_top + fader_h, COLOR_CELL_EDGE)
 
     ImGui.DrawList_AddRectFilled(draw_list, meter_x, fader_top, meter_x + meter_w, fader_top + fader_h, COLOR_METER_BG)
@@ -722,6 +718,7 @@ local function draw_channel_controls(track, fx, active_ch)
   end
 
   ImGui.SetCursorScreenPos(ctx, x0, y0 + canvas_h)
+  ImGui.Dummy(ctx, 1, 16)
 end
 
 local function draw_pin_matrix(track, fx, active_ch)
@@ -807,7 +804,7 @@ local function draw_pin_matrix(track, fx, active_ch)
 end
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 920, 760, ImGui.Cond_Appearing)
+  ImGui.SetNextWindowSize(ctx, 920, 780, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "128ch Automation Mixer", open)
   if visible then
@@ -828,7 +825,7 @@ local function loop()
         theme.status(ImGui, ctx, "Could not load JS: " .. FX_NAME, "warn")
       else
         local channel_panel = theme.push_soft_panel(ImGui, ctx)
-        if ImGui.BeginChild(ctx, "##automation_channel_tool_area", 0, 392, 0) then
+        if ImGui.BeginChild(ctx, "##automation_channel_tool_area", 0, 410, 0) then
           draw_channel_controls(track, fx, active_ch)
         end
         ImGui.EndChild(ctx)

@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category 3OAFX
 -- @render Yes; NumPy-backed ambisonic pulsar synthesis render.
--- @method Creates a new ACN/SN3D ambisonic item from multiple pulsar streams. A diagram previews pulse trains, pulsaret masking, and ambisonic placement. Breakpoint curves can vary amplitude, fundamental, formant, probability, spatial spread, and azimuth over time.
+-- @method Creates a new ACN/SN3D ambisonic item from multiple pulsar streams. Breakpoint curves can vary amplitude, fundamental, formant, probability, spatial spread, and azimuth over time.
 
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
@@ -23,6 +23,7 @@ do
   end
   local _s3g_theme_dir = _s3g_theme_path:match("^(.*[/\\])") or ""
   package.path = _s3g_theme_dir .. "?.lua;" .. package.path
+  package.loaded["s3g-mc ImGui Theme"] = nil
   local _s3g_theme_ok, _s3g_theme = pcall(require, "s3g-mc ImGui Theme")
   if _s3g_theme_ok and _s3g_theme then
     theme = _s3g_theme
@@ -54,61 +55,12 @@ local function getn(k, d) return tonumber(reaper.GetExtState(EXT, k)) or d end
 local function getb(k, d) local v = reaper.GetExtState(EXT, k); if v == "" then return d end; return v ~= "0" end
 local function set(k, v) reaper.SetExtState(EXT, k, type(v) == "boolean" and (v and "1" or "0") or tostring(v), true) end
 local function order_channels(order) return (order + 1) * (order + 1) end
-local function rgba(r, g, b, a) return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1) end
 local settings
 local function combo(ctx, label, idx, names)
   local _, next_idx = theme.combo_row(ImGui, ctx, label, names, idx)
   return next_idx
 end
 
-local function draw_diagram(ctx)
-  local w = math.max(420, ImGui.GetContentRegionAvail(ctx) - 2)
-  local h = 132
-  ImGui.InvisibleButton(ctx, "##pulsar_diagram", w, h)
-  local x0, y0 = ImGui.GetItemRectMin(ctx)
-  local x1, y1 = ImGui.GetItemRectMax(ctx)
-  local dl = ImGui.GetWindowDrawList(ctx)
-  local c_bg = rgba(0.035, 0.038, 0.040, 1)
-  local c_grid = rgba(0.55, 0.60, 0.58, 0.12)
-  local c_text = rgba(0.76, 0.79, 0.76, 1)
-  local c_dim = rgba(0.54, 0.58, 0.56, 1)
-  local c_a = rgba(0.98, 0.74, 0.25, 1)
-  local c_b = rgba(0.34, 0.72, 0.86, 1)
-  local c_c = rgba(0.80, 0.62, 0.95, 1)
-  ImGui.DrawList_AddRectFilled(dl, x0, y0, x1, y1, c_bg)
-  ImGui.DrawList_AddRect(dl, x0, y0, x1, y1, rgba(0.45, 0.50, 0.48, 0.38), 0, 0, 1)
-  for i = 1, 5 do
-    local gx = x0 + w * i / 6
-    ImGui.DrawList_AddLine(dl, gx, y0 + 12, gx, y1 - 12, c_grid, 1)
-  end
-  local mid = y0 + h * 0.50
-  local left = x0 + 26
-  local right = x1 - 26
-  ImGui.DrawList_AddText(dl, left, y0 + 10, c_text, "pulse trains")
-  ImGui.DrawList_AddText(dl, x0 + w * 0.42, y0 + 10, c_text, "pulsaret / mask")
-  ImGui.DrawList_AddText(dl, right - 96, y0 + 10, c_text, tostring(settings.order) .. "OA field")
-  for s = 1, math.min(8, settings.streams) do
-    local sy = y0 + 38 + (s - 1) * 9
-    ImGui.DrawList_AddLine(dl, left, sy, x0 + w * 0.35, sy + math.sin(s) * 5, c_a, 1.6)
-    for p = 0, 6 do
-      local px = left + p * (w * 0.34 / 6)
-      ImGui.DrawList_AddCircleFilled(dl, px, sy, 2.2, c_a)
-    end
-  end
-  local cx = x0 + w * 0.50
-  ImGui.DrawList_AddCircle(dl, cx, mid, 34, c_b, 0, 1.5)
-  ImGui.DrawList_AddLine(dl, cx - 24, mid + 18, cx + 24, mid - 18, c_b, 2)
-  ImGui.DrawList_AddCircleFilled(dl, cx, mid, 4.5, c_b)
-  local ox = x0 + w * 0.79
-  local oy = mid
-  for i = 1, 3 do ImGui.DrawList_AddCircle(dl, ox, oy, 18 + i * 12, c_grid, 0, 1) end
-  local yaw_a = math.rad(settings.yaw_start)
-  local yaw_b = math.rad(settings.yaw_end)
-  ImGui.DrawList_AddLine(dl, ox, oy, ox + math.cos(yaw_a) * 48, oy - math.sin(yaw_a) * 48, c_c, 2)
-  ImGui.DrawList_AddLine(dl, ox, oy, ox + math.cos(yaw_b) * 48, oy - math.sin(yaw_b) * 48, c_a, 2)
-  ImGui.DrawList_AddCircleFilled(dl, ox + math.cos(yaw_b) * 48, oy - math.sin(yaw_b) * 48, 4, c_a)
-  ImGui.DrawList_AddText(dl, left, y1 - 22, c_dim, "rate curves and masks emit short spectra into a moving ambisonic direction field")
-end
 
 settings = {
   order = math.max(1, math.min(3, math.floor(getn("order", 3)))),
@@ -202,11 +154,12 @@ local function loop()
   local visible
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
-    draw_diagram(ctx)
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
     local control_h = math.max(400, (avail_h or 760) - 44)
     if ImGui.BeginChild(ctx, "##pulsar_controls", 0, control_h) then
       local changed
+      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
+      ImGui.Separator(ctx)
       local sx, sy, sh, stack = theme.begin_section(ImGui, ctx, "Pulsar", 158)
       changed, settings.order = theme.slider_int(ImGui, ctx, "Ambisonic order", math.floor(settings.order), 1, 3)
       changed, settings.duration = theme.slider_double(ImGui, ctx, "Duration sec", settings.duration, 0.25, 120.0, "%.2f")
@@ -245,12 +198,11 @@ local function loop()
       changed, settings.seed = theme.input_int_row(ImGui, ctx, "Seed", math.floor(settings.seed))
       theme.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-      selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL")
+    if render_pressed then should_render = true end
+    if cancel_pressed then open = false end
     ImGui.End(ctx)
   end
   persist()

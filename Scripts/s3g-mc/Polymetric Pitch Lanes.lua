@@ -589,7 +589,9 @@ end
 local function draw_preview_controls()
   local changed
   changed, preview_t = ui_slider_double("TIMELINE PREVIEW", preview_t, 0, 1, "%.3f")
-  if ImGui.Button(ctx, preview_play and "STOP PREVIEW" or "PLAY PREVIEW", 130, 26) then
+  local bx, by = ImGui.GetCursorScreenPos(ctx)
+  ImGui.SetCursorScreenPos(ctx, bx + 10, by)
+  if ImGui.Button(ctx, preview_play and "STOP" or "PLAY", 86, 26) then
     preview_play = not preview_play
     last_time = reaper.time_precise()
   end
