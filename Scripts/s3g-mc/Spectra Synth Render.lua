@@ -1298,7 +1298,7 @@ local function loop()
     changed, drift = theme.slider_double(ImGui, ctx, "Drift", drift, 0, 1, "%.3f")
     changed, crush = theme.slider_double(ImGui, ctx, "Crush / decimate", crush, 0, 1, "%.3f")
     changed, gain_db = theme.slider_double(ImGui, ctx, "Print gain", gain_db, -60, 0, "%.1f dB")
-    changed, normalize = ImGui.Checkbox(ctx, "PEAK NORMALIZE", normalize)
+    changed, normalize = ImGui.Checkbox(ctx, "PK NORM", normalize)
     if normalize then
       changed, normalize_db = theme.slider_double(ImGui, ctx, "Normalize peak dB", normalize_db, -36, -3, "%.1f")
     end

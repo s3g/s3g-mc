@@ -250,6 +250,16 @@ end
 
 local function combo(ctx, label, current, names)
   local preview = names[current] or names[1] or ""
+  local function text_width(text)
+    if ImGui.CalcTextSize then
+      local ok, w = pcall(ImGui.CalcTextSize, ctx, tostring(text or ""))
+      if ok and type(w) == "number" then return w end
+    end
+    return #tostring(text or "") * 7
+  end
+  local width = text_width(preview) + 38
+  for _, name in ipairs(names or {}) do width = math.max(width, text_width(name) + 38) end
+  ImGui.SetNextItemWidth(ctx, math.max(80, width))
   if ImGui.BeginCombo(ctx, label, preview) then
     for i, name in ipairs(names) do
       local selected = i == current
@@ -265,7 +275,7 @@ local function disabled_text(text)
   if ImGui.TextDisabled then
     ImGui.TextDisabled(ctx, text)
   else
-    ImGui.TextColored(ctx, 0x777777FF, text)
+    ImGui.Text(ctx, text)
   end
 end
 
@@ -562,7 +572,7 @@ local function loop()
 
     ImGui.Separator(ctx)
     ImGui.TextWrapped(ctx, "Track volume lanes use dB scaling before writing REAPER envelope values. FX parameter lanes write normalized parameter values.")
-    ImGui.TextColored(ctx, 0xBBBBBBFF, status)
+    if theme and theme.muted then theme.muted(ImGui, ctx, status) else ImGui.Text(ctx, status) end
     if ImGui.Button(ctx, "WRITE AUTOMATION", 150, 30) then write_requested = true end
     ImGui.SameLine(ctx)
     if ImGui.Button(ctx, "CANCEL", 100, 30) then open = false end

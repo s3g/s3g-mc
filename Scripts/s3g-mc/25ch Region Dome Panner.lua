@@ -496,6 +496,16 @@ local function shape_combo(track, fx, source)
   local value = math.floor(get_param(track, fx, param, 0) + 0.5)
   value = math.floor(clamp(value, 0, #SHAPES - 1))
   local label = "Shape##shape" .. tostring(source)
+  local function text_width(text)
+    if ImGui.CalcTextSize then
+      local ok, w = pcall(ImGui.CalcTextSize, ctx, tostring(text or ""))
+      if ok and type(w) == "number" then return w end
+    end
+    return #tostring(text or "") * 7
+  end
+  local width = text_width(SHAPES[value + 1]) + 38
+  for _, name in ipairs(SHAPES or {}) do width = math.max(width, text_width(name) + 38) end
+  ImGui.SetNextItemWidth(ctx, math.max(80, width))
   if ImGui.BeginCombo(ctx, label, SHAPES[value + 1]) then
     for _, option in ipairs(SHAPE_OPTIONS) do
       local shape_index = option.id

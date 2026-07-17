@@ -182,6 +182,16 @@ end
 
 local function draw_combo(ctx, label, value, names, first_index, last_index)
   local changed = false
+  local function text_width(text)
+    if ImGui.CalcTextSize then
+      local ok, w = pcall(ImGui.CalcTextSize, ctx, tostring(text or ""))
+      if ok and type(w) == "number" then return w end
+    end
+    return #tostring(text or "") * 7
+  end
+  local width = text_width(names[value] or "") + 38
+  for index = first_index, last_index do width = math.max(width, text_width(names[index]) + 38) end
+  ImGui.SetNextItemWidth(ctx, math.max(80, width))
   if ImGui.BeginCombo(ctx, label, names[value] or "") then
     for index = first_index, last_index do
       local selected = value == index
@@ -643,39 +653,46 @@ local function main()
   local should_render = false
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 560, 520, ImGui.Cond_Appearing)
+    local section_h = normalize and 273 or 248
+    local body_target_h = section_h + 110
+    ImGui.SetNextWindowSize(ctx, 560, body_target_h + 124, ImGui.Cond_Appearing)
     local visible
     visible, open = ImGui.Begin(ctx, "Spectral Shaper", open)
     if visible then
       local carrier = swap and entries[2] or entries[1]
       local shaper = swap and entries[1] or entries[2]
-      theme.muted(ImGui, ctx, "Carrier: " .. carrier.name .. "  (" .. tostring(carrier.channels) .. " ch)")
-      theme.muted(ImGui, ctx, "Shaper: " .. shaper.name .. "  (" .. tostring(shaper.channels) .. " ch)")
-      if ImGui.Button(ctx, "SWAP", 92, 26) then swap = not swap end
-      local changed
-      local sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Shaper", 223)
-      changed, algorithm_index = sol_ui.draw_combo(ImGui, ctx, "Algorithm", algorithm_index, ALGORITHM_NAMES, 1, 2)
-      changed, fft_index = sol_ui.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
-      changed, amount = sol_ui.draw_slider(ImGui, ctx, algorithm_index == 2 and "Formant amount" or "Envelope amount", amount, 0, 1, "%.3f", false)
-      changed, mix = sol_ui.draw_slider(ImGui, ctx, "Wet mix", mix, 0, 1, "%.3f", false)
-      changed, smooth_bins = sol_ui.draw_slider_int(ImGui, ctx, algorithm_index == 2 and "Formant smoothing bins" or "Envelope smoothing bins", smooth_bins, 1, 96)
-      changed, contrast = sol_ui.draw_slider(ImGui, ctx, algorithm_index == 2 and "Formant contrast" or "Envelope contrast", contrast, 0.1, 3.0, "%.2f", false)
-      changed, floor = sol_ui.draw_slider(ImGui, ctx, "Envelope floor", floor, 0.001, 0.5, "%.3f", false)
-      sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
-      sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Output", normalize and 98 or 73)
-      changed, normalize = sol_ui.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
-      if normalize then
-        changed, normalize_db = sol_ui.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false)
+      local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+      local footer_h = 48
+      local body_h = math.min(body_target_h, math.max(1, (avail_h or body_target_h + footer_h) - footer_h))
+      local body_visible = ImGui.BeginChild(ctx, "##spectral_shaper_controls", 0, body_h, 0)
+      if body_visible then
+        theme.muted(ImGui, ctx, "Carrier: " .. carrier.name .. "  (" .. tostring(carrier.channels) .. " ch)")
+        theme.muted(ImGui, ctx, "Shaper: " .. shaper.name .. "  (" .. tostring(shaper.channels) .. " ch)")
+        if ImGui.Button(ctx, "SWAP", 92, 26) then swap = not swap end
+        local changed
+        local sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Shaper", section_h)
+        changed, algorithm_index = sol_ui.draw_combo(ImGui, ctx, "Algorithm", algorithm_index, ALGORITHM_NAMES, 1, 2)
+        changed, fft_index = sol_ui.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
+        changed, amount = sol_ui.draw_slider(ImGui, ctx, algorithm_index == 2 and "Formant amount" or "Envelope amount", amount, 0, 1, "%.3f", false)
+        changed, mix = sol_ui.draw_slider(ImGui, ctx, "Wet mix", mix, 0, 1, "%.3f", false)
+        changed, smooth_bins = sol_ui.draw_slider_int(ImGui, ctx, algorithm_index == 2 and "Formant smoothing bins" or "Envelope smoothing bins", smooth_bins, 1, 96)
+        changed, contrast = sol_ui.draw_slider(ImGui, ctx, algorithm_index == 2 and "Formant contrast" or "Envelope contrast", contrast, 0.1, 3.0, "%.2f", false)
+        changed, floor = sol_ui.draw_slider(ImGui, ctx, "Envelope floor", floor, 0.001, 0.5, "%.3f", false)
+        changed, normalize = sol_ui.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
+        if normalize then
+          changed, normalize_db = sol_ui.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false)
+        end
+        sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
+        if algorithm_index == 2 then
+          theme.muted(ImGui, ctx, "Carrier keeps timing/phase/detail; shaper supplies broad formant contour.")
+        else
+          theme.muted(ImGui, ctx, "Carrier keeps timing/phase; shaper supplies the spectral envelope.")
+        end
       end
-      sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
-      if algorithm_index == 2 then
-        theme.muted(ImGui, ctx, "Carrier keeps timing/phase/detail; shaper supplies broad formant contour.")
-      else
-        theme.muted(ImGui, ctx, "Carrier keeps timing/phase; shaper supplies the spectral envelope.")
-      end
-      if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
+      ImGui.EndChild(ctx)
+      local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+      if render_pressed then should_render = true end
+      if cancel_pressed then open = false end
       ImGui.End(ctx)
     end
 

@@ -192,6 +192,23 @@ local function row_layout()
   return x, y, control_x, control_w
 end
 
+local function text_width(text)
+  text = tostring(text or "")
+  if ImGui.CalcTextSize then
+    local ok, width = pcall(ImGui.CalcTextSize, ctx, text)
+    if ok and type(width) == "number" then return width end
+  end
+  return #text * 7
+end
+
+local function combo_width(labels, current, max_width)
+  local width = text_width(labels[current or 1] or "") + 38
+  for _, label in ipairs(labels or {}) do
+    width = math.max(width, text_width(label) + 38)
+  end
+  return math.max(80, math.min(max_width or width, width))
+end
+
 local function row_label(x, y, label)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 4, THEME.label, row_label_text(label))
 end
@@ -250,7 +267,7 @@ local function draw_combo(label, labels, param)
   local x, y, control_x, control_w = row_layout()
   row_label(x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, combo_width(labels, current, control_w))
   local changed, next_index = ImGui.Combo(ctx, "##" .. label, current, table.concat(labels, "\0") .. "\0")
   finish_row(x, y)
   if changed then set_param(param, next_index - 1) end
@@ -277,7 +294,7 @@ local function draw_channels()
   local x, y, control_x, control_w = row_layout()
   row_label(x, y, "Output channels")
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, combo_width(CH_NAMES, index, control_w))
   local changed, next_index = ImGui.Combo(ctx, "##Output channels", index, table.concat(CH_NAMES, "\0") .. "\0")
   finish_row(x, y)
   if changed then

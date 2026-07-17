@@ -1,7 +1,7 @@
 -- @description Channel Smear
 -- @author s3g
 -- @version 0.1
--- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
+-- @requires ReaImGui; Multichannel Texture Library.lua; REAPER multichannel stem render action
 -- @category Multichannel Texture / Montage
 -- @render Yes; bounds to source item length.
 -- @method Slices one source channel and duplicates each slice to neighboring output channels with gain compensation.

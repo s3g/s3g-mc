@@ -1,7 +1,7 @@
 -- @description Channel orbit delay
 -- @author s3g
 -- @version 0.1
--- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
+-- @requires ReaImGui; Multichannel Texture Library.lua; REAPER multichannel stem render action
 -- @category Multichannel Texture / Montage
 -- @render Yes; may extend beyond source item length.
 -- @method Prints whole-item delay repeats that orbit through output channels by a fixed channel step.

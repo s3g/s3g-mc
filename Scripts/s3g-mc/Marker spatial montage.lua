@@ -1,7 +1,7 @@
 -- @description Marker spatial montage
 -- @author s3g
 -- @version 0.2
--- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
+-- @requires ReaImGui; Multichannel Texture Library.lua; REAPER multichannel stem render action
 -- @category Multichannel Texture / Montage
 -- @render Yes; bounds to source item length.
 -- @method Uses project markers or active-take markers inside the selected item as source chunks, then distributes them across a multichannel output.

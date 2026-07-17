@@ -6,10 +6,10 @@
   --field: #080909;
   --line: #3d3d3d;
   --line-soft: #292929;
-  --text: #d8d8d8;
+  --text: #c9c9c9;
   --muted: #969696;
-  --accent: #5aa8c7;
-  --accent-2: #d8a24a;
+  --accent: #8d8d8d;
+  --accent-2: #a8a8a8;
 }
 
 * { box-sizing: border-box; }
@@ -101,24 +101,9 @@ h2 {
   border-bottom: 1px solid var(--line-soft);
   font-size: 11px;
   text-transform: uppercase;
-  justify-content: flex-start;
-  gap: 6px;
+  justify-content: space-between;
   cursor: pointer;
   user-select: none;
-}
-
-h2::before {
-  content: "-";
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  border: 1px solid var(--line-soft);
-  background: var(--field);
-  color: var(--muted);
-  font-weight: 400;
 }
 
 .space-header h2 {
@@ -135,8 +120,17 @@ h2::before {
   content: none;
 }
 
-.space-header h2::before {
-  content: none;
+h2::after {
+  content: "-";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line-soft);
+  background: var(--field);
+  color: var(--muted);
+  font-weight: 400;
 }
 
 .panel section.collapsed {
@@ -148,7 +142,7 @@ h2::before {
   border-bottom: 0;
 }
 
-.panel section.collapsed h2::before {
+.panel section.collapsed h2::after {
   content: "+";
 }
 
@@ -191,7 +185,7 @@ button {
 button:hover,
 button.active {
   border-color: var(--accent);
-  color: #ecffff;
+  color: #d8d8d2;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -238,8 +232,8 @@ button.active {
   .custom-select-button:hover,
   .custom-select.open .custom-select-button {
     border-color: var(--accent);
-    background: #242424;
-    color: #f0f0f0;
+    background: #232323;
+    color: #d8d8d2;
   }
 
   .custom-select-menu {
@@ -263,8 +257,8 @@ button.active {
 
   .custom-select-option:hover,
   .custom-select-option.active {
-    background: #193035;
-    color: #ecffff;
+    background: #282828;
+    color: #d8d8d2;
   }
 }
 
@@ -276,7 +270,7 @@ button.active {
 
 #exportJson {
   border-color: #555;
-  background: #171f21;
+  background: #202020;
 }
 
 #field {
@@ -366,7 +360,7 @@ input[type="range"] {
     border: 1px solid #4b4b4b;
     border-radius: 0;
     background:
-      linear-gradient(90deg, #8d8d8d 0 var(--fill, 50%), #242424 var(--fill, 50%) 100%);
+      linear-gradient(90deg, #8d8d8d 0 var(--fill, 50%), #232323 var(--fill, 50%) 100%);
     box-shadow: 0 0 0 1px #080808 inset;
   }
 
@@ -464,7 +458,7 @@ input[type="color"] {
 .section-button.active {
   border-color: var(--accent-2);
   color: var(--text);
-  background: #241e14;
+  background: #202020;
 }
 
 .lane-swatch {
@@ -558,6 +552,11 @@ input[type="color"] {
   font-size: 10px;
 }
 
+.panel h2::after {
+  width: 15px;
+  height: 15px;
+}
+
 .panel label {
   gap: 3px;
   margin: 5px 0;
@@ -616,5 +615,111 @@ input[type="color"] {
   .panel input[type="range"]::-moz-range-track,
   .panel input[type="range"]::-moz-range-thumb {
     height: 11px;
+  }
+}
+
+/* s3g-mc browser utility convergence layer */
+.topbar,
+.statusbar,
+.playbar,
+.space-header,
+.space-controls,
+.panel {
+  background: var(--panel);
+}
+
+.panel {
+  padding: 5px;
+  border-left-color: var(--line-soft);
+  font-size: 10px;
+}
+
+.panel section {
+  position: relative;
+  margin: 5px;
+  padding: 6px;
+  border: 0;
+  background: #141414;
+}
+
+.panel section::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: #c9c9c2;
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+.panel h2 {
+  min-height: 23px;
+  margin: -6px -6px 6px;
+  padding: 0 5px 0 6px;
+  border-bottom: 0;
+  background: #0f0f0f;
+  color: #bdbdb8;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.panel h2::after {
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  border-color: var(--line-soft);
+  background: var(--field);
+}
+
+.panel label {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+button,
+.custom-select-button {
+  background: #0b0b0b;
+}
+
+button {
+  text-transform: uppercase;
+}
+
+button:hover,
+button.active,
+.custom-select-button:hover,
+.custom-select.open .custom-select-button,
+.lane-button.active,
+.section-button.active {
+  border-color: #555;
+  background: #111;
+  color: #d8d8d2;
+}
+
+.panel button,
+.panel select,
+.panel input[type="text"],
+.panel input[type="number"],
+.panel input[type="color"],
+.panel .custom-select-button,
+.panel .custom-select-option {
+  min-height: 18px;
+  padding-left: 5px;
+  padding-right: 5px;
+  font-size: 10px;
+}
+
+.panel .custom-select-button {
+  padding-right: 18px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  input[type="range"],
+  input[type="range"]:hover,
+  input[type="range"]:focus-visible {
+    border-color: #4b4b4b;
+    background:
+      linear-gradient(90deg, #8d8d8d 0 var(--fill, 50%), #232323 var(--fill, 50%) 100%);
   }
 }

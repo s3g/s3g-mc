@@ -85,6 +85,30 @@ report_files_without() {
   rm -f "$tmp"
 }
 
+report_missing_reimgui_requires() {
+  local tmp
+  tmp="$(mktemp)"
+  while IFS= read -r file; do
+    local head
+    head="$(sed -n '1,12p' "$file")"
+    case "$head" in
+      *"@browser hidden"*) continue ;;
+    esac
+    if rg -q 'ImGui_GetVersion|require\("imgui"\)|require\('\''imgui'\''\)|CreateContext|s3g-mc ImGui Input Dialog\.lua' "$file" \
+      && ! printf '%s\n' "$head" | rg -q '@requires.*ReaImGui'; then
+      printf '%s\n' "$file" >> "$tmp"
+    fi
+  done < <(rg --files "$SCRIPTS" --glob '*.lua' --glob '!*s3g-mc Package Browser.lua')
+  local count
+  count=$(wc -l < "$tmp" | tr -d ' ')
+  if [[ "$count" != "0" ]]; then
+    warn "Package Browser-visible scripts using ReaImGui without @requires ReaImGui ($count files)"
+    head -n "$SAMPLE_LINES" "$tmp"
+    if (( count > SAMPLE_LINES )); then printf '... %d more\n' "$((count - SAMPLE_LINES))"; fi
+  fi
+  rm -f "$tmp"
+}
+
 if [[ ! -d "$SCRIPTS" ]]; then
   warn "missing Scripts/s3g-mc directory: $SCRIPTS"
   exit 0
@@ -93,6 +117,8 @@ fi
 printf 's3g-mc ReImGui consistency audit\n'
 printf 'root: %s\n\n' "$ROOT"
 printf 'exempt: s3g-mc Package Browser keeps its package-index browser visual language\n\n'
+
+report_missing_reimgui_requires
 
 report_files_without "WARN" \
   "ReImGui scripts using widgets but not loading the shared theme module" \
@@ -105,8 +131,13 @@ report_files_without "INFO" \
   "s3g-mc ImGui Theme"
 
 report_rg "WARN" \
-  "local neutral color palettes remain; prefer theme.palette(ImGui) for base UI colors" \
-  "local COLORS|COLORS =|COLOR_[A-Z_]+ =" \
+  "local neutral UI palette names remain; prefer theme.palette(ImGui) for base UI colors" \
+  "COLOR_(BG|PANEL|PANEL_SOFT|TEXT|MUTED|LABEL|VALUE|EDGE|FRAME|BUTTON|BUTTON_HOVER|BUTTON_ACTIVE|TITLE|SLIDER|TRACK|THUMB)[A-Z_]*\\s*=|COLORS\\.(bg|panel|panel_soft|text|muted|label|value|edge|frame|button|button_hover|button_active|title|slider|track|thumb)\\s*=" \
+  "s3g-mc ImGui Theme.lua"
+
+report_rg "INFO" \
+  "local semantic drawing palettes remain; okay for canvas/meter/path data when not used as base UI colors" \
+  "COLOR_(METER|PATH|LANE|SOURCE|SPEAKER|FLOW|GRID|AXIS|WARN|OK|ERROR|DRY|WET|WIDTH|SHARP|FOCUS|ACTIVE)|COLORS\\.(meter|path|lane|source|speaker|flow|grid|axis|warn|ok|error|dry|wet|width|sharp|focus|active)|local (CANVAS|FLOW|METER|PATH|LANE|TRACK|SOURCE|SPEAKER|COLORS)\\s*=" \
   "s3g-mc ImGui Theme.lua"
 
 report_rg "INFO" \

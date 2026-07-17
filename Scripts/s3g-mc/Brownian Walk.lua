@@ -1,7 +1,7 @@
 -- @description Brownian Walk
 -- @author s3g
 -- @version 0.2
--- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
+-- @requires ReaImGui; Multichannel Texture Library.lua; REAPER multichannel stem render action
 -- @category Multichannel Texture / Montage
 -- @render Yes; bounds to source item length.
 -- @method Generates short fragments from one source channel using a bounded random walk through source time and output channels.

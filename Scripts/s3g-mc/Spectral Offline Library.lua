@@ -55,7 +55,7 @@ local LABEL_ABBR = {
   ["OUTPUT CHANNELS"] = "OUT CH",
   ["OUTPUT LENGTH"] = "LENGTH",
   ["PARTIAL COUNT"] = "PARTIAL",
-  ["PEAK NORMALIZE"] = "PEAK",
+  ["PEAK NORMALIZE"] = "PK NORM",
   ["PRE-NORMALIZE GAIN DB"] = "GAIN",
   ["PROFILE FREQUENCY"] = "FREQ",
   ["PROFILE VARIATION"] = "VAR",
@@ -145,6 +145,30 @@ end
 
 local function draw_label(ImGui, ctx, x, y, label)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, palette(ImGui).label, row_label(label))
+end
+
+local function text_width(ImGui, ctx, text)
+  text = tostring(text or "")
+  if ImGui.CalcTextSize then
+    local ok, width = pcall(ImGui.CalcTextSize, ctx, text)
+    if ok and type(width) == "number" then return width end
+  end
+  return #text * 7
+end
+
+local function combo_width(ImGui, ctx, names, value, max_width)
+  local width = text_width(ImGui, ctx, names[value or 1] or "") + 38
+  for _, name in ipairs(names or {}) do
+    width = math.max(width, text_width(ImGui, ctx, name) + 38)
+  end
+  return math.max(80, math.min(max_width or width, width))
+end
+
+local function input_int_width(ImGui, ctx, label, max_width)
+  if tostring(label or ""):lower():find("seed", 1, true) then
+    return math.min(max_width or 112, math.max(92, text_width(ImGui, ctx, "0000000000") + 28))
+  end
+  return max_width
 end
 
 function M.shell_quote(path)
@@ -269,7 +293,7 @@ function M.draw_combo(ImGui, ctx, label, value, names, first_index, last_index)
   local x, y, avail, control_x, control_w = row_layout(ImGui, ctx)
   draw_label(ImGui, ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, combo_width(ImGui, ctx, names, value, control_w))
   local changed = false
   if ImGui.BeginCombo(ctx, "##" .. tostring(label or ""), names[value] or "") then
     for index = first_index, last_index do
@@ -362,7 +386,7 @@ function M.draw_input_int(ImGui, ctx, label, value, step, step_fast)
   local x, y, avail, control_x, control_w = row_layout(ImGui, ctx)
   draw_label(ImGui, ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, input_int_width(ImGui, ctx, label, control_w))
   local changed, next_value = ImGui.InputInt(ctx, "##" .. tostring(label or ""), math.floor(value), step or 1, step_fast or 10)
   finish_row(ImGui, ctx, x, y, avail)
   return changed, next_value
@@ -381,7 +405,7 @@ function M.begin_section(ImGui, ctx, label, height)
   if theme and theme.text then
     theme.text(ImGui, ctx, clean_label(label))
   else
-    ImGui.TextColored(ctx, p.label, clean_label(label))
+    ImGui.Text(ctx, clean_label(label))
   end
   ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
   return x, y, height, stack

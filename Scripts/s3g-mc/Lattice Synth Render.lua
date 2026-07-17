@@ -542,7 +542,7 @@ local function loop()
     _, gate = theme.slider_double(ImGui, ctx, "Note gate depth", gate, 0, 1, "%.3f")
     _, focus_width = theme.slider_double(ImGui, ctx, "Focus width", focus_width, 0.02, 1, "%.3f")
     ImGui.Separator(ctx)
-    _, normalize = ImGui.Checkbox(ctx, "PEAK NORMALIZE", normalize)
+    _, normalize = ImGui.Checkbox(ctx, "PK NORM", normalize)
     if normalize then _, normalize_db = theme.slider_double(ImGui, ctx, "Normalize peak dB", normalize_db, -36, -3, "%.1f") end
     _, insert_gain = theme.slider_double(ImGui, ctx, "Inserted item gain", insert_gain, 0.05, 1, "%.2f")
     _, seed = theme.input_int_row(ImGui, ctx, "Seed", seed, 1, 10)

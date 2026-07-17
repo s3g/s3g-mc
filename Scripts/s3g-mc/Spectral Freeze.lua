@@ -48,13 +48,14 @@ local normalize_db = -6.0
 local should_render = false
 
 local function loop()
-    ImGui.SetNextWindowSize(ctx, 520, 520, ImGui.Cond_Appearing)
+  local section_h = 248 + (normalize and 50 or 25)
+  ImGui.SetNextWindowSize(ctx, 520, section_h + 150, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Spectral Freeze", open)
   if visible then
     theme.muted(ImGui, ctx, "Source: " .. entry.name .. " (" .. tostring(entry.channels) .. " ch)")
     local changed
-    local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Freeze", 248)
+    local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Freeze", section_h)
     changed, fft_index = sol.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
     changed, pos = sol.draw_slider(ImGui, ctx, "Freeze position", pos, 0, 1, "%.3f", false)
     changed, amount = sol.draw_slider(ImGui, ctx, "Freeze amount", amount, 0, 1, "%.3f", false)
@@ -63,15 +64,13 @@ local function loop()
     changed, expand = sol.draw_slider(ImGui, ctx, "Expansion", expand, 1.0, 8.0, "%.2fx", false)
     changed, floor = sol.draw_slider(ImGui, ctx, "Envelope floor", floor, 0.001, 0.5, "%.3f", false)
     changed, safe = sol.draw_checkbox(ImGui, ctx, "Safe envelope mode", safe)
-    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
-    sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Output", normalize and 98 or 73)
     changed, normalize = sol.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
     if normalize then changed, normalize_db = sol.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false) end
     sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
     theme.muted(ImGui, ctx, "Freezes one spectral magnitude frame across the selected item.")
-    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+    if render_pressed then should_render = true end
+    if cancel_pressed then open = false end
     ImGui.End(ctx)
   end
   if should_render then

@@ -6,7 +6,7 @@
   --field: #080909;
   --line: #3d3d3d;
   --line-soft: #292929;
-  --text: #d8d8d8;
+  --text: #c9c9c9;
   --muted: #969696;
   --accent: #8d8d8d;
   --accent-2: #a8a8a8;
@@ -185,7 +185,7 @@ button {
 button:hover,
 button.active {
   border-color: var(--accent);
-  color: #f0f0f0;
+  color: #d8d8d2;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -233,7 +233,7 @@ button.active {
   .custom-select.open .custom-select-button {
     border-color: var(--accent);
     background: #232323;
-    color: #f0f0f0;
+    color: #d8d8d2;
   }
 
   .custom-select-menu {
@@ -258,7 +258,7 @@ button.active {
   .custom-select-option:hover,
   .custom-select-option.active {
     background: #282828;
-    color: #f0f0f0;
+    color: #d8d8d2;
   }
 }
 
@@ -615,5 +615,111 @@ input[type="color"] {
   .panel input[type="range"]::-moz-range-track,
   .panel input[type="range"]::-moz-range-thumb {
     height: 11px;
+  }
+}
+
+/* s3g-mc browser utility convergence layer */
+.topbar,
+.statusbar,
+.playbar,
+.space-header,
+.space-controls,
+.panel {
+  background: var(--panel);
+}
+
+.panel {
+  padding: 5px;
+  border-left-color: var(--line-soft);
+  font-size: 10px;
+}
+
+.panel section {
+  position: relative;
+  margin: 5px;
+  padding: 6px;
+  border: 0;
+  background: #141414;
+}
+
+.panel section::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: #c9c9c2;
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+.panel h2 {
+  min-height: 23px;
+  margin: -6px -6px 6px;
+  padding: 0 5px 0 6px;
+  border-bottom: 0;
+  background: #0f0f0f;
+  color: #bdbdb8;
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.panel h2::after {
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  border-color: var(--line-soft);
+  background: var(--field);
+}
+
+.panel label {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+button,
+.custom-select-button {
+  background: #0b0b0b;
+}
+
+button {
+  text-transform: uppercase;
+}
+
+button:hover,
+button.active,
+.custom-select-button:hover,
+.custom-select.open .custom-select-button,
+.lane-button.active,
+.section-button.active {
+  border-color: #555;
+  background: #111;
+  color: #d8d8d2;
+}
+
+.panel button,
+.panel select,
+.panel input[type="text"],
+.panel input[type="number"],
+.panel input[type="color"],
+.panel .custom-select-button,
+.panel .custom-select-option {
+  min-height: 18px;
+  padding-left: 5px;
+  padding-right: 5px;
+  font-size: 10px;
+}
+
+.panel .custom-select-button {
+  padding-right: 18px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  input[type="range"],
+  input[type="range"]:hover,
+  input[type="range"]:focus-visible {
+    border-color: #4b4b4b;
+    background:
+      linear-gradient(90deg, #8d8d8d 0 var(--fill, 50%), #232323 var(--fill, 50%) 100%);
   }
 }

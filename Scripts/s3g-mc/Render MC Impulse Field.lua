@@ -74,6 +74,16 @@ end
 
 local function combo(ctx, label, names, value)
   local changed = false
+  local function text_width(text)
+    if ImGui.CalcTextSize then
+      local ok, w = pcall(ImGui.CalcTextSize, ctx, tostring(text or ""))
+      if ok and type(w) == "number" then return w end
+    end
+    return #tostring(text or "") * 7
+  end
+  local width = text_width(names[value] or names[1] or "") + 38
+  for _, name in ipairs(names or {}) do width = math.max(width, text_width(name) + 38) end
+  ImGui.SetNextItemWidth(ctx, math.max(80, width))
   if ImGui.BeginCombo(ctx, label, names[value] or names[1] or "") then
     for index, name in ipairs(names) do
       local selected = value == index
@@ -392,40 +402,48 @@ end
 load_last_settings()
 
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 560, 620, ImGui.Cond_Appearing)
+  local body_target_h = 594
+  ImGui.SetNextWindowSize(ctx, 560, body_target_h + 124, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Render MC Impulse Field", open)
   if visible then
     local changed
-    local sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Timing", 123)
-    changed, position = sol_ui.draw_input_double(ImGui, ctx, "Start time", position, 0.1, 1.0, "%.3f")
-    changed, duration = sol_ui.draw_input_double(ImGui, ctx, "Duration (sec)", duration, 0.5, 2.0, "%.3f")
-    duration = math.max(0.05, duration)
-    theme.muted(ImGui, ctx, string.format("End %.3f sec", math.max(0, position) + duration))
-    sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+    local footer_h = 48
+    local controls_h = math.min(body_target_h, math.max(1, (avail_h or body_target_h + footer_h) - footer_h))
+    local controls_visible = ImGui.BeginChild(ctx, "##impulse_field_controls", 0, controls_h, 0)
+    if controls_visible then
+      local sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Timing", 123)
+      changed, position = sol_ui.draw_input_double(ImGui, ctx, "Start time", position, 0.1, 1.0, "%.3f")
+      changed, duration = sol_ui.draw_input_double(ImGui, ctx, "Duration (sec)", duration, 0.5, 2.0, "%.3f")
+      duration = math.max(0.05, duration)
+      theme.muted(ImGui, ctx, string.format("End %.3f sec", math.max(0, position) + duration))
+      sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-    sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Distribution", 198)
-    changed, channels = sol_ui.draw_slider_int(ImGui, ctx, "Channels", channels, 1, 128)
-    changed, count = sol_ui.draw_slider_int(ImGui, ctx, "Impulses", count, 1, 512)
-    changed, safe_ms = sol_ui.draw_slider(ImGui, ctx, "Safe distance", safe_ms, 0, 1000, "%.1f ms", false)
-    changed, global_safe = sol_ui.draw_checkbox(ImGui, ctx, "Global spacing", global_safe)
-    changed, rule = sol_ui.draw_combo(ImGui, ctx, "Distribution", rule, RULE_NAMES, 1, #RULE_NAMES)
-    changed, jitter = sol_ui.draw_slider(ImGui, ctx, "Timing variation", jitter, 0, 1, "%.2f", false)
-    sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Distribution", 198)
+      changed, channels = sol_ui.draw_slider_int(ImGui, ctx, "Channels", channels, 1, 128)
+      changed, count = sol_ui.draw_slider_int(ImGui, ctx, "Impulses", count, 1, 512)
+      changed, safe_ms = sol_ui.draw_slider(ImGui, ctx, "Safe distance", safe_ms, 0, 1000, "%.1f ms", false)
+      changed, global_safe = sol_ui.draw_checkbox(ImGui, ctx, "Global spacing", global_safe)
+      changed, rule = sol_ui.draw_combo(ImGui, ctx, "Distribution", rule, RULE_NAMES, 1, #RULE_NAMES)
+      changed, jitter = sol_ui.draw_slider(ImGui, ctx, "Timing variation", jitter, 0, 1, "%.2f", false)
+      sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
 
-    sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Profile", 223)
-    changed, profile = sol_ui.draw_combo(ImGui, ctx, "Impulse profile", profile, PROFILE_NAMES, 1, #PROFILE_NAMES)
-    changed, width_ms = sol_ui.draw_slider(ImGui, ctx, "Profile width", width_ms, 0.02, 100, "%.2f ms", false)
-    changed, freq = sol_ui.draw_slider(ImGui, ctx, "Profile frequency", freq, 20, 12000, "%.1f Hz", false)
-    changed, gain = sol_ui.draw_slider(ImGui, ctx, "Impulse gain", gain, 0, 1, "%.2f", false)
-    changed, variation = sol_ui.draw_slider(ImGui, ctx, "Profile variation", variation, 0, 1, "%.2f", false)
-    changed, normalize_db = sol_ui.draw_slider(ImGui, ctx, "Peak normalize", normalize_db, -36, 0, "%.1f dB", false)
-    changed, seed = sol_ui.draw_slider_int(ImGui, ctx, "Seed", seed, 1, 9999)
-    sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
+      sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Profile", 223)
+      changed, profile = sol_ui.draw_combo(ImGui, ctx, "Impulse profile", profile, PROFILE_NAMES, 1, #PROFILE_NAMES)
+      changed, width_ms = sol_ui.draw_slider(ImGui, ctx, "Profile width", width_ms, 0.02, 100, "%.2f ms", false)
+      changed, freq = sol_ui.draw_slider(ImGui, ctx, "Profile frequency", freq, 20, 12000, "%.1f Hz", false)
+      changed, gain = sol_ui.draw_slider(ImGui, ctx, "Impulse gain", gain, 0, 1, "%.2f", false)
+      changed, variation = sol_ui.draw_slider(ImGui, ctx, "Profile variation", variation, 0, 1, "%.2f", false)
+      changed, normalize_db = sol_ui.draw_slider(ImGui, ctx, "Peak normalize", normalize_db, -36, 0, "%.1f dB", false)
+      changed, seed = sol_ui.draw_slider_int(ImGui, ctx, "Seed", seed, 1, 9999)
+      sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
+    end
+    ImGui.EndChild(ctx)
 
-    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+    if render_pressed then should_render = true end
+    if cancel_pressed then open = false end
     ImGui.End(ctx)
   end
 

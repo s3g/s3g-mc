@@ -169,6 +169,16 @@ end
 
 local function draw_combo(ctx, label, value, names, first_index, last_index)
   local changed = false
+  local function text_width(text)
+    if ImGui.CalcTextSize then
+      local ok, w = pcall(ImGui.CalcTextSize, ctx, tostring(text or ""))
+      if ok and type(w) == "number" then return w end
+    end
+    return #tostring(text or "") * 7
+  end
+  local width = text_width(names[value] or "") + 38
+  for index = first_index, last_index do width = math.max(width, text_width(names[index]) + 38) end
+  ImGui.SetNextItemWidth(ctx, math.max(80, width))
   if ImGui.BeginCombo(ctx, label, names[value] or "") then
     for index = first_index, last_index do
       local selected = value == index
@@ -659,38 +669,47 @@ local function main()
   local should_render = false
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 560, 520, ImGui.Cond_Appearing)
+    local section_h = normalize and 173 or 148
+    local body_target_h = section_h + 210
+    ImGui.SetNextWindowSize(ctx, 560, body_target_h + 124, ImGui.Cond_Appearing)
     local visible
     visible, open = ImGui.Begin(ctx, "Convolve selected items", open)
     if visible then
       local source = swap and entries[2] or entries[1]
       local impulse = swap and entries[1] or entries[2]
       local plan, output_channels = channel_plan(source.channels, impulse.channels, mode)
-      theme.muted(ImGui, ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
-      theme.muted(ImGui, ctx, "Impulse: " .. impulse.name .. "  (" .. tostring(impulse.channels) .. " ch)")
-      if ImGui.Button(ctx, "SWAP", 92, 26) then swap = not swap end
-      local changed
-      local sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Convolution", normalize and 173 or 148)
-      changed, mode = sol_ui.draw_combo(ImGui, ctx, "Channel mode", mode, MODE_NAMES, MODE_MATCHED_WRAP, MODE_MATRIX)
-      changed, tail_mode = sol_ui.draw_combo(ImGui, ctx, "Output length", tail_mode, TAIL_NAMES, TAIL_FULL, TAIL_TRIM)
-      changed, wet_gain_db = sol_ui.draw_slider(ImGui, ctx, "Pre-normalize gain dB", wet_gain_db, -36, 12, "%.1f", false)
-      changed, normalize = sol_ui.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
-      if normalize then
-        changed, normalize_db = sol_ui.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false)
+      local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+      local footer_h = 48
+      local body_h = math.min(body_target_h, math.max(1, (avail_h or body_target_h + footer_h) - footer_h))
+      local body_visible = ImGui.BeginChild(ctx, "##convolve_controls", 0, body_h, 0)
+      if body_visible then
+        theme.muted(ImGui, ctx, "Source: " .. source.name .. "  (" .. tostring(source.channels) .. " ch)")
+        theme.muted(ImGui, ctx, "Impulse: " .. impulse.name .. "  (" .. tostring(impulse.channels) .. " ch)")
+        if ImGui.Button(ctx, "SWAP", 92, 26) then swap = not swap end
+        local changed
+        local sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Convolution", section_h)
+        changed, mode = sol_ui.draw_combo(ImGui, ctx, "Channel mode", mode, MODE_NAMES, MODE_MATCHED_WRAP, MODE_MATRIX)
+        changed, tail_mode = sol_ui.draw_combo(ImGui, ctx, "Output length", tail_mode, TAIL_NAMES, TAIL_FULL, TAIL_TRIM)
+        changed, wet_gain_db = sol_ui.draw_slider(ImGui, ctx, "Pre-normalize gain dB", wet_gain_db, -36, 12, "%.1f", false)
+        changed, normalize = sol_ui.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
+        if normalize then
+          changed, normalize_db = sol_ui.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false)
+        end
+        sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
+        sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Summary", 110)
+        sol_ui.draw_value(ImGui, ctx, "Paths", tostring(#plan))
+        sol_ui.draw_value(ImGui, ctx, "Out ch", tostring(output_channels))
+        if output_channels > mc.MAX_REAPER_TRACK_CHANNELS then
+          sol_ui.draw_value(ImGui, ctx, "Status", "Too many output channels for REAPER.", "warn")
+        end
+        sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
       end
-      sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
-      sx, sy, sh, stack = sol_ui.begin_section(ImGui, ctx, "Summary", 110)
-      sol_ui.draw_value(ImGui, ctx, "Paths", tostring(#plan))
-      sol_ui.draw_value(ImGui, ctx, "Out ch", tostring(output_channels))
-      if output_channels > mc.MAX_REAPER_TRACK_CHANNELS then
-        sol_ui.draw_value(ImGui, ctx, "Status", "Too many output channels for REAPER.", "warn")
-      end
-      sol_ui.finish_section(ImGui, ctx, sx, sy, sh, stack)
-      if ImGui.Button(ctx, "RENDER", 92, 26) and output_channels <= mc.MAX_REAPER_TRACK_CHANNELS then
+      ImGui.EndChild(ctx)
+      local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+      if render_pressed and output_channels <= mc.MAX_REAPER_TRACK_CHANNELS then
         should_render = true
       end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
+      if cancel_pressed then open = false end
       ImGui.End(ctx)
     end
 

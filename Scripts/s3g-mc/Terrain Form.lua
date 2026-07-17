@@ -94,7 +94,16 @@ local STYLE = {
 
 local function combo(label, labels, value, width)
   if theme and theme.combo_row then return theme.combo_row(ImGui, ctx, label, labels, value, width) end
-  ImGui.SetNextItemWidth(ctx, width or 160)
+  local function text_width(text)
+    if ImGui.CalcTextSize then
+      local ok, w = pcall(ImGui.CalcTextSize, ctx, tostring(text or ""))
+      if ok and type(w) == "number" then return w end
+    end
+    return #tostring(text or "") * 7
+  end
+  local combo_w = text_width(labels[value or 1] or "") + 38
+  for _, item in ipairs(labels or {}) do combo_w = math.max(combo_w, text_width(item) + 38) end
+  ImGui.SetNextItemWidth(ctx, math.max(80, math.min(width or 160, combo_w)))
   local changed, next_value = ImGui.Combo(ctx, "##combo_" .. tostring(label or ""), value - 1, table.concat(labels, "\0") .. "\0")
   return changed, next_value + 1
 end

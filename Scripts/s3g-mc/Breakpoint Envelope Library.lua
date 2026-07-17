@@ -337,7 +337,7 @@ local function begin_section(ImGui, ctx, label, height)
   if theme and theme.text then
     theme.text(ImGui, ctx, clean_label(label))
   else
-    ImGui.TextColored(ctx, p.label, clean_label(label))
+    ImGui.Text(ctx, clean_label(label))
   end
   ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
   return x, y, height, stack
@@ -659,7 +659,13 @@ function M.draw(ImGui, ctx, defs, points, enabled, selected, selected_point, cur
   if selected_point and p[selected_point] then
     ImGui.SameLine(ctx)
     local point = p[selected_point]
-    ImGui.TextColored(ctx, palette(ImGui).muted, string.format("T %.2f / " .. (def.fmt or "%.3f"), point.x, M.value(def, point.y)))
+    local theme = theme_module()
+    local text = string.format("T %.2f / " .. (def.fmt or "%.3f"), point.x, M.value(def, point.y))
+    if theme and theme.muted then
+      theme.muted(ImGui, ctx, text)
+    else
+      ImGui.Text(ctx, text)
+    end
   end
   finish_section(ImGui, ctx, sx, sy, sh, stack)
 

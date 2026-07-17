@@ -1,7 +1,7 @@
 -- @description Rotate item channels
 -- @author s3g
 -- @version 0.1
--- @requires Multichannel Library.lua; REAPER multichannel stem render action
+-- @requires ReaImGui; Multichannel Library.lua; REAPER multichannel stem render action
 -- @category Item Channel Transforms
 -- @render Yes; bounds to source item length.
 -- @method Rotates source-channel order by a user-entered offset.

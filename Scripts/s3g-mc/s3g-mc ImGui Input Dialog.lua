@@ -102,7 +102,7 @@ function M.prompt_csv(title, labels_csv, defaults_csv, on_submit, opts)
         local input_w = opts.input_width or math.max(160, window_width - label_w - 54)
         for index, label in ipairs(labels) do
           ImGui.AlignTextToFramePadding(ctx)
-          ImGui.TextColored(ctx, 0x9a9a9aff, tostring(label):upper())
+          ImGui.Text(ctx, tostring(label):upper())
           ImGui.SameLine(ctx, label_w)
           ImGui.PushItemWidth(ctx, input_w)
           local changed, value = ImGui.InputText(ctx, "##field" .. tostring(index), values[index] or "")

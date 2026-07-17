@@ -70,7 +70,7 @@ local LABEL_ABBR = {
   ["ADD EARLY REFLECTIONS"] = "EARLY",
   ["REFLECTION COUNT"] = "COUNT",
   ["REFLECTION WINDOW MS"] = "WINDOW",
-  ["PEAK NORMALIZE"] = "PEAK",
+  ["PEAK NORMALIZE"] = "PK NORM",
   ["NORMALIZE DB"] = "NORM DB",
 }
 
@@ -137,7 +137,7 @@ local function draw_int_input(ctx, label, value)
   local x, y, control_x, control_w = row_layout(ctx)
   row_label(ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, math.min(control_w, 104))
   local changed, next_value = ImGui.InputInt(ctx, "##" .. label, math.floor(value))
   finish_row(ctx, x, y)
   return changed, next_value
@@ -238,7 +238,8 @@ local function main()
   local should_render = false
 
   local function loop()
-    ImGui.SetNextWindowSize(ctx, 500, 560, ImGui.Cond_Appearing)
+    local section_h = 44 + (settings.trim and 148 or 96) + (settings.early_reflections and 174 or 122) + (settings.normalize and 124 or 98)
+    ImGui.SetNextWindowSize(ctx, 500, section_h + 128, ImGui.Cond_Appearing)
     local visible
     visible, open = ImGui.Begin(ctx, "IR Toolkit", open)
     if visible then
@@ -262,16 +263,16 @@ local function main()
         changed, settings.reflection_ms = draw_custom_slider(ctx, "Reflection window ms", settings.reflection_ms, 5.0, 500.0, "%.1f", false)
       end
       finish_section(ctx, sx, sy, sh, stack)
-      sx, sy, sh, stack = section(ctx, "Output", settings.normalize and 124 or 98)
+      sx, sy, sh, stack = section(ctx, "Render", settings.normalize and 124 or 98)
       changed, settings.normalize = draw_checkbox(ctx, "Peak normalize", settings.normalize)
       if settings.normalize then
         changed, settings.normalize_db = draw_custom_slider(ctx, "Normalize dB", settings.normalize_db, -24.0, 0.0, "%.1f", false)
       end
       changed, settings.seed = draw_int_input(ctx, "Seed", settings.seed)
       finish_section(ctx, sx, sy, sh, stack)
-      if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
+      local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+      if render_pressed then should_render = true end
+      if cancel_pressed then open = false end
       ImGui.End(ctx)
     end
     if should_render then

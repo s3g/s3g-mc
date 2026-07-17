@@ -1,13 +1,16 @@
 :root {
-  --bg: #050606;
-  --panel: #101313;
-  --panel2: #171b1b;
-  --line: #323939;
-  --muted: #899393;
-  --text: #d8dddd;
-  --cyan: #5eb9cf;
-  --amber: #d9a84d;
-  --orange: #df7348;
+  color-scheme: dark;
+  --bg: #101010;
+  --panel: #171717;
+  --panel2: #202020;
+  --field: #0f0f0f;
+  --line: #3f3f3f;
+  --line-soft: #292929;
+  --muted: #9a9a9a;
+  --text: #c9c9c9;
+  --cyan: #8d8d8d;
+  --amber: #a8a8a8;
+  --orange: #a8a8a8;
 }
 
 * { box-sizing: border-box; }
@@ -92,8 +95,7 @@ h2 {
   padding: 0 6px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
+  justify-content: space-between;
   border-bottom: 1px solid #252c2c;
   background: var(--panel2);
   color: var(--cyan);
@@ -103,14 +105,14 @@ h2 {
   user-select: none;
 }
 
-h2::before {
+h2::after {
   content: "-";
+  width: 15px;
+  height: 15px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
-  width: 15px;
-  height: 15px;
+  margin-left: 6px;
   border: 1px solid #252c2c;
   background: #090c0c;
   color: var(--muted);
@@ -126,7 +128,7 @@ h2::before {
   border-bottom: 0;
 }
 
-.panel section.collapsed h2::before {
+.panel section.collapsed h2::after {
   content: "+";
 }
 
@@ -160,7 +162,7 @@ button {
 
 button:hover {
   border-color: var(--cyan);
-  color: #ffffff;
+  color: #d8d8d2;
 }
 
 button:disabled {
@@ -177,8 +179,8 @@ button:disabled:hover {
 
 button.active {
   border-color: var(--cyan);
-  background: #193038;
-  color: #ecffff;
+  background: #282828;
+  color: #d8d8d2;
 }
 
 #field {
@@ -355,8 +357,8 @@ input[type="range"] {
   .custom-select-button:hover,
   .custom-select.open .custom-select-button {
     border-color: var(--cyan);
-    background: #172326;
-    color: #ecffff;
+    background: #202020;
+    color: #d8d8d2;
   }
 
   .custom-select-menu {
@@ -380,8 +382,8 @@ input[type="range"] {
 
   .custom-select-option:hover,
   .custom-select-option.active {
-    background: #193038;
-    color: #ecffff;
+    background: #282828;
+    color: #d8d8d2;
   }
 }
 
@@ -394,7 +396,7 @@ input[type="range"] {
 
 .value-readout {
   float: right;
-  color: var(--amber);
+  color: var(--text);
 }
 
 @media (max-width: 860px) {
@@ -406,5 +408,111 @@ input[type="range"] {
   }
   .panel {
     max-height: none;
+  }
+}
+
+/* s3g-mc browser utility convergence layer */
+.topbar,
+.stage,
+.statusbar,
+.panel {
+  background: var(--panel);
+}
+
+.panel {
+  padding: 5px;
+  border-left-color: var(--line-soft);
+  font-size: 10px;
+}
+
+.panel section {
+  position: relative;
+  margin-bottom: 5px;
+  padding: 6px;
+  border: 0;
+  background: #141414;
+}
+
+.panel section::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: #c9c9c2;
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+.panel h2 {
+  min-height: 23px;
+  margin: -6px -6px 6px;
+  padding: 0 5px 0 6px;
+  border-bottom: 0;
+  background: #0f0f0f;
+  color: #bdbdb8;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.panel h2::after {
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+  border-color: var(--line-soft);
+  background: var(--field);
+}
+
+.panel label {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+button,
+.custom-select-button {
+  background: #0b0b0b;
+}
+
+button {
+  text-transform: uppercase;
+}
+
+button:hover,
+button.active,
+.custom-select-button:hover,
+.custom-select.open .custom-select-button {
+  border-color: #555;
+  background: #111;
+  color: #d8d8d2;
+}
+
+.panel button,
+.panel select,
+.panel input[type="text"],
+.panel input[type="number"],
+.panel .custom-select-button,
+.panel .custom-select-option {
+  min-height: 18px;
+  padding-left: 5px;
+  padding-right: 5px;
+  font-size: 10px;
+}
+
+.panel .custom-select-button {
+  padding-right: 18px;
+}
+
+.panel input[type="range"] {
+  height: 13px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  input[type="range"],
+  input[type="range"]:hover,
+  input[type="range"]:focus-visible {
+    border-color: #4b4b4b;
+    background:
+      linear-gradient(90deg, #8d8d8d 0 var(--fill, 50%), #232323 var(--fill, 50%) 100%);
   }
 }

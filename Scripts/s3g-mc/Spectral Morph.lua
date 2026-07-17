@@ -50,36 +50,43 @@ local swap = false
 local should_render = false
 
 local function loop()
-    ImGui.SetNextWindowSize(ctx, 560, 520, ImGui.Cond_Appearing)
+  local section_h = (mode_index == 2 and 248 or 198) + (normalize and 50 or 25)
+  local body_target_h = section_h + 110
+  ImGui.SetNextWindowSize(ctx, 560, body_target_h + 124, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Spectral Morph", open)
   if visible then
     local carrier = swap and entries[2] or entries[1]
     local modulator = swap and entries[1] or entries[2]
-    theme.muted(ImGui, ctx, "Carrier: " .. carrier.name .. " (" .. tostring(carrier.channels) .. " ch)")
-    theme.muted(ImGui, ctx, "Modulator: " .. modulator.name .. " (" .. tostring(modulator.channels) .. " ch)")
-    if ImGui.Button(ctx, "SWAP", 92, 26) then swap = not swap end
-    local changed
-    local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Morph", mode_index == 2 and 248 or 198)
-    changed, mode_index = sol.draw_combo(ImGui, ctx, "Morph mode", mode_index, MODE_NAMES, 1, 2)
-    changed, fft_index = sol.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
-    changed, morph = sol.draw_slider(ImGui, ctx, "Morph position", morph, 0, 1, "%.3f", false)
-    if mode_index == 2 then
-      changed, carrier_pos = sol.draw_slider(ImGui, ctx, "Carrier freeze position", carrier_pos, 0, 1, "%.3f", false)
-      changed, modulator_pos = sol.draw_slider(ImGui, ctx, "Modulator freeze position", modulator_pos, 0, 1, "%.3f", false)
+    local _, avail_h = ImGui.GetContentRegionAvail(ctx)
+    local footer_h = 48
+    local body_h = math.min(body_target_h, math.max(1, (avail_h or body_target_h + footer_h) - footer_h))
+    local body_visible = ImGui.BeginChild(ctx, "##spectral_morph_controls", 0, body_h, 0)
+    if body_visible then
+      theme.muted(ImGui, ctx, "Carrier: " .. carrier.name .. " (" .. tostring(carrier.channels) .. " ch)")
+      theme.muted(ImGui, ctx, "Modulator: " .. modulator.name .. " (" .. tostring(modulator.channels) .. " ch)")
+      if ImGui.Button(ctx, "SWAP", 92, 26) then swap = not swap end
+      local changed
+      local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Morph", section_h)
+      changed, mode_index = sol.draw_combo(ImGui, ctx, "Morph mode", mode_index, MODE_NAMES, 1, 2)
+      changed, fft_index = sol.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
+      changed, morph = sol.draw_slider(ImGui, ctx, "Morph position", morph, 0, 1, "%.3f", false)
+      if mode_index == 2 then
+        changed, carrier_pos = sol.draw_slider(ImGui, ctx, "Carrier freeze position", carrier_pos, 0, 1, "%.3f", false)
+        changed, modulator_pos = sol.draw_slider(ImGui, ctx, "Modulator freeze position", modulator_pos, 0, 1, "%.3f", false)
+      end
+      changed, smooth_bins = sol.draw_slider_int(ImGui, ctx, "Spectral smoothing bins", smooth_bins, 1, 96)
+      changed, expand = sol.draw_slider(ImGui, ctx, "Expansion", expand, 1.0, 8.0, "%.2fx", false)
+      changed, mix = sol.draw_slider(ImGui, ctx, "Wet mix", mix, 0, 1, "%.3f", false)
+      changed, normalize = sol.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
+      if normalize then changed, normalize_db = sol.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false) end
+      sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
+      theme.muted(ImGui, ctx, "Interpolates spectral magnitude while keeping carrier timing/phase.")
     end
-    changed, smooth_bins = sol.draw_slider_int(ImGui, ctx, "Spectral smoothing bins", smooth_bins, 1, 96)
-    changed, expand = sol.draw_slider(ImGui, ctx, "Expansion", expand, 1.0, 8.0, "%.2fx", false)
-    changed, mix = sol.draw_slider(ImGui, ctx, "Wet mix", mix, 0, 1, "%.3f", false)
-    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
-    sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Output", normalize and 98 or 73)
-    changed, normalize = sol.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
-    if normalize then changed, normalize_db = sol.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false) end
-    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
-    theme.muted(ImGui, ctx, "Interpolates spectral magnitude while keeping carrier timing/phase.")
-    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
+    ImGui.EndChild(ctx)
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+    if render_pressed then should_render = true end
+    if cancel_pressed then open = false end
     ImGui.End(ctx)
   end
   if should_render then

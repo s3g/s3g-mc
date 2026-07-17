@@ -1,7 +1,7 @@
 -- @description Extract item channel to mono track
 -- @author s3g
 -- @version 0.1
--- @requires Multichannel Library.lua
+-- @requires ReaImGui; Multichannel Library.lua
 -- @category Item Channel Transforms
 -- @method Duplicates the selected item to a new mono track and sets the take to one chosen source channel.
 -- @about

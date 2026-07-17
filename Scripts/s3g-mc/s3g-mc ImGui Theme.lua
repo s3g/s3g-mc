@@ -260,7 +260,7 @@ local SLIDER_ABBR = {
   ["DISTANCE MOTION"] = "D MOT",
   ["TRIM"] = "TRIM",
   ["PRE-GAIN DB"] = "GAIN",
-  ["PEAK NORMALIZE"] = "PEAK",
+  ["PEAK NORMALIZE"] = "PK NORM",
   ["NORMALIZE DB"] = "NORM",
   ["SEED"] = "SEED",
   ["PULSAR STREAMS"] = "STREAMS",
@@ -314,7 +314,7 @@ local SLIDER_ABBR = {
   ["FREQUENCY SMOOTHING BINS"] = "FREQ",
   ["FFT SIZE"] = "FFT",
   ["OVERLAP"] = "OVERLAP",
-  ["PEAK NORMALIZE OUTPUT"] = "PEAK",
+  ["PEAK NORMALIZE OUTPUT"] = "PK NORM",
   ["NORMALIZE PEAK DB"] = "NORM",
   ["ADAPT MIXED-ORDER KERNELS"] = "ADAPT",
   ["MAX KERNEL WINDOW SEC"] = "WINDOW",
@@ -439,9 +439,9 @@ local SLIDER_ABBR = {
   ["KERNEL ASSIGNMENT"] = "ASSIGN",
   ["OUTPUT LENGTH"] = "LENGTH",
   ["CONVOLUTION METHOD"] = "METHOD",
-  ["PEAK NORMALIZE OUTPUT"] = "PEAK",
+  ["PEAK NORMALIZE OUTPUT"] = "PK NORM",
   ["SOFT LIMIT BEFORE NORMALIZE"] = "LIMIT",
-  ["PEAK NORMALIZE"] = "PEAK",
+  ["PEAK NORMALIZE"] = "PK NORM",
   ["NORMALIZE PEAK DB"] = "NORM",
   ["ADAPT MIXED-ORDER KERNELS"] = "ADAPT",
   ["NORMALIZE EACH KERNEL WINDOW"] = "K NORM",
@@ -539,6 +539,14 @@ local function combo_width(ImGui, ctx, labels, current, max_width)
     width = math.max(width, text_width(ImGui, ctx, label) + 38)
   end
   return math.max(80, math.min(max_width or width, width))
+end
+
+local function input_int_width(ImGui, ctx, label, max_width)
+  local text = tostring(label or ""):lower()
+  if text:find("seed", 1, true) then
+    return math.min(max_width or 112, math.max(92, text_width(ImGui, ctx, "0000000000") + 28))
+  end
+  return max_width
 end
 
 local function row_metrics(ImGui, ctx, width)
@@ -679,7 +687,7 @@ function M.input_int_row(ImGui, ctx, label, value, step, step_fast, width)
   local p = M.palette(ImGui)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, p.label, slider_label(label))
   ImGui.SetCursorScreenPos(ctx, row.control_x, y)
-  ImGui.SetNextItemWidth(ctx, row.control_w)
+  ImGui.SetNextItemWidth(ctx, input_int_width(ImGui, ctx, label, row.control_w))
   local border_vars = push_borderless_frame(ImGui, ctx)
   local changed, next_value = ImGui.InputInt(ctx, "##input_" .. tostring(label or ""), value, step or 1, step_fast or 10)
   pop_borderless_frame(ImGui, ctx, border_vars)

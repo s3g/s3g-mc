@@ -1,7 +1,7 @@
 -- @description Cycle mono tracks into multichannel stem
 -- @author s3g
 -- @version 0.1
--- @requires Multichannel Library.lua; REAPER multichannel stem render action
+-- @requires ReaImGui; Multichannel Library.lua; REAPER multichannel stem render action
 -- @category Track Building / Routing
 -- @render Yes; bounds to selected-track media range.
 -- @method Routes selected mono tracks across the requested output channels, repeating or grouped-downmixing as needed.

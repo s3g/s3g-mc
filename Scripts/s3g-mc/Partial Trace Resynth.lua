@@ -107,7 +107,7 @@ local LABEL_ABBR = {
   ["CLARITY PROTECT"] = "CLARITY",
   ["LOW CUT / MIN PARTIAL HZ"] = "LOWCUT",
   ["SOFT LIMIT PEAKS"] = "LIMIT",
-  ["PEAK NORMALIZE"] = "PEAK",
+  ["PEAK NORMALIZE"] = "PK NORM",
   ["NORMALIZE DB"] = "NORM DB",
   ["INSERTED TRACK GAIN"] = "INSERT",
 }
@@ -124,6 +124,29 @@ local function row_layout(ctx)
   local control_x = x + LABEL_W
   local control_w = math.max(120, avail - LABEL_W - CONTROL_GAP)
   return x, y, control_x, control_w
+end
+
+local function text_width(ctx, text)
+  text = tostring(text or "")
+  if ImGui.CalcTextSize then
+    local ok, width = pcall(ImGui.CalcTextSize, ctx, text)
+    if ok and type(width) == "number" then return width end
+  end
+  return #text * 7
+end
+
+local function combo_width(ctx, names, current, max_width)
+  local width = text_width(ctx, names[current or 1] or "") + 38
+  for _, name in ipairs(names or {}) do
+    width = math.max(width, text_width(ctx, name) + 38)
+  end
+  return math.max(80, math.min(max_width or width, width))
+end
+
+local function combo_table_width(ctx, entries, current, max_width)
+  local labels = {}
+  for index, entry in ipairs(entries or {}) do labels[index] = entry.label end
+  return combo_width(ctx, labels, current, max_width)
 end
 
 local function row_label(ctx, x, y, label)
@@ -175,7 +198,7 @@ local function draw_int_input(ctx, label, value)
   local x, y, control_x, control_w = row_layout(ctx)
   row_label(ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, math.min(control_w, 104))
   local changed, next_value = ImGui.InputInt(ctx, "##" .. label, math.floor(value))
   finish_row(ctx, x, y)
   return changed, next_value
@@ -227,7 +250,7 @@ local function combo_value(ctx, label, value, values)
   local x, y, control_x, control_w = row_layout(ctx)
   row_label(ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, combo_width(ctx, values, current, control_w))
   if ImGui.BeginCombo(ctx, "##" .. label, tostring(values[current])) then
     for index, candidate in ipairs(values) do
       local selected = index == current
@@ -251,7 +274,7 @@ local function combo_behavior(ctx, label, value)
   local x, y, control_x, control_w = row_layout(ctx)
   row_label(ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, combo_table_width(ctx, TRACE_BEHAVIORS, current, control_w))
   if ImGui.BeginCombo(ctx, "##" .. label, TRACE_BEHAVIORS[current].label) then
     for index, behavior in ipairs(TRACE_BEHAVIORS) do
       local selected = index == current
@@ -389,7 +412,8 @@ local function main()
     visible, open = ImGui.Begin(ctx, "Partial Trace Resynth", open)
     if visible then
       local _, avail_h = ImGui.GetContentRegionAvail(ctx)
-      local control_h = math.max(260, (avail_h or env_opts.compact_window_h) - 44)
+      local footer_h = 48
+      local control_h = math.max(260, (avail_h or env_opts.compact_window_h) - footer_h)
       if ImGui.BeginChild(ctx, "##partial_trace_controls", 0, control_h) then
       theme.muted(ImGui, ctx, "Source: " .. (entry.name or entry.filename))
       local changed
@@ -419,7 +443,7 @@ local function main()
       changed, settings.drift = draw_custom_slider(ctx, "Frequency drift", settings.drift, 0.0, 0.18, "%.3f", false)
       changed, settings.spatial_width = draw_custom_slider(ctx, "Spatial width", settings.spatial_width, 0.05, 6.0, "%.2f", false)
       finish_section(ctx, sx, sy, sh, stack)
-      sx, sy, sh, stack = section(ctx, "Output", settings.clarity_protect and (settings.normalize and 200 or 174) or (settings.normalize and 148 or 122))
+      sx, sy, sh, stack = section(ctx, "Render Safety", settings.clarity_protect and (settings.normalize and 200 or 174) or (settings.normalize and 174 or 148))
       changed, settings.clarity_protect = draw_checkbox(ctx, "Clarity protect", settings.clarity_protect)
       if settings.clarity_protect then
         changed, settings.low_cut_hz = draw_custom_slider(ctx, "Low cut / min partial Hz", settings.low_cut_hz, 0.0, 180.0, "%.1f", false)
@@ -437,9 +461,9 @@ local function main()
       settings.min_track_frames = clamp(math.floor(settings.min_track_frames), 2, 64)
         ImGui.EndChild(ctx)
       end
-      if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
+      local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+      if render_pressed then should_render = true end
+      if cancel_pressed then open = false end
       ImGui.End(ctx)
     end
     if should_render then

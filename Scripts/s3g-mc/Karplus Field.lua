@@ -114,7 +114,7 @@ local function draw_int_input(label, value)
   local x, y, control_x, control_w = row_layout()
   row_label(x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, math.min(control_w, 104))
   local changed, next_value = ImGui.InputInt(ctx, "##" .. label, math.floor(value))
   finish_row(x, y)
   return changed, next_value
@@ -159,14 +159,13 @@ local function render()
   mc.print_plan("Karplus Field",{"Output: "..output_path,string.format("NumPy time: %.2f sec",elapsed),log})
 end
 local function loop()
-  ImGui.SetNextWindowSize(ctx, 520, 560, ImGui.Cond_Appearing)
+  local section_h = s.normalize and 426 or 401
+  ImGui.SetNextWindowSize(ctx, 520, section_h + 130, ImGui.Cond_Appearing)
   local vis
   vis, open = ImGui.Begin(ctx, "Karplus Field", open)
   if vis then
     local changed
-    theme.muted(ImGui, ctx, "Offline plucked resonator field render")
-    ImGui.Spacing(ctx)
-    local sx, sy, sh, stack = section("Field", 326)
+    local sx, sy, sh, stack = section("Field", section_h)
     changed, s.duration = draw_custom_slider("Duration sec", s.duration, 0.5, 180, "%.2f", false)
     changed, s.channels = draw_custom_slider("Channels", math.floor(s.channels), 1, mc.MAX_REAPER_TRACK_CHANNELS, nil, true)
     changed, s.events = draw_custom_slider("Pluck events", math.floor(s.events), 1, 800, nil, true)
@@ -177,18 +176,15 @@ local function loop()
     changed, s.brightness = draw_custom_slider("Brightness", s.brightness, 0, 1, "%.2f", false)
     changed, s.dispersion = draw_custom_slider("Dispersion", s.dispersion, 0, 0.5, "%.2f", false)
     changed, s.spatial_width = draw_custom_slider("Spatial width", s.spatial_width, 0.2, 8, "%.2f", false)
-    finish_section(sx, sy, sh, stack)
-    sx, sy, sh, stack = section("Output", s.normalize and 124 or 98)
     changed, s.normalize = draw_checkbox("Peak normalize", s.normalize)
     if s.normalize then
       changed, s.normalize_db = draw_custom_slider("Normalize dB", s.normalize_db, -36, 0, "%.1f", false)
     end
     changed, s.seed = draw_int_input("Seed", s.seed)
     finish_section(sx, sy, sh, stack)
-    ImGui.Separator(ctx)
-    if ImGui.Button(ctx, "RENDER", 96, 28) then go = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+    if render_pressed then go = true end
+    if cancel_pressed then open = false end
     ImGui.End(ctx)
   end
   persist()

@@ -1,7 +1,7 @@
 -- @description Cascade spatial echo
 -- @author s3g
 -- @version 0.1
--- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
+-- @requires ReaImGui; Multichannel Texture Library.lua; REAPER multichannel stem render action
 -- @category Multichannel Texture / Montage
 -- @render Yes; may extend beyond source item length.
 -- @method Takes equal segments from one source channel and prints decaying echoes that step through multichannel space.

@@ -46,7 +46,8 @@ local swap = false
 local should_render = false
 
 local function loop()
-    ImGui.SetNextWindowSize(ctx, 540, 520, ImGui.Cond_Appearing)
+  local section_h = 210 + (normalize and 50 or 25)
+  ImGui.SetNextWindowSize(ctx, 540, section_h + 220, ImGui.Cond_Appearing)
   local visible
   visible, open = ImGui.Begin(ctx, "Cross Synthesis", open)
   if visible then
@@ -56,22 +57,20 @@ local function loop()
     theme.muted(ImGui, ctx, "Modulator: " .. modulator.name .. " (" .. tostring(modulator.channels) .. " ch)")
     if ImGui.Button(ctx, "SWAP", 92, 26) then swap = not swap end
     local changed
-    local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Cross Synthesis", 198)
+    local sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Cross Synthesis", section_h)
     changed, fft_index = sol.draw_combo(ImGui, ctx, "FFT size", fft_index, FFT_NAMES, 1, 4)
     changed, amount = sol.draw_slider(ImGui, ctx, "Modulator amount", amount, 0, 1, "%.3f", false)
     changed, mix = sol.draw_slider(ImGui, ctx, "Wet mix", mix, 0, 1, "%.3f", false)
     changed, smooth_bins = sol.draw_slider_int(ImGui, ctx, "Envelope smoothing bins", smooth_bins, 1, 96)
     changed, contrast = sol.draw_slider(ImGui, ctx, "Envelope contrast", contrast, 0.1, 3.0, "%.2f", false)
     changed, floor = sol.draw_slider(ImGui, ctx, "Envelope floor", floor, 0.001, 0.5, "%.3f", false)
-    sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
-    sx, sy, sh, stack = sol.begin_section(ImGui, ctx, "Output", normalize and 98 or 73)
     changed, normalize = sol.draw_checkbox(ImGui, ctx, "Peak normalize", normalize)
     if normalize then changed, normalize_db = sol.draw_slider(ImGui, ctx, "Normalize peak dB", normalize_db, -24, 0, "%.1f", false) end
     sol.finish_section(ImGui, ctx, sx, sy, sh, stack)
     theme.muted(ImGui, ctx, "Carrier keeps phase/timing; modulator supplies spectral contour.")
-    if ImGui.Button(ctx, "RENDER", 92, 26) then should_render = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 92, 26) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+    if render_pressed then should_render = true end
+    if cancel_pressed then open = false end
     ImGui.End(ctx)
   end
   if should_render then

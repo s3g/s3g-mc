@@ -210,6 +210,23 @@ local function row_layout(ctx)
   return x, y, control_x, control_w
 end
 
+local function text_width(ctx, text)
+  text = tostring(text or "")
+  if ImGui.CalcTextSize then
+    local ok, width = pcall(ImGui.CalcTextSize, ctx, text)
+    if ok and type(width) == "number" then return width end
+  end
+  return #text * 7
+end
+
+local function combo_width(ctx, labels, current, max_width)
+  local width = text_width(ctx, labels[current or 1] or "") + 38
+  for _, label in ipairs(labels or {}) do
+    width = math.max(width, text_width(ctx, label) + 38)
+  end
+  return math.max(80, math.min(max_width or width, width))
+end
+
 local function row_label(ctx, x, y, label)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 4, THEME.label, row_label_text(label))
 end
@@ -402,7 +419,7 @@ local function draw_combo(ctx, label, value, names, first_index, last_index)
   local x, y, control_x, control_w = row_layout(ctx)
   row_label(ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, combo_width(ctx, names, value, control_w))
   if ImGui.BeginCombo(ctx, "##" .. label, names[value] or "") then
     for index = first_index, last_index do
       local selected = value == index

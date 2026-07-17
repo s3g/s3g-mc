@@ -442,8 +442,7 @@ local function draw_image_preview(key, title, path, max_h)
     ImGui.SetCursorScreenPos(ctx, img_x, img_y)
     local ok = pcall(ImGui.Image, ctx, cache.image, draw_w, draw_h)
     if not ok then
-      ImGui.SetCursorScreenPos(ctx, x + 12, y + 34)
-      ImGui.TextColored(ctx, COLORS.muted, "Preview image could not be drawn.")
+      ImGui.DrawList_AddText(dl, x + 12, y + 34, COLORS.muted, "Preview image could not be drawn.")
     else
       draw_read_graph(dl, img_x, img_y, img_x + draw_w, img_y + draw_h)
     end
@@ -473,7 +472,11 @@ local function loop()
         if preview_path then
           draw_image_preview("ampmask", AMP_SOURCES[settings.amp_source] .. " amplitude preview", preview_path, 150)
         else
-          ImGui.TextColored(ctx, COLORS.muted, preview_err or "Amplitude preview unavailable.")
+          if ui_theme and ui_theme.muted then
+            ui_theme.muted(ImGui, ctx, preview_err or "Amplitude preview unavailable.")
+          else
+            ImGui.Text(ctx, preview_err or "Amplitude preview unavailable.")
+          end
         end
       end
       if settings.amp_source == #AMP_SOURCES and settings.amp_image_path ~= "" then

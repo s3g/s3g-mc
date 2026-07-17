@@ -140,7 +140,7 @@ local function draw_int_input(ctx, label, value)
   local x, y, control_x, control_w = row_layout(ctx)
   row_label(ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, math.min(control_w, 104))
   local changed, next_value = ImGui.InputInt(ctx, "##" .. label, math.floor(value))
   finish_row(ctx, x, y)
   return changed, next_value
@@ -268,7 +268,8 @@ local function main()
     visible, open = ImGui.Begin(ctx, "Dense Grain Cloud", open)
     if visible then
       local _, avail_h = ImGui.GetContentRegionAvail(ctx)
-      local control_h = math.max(260, (avail_h or env_opts.compact_window_h) - 44)
+      local footer_h = 48
+      local control_h = math.max(260, (avail_h or env_opts.compact_window_h) - footer_h)
       if ImGui.BeginChild(ctx, "##dense_grain_controls", 0, control_h) then
       theme.muted(ImGui, ctx, "Source: " .. entry.name .. "  (" .. tostring(entry.channels) .. " ch)")
       local changed
@@ -292,7 +293,7 @@ local function main()
       changed, settings.density_shape = draw_custom_slider(ctx, "Density shape", settings.density_shape, -1.0, 1.0, "%.2f", false)
       changed, settings.gain = draw_custom_slider(ctx, "Cloud gain", settings.gain, 0.05, 4.0, "%.2f", false)
       finish_section(ctx, sx, sy, sh, stack)
-      sx, sy, sh, stack = section(ctx, "Output", settings.normalize and 148 or 122)
+      sx, sy, sh, stack = section(ctx, "Render", settings.normalize and 148 or 122)
       changed, settings.normalize = draw_checkbox(ctx, "Peak normalize", settings.normalize)
       if settings.normalize then
         changed, settings.normalize_db = draw_custom_slider(ctx, "Normalize dB", settings.normalize_db, -36.0, -3.0, "%.1f", false)
@@ -303,9 +304,9 @@ local function main()
       settings.channels = clamp(math.floor(settings.channels), 1, mc.MAX_REAPER_TRACK_CHANNELS)
         ImGui.EndChild(ctx)
       end
-      if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
-      ImGui.SameLine(ctx)
-      if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
+      local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+      if render_pressed then should_render = true end
+      if cancel_pressed then open = false end
       ImGui.End(ctx)
     end
 

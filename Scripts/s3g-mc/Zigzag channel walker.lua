@@ -1,7 +1,7 @@
 -- @description Zigzag channel walker
 -- @author s3g
 -- @version 0.1
--- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
+-- @requires ReaImGui; Multichannel Texture Library.lua; REAPER multichannel stem render action
 -- @category Multichannel Texture / Montage
 -- @render Yes; bounds to source item length.
 -- @method Slices one source channel and walks successive slices back and forth across the output channels.

@@ -154,6 +154,23 @@ local function row_layout(ctx)
   return x, y, control_x, control_w
 end
 
+local function text_width(ctx, text)
+  text = tostring(text or "")
+  if ImGui.CalcTextSize then
+    local ok, width = pcall(ImGui.CalcTextSize, ctx, text)
+    if ok and type(width) == "number" then return width end
+  end
+  return #text * 7
+end
+
+local function combo_options_width(ctx, options, current_index, max_width)
+  local width = text_width(ctx, options[current_index] and options[current_index].label or "") + 38
+  for _, option in ipairs(options or {}) do
+    width = math.max(width, text_width(ctx, option.label) + 38)
+  end
+  return math.max(80, math.min(max_width or width, width))
+end
+
 local function row_label(ctx, x, y, label)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 4, THEME.label, row_label_text(label))
 end
@@ -205,7 +222,7 @@ local function draw_int_input(ctx, label, value)
   local x, y, control_x, control_w = row_layout(ctx)
   row_label(ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, math.min(control_w, 104))
   local changed, next_value = ImGui.InputInt(ctx, "##" .. label, math.floor(value))
   finish_row(ctx, x, y)
   return changed, next_value
@@ -230,7 +247,7 @@ local function combo_from_options(ctx, label, current, options)
   local x, y, control_x, control_w = row_layout(ctx)
   row_label(ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, combo_options_width(ctx, options, current_index, control_w))
   if ImGui.BeginCombo(ctx, "##" .. label, preview) then
     for index, option in ipairs(options) do
       local selected = index == current_index

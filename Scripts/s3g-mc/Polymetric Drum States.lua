@@ -317,10 +317,21 @@ local function custom_combo_row(label, index, items, width)
     return changed, next_index - 1
   end
   width = width or 126
+  local function text_width(text)
+    if ImGui.CalcTextSize then
+      local ok, w = pcall(ImGui.CalcTextSize, ctx, tostring(text or ""))
+      if ok and type(w) == "number" then return w end
+    end
+    return #tostring(text or "") * 7
+  end
+  local labels = {}
+  for item in tostring(items or ""):gmatch("([^\0]+)") do labels[#labels + 1] = item end
+  local combo_w = text_width(labels[index + 1] or "") + 38
+  for _, item in ipairs(labels) do combo_w = math.max(combo_w, text_width(item) + 38) end
   local x, y = ImGui.GetCursorScreenPos(ctx)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, rgba(0.66, 0.66, 0.66, 1.0), slider_label(label))
   ImGui.SetCursorScreenPos(ctx, x + 82, y)
-  ImGui.SetNextItemWidth(ctx, width)
+  ImGui.SetNextItemWidth(ctx, math.max(74, math.min(width, combo_w)))
   local changed
   changed, index = ImGui.Combo(ctx, "##combo_" .. label, index, items)
   ImGui.SetCursorScreenPos(ctx, x, y + 22)
@@ -337,10 +348,21 @@ local function custom_combo_action_row(label, index, items, width, button_label,
   end
   width = width or 126
   button_width = button_width or 62
+  local function text_width(text)
+    if ImGui.CalcTextSize then
+      local ok, w = pcall(ImGui.CalcTextSize, ctx, tostring(text or ""))
+      if ok and type(w) == "number" then return w end
+    end
+    return #tostring(text or "") * 7
+  end
+  local labels = {}
+  for item in tostring(items or ""):gmatch("([^\0]+)") do labels[#labels + 1] = item end
+  local combo_w = text_width(labels[index + 1] or "") + 38
+  for _, item in ipairs(labels) do combo_w = math.max(combo_w, text_width(item) + 38) end
   local x, y = ImGui.GetCursorScreenPos(ctx)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, rgba(0.66, 0.66, 0.66, 1.0), slider_label(label))
   ImGui.SetCursorScreenPos(ctx, x + 82, y)
-  ImGui.SetNextItemWidth(ctx, width)
+  ImGui.SetNextItemWidth(ctx, math.max(74, math.min(width, combo_w)))
   local changed
   changed, index = ImGui.Combo(ctx, "##combo_" .. label, index, items)
   ImGui.SameLine(ctx)
@@ -352,10 +374,21 @@ end
 
 local function custom_mini_combo(label, index, items, width)
   width = width or 74
+  local function text_width(text)
+    if ImGui.CalcTextSize then
+      local ok, w = pcall(ImGui.CalcTextSize, ctx, tostring(text or ""))
+      if ok and type(w) == "number" then return w end
+    end
+    return #tostring(text or "") * 7
+  end
+  local labels = {}
+  for item in tostring(items or ""):gmatch("([^\0]+)") do labels[#labels + 1] = item end
+  local combo_w = text_width(labels[index + 1] or "") + 34
+  for _, item in ipairs(labels) do combo_w = math.max(combo_w, text_width(item) + 34) end
   local x, y = ImGui.GetCursorScreenPos(ctx)
   ImGui.DrawList_AddText(ImGui.GetWindowDrawList(ctx), x, y + 2, rgba(0.62, 0.62, 0.62, 1.0), slider_label(label))
   ImGui.SetCursorScreenPos(ctx, x + 34, y)
-  ImGui.SetNextItemWidth(ctx, width)
+  ImGui.SetNextItemWidth(ctx, math.max(48, math.min(width, combo_w)))
   local changed
   changed, index = ImGui.Combo(ctx, "##combo_" .. label, index, items)
   return changed, index

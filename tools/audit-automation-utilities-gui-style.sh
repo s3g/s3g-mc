@@ -66,7 +66,7 @@ for file in "${shared_panel_files[@]}"; do
   check_present_file "$file" 'push_soft_panel' "missing gray tool-area background"
 done
 
-check_present_file "$scripts/Focused FX Automation Capture.lua" 'panel_begin' "focused FX should use its local crash-safe gray panel renderer"
+check_present_file "$scripts/Focused FX Automation Capture.lua" 'theme\.begin_section' "focused FX should use the shared gray section renderer"
 check_present_file "$scripts/Vertical Timeline Navigator.lua" '##vertical_timeline_tool_area' "vertical timeline should wrap controls in a gray tool area"
 check_present_file "$scripts/Transaural Crosstalk Canceller.lua" '##transaural_tool_area' "transaural controls should use a gray tool area"
 check_present_file "$scripts/Snapshot Surface.lua" '##snapshot_surface_side' "snapshot side controls should use a gray tool area"

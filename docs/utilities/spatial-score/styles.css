@@ -6,10 +6,10 @@
   --field: #0f0f0f;
   --line: #3f3f3f;
   --line-soft: #292929;
-  --text: #d7d7d7;
+  --text: #c9c9c9;
   --muted: #9a9a9a;
-  --accent: #5aa8c7;
-  --accent-2: #d8a24a;
+  --accent: #8d8d8d;
+  --accent-2: #a8a8a8;
   --hot: #ff7f6e;
 }
 
@@ -101,8 +101,7 @@ h2 {
   padding: 0 6px 0 8px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 6px;
+  justify-content: space-between;
   background: var(--panel-2);
   border-bottom: 1px solid var(--line-soft);
   font-size: 11px;
@@ -114,18 +113,24 @@ h2 {
   user-select: none;
 }
 
-h2::before {
+h2::after {
   content: "-";
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  margin-left: 8px;
   border: 1px solid var(--line-soft);
   background: var(--field);
   color: var(--muted);
   font-weight: 400;
+}
+
+h2:hover::after,
+h2:focus-visible::after {
+  border-color: var(--accent);
+  color: var(--text);
 }
 
 .panel section.collapsed {
@@ -137,7 +142,7 @@ h2::before {
   border-bottom: 0;
 }
 
-.panel section.collapsed h2::before {
+.panel section.collapsed h2::after {
   content: "+";
 }
 
@@ -182,12 +187,12 @@ button {
 button:hover,
 button.active {
   border-color: var(--accent);
-  color: #ecffff;
+  color: #d8d8d2;
 }
 
 #exportJson {
   border-color: #555;
-  background: #171f21;
+  background: #202020;
 }
 
 #view {
@@ -267,7 +272,7 @@ button.active {
 
 .scene-button.active {
   border-color: var(--accent-2);
-  color: #fff2d2;
+  color: #d4c9ad;
   background: #201b12;
   box-shadow: 0 0 0 1px #4b3b1d inset;
 }
@@ -349,7 +354,7 @@ input[type="range"] {
   -webkit-appearance: none;
   border: 1px solid #4b4b4b;
   background:
-    linear-gradient(90deg, #8d8d8d 0 var(--fill, 50%), #242424 var(--fill, 50%) 100%);
+    linear-gradient(90deg, #8d8d8d 0 var(--fill, 50%), #232323 var(--fill, 50%) 100%);
   box-shadow: 0 0 0 1px #080808 inset;
 }
 
@@ -462,8 +467,8 @@ select {
 
 .custom-select-option:hover,
 .custom-select-option.active {
-  background: #193035;
-  color: #ecffff;
+  background: #282828;
+  color: #d8d8d2;
 }
 
 .row {
@@ -560,6 +565,12 @@ select {
   font-size: 10px;
 }
 
+.panel h2::after {
+  width: 15px;
+  height: 15px;
+  margin-left: 6px;
+}
+
 .panel label {
   margin: 4px 0;
   font-size: 10px;
@@ -605,6 +616,77 @@ select {
 .panel .row {
   gap: 4px;
   margin-bottom: 5px;
+}
+
+/* s3g-mc browser utility convergence layer */
+.topbar,
+.statusbar,
+.panel {
+  background: var(--panel);
+}
+
+.panel section {
+  position: relative;
+  border: 0;
+  background: #141414;
+}
+
+.panel section::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: #c9c9c2;
+  opacity: 0.58;
+  pointer-events: none;
+}
+
+.panel h2 {
+  border-bottom: 0;
+  background: #0f0f0f;
+  color: #bdbdb8;
+  font-weight: 400;
+}
+
+button,
+.custom-select-button {
+  background: #0b0b0b;
+}
+
+button {
+  text-transform: uppercase;
+}
+
+button:hover,
+button.active,
+.custom-select-button:hover,
+.custom-select.open .custom-select-button {
+  border-color: #555;
+  background: #111;
+  color: #d8d8d2;
+}
+
+.bank-button.active,
+.scene-button.active {
+  border-color: var(--accent);
+  background: #202020;
+  color: #d8d8d2;
+  box-shadow: none;
+}
+
+.scene-button.target {
+  border-color: #777;
+  color: #d8d8d2;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  input[type="range"],
+  input[type="range"]:hover,
+  input[type="range"]:focus-visible {
+    border-color: #4b4b4b;
+    background:
+      linear-gradient(90deg, #8d8d8d 0 var(--fill, 50%), #232323 var(--fill, 50%) 100%);
+  }
 }
 
 .panel .compact-row {

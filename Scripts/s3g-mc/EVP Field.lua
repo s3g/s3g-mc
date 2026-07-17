@@ -116,7 +116,7 @@ local LABEL_ABBR = {
   ["SPATIAL MOTION"] = "MOTION",
   ["SPEAKER SPREAD"] = "SPREAD",
   ["PRE-GAIN DB"] = "GAIN",
-  ["PEAK NORMALIZE"] = "PEAK",
+  ["PEAK NORMALIZE"] = "PK NORM",
   ["NORMALIZE DB"] = "NORM DB",
 }
 
@@ -132,6 +132,23 @@ local function row_layout(ctx)
   local control_x = x + LABEL_W
   local control_w = math.max(120, avail - LABEL_W - CONTROL_GAP)
   return x, y, control_x, control_w
+end
+
+local function text_width(ctx, text)
+  text = tostring(text or "")
+  if ImGui.CalcTextSize then
+    local ok, width = pcall(ImGui.CalcTextSize, ctx, text)
+    if ok and type(width) == "number" then return width end
+  end
+  return #text * 7
+end
+
+local function combo_width(ctx, names, current, max_width)
+  local width = text_width(ctx, names[current or 1] or "") + 38
+  for _, name in ipairs(names or {}) do
+    width = math.max(width, text_width(ctx, name) + 38)
+  end
+  return math.max(80, math.min(max_width or width, width))
 end
 
 local function row_label(ctx, x, y, label)
@@ -183,7 +200,7 @@ local function draw_int_input(ctx, label, value)
   local x, y, control_x, control_w = row_layout(ctx)
   row_label(ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, math.min(control_w, 104))
   local changed, next_value = ImGui.InputInt(ctx, "##" .. label, math.floor(value))
   finish_row(ctx, x, y)
   return changed, next_value
@@ -231,7 +248,7 @@ local function combo(ctx, label, idx, names)
   local x, y, control_x, control_w = row_layout(ctx)
   row_label(ctx, x, y, label)
   ImGui.SetCursorScreenPos(ctx, control_x, y)
-  ImGui.SetNextItemWidth(ctx, control_w)
+  ImGui.SetNextItemWidth(ctx, combo_width(ctx, names, idx, control_w))
   if ImGui.BeginCombo(ctx, "##" .. label, names[idx] or "") then
     for i, name in ipairs(names) do
       local selected = i == idx
@@ -406,7 +423,8 @@ local function loop()
   visible, open = ImGui.Begin(ctx, TITLE, open)
   if visible then
     local _, avail_h = ImGui.GetContentRegionAvail(ctx)
-    local control_h = math.max(460, (avail_h or 860) - 44)
+    local footer_h = 48
+    local control_h = math.max(460, (avail_h or 860) - footer_h)
     if ImGui.BeginChild(ctx, "##evp_controls", 0, control_h) then
       local changed
       selected_env, selected_env_point = be.draw(ImGui, ctx, ENV_DEFS, env_points, env_enabled, selected_env, selected_env_point, settings, env_opts)
@@ -483,7 +501,7 @@ local function loop()
       changed, settings.whisper = draw_custom_slider(ctx, "Whisper", settings.whisper, 0.0, 1.0, "%.2f", false)
       changed, settings.smear = draw_custom_slider(ctx, "Formant smear", settings.smear, 0.0, 1.0, "%.2f", false)
       finish_section(ctx, sx, sy, sh, stack)
-      sx, sy, sh, stack = section(ctx, "Spatial / Output", settings.normalize and 252 or 226)
+      sx, sy, sh, stack = section(ctx, "Spatial / Output", settings.normalize and 304 or 278)
       changed, settings.az_width = draw_custom_slider(ctx, "Azimuth width", settings.az_width, 0.0, 360.0, "%.1f", false)
       changed, settings.el_width = draw_custom_slider(ctx, "Elevation width", settings.el_width, 0.0, 178.0, "%.1f", false)
       changed, settings.spatial_motion = draw_custom_slider(ctx, "Spatial motion", settings.spatial_motion, 0.0, 1.0, "%.2f", false)
@@ -497,9 +515,9 @@ local function loop()
       finish_section(ctx, sx, sy, sh, stack)
       ImGui.EndChild(ctx)
     end
-    if ImGui.Button(ctx, "RENDER", 96, 28) then should_render = true end
-    ImGui.SameLine(ctx)
-    if ImGui.Button(ctx, "CANCEL", 96, 28) then open = false end
+    local render_pressed, cancel_pressed = theme.footer_buttons(ImGui, ctx, "RENDER", "CANCEL", 104, 104)
+    if render_pressed then should_render = true end
+    if cancel_pressed then open = false end
     ImGui.End(ctx)
   end
   persist()

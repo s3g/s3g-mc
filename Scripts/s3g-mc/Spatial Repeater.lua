@@ -1,7 +1,7 @@
 -- @description Spatial Repeater
 -- @author s3g
 -- @version 0.1
--- @requires Multichannel Texture Library.lua; REAPER multichannel stem render action
+-- @requires ReaImGui; Multichannel Texture Library.lua; REAPER multichannel stem render action
 -- @category Multichannel Texture / Montage
 -- @render Yes; may extend beyond source item length.
 -- @method Repeats one source channel around a multichannel path with spacing, decay, and channel walk modes.
