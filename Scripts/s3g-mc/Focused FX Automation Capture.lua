@@ -450,46 +450,74 @@ local function ensure_envelope(track, fx, param)
   return env
 end
 
-local function set_envelope_chunk_visibility(env, visible)
+local function set_envelope_chunk_layout(env, visible, height)
   if not env or not reaper.GetEnvelopeStateChunk or not reaper.SetEnvelopeStateChunk then return false end
   local ok, chunk = reaper.GetEnvelopeStateChunk(env, "", false)
   if not ok or chunk == "" then return false end
   local vis = visible and "1" or "0"
-  local changed = false
+  local vis_changed = false
   chunk = chunk:gsub("(\nVIS%s+)%d", function(prefix)
-    changed = true
+    vis_changed = true
     return prefix .. vis
   end, 1)
-  if not changed then
+  if not vis_changed then
     chunk = chunk:gsub("^(VIS%s+)%d", function(prefix)
-      changed = true
+      vis_changed = true
       return prefix .. vis
     end, 1)
   end
-  if not changed then return false end
+
+  local height_changed = false
+  local target_height = math.max(0, math.floor(tonumber(height) or 0))
+  chunk = chunk:gsub("(\nLANEHEIGHT%s+)%-?%d+", function(prefix)
+    height_changed = true
+    return prefix .. tostring(target_height)
+  end, 1)
+  if not height_changed then
+    chunk = chunk:gsub("^(LANEHEIGHT%s+)%-?%d+", function(prefix)
+      height_changed = true
+      return prefix .. tostring(target_height)
+    end, 1)
+  end
+  if not height_changed then
+    chunk = chunk:gsub("(\nVIS[^\r\n]*)", function(line)
+      height_changed = true
+      return line .. "\nLANEHEIGHT " .. tostring(target_height) .. " 0"
+    end, 1)
+  end
+
+  if not vis_changed and not height_changed then return false end
   return reaper.SetEnvelopeStateChunk(env, chunk, false)
 end
 
 local function configure_envelope(env)
   if not env then return false end
+  if reaper.GetSetEnvelopeInfo_String then
+    pcall(reaper.GetSetEnvelopeInfo_String, env, "VISIBLE", show_lanes and "1" or "0", true)
+    pcall(reaper.GetSetEnvelopeInfo_String, env, "SHOWLANE", show_lanes and "1" or "0", true)
+    pcall(reaper.GetSetEnvelopeInfo_String, env, "ARM", arm_lanes and "1" or "0", true)
+  end
   if reaper.SetEnvelopeInfo_Value then
     pcall(reaper.SetEnvelopeInfo_Value, env, "B_VISIBLE", show_lanes and 1 or 0)
     pcall(reaper.SetEnvelopeInfo_Value, env, "B_ACTIVE", 1)
     pcall(reaper.SetEnvelopeInfo_Value, env, "B_ARM", arm_lanes and 1 or 0)
-    pcall(reaper.SetEnvelopeInfo_Value, env, "I_TCPH", show_lanes and lane_height or 0)
   end
-  set_envelope_chunk_visibility(env, show_lanes)
+  set_envelope_chunk_layout(env, show_lanes, show_lanes and lane_height or 0)
   return true
 end
 
 local function hide_envelope(env)
   if not env then return false end
+  if reaper.GetSetEnvelopeInfo_String then
+    pcall(reaper.GetSetEnvelopeInfo_String, env, "VISIBLE", "0", true)
+    pcall(reaper.GetSetEnvelopeInfo_String, env, "SHOWLANE", "0", true)
+    pcall(reaper.GetSetEnvelopeInfo_String, env, "ARM", "0", true)
+  end
   if reaper.SetEnvelopeInfo_Value then
     pcall(reaper.SetEnvelopeInfo_Value, env, "B_VISIBLE", 0)
     pcall(reaper.SetEnvelopeInfo_Value, env, "B_ARM", 0)
-    pcall(reaper.SetEnvelopeInfo_Value, env, "I_TCPH", 0)
   end
-  set_envelope_chunk_visibility(env, false)
+  set_envelope_chunk_layout(env, false, 0)
   return true
 end
 
