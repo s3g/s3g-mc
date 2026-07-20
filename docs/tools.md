@@ -34,7 +34,7 @@ toc:
 
 For step-by-step notes on selected processes, see the [Process Guides](process-guides.md).
 The [Utilities](utilities.md) pages cover the browser-based companion tools for
-Automation Score breakpoint lanes, image scores, IR room sketches, and Spatial
+Automation Score breakpoint lanes, image scores, acoustic imprints, and Spatial
 Score automation JSON.
 
 Current package snapshot: the browser exposes 121 user-facing tools/controllers,
@@ -71,8 +71,10 @@ Package Browser group counts:
   exported geometry in Max with points, polygon lines, and a projected heatmap.
 - `Image Score`: opens the browser utility for composing PNG scores
   used by `3OAFX Image Sonogram Field`.
-- `IR Sketch`: opens the browser utility for preparing room
-  sketch JSON used by `3OAFX Synthetic Ambisonic IR Bank`.
+- `Imprint Sketch`: designs seeded directional responses for architectural,
+  natural, open, and imaginary spaces. It exports compatible JSON for `3OAFX
+  Synthetic Ambisonic IR Bank` and `.s3gimprint` files for `s3g Ambi Imprint
+  64` in `s3g-dsp`.
 - `Load Automation Score JSON`: opens an ImGui target-assignment window for
   mapping Automation Score lanes to selected track volume envelopes or
   named FX parameter envelopes, with append or replace write modes and optional
@@ -321,8 +323,8 @@ behaviors.
   its own ambisonic item for creative or diagnostic use.
 - `3OAFX Synthetic Ambisonic IR Bank`: designs encoded ambisonic IR banks for
   `3OAFX Offline Ambisonic Convolve`, with room size, material absorption,
-  scattering, early reflections, late-field controls, optional IR Room Sketch
-  Designer JSON import, and separate or stacked output formats. Higher-order
+  scattering, early reflections, late-field controls, optional Imprint Sketch
+  JSON import, and separate or stacked output formats. Higher-order
   banks use 8 directions: stacked 2OA is 72 channels and stacked 3OA is 128
   channels.
 

@@ -4,7 +4,7 @@
 -- @requires ReaImGui; Python 3 with NumPy
 -- @category 3OAFX
 -- @render Yes; NumPy-backed synthetic ambisonic IR bank generator.
--- @method Designs encoded ACN/SN3D ambisonic impulse-response WAVs for the direction layer used by 3OAFX Offline Ambisonic Convolve. Room size, material absorption, scattering, source distance, early reflections, late diffuse taps, and optional IR Sketch JSON files shape the synthetic space.
+-- @method Designs encoded ACN/SN3D ambisonic impulse-response WAVs for the direction layer used by 3OAFX Offline Ambisonic Convolve. Dimensions, material absorption, scattering, source distance, early reflections, late diffuse taps, and optional Imprint Sketch JSON files shape the synthetic space.
 -- @about
 --   Creates either one encoded ambisonic IR file per virtual direction or one
 --   stacked multichannel bank with one ambisonic channel block per direction.
@@ -131,7 +131,7 @@ local function apply_room_sketch(settings, path)
   local text = nr.read_file(path)
   if text == "" then return false, "Could not read JSON file." end
   if not text:find('"target_process"%s*:%s*"3OAFX Synthetic Ambisonic IR Bank"', 1) then
-    return false, "This does not look like an IR Sketch export."
+    return false, "This does not look like an Imprint Sketch or legacy IR Sketch export."
   end
   settings.sketch_path = path
   settings.room_x = json_number(text, "room_x") or settings.room_x
@@ -152,11 +152,11 @@ local function apply_room_sketch(settings, path)
 end
 
 local function choose_room_sketch(settings)
-  local ok, path = reaper.GetUserFileNameForRead(settings.sketch_path or "", "Load IR Room Sketch JSON", "json")
+  local ok, path = reaper.GetUserFileNameForRead(settings.sketch_path or "", "Load Imprint Sketch JSON", "json")
   if not ok or path == "" then return end
   local loaded, message = apply_room_sketch(settings, path)
   if not loaded then
-    mc.show_error(message or "Could not load room sketch JSON.")
+    mc.show_error(message or "Could not load Imprint Sketch JSON.")
   else
     reaper.ShowConsoleMsg("[3OAFX Synthetic Ambisonic IR Bank]\n" .. message .. "\n")
   end
@@ -372,7 +372,7 @@ local function run_render(settings)
     "Direction layout: " .. (order == 1 and "P-format / tetrahedral" or "Practical 8-direction bank"),
     "Output mode: " .. (OUTPUT_MODE_NAMES[settings.output_mode_index] or "?"),
     "IR files: " .. tostring(#paths),
-    settings.sketch_path and settings.sketch_path ~= "" and ("Room sketch: " .. settings.sketch_path) or "Room sketch: none",
+    settings.sketch_path and settings.sketch_path ~= "" and ("Imprint sketch: " .. settings.sketch_path) or "Imprint sketch: none",
     string.format("NumPy time: %.2f sec", elapsed),
     "Output folder: " .. output_dir,
     "",
@@ -436,7 +436,7 @@ local function main()
       ImGui.Spacing(ctx)
       draw_ir_preview(ctx, settings)
       ImGui.Spacing(ctx)
-      if ui_theme.action_button(ImGui, ctx, "LOAD ROOM SKETCH JSON") then choose_room_sketch(settings) end
+      if ui_theme.action_button(ImGui, ctx, "LOAD IMPRINT SKETCH JSON") then choose_room_sketch(settings) end
       if settings.sketch_path and settings.sketch_path ~= "" then
         ui_theme.muted(ImGui, ctx, basename(settings.sketch_path))
       else

@@ -267,6 +267,31 @@ h2 {
   gap: 4px;
 }
 
+.compact-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 2px;
+  color: #aeb7bd;
+  white-space: nowrap;
+}
+
+.compact-control .custom-select {
+  width: 116px;
+  margin: 0;
+}
+
+.compact-control select {
+  width: 116px;
+  margin: 0;
+}
+
+.seed-control input {
+  width: 76px;
+  margin: 0;
+  padding: 0 5px;
+}
+
 .generate-bias {
   display: flex;
   align-items: center;

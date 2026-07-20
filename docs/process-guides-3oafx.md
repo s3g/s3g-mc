@@ -518,12 +518,12 @@ Direction formats:
 
 The stacked 2OA bank is `72ch`. The stacked 3OA bank is `128ch`, which fits REAPER's maximum track channel count. The script also writes a direction-map CSV next to the generated IRs so the direction order can be checked later.
 
-The browser-based IR Sketch can be used to preview the same bank groups, source positions, and stacked channel ranges before rendering. Export a JSON sketch from the browser tool, then use `Load Room Sketch JSON` in this renderer. Imported sketches can set the room dimensions, material values, source distance, duration, pre-delay, early-reflection count, and ambisonic order. If the sketch includes polygon room data, field offset, chamber networks, exterior openings, and Bank Map group positions, the renderer uses that data to place each IR source across the larger floorplan, add chamber-return timing, and apply exterior-leak thinning to the late field.
+The browser-based Imprint Sketch can preview the same bank groups, response positions, and stacked channel ranges before rendering. Export a project JSON sketch from the browser tool, then use `Load Imprint Sketch JSON` in this renderer. Imported sketches can set dimensions, material values, source distance, duration, pre-delay, early-reflection count, and ambisonic order. Polygon geometry, field offset, connected regions, open boundaries, and Bank Map positions are also available to the renderer. Natural and abstract Imprint Sketch spaces are intentionally reinterpreted by this older offline renderer, while `.s3gimprint` export preserves their complete directional event model for Ambi Imprint.
 
 Main controls:
 
 - Room dimensions set the broad size relationship.
-- `Load Room Sketch JSON` imports a sketch exported by the browser utility.
+- `Load Imprint Sketch JSON` imports an Imprint Sketch or legacy IR Sketch project.
 - Material absorption changes how quickly energy decays.
 - Scattering changes how separated or diffuse the reflections become.
 - Source distance shapes the direct-to-reflected balance.

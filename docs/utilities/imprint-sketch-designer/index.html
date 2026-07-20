@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>s3g-mc Imprint Sketch</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <h1>s3g-mc Imprint Sketch</h1>
+          <p>Directional responses for rooms, caves, passages, open fields, and impossible spaces</p>
+        </div>
+        <div class="top-actions">
+          <button id="reset" type="button">Reset</button>
+          <label class="compact-control">Space
+            <select id="spaceFamily">
+              <option value="room" selected>Architecture</option>
+              <option value="cave">Cave</option>
+              <option value="cavern">Cavern</option>
+              <option value="tunnel">Tunnel</option>
+              <option value="canyon">Canyon</option>
+              <option value="clearing">Clearing</option>
+              <option value="abstract">Abstract</option>
+              <option value="any">Any</option>
+            </select>
+          </label>
+          <label class="compact-control seed-control">Seed <input id="spaceSeed" type="number" min="1" max="9999999" value="314159" step="1" /></label>
+          <label class="generate-bias">Strangeness <input id="topologyBias" type="range" min="0" max="1" value="0.35" step="0.01" /></label>
+          <button id="randomize" type="button">Generate</button>
+          <button id="mutate" type="button">Mutate</button>
+          <button id="importJson" type="button">Import JSON</button>
+          <button id="exportJson" type="button">Export Project</button>
+          <button id="exportImprint" type="button">Export Imprint</button>
+          <button id="viewGltf" type="button">View glTF</button>
+          <button id="exportGltf" type="button">Export glTF</button>
+          <input id="projectFileInput" type="file" accept="application/json,.json" hidden />
+        </div>
+      </header>
+
+      <section class="workspace">
+        <aside class="panel preview">
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Selected Response</span></h2>
+            <div id="groupReadout" class="group-readout"></div>
+          </section>
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Response Sketch</span></h2>
+            <canvas id="timelineCanvas" width="512" height="180"></canvas>
+            <p class="hint">Early marks show boundary and scatter timing. The tail preview uses absorption, scattering, openness, and duration.</p>
+          </section>
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Export Preview</span></h2>
+            <pre id="jsonPreview"></pre>
+          </section>
+        </aside>
+
+        <section class="stage">
+          <div class="view-tabs">
+            <button type="button" data-view="top" class="active">TOP</button>
+            <button type="button" data-view="side">SIDE</button>
+            <button type="button" data-view="view3d">3D</button>
+            <button type="button" data-view="sphere">BANK MAP</button>
+            <button type="button" data-view="matrix">BANK MATRIX</button>
+            <button type="button" data-view="layers">REFLECTION LAYERS</button>
+          </div>
+          <div class="group-nav">
+            <button id="prevGroup" type="button">Prev Group</button>
+            <div id="groupStrip" class="group-strip" aria-label="IR bank groups"></div>
+            <button id="nextGroup" type="button">Next Group</button>
+          </div>
+          <div class="canvas-frame">
+            <svg id="roomSvg" viewBox="0 0 900 560" role="img" aria-label="Imprint space vector drawing"></svg>
+            <canvas id="roomCanvas" width="900" height="560"></canvas>
+          </div>
+          <div class="readout-grid">
+            <div><span>RT60</span><strong id="rt60Readout">0.00 s</strong></div>
+            <div><span>Acoustic volume</span><strong id="volumeReadout">0 m3</strong></div>
+            <div><span>Channels</span><strong id="channelReadout">128</strong></div>
+            <div><span>Late start</span><strong id="lateReadout">0 ms</strong></div>
+          </div>
+        </section>
+
+        <aside class="panel tools">
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Space</span></h2>
+            <label>Extent X m <input id="roomX" type="range" min="1" max="80" value="12" step="0.1" /></label>
+            <label>Extent Y m <input id="roomY" type="range" min="1" max="80" value="9" step="0.1" /></label>
+            <label>Mean height m <input id="roomZ" type="range" min="1" max="30" value="5" step="0.1" /></label>
+            <label>Material preset
+              <select id="materialPreset">
+                <option value="concrete">Concrete room</option>
+                <option value="brick">Brick hall</option>
+                <option value="stone">Stone room</option>
+                <option value="wood">Wood room</option>
+                <option value="metal">Metal tank</option>
+                <option value="studio">Studio room</option>
+                <option value="damped">Damped room</option>
+                <option value="glass">Glass / tile</option>
+                <option value="fabric">Fabric / curtain</option>
+                <option value="water">Water / ceramic</option>
+                <option value="earth">Earth / soil</option>
+                <option value="porous_rock">Porous rock</option>
+                <option value="ice">Ice</option>
+                <option value="vegetation">Vegetation / canopy</option>
+              </select>
+            </label>
+            <label>Absorption <input id="absorption" type="range" min="0.03" max="0.95" value="0.12" step="0.01" /></label>
+            <label>Scattering <input id="scattering" type="range" min="0" max="1" value="0.32" step="0.01" /></label>
+            <label>Tail soften <input id="tailSoften" type="range" min="0" max="1" value="0.16" step="0.01" /></label>
+            <label>Boundary irregularity <input id="irregularity" type="range" min="0" max="1" value="0.18" step="0.01" /></label>
+            <label>Surface roughness <input id="surfaceRoughness" type="range" min="0" max="1" value="0.28" step="0.01" /></label>
+            <label>Vertical variation <input id="verticalVariation" type="range" min="0" max="1" value="0.12" step="0.01" /></label>
+            <label>Openness <input id="openness" type="range" min="0" max="1" value="0.08" step="0.01" /></label>
+          </section>
+
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Topology</span></h2>
+            <label>Connectivity
+              <select id="spaceShape">
+                <option value="shoebox">Single region</option>
+                <option value="side_chamber" selected>Connected regions</option>
+              </select>
+            </label>
+            <label>Primary shape
+              <select id="roomShape">
+                <option value="rect" selected>Rectangular</option>
+                <option value="trapezoid">Trapezoid</option>
+                <option value="wedge">Wedge</option>
+                <option value="skew">Skewed polygon</option>
+                <option value="diamond">Diamond / lens</option>
+                <option value="impossible">Impossible fold</option>
+              </select>
+            </label>
+            <label>Branch family
+              <select id="branchFamily">
+                <option value="inherit" selected>Inherit primary</option>
+                <option value="room">Architecture</option>
+                <option value="cave">Cave</option>
+                <option value="cavern">Cavern</option>
+                <option value="tunnel">Tunnel</option>
+                <option value="canyon">Canyon</option>
+                <option value="clearing">Clearing</option>
+                <option value="abstract">Abstract</option>
+                <option value="mixed">Mixed deterministic</option>
+              </select>
+            </label>
+            <label>Architecture branch shape
+              <select id="chamberShape">
+                <option value="rect">Rectangular</option>
+                <option value="trapezoid">Trapezoid</option>
+                <option value="wedge">Wedge</option>
+                <option value="skew">Skewed polygon</option>
+                <option value="impossible">Impossible fold</option>
+              </select>
+            </label>
+            <label>Attachment side
+              <select id="chamberSide">
+                <option value="back" selected>Back wall</option>
+                <option value="front">Front wall</option>
+                <option value="left">Left wall</option>
+                <option value="right">Right wall</option>
+                <option value="all">All sides</option>
+              </select>
+            </label>
+            <label>Branch material
+              <select id="chamberMaterial">
+                <option value="inherit">Follow primary</option>
+                <option value="concrete">Concrete room</option>
+                <option value="brick">Brick hall</option>
+                <option value="stone">Stone room</option>
+                <option value="wood">Wood room</option>
+                <option value="metal">Metal tank</option>
+                <option value="studio">Studio room</option>
+                <option value="damped">Damped room</option>
+                <option value="glass">Glass / tile</option>
+                <option value="fabric">Fabric / curtain</option>
+                <option value="water">Water / ceramic</option>
+                <option value="earth">Earth / soil</option>
+                <option value="porous_rock">Porous rock</option>
+                <option value="ice">Ice</option>
+                <option value="vegetation">Vegetation / canopy</option>
+              </select>
+            </label>
+            <label>Material distribution
+              <select id="chamberMaterialMode">
+                <option value="uniform">Uniform branch material</option>
+                <option value="alternating">Alternating primary / branch</option>
+                <option value="nested">Deeper branches shift material</option>
+                <option value="palette">Varied material palette</option>
+              </select>
+            </label>
+            <label>Branch width m <input id="chamberWidth" type="range" min="1" max="20" value="4.5" step="0.1" /></label>
+            <label>Branch depth m <input id="chamberDepth" type="range" min="1" max="20" value="3.8" step="0.1" /></label>
+            <label>Branch count <input id="chamberCount" type="range" min="1" max="4" value="2" step="1" /></label>
+            <label>Branch position <input id="chamberPosition" type="range" min="0" max="1" value="0.5" step="0.01" /></label>
+            <label>Branch depth levels <input id="nestedChambers" type="range" min="0" max="2" value="1" step="1" /></label>
+            <label>Portal width <input id="openingWidth" type="range" min="0.1" max="1" value="0.42" step="0.01" /></label>
+            <label>Region coupling <input id="chamberCoupling" type="range" min="0" max="1" value="0.48" step="0.01" /></label>
+            <label>Material contrast <input id="chamberMaterialMix" type="range" min="0" max="1" value="0.65" step="0.01" /></label>
+            <label class="check-row"><input id="outsideOpening" type="checkbox" checked /> Open boundary</label>
+            <label>Boundary side
+              <select id="outsideOpeningSide">
+                <option value="front">Front wall</option>
+                <option value="back" selected>Back wall</option>
+                <option value="left">Left wall</option>
+                <option value="right">Right wall</option>
+                <option value="all">All sides</option>
+              </select>
+            </label>
+            <label>Boundary count <input id="outsideOpeningCount" type="range" min="1" max="6" value="2" step="1" /></label>
+            <label>Boundary position <input id="outsideOpeningPosition" type="range" min="0" max="1" value="0.76" step="0.01" /></label>
+            <label>Boundary spread <input id="outsideOpeningSpread" type="range" min="0" max="1" value="0.42" step="0.01" /></label>
+            <label>Boundary width <input id="outsideOpeningWidth" type="range" min="0.03" max="1" value="0.22" step="0.01" /></label>
+            <label>Energy escape <input id="outsideLeak" type="range" min="0" max="1" value="0.28" step="0.01" /></label>
+          </section>
+
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Field / Response</span></h2>
+            <label>Field X offset <input id="fieldX" type="range" min="-1" max="1" value="0" step="0.01" /></label>
+            <label>Field Y offset <input id="fieldY" type="range" min="-1" max="1" value="0" step="0.01" /></label>
+            <label>Distance m <input id="sourceDistance" type="range" min="0.25" max="20" value="3.2" step="0.05" /></label>
+            <label>Direction spread <input id="spreadDeg" type="range" min="0" max="120" value="45" step="1" /></label>
+            <label>Group variation <input id="groupVariation" type="range" min="0" max="1" value="0.35" step="0.01" /></label>
+            <label>Surface contrast <input id="surfaceContrast" type="range" min="0" max="1" value="0.45" step="0.01" /></label>
+            <label>Distance variation <input id="distanceVariation" type="range" min="0" max="1" value="0.18" step="0.01" /></label>
+            <input id="sourceAz" type="hidden" value="0" />
+            <input id="sourceEl" type="hidden" value="0" />
+          </section>
+
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Directional Model</span></h2>
+            <label>Output order
+              <select id="order">
+                <option value="1">1OA / 4ch</option>
+                <option value="2">2OA / 9ch</option>
+                <option value="3" selected>3OA / 16ch</option>
+              </select>
+            </label>
+            <label>Direction set
+              <select id="directionSet">
+                <option value="auto" selected>Auto by order</option>
+                <option value="tetra">P-format tetra</option>
+                <option value="cube">Practical 8-direction</option>
+              </select>
+            </label>
+            <label>Duration s <input id="duration" type="range" min="0.1" max="12" value="3" step="0.05" /></label>
+            <label>Pre-delay ms <input id="preDelay" type="range" min="0" max="120" value="12" step="1" /></label>
+            <label>Early reflections <input id="earlyReflections" type="range" min="0" max="80" value="18" step="1" /></label>
+          </section>
+
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Auralization View</span></h2>
+            <label>Camera azimuth <input id="cameraAz" type="range" min="-180" max="180" value="-38" step="1" /></label>
+            <label>Camera elevation <input id="cameraEl" type="range" min="-80" max="80" value="32" step="1" /></label>
+            <label>Zoom <input id="cameraZoom" type="range" min="0.55" max="2.4" value="1" step="0.01" /></label>
+            <div class="button-row">
+              <button type="button" data-camera="top">TOP</button>
+              <button type="button" data-camera="side">SIDE</button>
+              <button type="button" data-camera="iso">3/4</button>
+              <button type="button" data-camera="wide">WIDE</button>
+            </div>
+            <label class="check-row"><input id="showDirect" type="checkbox" checked /> Direct path</label>
+            <label class="check-row"><input id="showEarly" type="checkbox" checked /> Early reflections</label>
+            <label class="check-row"><input id="showDiffuse" type="checkbox" checked /> Late field</label>
+          </section>
+        </aside>
+      </section>
+    </main>
+    <div id="gltfModal" class="gltf-modal" aria-hidden="true">
+      <div class="gltf-panel" role="dialog" aria-label="glTF space preview">
+        <div class="gltf-head">
+          <div>
+            <h2>glTF Space Preview</h2>
+            <p>Generated 3D model of the primary region, branches, field center, and response positions.</p>
+          </div>
+          <div class="gltf-camera">
+            <label>Az <input id="gltfCameraAz" type="range" min="-180" max="180" value="-38" step="1" /></label>
+            <label>El <input id="gltfCameraEl" type="range" min="-80" max="80" value="32" step="1" /></label>
+            <label>Zoom <input id="gltfCameraZoom" type="range" min="0.45" max="3.2" value="1" step="0.01" /></label>
+            <div class="gltf-presets">
+              <button type="button" data-gltf-camera="top">TOP</button>
+              <button type="button" data-gltf-camera="side">SIDE</button>
+              <button type="button" data-gltf-camera="iso">3/4</button>
+              <button type="button" data-gltf-camera="wide">WIDE</button>
+            </div>
+          </div>
+          <div class="gltf-actions">
+            <button id="modalExportGltf" type="button">Export glTF</button>
+            <button id="closeGltf" type="button">Close</button>
+          </div>
+        </div>
+        <canvas id="gltfCanvas" width="1100" height="720"></canvas>
+      </div>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

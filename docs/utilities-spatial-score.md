@@ -4,8 +4,8 @@ title: Spatial Score
 utility_nav: true
 lightbox: true
 prev_page:
-  title: IR Sketch
-  url: /utilities-ir-room-sketch-designer.html
+  title: Imprint Sketch
+  url: /utilities-imprint-sketch.html
 next_page:
   title: References
   url: /references.html

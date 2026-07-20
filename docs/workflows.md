@@ -52,8 +52,9 @@ PNG, then load that file with a paired REAPER action or process. `Automation
 Score` writes generic breakpoint lanes that can be assigned to track or FX
 automation. `Spatial Score` writes 3OA source-motion automation and can also be
 monitored through its browser link or Max bridge. `Image Score` prepares PNG
-scores for image-to-sound 3OAFX rendering. `IR Sketch` prepares room and impulse
-bank layouts for synthetic ambisonic IR generation. `Displacement Score`
+scores for image-to-sound 3OAFX rendering. `Imprint Sketch` prepares seeded
+architectural, natural, open, or imaginary directional responses for synthetic
+ambisonic IR generation and realtime Ambi Imprint processing. `Displacement Score`
 prepares 24-point virtual speaker geometry changes for 3OAFX displacement
 workflows.
 

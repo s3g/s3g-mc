@@ -1,10 +1,11 @@
--- @description IR Sketch
+-- @description IR Sketch (Deprecated)
 -- @author s3g
--- @version 0.1
+-- @version 0.2
 -- @category Utils
--- @method Opens the browser-based IR Sketch for preparing JSON room sketches used by 3OAFX Synthetic Ambisonic IR Bank.
+-- @browser hidden
+-- @method Compatibility launcher for projects and actions created before IR Sketch became Imprint Sketch.
 
-local script_name = "IR Sketch"
+local script_name = "IR Sketch (Deprecated)"
 
 local script_path = ({ reaper.get_action_context() })[2]
 local script_dir = script_path:match("^(.*[/\\])") or ""
@@ -16,22 +17,20 @@ local function file_exists(path)
   return false
 end
 
-local function find_utility_dir(name)
-  local candidates = {
-    script_dir .. "/utilities/" .. name,
-    repo_root .. "/docs/utilities/" .. name,
-  }
-  for _, path in ipairs(candidates) do
-    if file_exists(path .. "/index.html") then return path end
-  end
-  return nil
+local utility_dir
+for _, path in ipairs({
+  script_dir .. "/utilities/imprint-sketch-designer",
+  repo_root .. "/docs/utilities/imprint-sketch-designer",
+}) do
+  if file_exists(path .. "/index.html") then utility_dir = path break end
 end
 
-local utility_dir = find_utility_dir("ir-room-sketch-designer")
 if not utility_dir then
-  reaper.MB("Could not find ir-room-sketch-designer/index.html in Scripts/s3g-mc/utilities or docs/utilities.", script_name, 0)
+  reaper.MB("Could not find Imprint Sketch. Reinstall or update the s3g-mc package.", script_name, 0)
   return
 end
+
+reaper.MB("IR Sketch has moved to Imprint Sketch. This compatibility action will now open the replacement utility.", script_name, 0)
 
 local function shell_quote(text)
   text = tostring(text or "")
@@ -39,8 +38,7 @@ local function shell_quote(text)
 end
 
 local index_path = utility_dir .. "/index.html"
-local sep = package.config:sub(1, 1)
-if sep == "\\" then
+if package.config:sub(1, 1) == "\\" then
   os.execute('start "" "' .. index_path .. '"')
 else
   os.execute("open " .. shell_quote(index_path) .. " >/dev/null 2>&1 &")

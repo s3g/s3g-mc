@@ -15,8 +15,8 @@ toc:
     href: "#displacement-score"
   - title: Image Score
     href: "#image-score"
-  - title: IR Sketch
-    href: "#ir-sketch"
+  - title: Imprint Sketch
+    href: "#imprint-sketch"
   - title: Spatial Score
     href: "#spatial-score"
 ---
@@ -69,20 +69,22 @@ includes drawing, generator, preview, and export controls.
 
 The same utility can be launched from REAPER with `Image Score`.
 
-## IR Sketch
+## Imprint Sketch
 
-[Open IR Sketch](utilities/ir-room-sketch-designer/){:target="_blank" rel="noopener noreferrer" .utility-link}
+[Open Imprint Sketch](utilities/imprint-sketch-designer/){:target="_blank" rel="noopener noreferrer" .utility-link}
 
-[Read IR Sketch notes](utilities-ir-room-sketch-designer.md)
+[Read Imprint Sketch notes](utilities-imprint-sketch.md)
 
-Sketches synthetic ambisonic impulse-response banks for `3OAFX Synthetic
-Ambisonic IR Bank`, including room geometry, chambers, exterior leak openings,
-direction groups, reflection timing, material variation, JSON export, and glTF
-room export. Load the exported JSON with `Load Room Sketch JSON` inside
-`3OAFX Synthetic Ambisonic IR Bank`; the generated IRs can then be used with
-`3OAFX Offline Ambisonic Convolve`.
+Sketches seeded directional responses for rooms, caves, caverns, passages,
+open fields, and impossible spaces. Generate and Mutate provide repeatable
+variation across geometry, materials, connected regions, reflection timing,
+and decay behavior. Project JSON can be re-imported for editing or loaded by
+`3OAFX Synthetic Ambisonic IR Bank`. `Export Imprint` writes a `.s3gimprint`
+file that loads directly in `s3g Ambi Imprint 64` from the sibling `s3g-dsp`
+package.
 
-The same utility can be launched from REAPER with `IR Sketch`.
+The same utility can be launched from REAPER with `Imprint Sketch`. The retired
+`IR Sketch` action remains as a hidden compatibility launcher.
 
 ## Spatial Score
 

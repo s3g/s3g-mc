@@ -9,10 +9,20 @@ const timelineCanvas = $("timelineCanvas");
 const timelineCtx = timelineCanvas.getContext("2d");
 const gltfCanvas = $("gltfCanvas");
 const gltfCtx = gltfCanvas.getContext("2d");
-const STORAGE_KEY = "s3g-mc-ir-sketch-autosave-v1";
+const STORAGE_KEY = "s3g-mc-imprint-sketch-autosave-v1";
+const LEGACY_STORAGE_KEY = "s3g-mc-ir-sketch-autosave-v1";
+const PROJECT_FORMAT = "s3g-imprint-sketch";
+const PROJECT_VERSION = 1;
+const LEGACY_PROJECT_FORMAT = "s3g-ir-room-sketch";
+const LEGACY_PROJECT_VERSION = 2;
+const IMPRINT_FORMAT = "s3g-ambi-imprint";
+const IMPRINT_VERSION = 1;
+const IMPRINT_BANDS_HZ = [125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 let lastAutosaveJson = "";
 
 const controls = {
+  spaceFamily: $("spaceFamily"),
+  spaceSeed: $("spaceSeed"),
   roomX: $("roomX"),
   roomY: $("roomY"),
   roomZ: $("roomZ"),
@@ -20,9 +30,14 @@ const controls = {
   absorption: $("absorption"),
   scattering: $("scattering"),
   tailSoften: $("tailSoften"),
+  irregularity: $("irregularity"),
+  surfaceRoughness: $("surfaceRoughness"),
+  verticalVariation: $("verticalVariation"),
+  openness: $("openness"),
   spaceShape: $("spaceShape"),
   roomShape: $("roomShape"),
   topologyBias: $("topologyBias"),
+  branchFamily: $("branchFamily"),
   chamberShape: $("chamberShape"),
   chamberSide: $("chamberSide"),
   chamberMaterial: $("chamberMaterial"),
@@ -89,17 +104,85 @@ const state = {
 };
 
 const materials = {
-  concrete: { absorption: 0.12, scattering: 0.32, tailSoften: 0.16 },
-  brick: { absorption: 0.16, scattering: 0.62, tailSoften: 0.20 },
-  stone: { absorption: 0.18, scattering: 0.48, tailSoften: 0.22 },
-  wood: { absorption: 0.30, scattering: 0.55, tailSoften: 0.36 },
-  metal: { absorption: 0.08, scattering: 0.18, tailSoften: 0.08 },
-  studio: { absorption: 0.42, scattering: 0.42, tailSoften: 0.48 },
-  damped: { absorption: 0.68, scattering: 0.38, tailSoften: 0.72 },
-  glass: { absorption: 0.20, scattering: 0.22, tailSoften: 0.12 },
-  fabric: { absorption: 0.74, scattering: 0.58, tailSoften: 0.82 },
-  water: { absorption: 0.10, scattering: 0.70, tailSoften: 0.10 }
+  concrete: { absorption: 0.12, scattering: 0.32, tailSoften: 0.16, bands: [0.04, 0.05, 0.07, 0.09, 0.12, 0.17, 0.24, 0.32] },
+  brick: { absorption: 0.16, scattering: 0.62, tailSoften: 0.20, bands: [0.05, 0.06, 0.08, 0.12, 0.17, 0.24, 0.33, 0.42] },
+  stone: { absorption: 0.18, scattering: 0.48, tailSoften: 0.22, bands: [0.05, 0.06, 0.08, 0.11, 0.16, 0.23, 0.31, 0.40] },
+  wood: { absorption: 0.30, scattering: 0.55, tailSoften: 0.36, bands: [0.22, 0.25, 0.28, 0.31, 0.35, 0.42, 0.50, 0.58] },
+  metal: { absorption: 0.08, scattering: 0.18, tailSoften: 0.08, bands: [0.13, 0.10, 0.07, 0.05, 0.05, 0.07, 0.10, 0.15] },
+  studio: { absorption: 0.42, scattering: 0.42, tailSoften: 0.48, bands: [0.24, 0.32, 0.42, 0.50, 0.58, 0.66, 0.73, 0.78] },
+  damped: { absorption: 0.68, scattering: 0.38, tailSoften: 0.72, bands: [0.40, 0.54, 0.68, 0.78, 0.86, 0.91, 0.94, 0.96] },
+  glass: { absorption: 0.20, scattering: 0.22, tailSoften: 0.12, bands: [0.26, 0.19, 0.14, 0.11, 0.10, 0.12, 0.17, 0.24] },
+  fabric: { absorption: 0.74, scattering: 0.58, tailSoften: 0.82, bands: [0.24, 0.42, 0.62, 0.76, 0.86, 0.92, 0.95, 0.97] },
+  water: { absorption: 0.10, scattering: 0.70, tailSoften: 0.10, bands: [0.04, 0.05, 0.06, 0.08, 0.11, 0.16, 0.24, 0.34] },
+  earth: { absorption: 0.38, scattering: 0.76, tailSoften: 0.58, bands: [0.18, 0.24, 0.31, 0.39, 0.49, 0.60, 0.70, 0.78] },
+  porous_rock: { absorption: 0.27, scattering: 0.84, tailSoften: 0.43, bands: [0.10, 0.14, 0.20, 0.27, 0.35, 0.45, 0.56, 0.66] },
+  ice: { absorption: 0.09, scattering: 0.28, tailSoften: 0.12, bands: [0.08, 0.07, 0.06, 0.06, 0.08, 0.12, 0.19, 0.28] },
+  vegetation: { absorption: 0.62, scattering: 0.88, tailSoften: 0.82, bands: [0.26, 0.39, 0.54, 0.66, 0.76, 0.85, 0.91, 0.95] }
 };
+
+const SPACE_FAMILIES = ["room", "cave", "cavern", "tunnel", "canyon", "clearing", "abstract"];
+
+function normalizedSeed(value) {
+  const seed = Math.abs(Math.trunc(Number(value) || 1)) % 10000000;
+  return seed || 1;
+}
+
+function makeRng(seedValue) {
+  let seed = normalizedSeed(seedValue) >>> 0;
+  return () => {
+    seed += 0x6d2b79f5;
+    let value = seed;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function freshSeed() {
+  if (window.crypto && window.crypto.getRandomValues) {
+    const values = new Uint32Array(1);
+    window.crypto.getRandomValues(values);
+    return values[0] % 9999999 + 1;
+  }
+  return Math.floor(Math.random() * 9999999) + 1;
+}
+
+function resolvedSpaceFamily(family, seed, bias = 0.35) {
+  if (family !== "any") return SPACE_FAMILIES.includes(family) ? family : "room";
+  const rng = makeRng(seed + Math.round(bias * 1009));
+  const pool = bias < 0.28
+    ? ["room", "room", "cave", "cavern", "tunnel", "clearing"]
+    : bias < 0.68
+      ? ["room", "cave", "cave", "cavern", "tunnel", "canyon", "clearing", "abstract"]
+      : ["cave", "cavern", "tunnel", "canyon", "clearing", "abstract", "abstract", "abstract"];
+  return pool[Math.floor(rng() * pool.length) % pool.length];
+}
+
+function resolvedBranchFamily(s, index, level = 0) {
+  const requested = s.branch_family || "inherit";
+  if (requested === "inherit") return s.space_family;
+  if (SPACE_FAMILIES.includes(requested)) return requested;
+  if (requested !== "mixed") return s.space_family;
+
+  const related = {
+    room: ["room", "cave", "tunnel", "clearing"],
+    cave: ["cave", "cavern", "tunnel", "room"],
+    cavern: ["cavern", "cave", "tunnel", "canyon"],
+    tunnel: ["tunnel", "cave", "room", "canyon"],
+    canyon: ["canyon", "cave", "clearing", "tunnel"],
+    clearing: ["clearing", "room", "canyon", "cave"],
+    abstract: SPACE_FAMILIES
+  };
+  const primary = SPACE_FAMILIES.includes(s.space_family) ? s.space_family : "room";
+  const bias = clamp(Number(s.topology_bias || 0), 0, 1);
+  const pool = bias < 0.28
+    ? [primary, primary, ...(related[primary] || SPACE_FAMILIES)]
+    : bias < 0.68
+      ? [...(related[primary] || SPACE_FAMILIES), "abstract"]
+      : [...SPACE_FAMILIES, "abstract", "abstract"];
+  const rng = makeRng(s.space_seed + (index + 1) * 7919 + (level + 1) * 104729 + Math.round(bias * 1009));
+  return pool[Math.floor(rng() * pool.length) % pool.length];
+}
 
 function configureRoomCanvas() {
   const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
@@ -129,39 +212,44 @@ function updateAllRangeFills() {
   document.querySelectorAll('input[type="range"]').forEach(updateRangeFill);
 }
 
-function choice(items) {
-  return items[Math.floor(Math.random() * items.length)];
+function choice(items, random = Math.random) {
+  return items[Math.floor(random() * items.length)];
 }
 
-function chooseByBias(low, mid, high, bias) {
-  if (bias < 0.28) return choice(low);
-  if (bias < 0.68) return choice(mid);
-  return choice(high);
+function chooseByBias(low, mid, high, bias, random = Math.random) {
+  if (bias < 0.28) return choice(low, random);
+  if (bias < 0.68) return choice(mid, random);
+  return choice(high, random);
 }
 
 function settings() {
   const roomX = Number(controls.roomX.value);
   const roomY = Number(controls.roomY.value);
   const roomZ = Number(controls.roomZ.value);
+  const spaceSeed = normalizedSeed(controls.spaceSeed.value);
+  const topologyBias = Number(controls.topologyBias.value);
+  const requestedFamily = controls.spaceFamily.value;
+  const spaceFamily = resolvedSpaceFamily(requestedFamily, spaceSeed, topologyBias);
   const baseAbsorption = Number(controls.absorption.value);
   const scattering = Number(controls.scattering.value);
   const duration = Number(controls.duration.value);
   const preDelay = Number(controls.preDelay.value);
-  const volume = roomX * roomY * roomZ;
-  const surface = 2 * (roomX * roomY + roomX * roomZ + roomY * roomZ);
+  const openness = Number(controls.openness.value);
   const outsideOpening = controls.outsideOpening.checked;
   const outsideOpeningCount = Math.max(1, Math.round(Number(controls.outsideOpeningCount.value)));
   const outsideOpeningWidth = Number(controls.outsideOpeningWidth.value);
   const outsideLeak = Number(controls.outsideLeak.value);
-  const leakFactor = outsideOpening ? clamp(outsideOpeningWidth * outsideLeak * outsideOpeningCount, 0, 1) : 0;
+  const apertureLeak = outsideOpening ? outsideOpeningWidth * outsideLeak * outsideOpeningCount : 0;
+  const leakFactor = clamp(apertureLeak * (1 - openness * 0.35) + openness * 0.82, 0, 1);
   const absorption = clamp(baseAbsorption + leakFactor * 0.32, 0.03, 0.95);
-  const rt60 = clamp(0.161 * volume / Math.max(0.01, surface * absorption), 0.08, 8.0);
-  const lateStart = clamp(Math.min(duration * 0.92, preDelay / 1000 + 0.035 + (1 - scattering) * 0.080 - leakFactor * 0.030), 0.008, duration * 0.92);
   const order = Number(controls.order.value);
   const directionSet = controls.directionSet.value;
   const effectiveDirectionLayout = directionSet === "auto" ? (order === 1 ? "tetra" : "practical_8") : directionSet;
   const directionCount = activeDirections({ direction_set: directionSet, order }).length;
-  return {
+  const result = {
+    space_family: spaceFamily,
+    space_family_requested: requestedFamily,
+    space_seed: spaceSeed,
     room_x: roomX,
     room_y: roomY,
     room_z: roomZ,
@@ -169,9 +257,14 @@ function settings() {
     absorption,
     scattering,
     tail_soften: Number(controls.tailSoften.value),
+    irregularity: Number(controls.irregularity.value),
+    surface_roughness: Number(controls.surfaceRoughness.value),
+    vertical_variation: Number(controls.verticalVariation.value),
+    openness,
     space_shape: controls.spaceShape.value,
     room_shape: controls.roomShape.value,
-    topology_bias: Number(controls.topologyBias.value),
+    topology_bias: topologyBias,
+    branch_family: controls.branchFamily.value,
     chamber_shape: controls.chamberShape.value,
     chamber_side: controls.chamberSide.value,
     chamber_material: controls.chamberMaterial.value,
@@ -216,9 +309,21 @@ function settings() {
     show_direct: controls.showDirect.checked,
     show_early: controls.showEarly.checked,
     show_diffuse: controls.showDiffuse.checked,
-    estimated_rt60: rt60,
-    late_start_seconds: lateStart
+    acoustic_volume: 0,
+    acoustic_surface: 0,
+    estimated_rt60: 0,
+    late_start_seconds: 0
   };
+  const geometry = acousticGeometry(result);
+  result.acoustic_volume = geometry.volume;
+  result.acoustic_surface = geometry.surface;
+  result.estimated_rt60 = localRt60(result, absorption);
+  result.late_start_seconds = clamp(
+    Math.min(duration * 0.92, preDelay / 1000 + 0.035 + (1 - scattering) * 0.080 - leakFactor * 0.030),
+    0.008,
+    duration * 0.92
+  );
+  return result;
 }
 
 function unitFromAed(azDeg, elDeg) {
@@ -258,11 +363,93 @@ function activeDirections(directionSetOrSettings = settings()) {
   return directionSetDirections(directionSet);
 }
 
+function polygonPerimeter(poly) {
+  let perimeter = 0;
+  for (let index = 0; index < poly.length; index += 1) {
+    const a = poly[index];
+    const b = poly[(index + 1) % poly.length];
+    perimeter += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return perimeter;
+}
+
+function spaceCeilingHeight(s, x, y) {
+  if (s.vertical_variation <= 0.0001) return s.room_z;
+  const nx = x / Math.max(0.1, s.room_x);
+  const ny = y / Math.max(0.1, s.room_y);
+  const phase = (s.space_seed % 997) * 0.0137;
+  const broad = Math.sin(nx * Math.PI * 2.1 + phase) * 0.52
+    + Math.cos(ny * Math.PI * 2.7 - phase * 0.61) * 0.31
+    + Math.sin((nx + ny) * Math.PI * 3.4 + phase * 1.7) * 0.17;
+  const familyDepth = s.space_family === "cave" || s.space_family === "cavern" ? 0.48
+    : s.space_family === "tunnel" ? 0.32
+      : s.space_family === "abstract" ? 0.62
+        : 0.24;
+  return clamp(s.room_z * (1 + broad * s.vertical_variation * familyDepth), s.room_z * 0.38, s.room_z * 1.62);
+}
+
+function ceilingProfile(s, count = 17) {
+  const bounds = floorplanBounds(s);
+  const centerY = (bounds.minY + bounds.maxY) * 0.5;
+  return Array.from({ length: count }, (_, index) => {
+    const amount = index / Math.max(1, count - 1);
+    const x = bounds.minX + (bounds.maxX - bounds.minX) * amount;
+    return { x, z: spaceCeilingHeight(s, x, centerY) };
+  });
+}
+
+function acousticGeometry(s) {
+  const polygons = floorplanPolygons(s);
+  const area = Math.max(0.25, polygons.reduce((sum, polygon) => sum + Math.abs(polygonArea(polygon)), 0));
+  const perimeter = Math.max(1, polygons.reduce((sum, polygon) => sum + polygonPerimeter(polygon), 0));
+  const verticalScale = 1 - s.vertical_variation * (s.space_family === "abstract" ? 0.12 : 0.06);
+  const meanHeight = Math.max(0.5, s.room_z * verticalScale);
+  const roughnessArea = 1 + s.surface_roughness * (0.18 + s.irregularity * 0.42);
+  const ceilingArea = area * (1 - s.openness * 0.92);
+  const wallArea = perimeter * meanHeight * roughnessArea * (1 - s.openness * 0.28);
+  return {
+    area,
+    perimeter,
+    meanHeight,
+    volume: area * meanHeight,
+    surface: Math.max(0.5, area + ceilingArea + wallArea)
+  };
+}
+
 function localRt60(s, absorption) {
-  const volume = s.room_x * s.room_y * s.room_z;
-  const surface = 2 * (s.room_x * s.room_y + s.room_x * s.room_z + s.room_y * s.room_z);
-  const leakAbsorption = (s.outside_opening ? s.outside_leak_factor || 0 : 0) * 0.20;
-  return clamp(0.161 * volume / Math.max(0.01, surface * clamp(absorption + leakAbsorption, 0.03, 0.95)), 0.08, 8.0);
+  const geometry = s.acoustic_volume > 0 && s.acoustic_surface > 0
+    ? { volume: s.acoustic_volume, surface: s.acoustic_surface }
+    : acousticGeometry(s);
+  const leakAbsorption = (s.outside_opening ? s.outside_leak_factor || 0 : 0) * 0.20 + s.openness * 0.48;
+  const effectiveAbsorption = clamp(absorption + leakAbsorption, 0.03, 0.98);
+  const familyScale = s.space_family === "cave" ? 1.08
+    : s.space_family === "cavern" ? 1.22
+      : s.space_family === "tunnel" ? 1.14
+        : s.space_family === "canyon" ? 0.68
+          : s.space_family === "clearing" ? 0.34
+            : s.space_family === "abstract" ? 0.82 + s.topology_bias * 0.72
+              : 1;
+  return clamp(0.161 * geometry.volume / Math.max(0.01, geometry.surface * effectiveAbsorption) * familyScale, 0.08, 8.0);
+}
+
+function resolvedAbsorptionBands(profile, materialKey) {
+  const material = materials[materialKey] || materials.concrete;
+  const scalarOffset = profile.absorption - material.absorption;
+  const tailOffset = profile.tail_soften - material.tailSoften;
+  return material.bands.map((value, index) => {
+    const highWeight = index / Math.max(1, material.bands.length - 1);
+    return clamp(value + scalarOffset + tailOffset * highWeight * 0.22, 0.02, 0.98);
+  });
+}
+
+function localRt60Bands(s, absorptionBands) {
+  return absorptionBands.map((absorption) => localRt60(s, absorption));
+}
+
+function imprintSeed(s, groupIndex) {
+  const spaceHash = Math.round(s.room_x * 101 + s.room_y * 211 + s.room_z * 307 + s.space_seed * 0.73);
+  const materialHash = Array.from(s.material_preset || "space").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return (spaceHash * 131 + materialHash * 17 + (groupIndex + 1) * 7919) >>> 0;
 }
 
 function roomMaterialProfile(s) {
@@ -273,9 +460,54 @@ function roomMaterialProfile(s) {
   };
 }
 
+function branchFamilyResponse(s, chamber) {
+  const profiles = {
+    room: { absorption: 0, scattering: 0, tail: 0, path: 1, coupling: 1, energy: 1, azimuth: 1, elevation: 1 },
+    cave: { absorption: -0.03, scattering: 0.14, tail: 0.08, path: 1.10, coupling: 0.95, energy: 1, azimuth: 1.18, elevation: 1.15 },
+    cavern: { absorption: -0.05, scattering: 0.10, tail: 0.15, path: 1.35, coupling: 0.82, energy: 0.92, azimuth: 1.38, elevation: 1.42 },
+    tunnel: { absorption: -0.03, scattering: -0.12, tail: 0.06, path: 1.55, coupling: 1.08, energy: 1.05, azimuth: 0.34, elevation: 0.58 },
+    canyon: { absorption: 0.12, scattering: 0.06, tail: -0.10, path: 1.35, coupling: 0.62, energy: 0.63, azimuth: 0.48, elevation: 1.05 },
+    clearing: { absorption: 0.22, scattering: 0.12, tail: -0.16, path: 1.18, coupling: 0.42, energy: 0.42, azimuth: 1.55, elevation: 1.18 }
+  };
+  if (chamber.family !== "abstract") return profiles[chamber.family] || profiles.room;
+  const seed = s.space_seed + (chamber.index + 1) * 431 + chamber.level * 97;
+  return {
+    absorption: (seededNoise(seed) - 0.45) * 0.30,
+    scattering: (seededNoise(seed + 11) - 0.35) * 0.44,
+    tail: (seededNoise(seed + 23) - 0.5) * 0.40,
+    path: 0.72 + seededNoise(seed + 31) * 1.18,
+    coupling: 0.48 + seededNoise(seed + 43) * 0.82,
+    energy: 0.52 + seededNoise(seed + 59) * 0.72,
+    azimuth: 0.38 + seededNoise(seed + 67) * 1.62,
+    elevation: 0.45 + seededNoise(seed + 79) * 1.50
+  };
+}
+
+function branchHeightRatio(s, chamber) {
+  const base = {
+    room: 0.72,
+    cave: 0.66,
+    cavern: 1.02,
+    tunnel: 0.52,
+    canyon: 1.10,
+    clearing: 0.34
+  }[chamber.family];
+  if (base !== undefined) return clamp(base + chamber.level * 0.05, 0.28, 1.16);
+  const variation = seededNoise(s.space_seed + (chamber.index + 1) * 271 + chamber.level * 41);
+  return clamp(0.42 + variation * 0.72 + chamber.level * 0.04, 0.30, 1.18);
+}
+
+function branchFamilyLabel(family) {
+  return {
+    room: "arch",
+    clearing: "clear",
+    abstract: "abstr"
+  }[family] || family;
+}
+
 function chamberMaterialProfile(s, chamber) {
   const base = roomMaterialProfile(s);
-  const palette = ["concrete", "brick", "stone", "wood", "metal", "glass", "fabric", "water"];
+  const palette = ["concrete", "brick", "stone", "wood", "metal", "glass", "fabric", "water", "earth", "porous_rock", "ice", "vegetation"];
   let materialKey = s.chamber_material;
   if (s.chamber_material_mode === "alternating" && chamber.index % 2 === 1) materialKey = "inherit";
   if (s.chamber_material_mode === "nested" && chamber.level > 0) materialKey = palette[(palette.indexOf(s.chamber_material) + chamber.level + 2 + palette.length) % palette.length];
@@ -285,11 +517,13 @@ function chamberMaterialProfile(s, chamber) {
   const seed = (chamber.index + 1) * 137 + chamber.level * 19;
   const variation = 0.08 + s.group_variation * 0.14;
   const targetTail = target.tailSoften === undefined ? target.tail_soften : target.tailSoften;
+  const family = branchFamilyResponse(s, chamber);
   return {
     material_key: materialKey,
-    absorption: clamp(base.absorption * (1 - mix) + target.absorption * mix + (seededNoise(seed) - 0.5) * variation, 0.03, 0.95),
-    scattering: clamp(base.scattering * (1 - mix) + target.scattering * mix + (seededNoise(seed + 7) - 0.5) * variation, 0, 1),
-    tail_soften: clamp(base.tail_soften * (1 - mix) + targetTail * mix + (seededNoise(seed + 13) - 0.5) * variation, 0, 1)
+    family: chamber.family,
+    absorption: clamp(base.absorption * (1 - mix) + target.absorption * mix + (seededNoise(seed) - 0.5) * variation + family.absorption, 0.03, 0.95),
+    scattering: clamp(base.scattering * (1 - mix) + target.scattering * mix + (seededNoise(seed + 7) - 0.5) * variation + family.scattering, 0, 1),
+    tail_soften: clamp(base.tail_soften * (1 - mix) + targetTail * mix + (seededNoise(seed + 13) - 0.5) * variation + family.tail, 0, 1)
   };
 }
 
@@ -407,8 +641,79 @@ function polygonForBox(x, y, w, d, shape) {
   ];
 }
 
+function radialSpacePolygon(s, family) {
+  const count = family === "abstract" ? 18
+    : family === "cavern" ? 20
+      : family === "clearing" ? 18
+        : 16;
+  const centerX = s.room_x * 0.5;
+  const centerY = s.room_y * 0.5;
+  const radiusX = s.room_x * 0.48;
+  const radiusY = s.room_y * 0.48;
+  const phase = seededNoise(s.space_seed * 0.73 + 19) * Math.PI * 2;
+  const familyIrregularity = family === "abstract"
+    ? clamp(0.48 + s.irregularity * 0.52 + s.topology_bias * 0.18, 0, 1)
+    : family === "cavern"
+      ? s.irregularity * 0.72
+      : family === "clearing"
+        ? s.irregularity * 0.58
+        : s.irregularity;
+  return Array.from({ length: count }, (_, index) => {
+    const angle = -Math.PI * 0.5 + index / count * Math.PI * 2;
+    const previous = seededNoise(s.space_seed + ((index + count - 1) % count) * 43 + 11);
+    const current = seededNoise(s.space_seed + index * 43 + 11);
+    const next = seededNoise(s.space_seed + ((index + 1) % count) * 43 + 11);
+    const smoothNoise = previous * 0.22 + current * 0.56 + next * 0.22;
+    const lobes = Math.sin(angle * (family === "abstract" ? 5 : 3) + phase) * 0.5
+      + Math.sin(angle * 2 - phase * 0.37) * 0.22;
+    const minimum = family === "abstract" ? 0.30 : 0.58;
+    const radius = clamp(0.82 + (smoothNoise - 0.5) * familyIrregularity * 0.78 + lobes * familyIrregularity * 0.34, minimum, 1.04);
+    return {
+      x: clamp(centerX + Math.cos(angle) * radiusX * radius, 0, s.room_x),
+      y: clamp(centerY + Math.sin(angle) * radiusY * radius, 0, s.room_y)
+    };
+  });
+}
+
+function passageSpacePolygon(s, family) {
+  const segments = family === "canyon" ? 12 : 10;
+  const left = [];
+  const right = [];
+  const phase = seededNoise(s.space_seed + 71) * Math.PI * 2;
+  const baseWidth = s.room_x * (family === "canyon" ? 0.58 : 0.34);
+  const bend = s.room_x * s.irregularity * (family === "canyon" ? 0.20 : 0.28);
+  for (let index = 0; index < segments; index += 1) {
+    const amount = index / Math.max(1, segments - 1);
+    const y = s.room_y * amount;
+    const noise = seededNoise(s.space_seed + index * 67 + 29) - 0.5;
+    const center = s.room_x * 0.5
+      + Math.sin(amount * Math.PI * (2.1 + s.topology_bias * 1.8) + phase) * bend
+      + noise * bend * 0.46;
+    const widthNoise = 0.72 + seededNoise(s.space_seed + index * 79 + 7) * 0.56;
+    const width = baseWidth * widthNoise * (1 + s.irregularity * 0.32);
+    left.push({ x: clamp(center - width * 0.5, 0, s.room_x), y });
+    right.push({ x: clamp(center + width * 0.5, 0, s.room_x), y });
+  }
+  return [...left, ...right.reverse()];
+}
+
+function perturbedRoomPolygon(s) {
+  const polygon = polygonForBox(0, 0, s.room_x, s.room_y, s.room_shape);
+  if (s.irregularity <= 0.001) return polygon;
+  const center = polygonCentroid(polygon);
+  return polygon.map((point, index) => {
+    const amount = (seededNoise(s.space_seed + index * 59 + 5) - 0.5) * s.irregularity * 0.20;
+    return {
+      x: clamp(point.x + (point.x - center.x) * amount, -s.room_x * 0.12, s.room_x * 1.12),
+      y: clamp(point.y + (point.y - center.y) * amount, -s.room_y * 0.12, s.room_y * 1.12)
+    };
+  });
+}
+
 function roomPolygon(s) {
-  return polygonForBox(0, 0, s.room_x, s.room_y, s.room_shape);
+  if (s.space_family === "tunnel" || s.space_family === "canyon") return passageSpacePolygon(s, s.space_family);
+  if (["cave", "cavern", "clearing", "abstract"].includes(s.space_family)) return radialSpacePolygon(s, s.space_family);
+  return perturbedRoomPolygon(s);
 }
 
 function polygonCentroid(poly) {
@@ -504,8 +809,98 @@ function chamberLocalPolygon(alongStart, alongWidth, outwardDepth, shape) {
   return polygonForBox(x, 0, w, d, "rect");
 }
 
-function transformLocalPolygon(edge, alongStart, alongWidth, outwardDepth, shape) {
-  return chamberLocalPolygon(alongStart, alongWidth, outwardDepth, shape).map((point) => mapLocal(edge, point.x, point.y));
+function radialBranchLocalGeometry(s, alongStart, alongWidth, outwardDepth, family, index, level) {
+  const segments = family === "cavern" ? 14 : family === "abstract" ? 12 : family === "clearing" ? 11 : 10;
+  const widthScale = family === "cavern" ? 1.18 : family === "clearing" ? 1.10 : 1;
+  const depthScale = family === "cavern" ? 1.10 : family === "clearing" ? 0.84 : 1;
+  const roughness = family === "abstract"
+    ? clamp(0.46 + s.irregularity * 0.48 + s.topology_bias * 0.20, 0, 1)
+    : family === "clearing"
+      ? s.irregularity * 0.46
+      : family === "cavern"
+        ? s.irregularity * 0.68
+        : s.irregularity * 0.82;
+  const center = alongStart + alongWidth * 0.5;
+  const seed = s.space_seed + (index + 1) * 3571 + (level + 1) * 101;
+  const phase = seededNoise(seed + 17) * Math.PI * 2;
+  const radialPoint = (amount) => {
+    const angle = amount * Math.PI;
+    const sample = amount * segments;
+    const sampleIndex = Math.round(sample);
+    const previous = seededNoise(seed + (sampleIndex - 1) * 47 + 31);
+    const current = seededNoise(seed + sampleIndex * 47 + 31);
+    const next = seededNoise(seed + (sampleIndex + 1) * 47 + 31);
+    const smoothNoise = previous * 0.22 + current * 0.56 + next * 0.22;
+    const radial = clamp(0.92 + (smoothNoise - 0.5) * roughness * 0.54, 0.68, 1.16);
+    const lateralFold = Math.sin(angle * 2 + phase) * alongWidth * roughness * (family === "abstract" ? 0.075 : 0.035);
+    return {
+      x: center + Math.cos(angle) * alongWidth * 0.5 * widthScale * radial + lateralFold * Math.sin(angle),
+      y: Math.max(0, Math.sin(angle) * outwardDepth * depthScale * radial)
+    };
+  };
+  const poly = [
+    { x: alongStart, y: 0 },
+    { x: alongStart + alongWidth, y: 0 }
+  ];
+  for (let pointIndex = 1; pointIndex < segments; pointIndex += 1) {
+    poly.push(radialPoint(pointIndex / segments));
+  }
+  return {
+    poly,
+    outerA: radialPoint(0.58),
+    outerB: radialPoint(0.42)
+  };
+}
+
+function passageBranchLocalGeometry(s, alongStart, alongWidth, outwardDepth, family, index, level) {
+  const segments = family === "canyon" ? 8 : 7;
+  const left = [];
+  const right = [];
+  const seed = s.space_seed + (index + 1) * 6173 + (level + 1) * 149;
+  const phase = seededNoise(seed + 13) * Math.PI * 2;
+  const bend = (family === "canyon" ? 0.18 : 0.24) * (0.30 + s.irregularity * 0.70);
+  for (let pointIndex = 0; pointIndex < segments; pointIndex += 1) {
+    const amount = pointIndex / Math.max(1, segments - 1);
+    const noise = seededNoise(seed + pointIndex * 71 + 23) - 0.5;
+    const drift = pointIndex === 0 ? 0
+      : (Math.sin(amount * Math.PI * (1.05 + s.topology_bias * 0.75) + phase) - Math.sin(phase)) * alongWidth * bend * amount;
+    const center = alongStart + alongWidth * 0.5 + drift;
+    const widthScale = pointIndex === 0 ? 1
+      : family === "canyon"
+        ? 0.92 + amount * 0.26 + noise * 0.22
+        : 0.68 + (1 - amount) * 0.18 + noise * 0.16;
+    const width = Math.max(alongWidth * 0.34, alongWidth * widthScale);
+    const y = outwardDepth * amount;
+    left.push({ x: center - width * 0.5, y });
+    right.push({ x: center + width * 0.5, y });
+  }
+  return {
+    poly: [...left, ...right.slice().reverse()],
+    outerA: left[left.length - 1],
+    outerB: right[right.length - 1]
+  };
+}
+
+function branchLocalGeometry(s, alongStart, alongWidth, outwardDepth, family, index, level) {
+  if (family === "tunnel" || family === "canyon") {
+    return passageBranchLocalGeometry(s, alongStart, alongWidth, outwardDepth, family, index, level);
+  }
+  if (["cave", "cavern", "clearing", "abstract"].includes(family)) {
+    return radialBranchLocalGeometry(s, alongStart, alongWidth, outwardDepth, family, index, level);
+  }
+  return {
+    poly: chamberLocalPolygon(alongStart, alongWidth, outwardDepth, s.chamber_shape),
+    outerA: { x: alongStart, y: outwardDepth },
+    outerB: { x: alongStart + alongWidth, y: outwardDepth }
+  };
+}
+
+function transformLocalGeometry(edge, geometry) {
+  return {
+    poly: geometry.poly.map((point) => mapLocal(edge, point.x, point.y)),
+    outerA: mapLocal(edge, geometry.outerA.x, geometry.outerA.y),
+    outerB: mapLocal(edge, geometry.outerB.x, geometry.outerB.y)
+  };
 }
 
 function boundsFromPoly(poly) {
@@ -513,13 +908,16 @@ function boundsFromPoly(poly) {
 }
 
 function makeEdgeChamber(s, side, edge, alongStart, alongWidth, outwardDepth, opening, level, parent, index) {
-  const poly = transformLocalPolygon(edge, alongStart, alongWidth, outwardDepth, s.chamber_shape);
+  const family = resolvedBranchFamily(s, index, level);
+  const geometry = transformLocalGeometry(
+    edge,
+    branchLocalGeometry(s, alongStart, alongWidth, outwardDepth, family, index, level)
+  );
+  const poly = geometry.poly;
   const bounds = boundsFromPoly(poly);
   const openingStart = alongStart + alongWidth * 0.5 - opening * 0.5;
   const openA = mapLocal(edge, openingStart, 0);
   const openB = mapLocal(edge, openingStart + opening, 0);
-  const outerA = mapLocal(edge, alongStart, outwardDepth);
-  const outerB = mapLocal(edge, alongStart + alongWidth, outwardDepth);
   return {
     x: bounds.minX,
     y: bounds.minY,
@@ -530,14 +928,15 @@ function makeEdgeChamber(s, side, edge, alongStart, alongWidth, outwardDepth, op
     openingY: openA.y,
     openA,
     openB,
-    outerA,
-    outerB,
+    outerA: geometry.outerA,
+    outerB: geometry.outerB,
     edgeOutward: edge.outward,
     poly,
     side,
     level,
     parent,
     index,
+    family,
     shape: s.chamber_shape
   };
 }
@@ -766,10 +1165,12 @@ function closestPointInFloorplan(point, s) {
 
 function floorplanCenter(s) {
   const bounds = floorplanBounds(s);
+  const x = (bounds.minX + bounds.maxX) * 0.5;
+  const y = (bounds.minY + bounds.maxY) * 0.5;
   return {
-    x: (bounds.minX + bounds.maxX) * 0.5,
-    y: (bounds.minY + bounds.maxY) * 0.5,
-    z: s.room_z * 0.5
+    x,
+    y,
+    z: spaceCeilingHeight(s, x, y) * 0.5
   };
 }
 
@@ -818,13 +1219,17 @@ function roomPoints(s, dir = selectedDirection(s), profile = groupProfile(s, dir
     y: clamp(bounds.minY + fieldHeight * (0.5 + s.field_y * 0.5), bounds.minY + margin, bounds.maxY - margin),
     z: s.room_z * 0.5
   };
+  listenerCandidate.z = spaceCeilingHeight(s, listenerCandidate.x, listenerCandidate.y) * 0.5;
   const listener = closestPointInFloorplan(listenerCandidate, s);
   const unit = unitFromAed(dir.azimuth, dir.elevation);
   const maxDist = Math.min(profile.source_distance, Math.min(fieldWidth, fieldHeight, s.room_z) * 0.48);
+  const sourceX = clamp(listener.x + unit.x * maxDist, bounds.minX + 0.05, bounds.maxX - 0.05);
+  const sourceY = clamp(listener.y + unit.z * maxDist, bounds.minY + 0.05, bounds.maxY - 0.05);
+  const sourceCeiling = spaceCeilingHeight(s, sourceX, sourceY);
   const sourceCandidate = {
-    x: clamp(listener.x + unit.x * maxDist, bounds.minX + 0.05, bounds.maxX - 0.05),
-    y: clamp(listener.y + unit.z * maxDist, bounds.minY + 0.05, bounds.maxY - 0.05),
-    z: clamp(listener.z + unit.y * maxDist, 0.05, s.room_z - 0.05)
+    x: sourceX,
+    y: sourceY,
+    z: clamp(listener.z + unit.y * maxDist, 0.05, sourceCeiling - 0.05)
   };
   const source = closestPointInFloorplan(sourceCandidate, s);
   return { listener, source };
@@ -864,18 +1269,61 @@ function groupMetrics(s, index) {
   };
 }
 
+function reflectedPointAcrossEdge(point, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSq = Math.max(1e-9, dx * dx + dy * dy);
+  const amount = ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSq;
+  const projection = { x: a.x + amount * dx, y: a.y + amount * dy };
+  return {
+    x: projection.x * 2 - point.x,
+    y: projection.y * 2 - point.y,
+    z: point.z
+  };
+}
+
+function boundaryImageSources(s, source, listener) {
+  const candidates = [];
+  floorplanPolygons(s).forEach((polygon, polygonIndex) => {
+    polygon.forEach((point, edgeIndex) => {
+      const next = polygon[(edgeIndex + 1) % polygon.length];
+      const image = reflectedPointAcrossEdge(source, point, next);
+      const distance = Math.hypot(image.x - listener.x, image.y - listener.y, image.z - listener.z);
+      candidates.push({
+        pos: image,
+        wall: polygonIndex === 0 ? `S${edgeIndex + 1}` : `B${polygonIndex}.${edgeIndex + 1}`,
+        distance,
+        surfaceGain: 1 - s.surface_roughness * 0.24
+      });
+    });
+  });
+  candidates.push({
+    pos: { x: source.x, y: source.y, z: -source.z },
+    wall: "D",
+    distance: Math.hypot(source.x - listener.x, source.y - listener.y, -source.z - listener.z),
+    surfaceGain: 1 - s.surface_roughness * 0.12
+  });
+  if (s.openness < 0.985) {
+    const ceiling = spaceCeilingHeight(s, source.x, source.y);
+    candidates.push({
+      pos: { x: source.x, y: source.y, z: 2 * ceiling - source.z },
+      wall: "U",
+      distance: Math.hypot(source.x - listener.x, source.y - listener.y, 2 * ceiling - source.z - listener.z),
+      surfaceGain: Math.pow(1 - s.openness, 0.72) * (1 - s.surface_roughness * 0.18)
+    });
+  }
+  return candidates.sort((a, b) => a.distance - b.distance);
+}
+
 function reflectionEvents(s, dir = selectedDirection(s)) {
   const profile = groupProfile(s, dir.index || 0);
   const { listener } = roomPoints(s, dir, profile);
   const source = groupMapPosition(s, dir, profile);
-  const images = [
-    { pos: { x: -source.x, y: source.y, z: source.z }, wall: "L" },
-    { pos: { x: 2 * s.room_x - source.x, y: source.y, z: source.z }, wall: "R" },
-    { pos: { x: source.x, y: -source.y, z: source.z }, wall: "F" },
-    { pos: { x: source.x, y: 2 * s.room_y - source.y, z: source.z }, wall: "B" },
-    { pos: { x: source.x, y: source.y, z: -source.z }, wall: "D" },
-    { pos: { x: source.x, y: source.y, z: 2 * s.room_z - source.z }, wall: "U" }
-  ];
+  const desiredBoundaryCount = Math.min(
+    Math.max(3, Math.floor(s.early_reflections)),
+    Math.round(6 + s.surface_roughness * 10 + s.irregularity * 6 + (s.space_family === "abstract" ? 5 : 0))
+  );
+  const images = boundaryImageSources(s, source, listener).slice(0, desiredBoundaryCount);
   const reflectivity = Math.sqrt(Math.max(0, 1 - profile.absorption));
   const baseEvents = images.map((image, index) => {
     const dx = image.pos.x - listener.x;
@@ -888,13 +1336,14 @@ function reflectionEvents(s, dir = selectedDirection(s)) {
     return {
       wall: image.wall,
       time: profile.pre_delay_ms / 1000 + distance / 343,
-      amp: Math.pow(reflectivity, 1 + index * 0.15) / Math.max(1, distance),
+      amp: Math.pow(reflectivity, 1 + index * 0.08) * image.surfaceGain / Math.max(1, distance),
       az: wrapDegrees(Math.atan2(dx, dy) * 180 / Math.PI + jitterA),
       el: clamp(Math.asin(clamp(dz / Math.max(0.001, distance), -1, 1)) * 180 / Math.PI + jitterE, -89, 89),
-      type: "image"
+      type: "surface"
     };
   });
-  const roomCross = Math.sqrt(s.room_x * s.room_x + s.room_y * s.room_y + s.room_z * s.room_z);
+  const bounds = floorplanBounds(s);
+  const roomCross = Math.sqrt((bounds.maxX - bounds.minX) ** 2 + (bounds.maxY - bounds.minY) ** 2 + s.room_z ** 2);
   const maxExtra = Math.max(0, Math.floor(s.early_reflections) - baseEvents.length);
   const extraEvents = Array.from({ length: maxExtra }, (_, index) => {
     const seed = (dir.index + 1) * 101 + index * 17;
@@ -903,22 +1352,27 @@ function reflectionEvents(s, dir = selectedDirection(s)) {
     const randomField = seededNoise(seed + 9);
     const baseTime = Math.min(s.duration * 0.35, roomCross / 343);
     const t = profile.pre_delay_ms / 1000 + 0.006 + u * Math.max(0.004, baseTime);
+    const passage = s.space_family === "tunnel" || s.space_family === "canyon";
     const aroundGroup = randomField < 0.55 + profile.scattering * 0.35;
-    const az = aroundGroup
-      ? wrapDegrees(dir.azimuth + (cluster - 0.5) * profile.direction_spread_deg * (1 + profile.scattering))
-      : wrapDegrees(-180 + cluster * 360);
+    const axialDirection = index % 2 === 0 ? 0 : 180;
+    const az = passage
+      ? wrapDegrees(axialDirection + (cluster - 0.5) * (18 + s.irregularity * 72))
+      : aroundGroup
+        ? wrapDegrees(dir.azimuth + (cluster - 0.5) * profile.direction_spread_deg * (1 + profile.scattering))
+        : wrapDegrees(-180 + cluster * 360);
     const elSeed = seededNoise(seed + 13);
     const el = aroundGroup
       ? clamp(dir.elevation + (elSeed - 0.5) * profile.direction_spread_deg * 0.7, -89, 89)
       : Math.asin(-1 + 2 * elSeed) * 180 / Math.PI;
-    const amp = (0.04 + 0.16 * seededNoise(seed + 19)) * reflectivity * Math.exp(-t / Math.max(0.05, profile.rt60));
+    const amp = (0.04 + 0.16 * seededNoise(seed + 19)) * reflectivity
+      * (1 - s.openness * 0.76) * Math.exp(-t / Math.max(0.05, profile.rt60));
     return {
-      wall: "E",
+      wall: passage ? "AX" : s.space_family === "abstract" ? "FOLD" : "SC",
       time: t,
       amp,
       az,
       el,
-      type: "extra"
+      type: passage ? "axial" : s.space_family === "abstract" ? "fold" : "scatter"
     };
   });
   const chambers = chamberGeometries(s);
@@ -931,18 +1385,21 @@ function reflectionEvents(s, dir = selectedDirection(s)) {
       const chamber = chambers[Math.floor(seededNoise(seed + 2) * chambers.length) % chambers.length];
       const outward = chamberOutwardVector(chamber.side);
       const sourceTowardChamber = Math.max(0, dirUnit.x * outward.x + dirUnit.z * outward.y);
-      const coupling = s.chamber_coupling * (0.35 + sourceTowardChamber * 0.65);
+      const familyResponse = branchFamilyResponse(s, chamber);
+      const coupling = s.chamber_coupling * (0.35 + sourceTowardChamber * 0.65) * familyResponse.coupling;
       const chamberProfile = chamberMaterialProfile(s, chamber);
       const chamberReflectivity = Math.sqrt(Math.max(0, 1 - chamberProfile.absorption));
-      const chamberPath = chamber.depth * 2 + chamber.width * 0.65 + chamber.level * (s.chamber_depth * 1.4);
+      const chamberPath = (chamber.depth * 2 + chamber.width * 0.65 + chamber.level * (s.chamber_depth * 1.4)) * familyResponse.path;
       const t = profile.pre_delay_ms / 1000 + (profile.source_distance + chamberPath * (0.52 + index * (0.12 + chamberProfile.scattering * 0.12))) / 343;
-      const az = wrapDegrees(outward.az + (seededNoise(seed) - 0.5) * (45 + chamberProfile.scattering * 70));
-      const el = clamp(dir.elevation * 0.35 + (seededNoise(seed + 5) - 0.5) * (24 + chamberProfile.scattering * 38), -70, 70);
-      const amp = (0.035 + 0.10 * seededNoise(seed + 9)) * chamberReflectivity * coupling * Math.exp(-t / Math.max(0.05, profile.rt60 * (0.9 + chamberProfile.tail_soften * 0.8)));
+      const az = wrapDegrees(outward.az + (seededNoise(seed) - 0.5) * (45 + chamberProfile.scattering * 70) * familyResponse.azimuth);
+      const el = clamp(dir.elevation * 0.35 + (seededNoise(seed + 5) - 0.5) * (24 + chamberProfile.scattering * 38) * familyResponse.elevation, -89, 89);
+      const amp = (0.035 + 0.10 * seededNoise(seed + 9)) * chamberReflectivity * coupling * familyResponse.energy
+        * Math.exp(-t / Math.max(0.05, profile.rt60 * (0.9 + chamberProfile.tail_soften * 0.8)));
       chamberEvents.push({
         wall: "C",
         chamber_index: chamber.index,
-        material: s.chamber_material,
+        branch_family: chamber.family,
+        material: chamberProfile.material_key,
         time: t,
         amp,
         az,
@@ -1044,7 +1501,7 @@ function renderVectorFloorplan(s, projection) {
     const alpha = Math.max(0.04, 0.06 + s.chamber_coupling * 0.08 + (1 - material.absorption) * 0.03 - chamber.level * 0.01);
     const poly = chamberPolygon(chamber).map(projection.point);
     const opening = chamberOpeningSegment(chamber);
-    const label = chamber.level === 0 ? `chamber ${chamber.index + 1}` : `nested ${chamber.level}`;
+    const label = chamber.level === 0 ? `branch ${chamber.index + 1}` : `depth ${chamber.level}`;
     const text = projection.point({ x: chamber.x, y: chamber.y });
     return `
       <polygon points="${svgPoints(poly)}" fill="rgba(120,190,150,${alpha.toFixed(3)})" stroke="rgba(120,190,150,${chamber.level === 0 ? 0.78 : 0.5})" stroke-width="1.3" vector-effect="non-scaling-stroke" />
@@ -1074,7 +1531,7 @@ function renderVectorFloorplan(s, projection) {
         .svg-small { fill: #d7d7d7; font-size: 10px; }
         .svg-tiny { font-size: 9px; }
         .svg-muted { fill: #8f9aa0; }
-        .svg-chamber { fill: #78be96; }
+        .svg-chamber { fill: #8f9892; }
         .svg-outside { fill: #c8f5eb; }
         .svg-grid { stroke: rgba(255,255,255,0.09); stroke-width: 1; vector-effect: non-scaling-stroke; }
       </style>
@@ -1125,7 +1582,7 @@ function renderVectorTopView(s) {
   }).join("") : "";
   const pointSvg = points.map((point) => `
     <g>
-      <circle cx="${round(point.p.x, 2)}" cy="${round(point.p.y, 2)}" r="${point.active ? 7 : 4}" fill="${point.active ? "#5aa8c7" : "rgba(90,168,199,0.48)"}" />
+      <circle cx="${round(point.p.x, 2)}" cy="${round(point.p.y, 2)}" r="${point.active ? 7 : 4}" fill="${point.active ? "#8d8d8d" : "rgba(90,168,199,0.48)"}" />
       <text x="${round(point.p.x, 2)}" y="${round(point.p.y + 0.5, 2)}" class="svg-label" fill="${point.active ? "#050607" : "#d7d7d7"}">${point.index + 1}</text>
     </g>
   `).join("");
@@ -1138,7 +1595,7 @@ function renderVectorTopView(s) {
     ${pointSvg}
     <circle cx="${round(lp.x, 2)}" cy="${round(lp.y, 2)}" r="7" fill="#d7d7d7" />
     <text x="${round(lp.x, 2)}" y="${round(lp.y + 0.5, 2)}" class="svg-label" fill="#050607">L</text>
-    <circle cx="${round(sp.x, 2)}" cy="${round(sp.y, 2)}" r="8" fill="#5aa8c7" />
+    <circle cx="${round(sp.x, 2)}" cy="${round(sp.y, 2)}" r="8" fill="#8d8d8d" />
     <text x="${round(sp.x, 2)}" y="${round(sp.y + 0.5, 2)}" class="svg-label" fill="#050607">${selected.index + 1}</text>
     <text x="12" y="20" class="svg-small svg-muted">TOP group ${selected.index + 1}/${selected.count}  ${selected.azimuth} az / ${selected.elevation} el</text>
     <text x="12" y="${ROOM_CANVAS_H - 16}" class="svg-small svg-muted">drag in Top view to move the field; use Bank Map to move mic positions</text>
@@ -1163,7 +1620,7 @@ function renderVectorBankMap(s) {
     return `
       ${active ? `<path d="M ${round(p.x, 2)} ${round(p.y, 2)} Q ${round(p.x + dirUnit.x * 26 - dirUnit.z * 14, 2)} ${round(p.y + dirUnit.z * 26 + dirUnit.x * 14, 2)} ${round(lobeX, 2)} ${round(lobeY, 2)} Q ${round(p.x + dirUnit.x * 26 + dirUnit.z * 14, 2)} ${round(p.y + dirUnit.z * 26 - dirUnit.x * 14, 2)} ${round(p.x, 2)} ${round(p.y, 2)} Z" fill="rgba(216,162,74,0.12)" />
       <line x1="${round(p.x, 2)}" y1="${round(p.y, 2)}" x2="${round(lobeX, 2)}" y2="${round(lobeY, 2)}" stroke="rgba(216,162,74,0.72)" stroke-width="1.2" vector-effect="non-scaling-stroke" />` : ""}
-      <circle cx="${round(p.x, 2)}" cy="${round(p.y, 2)}" r="${round(radius, 2)}" fill="${active ? "#d8a24a" : "rgba(90,168,199,0.72)"}" />
+      <circle cx="${round(p.x, 2)}" cy="${round(p.y, 2)}" r="${round(radius, 2)}" fill="${active ? "#a8a8a8" : "rgba(90,168,199,0.72)"}" />
       <text x="${round(p.x + 11, 2)}" y="${round(p.y + 3, 2)}" class="svg-small">${svgEscape(`G${index + 1}`)}</text>
     `;
   }).join("");
@@ -1172,9 +1629,9 @@ function renderVectorBankMap(s) {
     <circle cx="${round(lp.x, 2)}" cy="${round(lp.y, 2)}" r="7" fill="#d7d7d7" />
     <text x="${round(lp.x, 2)}" y="${round(lp.y + 0.5, 2)}" class="svg-label" fill="#050607">L</text>
     ${groupSvg}
-    <text x="12" y="20" class="svg-small svg-muted">Bank Map: ${dirs.length} IR groups placed in floorplan / ${s.channels_per_ir}ch per group / ${s.stacked_channels}ch stacked</text>
+    <text x="12" y="20" class="svg-small svg-muted">Bank Map: ${dirs.length} responses placed in ${svgEscape(s.space_family)} topology / ${s.channels_per_ir}ch per group / ${s.stacked_channels}ch stacked</text>
     <text x="12" y="38" class="svg-small svg-muted">selected G${selected.index + 1}: ${selected.channels_start}-${selected.channels_end}</text>
-    <text x="12" y="${ROOM_CANVAS_H - 16}" class="svg-small svg-muted">drag IR group points inside the room/chamber geometry</text>
+    <text x="12" y="${ROOM_CANVAS_H - 16}" class="svg-small svg-muted">drag response points inside the primary and branch geometry</text>
   `;
 }
 
@@ -1248,7 +1705,7 @@ function drawRoom3D(s) {
   const listenerPoint = { x: listener.x, y: listener.y, z: listener.z };
   const sourcePoint = { x: mapSource.x, y: mapSource.y, z: mapSource.z || source.z };
   const roomFloor = roomPolygon(s).map((p) => ({ ...p, z: 0 }));
-  const roomTop = roomPolygon(s).map((p) => ({ ...p, z: s.room_z }));
+  const roomTop = roomPolygon(s).map((p) => ({ ...p, z: spaceCeilingHeight(s, p.x, p.y) }));
   state.roomHitPoints = [];
   state.roomProjection = null;
 
@@ -1345,7 +1802,7 @@ function drawRoom3D(s) {
     const point = groupMapPosition(s, info, profile);
     const projected = project(point);
     const active = index === selected.index;
-    drawPoint(projected.x, projected.y, active ? 7 : 4, active ? "#5aa8c7" : "rgba(90,168,199,0.46)", String(index + 1), active);
+    drawPoint(projected.x, projected.y, active ? 7 : 4, active ? "#8d8d8d" : "rgba(90,168,199,0.46)", String(index + 1), active);
   });
 
   if (s.show_direct) {
@@ -1361,11 +1818,11 @@ function drawRoom3D(s) {
   const lp = project(listenerPoint);
   const sp = project(sourcePoint);
   drawPoint(lp.x, lp.y, 7, "#d7d7d7", "L", true);
-  drawPoint(sp.x, sp.y, 8, "#5aa8c7", String(selected.index + 1), true);
+  drawPoint(sp.x, sp.y, 8, "#8d8d8d", String(selected.index + 1), true);
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
-  ctx.fillText(`3D group ${selected.index + 1}/${selected.count}  camera ${s.camera_azimuth} az / ${s.camera_elevation} el / ${round(s.camera_zoom, 2)}x`, 12, 20);
-  ctx.fillText("use camera controls for 3D; Bank Map edits mic positions, Top edits field offset", 12, ROOM_CANVAS_H - 16);
+  ctx.fillText(`3D ${s.space_family}  group ${selected.index + 1}/${selected.count}  camera ${s.camera_azimuth} az / ${s.camera_elevation} el / ${round(s.camera_zoom, 2)}x`, 12, 20);
+  ctx.fillText("use camera controls for 3D; Bank Map edits response positions, Top edits field offset", 12, ROOM_CANVAS_H - 16);
 }
 
 function drawRoomView(s) {
@@ -1378,8 +1835,8 @@ function drawRoomView(s) {
   const viewMinX = bounds.minX;
   const viewMinY = state.view === "side" ? 0 : bounds.minY;
   const roomW = bounds.maxX - bounds.minX;
-  const roomH = state.view === "side" ? s.room_z : bounds.height;
-  const mainRoomH = state.view === "side" ? s.room_z : s.room_y;
+  const sideHeight = Math.max(s.room_z, ...ceilingProfile(s).map((point) => point.z));
+  const roomH = state.view === "side" ? sideHeight : bounds.height;
   const scale = Math.min((ROOM_CANVAS_W - pad * 2) / roomW, (ROOM_CANVAS_H - pad * 2) / roomH);
   const ox = (ROOM_CANVAS_W - roomW * scale) / 2;
   const oy = (ROOM_CANVAS_H - roomH * scale) / 2;
@@ -1401,11 +1858,22 @@ function drawRoomView(s) {
     drawChamberPlan(s, ox, oy, scale);
     drawOutsideOpeningPlan(s, ox, oy, scale);
   } else {
-    ctx.strokeRect(ox + (0 - viewMinX) * scale, oy + (0 - viewMinY) * scale, s.room_x * scale, mainRoomH * scale);
+    const profile = ceilingProfile(s);
+    ctx.beginPath();
+    ctx.moveTo(ox + (bounds.minX - viewMinX) * scale, oy + roomH * scale);
+    ctx.lineTo(ox + (bounds.maxX - viewMinX) * scale, oy + roomH * scale);
+    profile.slice().reverse().forEach((point) => {
+      ctx.lineTo(ox + (point.x - viewMinX) * scale, oy + (roomH - point.z) * scale);
+    });
+    ctx.closePath();
+    ctx.fillStyle = "rgba(90,168,199,0.045)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(90,168,199,0.72)";
+    ctx.stroke();
     drawChamberSide(s, ox, oy, scale, bounds);
   }
 
-  const grid = state.view === "side" ? s.room_z : s.room_y;
+  const grid = state.view === "side" ? roomH : bounds.height;
   ctx.strokeStyle = "rgba(255,255,255,0.09)";
   for (let i = 1; i < 8; i += 1) {
     const x = ox + roomW * scale * i / 8;
@@ -1449,7 +1917,7 @@ function drawRoomView(s) {
       ctx.lineTo(px(point), py(point));
       ctx.stroke();
     }
-    drawPoint(px(point), py(point), active ? 7 : 4, active ? "#5aa8c7" : "rgba(90,168,199,0.42)", String(index + 1), active);
+    drawPoint(px(point), py(point), active ? 7 : 4, active ? "#8d8d8d" : "rgba(90,168,199,0.42)", String(index + 1), active);
     state.roomHitPoints.push({ x: px(point), y: py(point), r: active ? 18 : 12, index });
   });
 
@@ -1466,9 +1934,9 @@ function drawRoomView(s) {
     events.slice(0, Math.min(events.length, s.early_reflections)).forEach((event) => {
       const dir = unitFromAed(event.az, event.el);
       const endpoint = {
-        x: clamp(listener.x + dir.x * selectedProfile.source_distance * 0.65, 0, s.room_x),
-        y: clamp(listener.y + dir.z * selectedProfile.source_distance * 0.65, 0, s.room_y),
-        z: clamp(listener.z + dir.y * selectedProfile.source_distance * 0.65, 0, s.room_z)
+        x: clamp(listener.x + dir.x * selectedProfile.source_distance * 0.65, bounds.minX, bounds.maxX),
+        y: clamp(listener.y + dir.z * selectedProfile.source_distance * 0.65, bounds.minY, bounds.maxY),
+        z: clamp(listener.z + dir.y * selectedProfile.source_distance * 0.65, 0, sideHeight)
       };
       const eventColor = event.type === "chamber" ? "120, 190, 150" : "216, 162, 74";
       ctx.strokeStyle = `rgba(${eventColor}, ${clamp(event.amp * 3.6, 0.18, 0.72)})`;
@@ -1481,7 +1949,7 @@ function drawRoomView(s) {
         ctx.lineTo(px(endpoint), py(endpoint));
         ctx.stroke();
       }
-      if (event.type === "image" || (event.type === "chamber" && state.view !== "top")) drawPoint(px(endpoint), py(endpoint), 3, event.type === "chamber" ? "rgba(120, 190, 150, 0.72)" : "rgba(216, 162, 74, 0.72)", event.wall, false);
+      if (event.type === "surface" || (event.type === "chamber" && state.view !== "top")) drawPoint(px(endpoint), py(endpoint), 3, event.type === "chamber" ? "rgba(120, 190, 150, 0.72)" : "rgba(216, 162, 74, 0.72)", event.wall, false);
       else {
         ctx.fillStyle = "rgba(216, 162, 74, 0.55)";
         ctx.fillRect(px(endpoint) - 1.5, py(endpoint) - 1.5, 3, 3);
@@ -1499,11 +1967,11 @@ function drawRoomView(s) {
   }
 
   drawPoint(px(listenerPoint), py(listenerPoint), 7, "#d7d7d7", "L", true);
-  drawPoint(px(sourcePoint), py(sourcePoint), 8, "#5aa8c7", String(selected.index + 1), true);
+  drawPoint(px(sourcePoint), py(sourcePoint), 8, "#8d8d8d", String(selected.index + 1), true);
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
-  ctx.fillText(`${state.view.toUpperCase()} group ${selected.index + 1}/${selected.count}  ${selected.azimuth} az / ${selected.elevation} el`, 12, 20);
-  ctx.fillText("drag in Top view to move the field; use Bank Map to move mic positions", 12, ROOM_CANVAS_H - 16);
+  ctx.fillText(`${state.view.toUpperCase()} ${s.space_family}  group ${selected.index + 1}/${selected.count}  ${selected.azimuth} az / ${selected.elevation} el`, 12, 20);
+  ctx.fillText("drag in Top view to move the field; use Bank Map to move response positions", 12, ROOM_CANVAS_H - 16);
 }
 
 function drawChamberRay(s, event, listenerPoint, px, py) {
@@ -1559,9 +2027,10 @@ function drawChamberSide(s, ox, oy, scale, bounds) {
     const chamberBoundsLocal = chamberBounds(chamber);
     const material = chamberMaterialProfile(s, chamber);
     const x = ox + (chamberBoundsLocal.minX - bounds.minX) * scale;
-    const yTop = oy + s.room_z * (1 - (0.72 + chamber.level * 0.06)) * scale;
+    const heightRatio = branchHeightRatio(s, chamber);
+    const yTop = oy + s.room_z * (1 - heightRatio) * scale;
     const w = Math.max(3, (chamberBoundsLocal.maxX - chamberBoundsLocal.minX) * scale);
-    const h = s.room_z * (0.72 + chamber.level * 0.06) * scale;
+    const h = s.room_z * heightRatio * scale;
     const alpha = Math.max(0.045, 0.07 + s.chamber_coupling * 0.08 + (1 - material.absorption) * 0.035 - chamber.level * 0.012);
     ctx.fillStyle = `rgba(120, 190, 150, ${alpha})`;
     ctx.fillRect(x, yTop, w, h);
@@ -1576,9 +2045,9 @@ function drawChamberSide(s, ox, oy, scale, bounds) {
     ctx.fillStyle = "rgba(5, 6, 7, 0.92)";
     ctx.fillRect(openX, oy + s.room_z * 0.24 * scale, Math.max(3, openWidth * scale), s.room_z * 0.56 * scale);
 
-    ctx.fillStyle = "#78be96";
+    ctx.fillStyle = "#8f9892";
     ctx.font = "9px Menlo, monospace";
-    ctx.fillText(chamber.level === 0 ? `chamber ${chamber.index + 1}` : `nested ${chamber.level}`, x + 6, yTop + 14);
+    ctx.fillText(chamber.level === 0 ? `b${chamber.index + 1} ${branchFamilyLabel(chamber.family)}` : `d${chamber.level} ${branchFamilyLabel(chamber.family)}`, x + 6, yTop + 14);
   });
   ctx.lineWidth = 1;
 }
@@ -1614,9 +2083,9 @@ function drawChamberPlan(s, ox, oy, scale) {
     ctx.lineTo(openX2, openY2);
     ctx.stroke();
     ctx.lineWidth = 1;
-    ctx.fillStyle = "#78be96";
+    ctx.fillStyle = "#8f9892";
     ctx.font = "10px Menlo, monospace";
-    ctx.fillText(chamber.level === 0 ? `chamber ${chamber.index + 1}` : `nested ${chamber.level}`, x + 8, y + 16);
+    ctx.fillText(chamber.level === 0 ? `b${chamber.index + 1} ${branchFamilyLabel(chamber.family)}` : `d${chamber.level} ${branchFamilyLabel(chamber.family)}`, x + 8, y + 16);
     ctx.fillStyle = "#8f9a94";
     ctx.font = "9px Menlo, monospace";
     ctx.fillText(`${material.material_key} a${round(material.absorption, 2)} s${round(material.scattering, 2)}`, x + 8, y + 29);
@@ -1729,7 +2198,7 @@ function drawDirections(s) {
     const radius = active ? Math.max(10, energyRadius) : energyRadius * 0.82;
     state.directionHitPoints.push({ x, y, r: radius + 10, index });
     ctx.globalAlpha = active ? 1 : 0.58;
-    ctx.fillStyle = active ? "#d8a24a" : "#5aa8c7";
+    ctx.fillStyle = active ? "#a8a8a8" : "#8d8d8d";
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
@@ -1755,9 +2224,9 @@ function drawDirections(s) {
   ctx.globalAlpha = 1;
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
-  ctx.fillText(`Bank Map: ${dirs.length} IR groups placed in floorplan / ${s.channels_per_ir}ch per group / ${s.stacked_channels}ch stacked`, 12, 20);
+  ctx.fillText(`Bank Map: ${dirs.length} responses placed in ${s.space_family} topology / ${s.channels_per_ir}ch per group / ${s.stacked_channels}ch stacked`, 12, 20);
   ctx.fillText(`selected G${selected.index + 1}: ${selected.channels_start}-${selected.channels_end}`, 12, 38);
-  ctx.fillText("drag IR group points inside the room/chamber geometry", 12, ROOM_CANVAS_H - 16);
+  ctx.fillText("drag response points inside the primary and branch geometry", 12, ROOM_CANVAS_H - 16);
 }
 
 function drawDirectivityLobe(cx, cy, x, y, radius, spreadDeg) {
@@ -1797,7 +2266,7 @@ function drawBankMatrix(s) {
 
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
-  ctx.fillText("Bank Matrix: each row is one encoded ambisonic IR group", x0, 22);
+  ctx.fillText("Bank Matrix: each row is one encoded directional response", x0, 22);
   ctx.fillStyle = "#d7d7d7";
   ctx.fillText("Group", columns.group, y0 - 10);
   ctx.fillText("AED", columns.aed, y0 - 10);
@@ -1828,13 +2297,13 @@ function drawBankMatrix(s) {
 
     const directW = clamp(item.direct_time / maxTime, 0, 1) * 90;
     const firstW = clamp(item.first_reflection_time / maxTime, 0, 1) * 110;
-    drawMetricBar(columns.direct, y + 8, 94, directW, "#5aa8c7", `${Math.round(item.direct_time * 1000)} ms`);
-    drawMetricBar(columns.first, y + 8, 116, firstW, "#d8a24a", `${item.first_reflection_wall} ${Math.round(item.first_reflection_time * 1000)} ms`);
-    drawMetricBar(columns.energy, y + 8, 170, clamp(item.early_energy / maxEnergy, 0, 1) * 170, item.chamber_energy > 0.00001 ? "#78be96" : "#b8d8e8", `${round(item.early_energy, 3)} c${round(item.chamber_energy, 3)}`);
+    drawMetricBar(columns.direct, y + 8, 94, directW, "#8d8d8d", `${Math.round(item.direct_time * 1000)} ms`);
+    drawMetricBar(columns.first, y + 8, 116, firstW, "#a8a8a8", `${item.first_reflection_wall} ${Math.round(item.first_reflection_time * 1000)} ms`);
+    drawMetricBar(columns.energy, y + 8, 170, clamp(item.early_energy / maxEnergy, 0, 1) * 170, item.chamber_energy > 0.00001 ? "#8f9892" : "#b8d8e8", `${round(item.early_energy, 3)} c${round(item.chamber_energy, 3)}`);
   });
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "10px Menlo, monospace";
-  ctx.fillText("click a row to select the IR group", x0, ROOM_CANVAS_H - 16);
+  ctx.fillText("click a row to select the response", x0, ROOM_CANVAS_H - 16);
 }
 
 function drawReflectionLayers(s) {
@@ -1878,7 +2347,7 @@ function drawReflectionLayers(s) {
 
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
-  ctx.fillText("Reflection Layers: all IR groups across time", pad, 22);
+  ctx.fillText("Reflection Layers: all directional responses across time", pad, 22);
   ctx.fillText("front-weighted log time view: early impulse expanded, late tail compressed", pad, 40);
 
   ctx.strokeStyle = "rgba(255,255,255,0.10)";
@@ -1966,7 +2435,7 @@ function drawReflectionLayers(s) {
       ctx.moveTo(directX, imageBase - 8);
       ctx.lineTo(directX, chamberBase + 8);
       ctx.stroke();
-      ctx.fillStyle = "#70dcf4";
+      ctx.fillStyle = "#95bcc2";
       ctx.beginPath();
       ctx.arc(directX, rowMid, active ? 4.6 : 3.4, 0, Math.PI * 2);
       ctx.fill();
@@ -2000,8 +2469,8 @@ function drawReflectionLayers(s) {
           ctx.closePath();
           ctx.fill();
         }
-        if (active && (event.type === "image" || event.type === "chamber")) {
-          ctx.fillStyle = isChamber ? "#78be96" : "#d8a24a";
+        if (active && (event.type === "surface" || event.type === "chamber")) {
+          ctx.fillStyle = isChamber ? "#8f9892" : "#a8a8a8";
           ctx.font = "9px Menlo, monospace";
           ctx.fillText(event.wall, x + 4, isChamber ? chamberBase + h + 8 : imageBase - h - 7);
         }
@@ -2011,7 +2480,7 @@ function drawReflectionLayers(s) {
   ctx.lineWidth = 1;
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "10px Menlo, monospace";
-  ctx.fillText("click a row to select; upper/lower lanes separate image-source and chamber timing", pad, ROOM_CANVAS_H - 16);
+  ctx.fillText("click a row to select; upper/lower lanes separate boundary and branch timing", pad, ROOM_CANVAS_H - 16);
 }
 
 function drawMetricBar(x, y, width, fillWidth, color, label) {
@@ -2113,11 +2582,14 @@ function updateReadouts(s) {
   const profile = groupProfile(s, selected.index);
   const points = roomPoints(s, selected, profile);
   const metrics = groupMetrics(s, selected.index);
+  const branchFamilies = [...new Set((chamberGeometries(s) || []).map((chamber) => chamber.family))];
   readouts.rt60.textContent = `${s.estimated_rt60.toFixed(2)} s`;
-  readouts.volume.textContent = `${(s.room_x * s.room_y * s.room_z).toFixed(1)} m3`;
+  readouts.volume.textContent = `${s.acoustic_volume.toFixed(1)} m3`;
   readouts.channels.textContent = `${s.stacked_channels}`;
   readouts.late.textContent = `${Math.round(s.late_start_seconds * 1000)} ms`;
   readouts.group.innerHTML = `
+    <div><span>Space</span><strong>${s.space_family} / seed ${s.space_seed}</strong></div>
+    <div><span>Branches</span><strong>${s.branch_family}${branchFamilies.length ? ` / ${branchFamilies.join(", ")}` : " / none"}</strong></div>
     <div><span>Group</span><strong>${selected.index + 1} / ${selected.count}</strong></div>
     <div><span>AED</span><strong>${round(selected.azimuth)} deg / ${round(selected.elevation)} deg</strong></div>
     <div><span>Stacked channels</span><strong>${selected.channels_start}-${selected.channels_end}</strong></div>
@@ -2125,8 +2597,8 @@ function updateReadouts(s) {
     <div><span>Direct arrival</span><strong>${Math.round(metrics.direct_time * 1000)} ms</strong></div>
     <div><span>First reflection</span><strong>${metrics.first_reflection_wall} / ${Math.round(metrics.first_reflection_time * 1000)} ms</strong></div>
     <div><span>Early energy</span><strong>${round(metrics.early_energy, 3)}</strong></div>
-    <div><span>Chamber energy</span><strong>${round(metrics.chamber_energy, 3)}</strong></div>
-    <div><span>Exterior leak</span><strong>${s.outside_opening ? round(s.outside_leak_factor, 3) : "off"}</strong></div>
+    <div><span>Branch energy</span><strong>${round(metrics.chamber_energy, 3)}</strong></div>
+    <div><span>Openness / escape</span><strong>${round(s.openness, 2)} / ${round(s.outside_leak_factor, 3)}</strong></div>
     <div><span>Local material</span><strong>a ${round(profile.absorption, 2)} / s ${round(profile.scattering, 2)} / tail ${round(profile.tail_soften, 2)}</strong></div>
     <div><span>Local distance</span><strong>${round(profile.source_distance, 2)} m</strong></div>
   `;
@@ -2157,6 +2629,7 @@ function exportObject(s = settings()) {
       },
       early_energy: round(metrics.early_energy, 5),
       chamber_energy: round(metrics.chamber_energy, 5),
+      branch_energy: round(metrics.chamber_energy, 5),
       local_profile: {
         absorption: round(metrics.profile.absorption, 3),
         scattering: round(metrics.profile.scattering, 3),
@@ -2174,8 +2647,13 @@ function exportObject(s = settings()) {
     };
   });
   return {
-    tool: "s3g-mc IR Sketch",
+    format: PROJECT_FORMAT,
+    version: PROJECT_VERSION,
+    tool: "s3g-mc Imprint Sketch",
     target_process: "3OAFX Synthetic Ambisonic IR Bank",
+    interpretation: "directional acoustic sketch for architectural, natural, open, or imaginary spaces",
+    space_family: s.space_family,
+    space_seed: s.space_seed,
     room_x: round(s.room_x),
     room_y: round(s.room_y),
     room_z: round(s.room_z),
@@ -2183,13 +2661,32 @@ function exportObject(s = settings()) {
     absorption: round(s.absorption, 3),
     scattering: round(s.scattering, 3),
     tail_soften: round(s.tail_soften, 3),
+    irregularity: round(s.irregularity, 3),
+    surface_roughness: round(s.surface_roughness, 3),
+    vertical_variation: round(s.vertical_variation, 3),
+    openness: round(s.openness, 3),
     space_shape: s.space_shape,
     room_shape: s.room_shape,
     topology_bias: round(s.topology_bias, 3),
+    branch_family: s.branch_family,
     room_polygon: roomPolygon(s).map((point) => ({
       x: round(point.x, 3),
       y: round(point.y, 3)
     })),
+    space: {
+      family: s.space_family,
+      seed: s.space_seed,
+      topology: s.space_shape === "side_chamber" ? "connected_regions" : "single_region",
+      branch_family_mode: s.branch_family,
+      primary_polygon_xy_m: roomPolygon(s).map((point) => ({ x: round(point.x, 3), y: round(point.y, 3) })),
+      ceiling_profile_xz_m: ceilingProfile(s).map((point) => ({ x: round(point.x, 3), z: round(point.z, 3) })),
+      irregularity: round(s.irregularity, 3),
+      roughness: round(s.surface_roughness, 3),
+      vertical_variation: round(s.vertical_variation, 3),
+      openness: round(s.openness, 3),
+      acoustic_volume_m3: round(s.acoustic_volume, 3),
+      acoustic_surface_m2: round(s.acoustic_surface, 3)
+    },
     chamber_shape: s.chamber_shape,
     chamber_side: s.chamber_side,
     exterior_opening: outsideOpenings.length ? {
@@ -2225,6 +2722,7 @@ function exportObject(s = settings()) {
       leak: 0
     },
     chamber: s.space_shape === "side_chamber" ? {
+      family_mode: s.branch_family,
       material: s.chamber_material,
       material_mode: s.chamber_material_mode,
       material_mix: round(s.chamber_material_mix, 3),
@@ -2249,6 +2747,8 @@ function exportObject(s = settings()) {
         }()),
         index: chamber.index + 1,
         level: chamber.level,
+        family: chamber.family,
+        height_m: round(s.room_z * branchHeightRatio(s, chamber), 3),
         x: round(chamber.x, 3),
         y: round(chamber.y, 3),
         width: round(chamber.width, 3),
@@ -2296,21 +2796,147 @@ function exportObject(s = settings()) {
   };
 }
 
+function imprintObject(s = settings()) {
+  const project = exportObject(s);
+  const directions = activeDirections(s);
+  const profiles = directions.map((direction, index) => {
+    const info = {
+      index,
+      count: directions.length,
+      azimuth: direction[0],
+      elevation: direction[1],
+      channels_start: index * s.channels_per_ir + 1,
+      channels_end: (index + 1) * s.channels_per_ir
+    };
+    const metrics = groupMetrics(s, index);
+    const absorptionBands = resolvedAbsorptionBands(metrics.profile, s.material_preset);
+    const rt60Bands = localRt60Bands(s, absorptionBands);
+    const reflections = reflectionEvents(s, info)
+      .filter((event) => Number.isFinite(event.time) && Number.isFinite(event.amp) && event.time <= s.duration)
+      .map((event) => ({
+        delay_ms: round(event.time * 1000, 3),
+        gain: round(event.amp, 7),
+        azimuth_deg: round(event.az, 3),
+        elevation_deg: round(event.el, 3),
+        kind: event.type,
+        surface: event.wall,
+        material: event.material || s.material_preset,
+        branch_family: event.branch_family || null,
+        chamber_index: event.chamber_index === undefined ? null : event.chamber_index + 1
+      }));
+    const tailLevel = clamp((Math.sqrt(Math.max(0, metrics.early_energy)) * 0.16
+      + (1 - metrics.profile.absorption) * 0.10) * (1 - s.openness * 0.88), 0.003, 0.55);
+    return {
+      id: index + 1,
+      input_direction: {
+        azimuth_deg: round(direction[0], 3),
+        elevation_deg: round(direction[1], 3)
+      },
+      source_position_m: {
+        x: round(metrics.map_position.x, 4),
+        y: round(metrics.map_position.y, 4),
+        z: round(metrics.map_position.z, 4)
+      },
+      weight: round(1 / Math.max(1, directions.length), 7),
+      direct: {
+        delay_ms: round(metrics.direct_time * 1000, 3),
+        gain: round(metrics.direct_amp, 7)
+      },
+      early_reflections: reflections,
+      late: {
+        start_ms: round(s.late_start_seconds * 1000, 3),
+        duration_s: round(s.duration, 4),
+        level: round(tailLevel, 7),
+        diffusion: round(metrics.profile.scattering, 5),
+        spread_deg: round(metrics.profile.direction_spread_deg, 3),
+        high_frequency_damping: round(metrics.profile.tail_soften, 5),
+        absorption_by_band: absorptionBands.map((value) => round(value, 6)),
+        rt60_s_by_band: rt60Bands.map((value) => round(value, 6)),
+        seed: imprintSeed(s, index)
+      }
+    };
+  });
+
+  return {
+    format: IMPRINT_FORMAT,
+    version: IMPRINT_VERSION,
+    generator: {
+      name: "s3g-mc Imprint Sketch",
+      project_format: PROJECT_FORMAT,
+      project_version: PROJECT_VERSION
+    },
+    interpretation: "procedural directional space sketch; spectral material curves are creative estimates, not measured coefficients",
+    coordinate_system: {
+      convention: "AED",
+      azimuth_zero: "front",
+      azimuth_positive: "counterclockwise",
+      elevation_positive: "up",
+      distance_unit: "metre",
+      time_unit: "millisecond"
+    },
+    ambisonics: {
+      channel_order: "ACN",
+      normalization: "SN3D",
+      reference_order: s.order,
+      maximum_runtime_order: 7
+    },
+    spectral_bands_hz: IMPRINT_BANDS_HZ,
+    space: project.space,
+    room: {
+      dimensions_m: {
+        x: round(s.room_x, 4),
+        y: round(s.room_y, 4),
+        z: round(s.room_z, 4)
+      },
+      polygon_xy_m: project.room_polygon,
+      shape: s.space_family === "room" ? s.room_shape : s.space_family,
+      family: s.space_family,
+      seed: s.space_seed,
+      material: s.material_preset,
+      absorption: round(s.absorption, 6),
+      scattering: round(s.scattering, 6),
+      tail_soften: round(s.tail_soften, 6),
+      exterior_opening: project.exterior_opening,
+      chamber: project.chamber
+    },
+    listener_position_m: {
+      x: round(roomPoints(s, { index: 0, azimuth: directions[0][0], elevation: directions[0][1] }).listener.x, 4),
+      y: round(roomPoints(s, { index: 0, azimuth: directions[0][0], elevation: directions[0][1] }).listener.y, 4),
+      z: round(roomPoints(s, { index: 0, azimuth: directions[0][0], elevation: directions[0][1] }).listener.z, 4)
+    },
+    direction_layout: s.effective_direction_layout,
+    direction_count: profiles.length,
+    duration_s: round(s.duration, 4),
+    profiles
+  };
+}
+
 function round(v, places = 2) {
   const f = 10 ** places;
   return Math.round(v * f) / f;
 }
 
-function downloadJson() {
-  const blob = new Blob([JSON.stringify(exportObject(), null, 2)], { type: "application/json" });
+function downloadObject(filename, object) {
+  const blob = new Blob([JSON.stringify(object, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
-  link.download = "s3g_ir_room_sketch.json";
+  link.download = filename;
   link.href = URL.createObjectURL(blob);
   link.click();
   URL.revokeObjectURL(link.href);
 }
 
+function downloadJson() {
+  downloadObject("s3g_imprint_sketch.json", exportObject());
+}
+
+function downloadImprint() {
+  const family = settings().space_family.replace(/[^a-z0-9_-]+/gi, "_");
+  downloadObject(`s3g_${family}_imprint.s3gimprint`, imprintObject());
+}
+
 const RESTORE_KEYS = {
+  space_family: "spaceFamily",
+  space_seed: "spaceSeed",
   room_x: "roomX",
   room_y: "roomY",
   room_z: "roomZ",
@@ -2318,9 +2944,14 @@ const RESTORE_KEYS = {
   absorption: "absorption",
   scattering: "scattering",
   tail_soften: "tailSoften",
+  irregularity: "irregularity",
+  surface_roughness: "surfaceRoughness",
+  vertical_variation: "verticalVariation",
+  openness: "openness",
   space_shape: "spaceShape",
   room_shape: "roomShape",
   topology_bias: "topologyBias",
+  branch_family: "branchFamily",
   chamber_shape: "chamberShape",
   chamber_side: "chamberSide",
   chamber_material: "chamberMaterial",
@@ -2344,7 +2975,7 @@ const RESTORE_KEYS = {
   source_azimuth: "sourceAz",
   source_elevation: "sourceEl",
   source_distance: "sourceDistance",
-  spread_deg: "spreadDeg",
+  direction_spread_deg: "spreadDeg",
   group_variation: "groupVariation",
   surface_contrast: "surfaceContrast",
   distance_variation: "distanceVariation",
@@ -2356,14 +2987,82 @@ const RESTORE_KEYS = {
 };
 
 function applyExportObject(data) {
+  if (!data || typeof data !== "object") throw new Error("Imprint Sketch project must be a JSON object");
+  const format = data.format || LEGACY_PROJECT_FORMAT;
+  if (format !== PROJECT_FORMAT && format !== LEGACY_PROJECT_FORMAT) throw new Error(`Unsupported project format: ${format}`);
+  const maximumVersion = format === LEGACY_PROJECT_FORMAT ? LEGACY_PROJECT_VERSION : PROJECT_VERSION;
+  if (data.version && Number(data.version) > maximumVersion) throw new Error(`Project version ${data.version} is newer than this Imprint Sketch`);
+
+  const chamber = data.chamber && typeof data.chamber === "object" ? data.chamber : {};
+  const exterior = data.exterior_opening && typeof data.exterior_opening === "object" ? data.exterior_opening : {};
+  const space = data.space && typeof data.space === "object" ? data.space : {};
+  const restored = {
+    ...data,
+    space_family: space.family ?? data.space_family ?? "room",
+    space_seed: space.seed ?? data.space_seed ?? 314159,
+    irregularity: space.irregularity ?? data.irregularity ?? (format === LEGACY_PROJECT_FORMAT ? 0 : undefined),
+    surface_roughness: space.roughness ?? data.surface_roughness ?? (format === LEGACY_PROJECT_FORMAT ? 0.2 : undefined),
+    vertical_variation: space.vertical_variation ?? data.vertical_variation ?? (format === LEGACY_PROJECT_FORMAT ? 0 : undefined),
+    openness: space.openness ?? data.openness ?? (format === LEGACY_PROJECT_FORMAT ? 0 : undefined),
+    direction_spread_deg: data.direction_spread_deg ?? data.spread_deg,
+    branch_family: chamber.family_mode ?? chamber.family ?? space.branch_family_mode ?? data.branch_family ?? "inherit",
+    chamber_material: chamber.material ?? data.chamber_material,
+    chamber_material_mode: chamber.material_mode ?? data.chamber_material_mode,
+    chamber_material_mix: chamber.material_mix ?? data.chamber_material_mix,
+    chamber_width: chamber.width ?? data.chamber_width,
+    chamber_depth: chamber.depth ?? data.chamber_depth,
+    chamber_count: chamber.count ?? data.chamber_count,
+    chamber_position: chamber.position ?? data.chamber_position,
+    nested_chambers: chamber.nested_chambers ?? data.nested_chambers,
+    opening_width: chamber.opening_width ?? data.opening_width,
+    chamber_coupling: chamber.coupling ?? data.chamber_coupling,
+    outside_opening_side: exterior.side ?? data.outside_opening_side,
+    outside_opening_count: exterior.count ?? data.outside_opening_count,
+    outside_opening_position: exterior.position ?? data.outside_opening_position,
+    outside_opening_spread: exterior.spread ?? data.outside_opening_spread,
+    outside_opening_width: exterior.width ?? data.outside_opening_width,
+    outside_leak: exterior.leak ?? data.outside_leak
+  };
   Object.entries(RESTORE_KEYS).forEach(([key, controlId]) => {
-    if (data[key] === undefined || !controls[controlId]) return;
-    controls[controlId].value = data[key];
+    if (restored[key] === undefined || !controls[controlId]) return;
+    controls[controlId].value = restored[key];
   });
   if (data.exterior_opening && controls.outsideOpening) controls.outsideOpening.checked = data.exterior_opening.enabled !== false;
+  if (data.field_offset) {
+    if (controls.fieldX && data.field_offset.x !== undefined) controls.fieldX.value = data.field_offset.x;
+    if (controls.fieldY && data.field_offset.y !== undefined) controls.fieldY.value = data.field_offset.y;
+  }
+  if (data.camera) {
+    if (controls.cameraAz && data.camera.azimuth !== undefined) controls.cameraAz.value = data.camera.azimuth;
+    if (controls.cameraEl && data.camera.elevation !== undefined) controls.cameraEl.value = data.camera.elevation;
+    if (controls.cameraZoom && data.camera.zoom !== undefined) controls.cameraZoom.value = data.camera.zoom;
+  }
+  state.groupMapPositions = {};
+  if (Array.isArray(data.groups)) {
+    data.groups.forEach((group, index) => {
+      const position = group && group.source_position_m;
+      if (!position || !Number.isFinite(Number(position.x)) || !Number.isFinite(Number(position.y))) return;
+      state.groupMapPositions[groupPositionKey(index)] = {
+        x: Number(position.x),
+        y: Number(position.y),
+        z: Number.isFinite(Number(position.z)) ? Number(position.z) : Number(controls.roomZ.value) * 0.5
+      };
+    });
+  }
   if (data.view) state.view = data.view;
+  document.querySelectorAll("[data-view]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.view === state.view);
+  });
   updateAllRangeFills();
   drawRoom();
+}
+
+async function importProjectFile(file) {
+  const text = await file.text();
+  const data = JSON.parse(text);
+  applyExportObject(data);
+  lastAutosaveJson = "";
+  autosave();
 }
 
 function autosave() {
@@ -2379,10 +3078,13 @@ function autosave() {
 
 function restoreAutosave() {
   try {
-    const json = localStorage.getItem(STORAGE_KEY);
+    const json = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!json) return false;
     applyExportObject(JSON.parse(json));
     lastAutosaveJson = json;
+    if (!localStorage.getItem(STORAGE_KEY)) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...exportObject(), view: state.view }));
+    }
     return true;
   } catch (error) {
     localStorage.removeItem(STORAGE_KEY);
@@ -2409,8 +3111,9 @@ function addExtrudedPolygonMesh(meshes, name, poly, height, materialIndex) {
   const positions = [];
   const indices = [];
   const clockwise = polygonArea(poly) < 0;
+  const topHeights = poly.map((point, index) => typeof height === "function" ? height(point, index) : height);
   poly.forEach((point) => pushVec3(positions, point.x, 0, -point.y));
-  poly.forEach((point) => pushVec3(positions, point.x, height, -point.y));
+  poly.forEach((point, index) => pushVec3(positions, point.x, topHeights[index], -point.y));
   for (let i = 1; i < poly.length - 1; i += 1) {
     if (clockwise) {
       indices.push(0, i + 1, i);
@@ -2534,7 +3237,7 @@ function openingSegmentsForModel(s) {
     height: s.room_z * 0.86
   }));
   (chamberGeometries(s) || []).forEach((chamber) => {
-    const chamberHeight = s.room_z * (0.72 + chamber.level * 0.06);
+    const chamberHeight = s.room_z * branchHeightRatio(s, chamber);
     openings.push({
       ...chamberOpeningSegment(chamber),
       index: openings.length,
@@ -2599,10 +3302,10 @@ function addSegmentPortalMesh(meshes, name, segment, outward, height, materialIn
 
 function buildGltfMeshes(s = settings()) {
   const meshes = [];
-  addExtrudedPolygonMesh(meshes, "Main room", roomPolygon(s), s.room_z, 0);
+  addExtrudedPolygonMesh(meshes, "Primary space", roomPolygon(s), (point) => spaceCeilingHeight(s, point.x, point.y), 0);
   (chamberGeometries(s) || []).forEach((chamber) => {
-    const chamberHeight = s.room_z * (0.72 + chamber.level * 0.06);
-    addExtrudedPolygonMesh(meshes, `Chamber ${chamber.index + 1}`, chamberPolygon(chamber), chamberHeight, 1);
+    const chamberHeight = s.room_z * branchHeightRatio(s, chamber);
+    addExtrudedPolygonMesh(meshes, `Branch ${chamber.index + 1} ${chamber.family}`, chamberPolygon(chamber), chamberHeight, 1);
   });
   openingSegmentsForModel(s).forEach((segment) => {
     addSegmentPortalMesh(meshes, `Opening ${segment.index + 1}`, segment, segment.outward, segment.height || s.room_z * 0.72, 4);
@@ -2618,7 +3321,7 @@ function buildGltfMeshes(s = settings()) {
       channels_end: (index + 1) * s.channels_per_ir
     };
     const position = groupMapPosition(s, info, groupProfile(s, index));
-    addPointMarkerMesh(meshes, `IR group ${index + 1}`, position, Math.max(0.09, Math.min(s.room_x, s.room_y) * 0.014), s.room_z * 0.06, 3);
+    addPointMarkerMesh(meshes, `Response ${index + 1}`, position, Math.max(0.09, Math.min(s.room_x, s.room_y) * 0.014), s.room_z * 0.06, 3);
   });
   return meshes;
 }
@@ -2682,17 +3385,17 @@ function buildGltf(s = settings()) {
   return {
     asset: {
       version: "2.0",
-      generator: "s3g-mc IR Sketch"
+      generator: "s3g-mc Imprint Sketch"
     },
     scene: 0,
     scenes: [{ nodes: nodes.map((_, index) => index) }],
     nodes,
     meshes: gltfMeshes,
     materials: [
-      { name: "Main room cyan", pbrMetallicRoughness: { baseColorFactor: [0.2, 0.75, 0.85, 0.42], metallicFactor: 0, roughnessFactor: 0.92 }, alphaMode: "BLEND", doubleSided: true },
-      { name: "Chambers green", pbrMetallicRoughness: { baseColorFactor: [0.32, 0.78, 0.52, 0.48], metallicFactor: 0, roughnessFactor: 0.86 }, alphaMode: "BLEND", doubleSided: true },
+      { name: "Primary space cyan", pbrMetallicRoughness: { baseColorFactor: [0.2, 0.75, 0.85, 0.42], metallicFactor: 0, roughnessFactor: 0.92 }, alphaMode: "BLEND", doubleSided: true },
+      { name: "Branches green", pbrMetallicRoughness: { baseColorFactor: [0.32, 0.78, 0.52, 0.48], metallicFactor: 0, roughnessFactor: 0.86 }, alphaMode: "BLEND", doubleSided: true },
       { name: "Field center", pbrMetallicRoughness: { baseColorFactor: [0.9, 0.9, 0.9, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
-      { name: "IR groups", pbrMetallicRoughness: { baseColorFactor: [0.93, 0.62, 0.22, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
+      { name: "Response groups", pbrMetallicRoughness: { baseColorFactor: [0.93, 0.62, 0.22, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
       { name: "Opening frames", pbrMetallicRoughness: { baseColorFactor: [0.78, 0.96, 0.92, 0.28], metallicFactor: 0, roughnessFactor: 0.96 }, alphaMode: "BLEND", doubleSided: true }
     ],
     accessors,
@@ -2703,7 +3406,7 @@ function buildGltf(s = settings()) {
     }],
     extras: {
       target_process: "3OAFX Synthetic Ambisonic IR Bank",
-      room_sketch: exportObject(s)
+      imprint_sketch: exportObject(s)
     }
   };
 }
@@ -2711,7 +3414,7 @@ function buildGltf(s = settings()) {
 function downloadGltf() {
   const blob = new Blob([JSON.stringify(buildGltf(), null, 2)], { type: "model/gltf+json" });
   const link = document.createElement("a");
-  link.download = "s3g_ir_room_sketch.gltf";
+  link.download = "s3g_imprint_sketch.gltf";
   link.href = URL.createObjectURL(blob);
   link.click();
   URL.revokeObjectURL(link.href);
@@ -2955,13 +3658,20 @@ function applyMaterial() {
 }
 
 function resetDefaults() {
+  controls.spaceFamily.value = "room";
+  controls.spaceSeed.value = 314159;
   controls.roomX.value = 12;
   controls.roomY.value = 9;
   controls.roomZ.value = 5;
   controls.materialPreset.value = "concrete";
+  controls.irregularity.value = 0.18;
+  controls.surfaceRoughness.value = 0.28;
+  controls.verticalVariation.value = 0.12;
+  controls.openness.value = 0.08;
   controls.spaceShape.value = "side_chamber";
   controls.roomShape.value = "rect";
   controls.topologyBias.value = 0.35;
+  controls.branchFamily.value = "inherit";
   controls.chamberShape.value = "rect";
   controls.chamberSide.value = "back";
   controls.chamberMaterial.value = "stone";
@@ -2999,63 +3709,126 @@ function resetDefaults() {
   controls.cameraEl.value = 32;
   controls.cameraZoom.value = 1;
   state.selectedDirection = 0;
+  state.groupMapPositions = {};
   applyMaterial();
 }
 
-function randomize() {
-  const presets = Object.keys(materials);
+function randomize(seedOverride = null) {
   const bias = clamp(Number(controls.topologyBias.value || 0.35), 0, 1);
-  const skew = Math.pow(bias, 1.35);
-  const range = (min, max) => min + Math.random() * (max - min);
-  const rangeBiased = (min, max) => min + (Math.random() * 0.55 + skew * 0.45) * (max - min);
+  const seed = Number.isFinite(Number(seedOverride)) ? normalizedSeed(seedOverride) : freshSeed();
+  const rng = makeRng(seed);
+  const range = (min, max) => min + rng() * (max - min);
+  const rangeBiased = (min, max) => min + (rng() * 0.55 + Math.pow(bias, 1.35) * 0.45) * (max - min);
+  const integer = (min, max) => Math.floor(range(min, max + 1));
+  const pick = (items) => items[Math.floor(rng() * items.length) % items.length];
+  let family = controls.spaceFamily.value;
+  if (family === "any") family = resolvedSpaceFamily("any", seed, bias);
+  controls.spaceFamily.value = family;
+  controls.spaceSeed.value = seed;
 
-  controls.materialPreset.value = choice(presets);
-  controls.roomX.value = round(6 + Math.random() * 26, 1);
-  controls.roomY.value = round(4 + Math.random() * 18, 1);
-  controls.roomZ.value = round(2.8 + Math.random() * 8, 1);
-  controls.spaceShape.value = Math.random() < 0.35 + bias * 0.62 ? "side_chamber" : "shoebox";
+  const familySettings = {
+    room: {
+      x: [6, 34], y: [4, 24], z: [2.8, 11], irregularity: [0.01, 0.16 + bias * 0.40],
+      roughness: [0.08, 0.42 + bias * 0.28], vertical: [0, 0.12 + bias * 0.30], openness: [0, 0.12 + bias * 0.34],
+      materials: ["concrete", "brick", "stone", "wood", "metal", "studio", "damped", "glass", "fabric"]
+    },
+    cave: {
+      x: [8, 38], y: [7, 32], z: [3.5, 16], irregularity: [0.38, 0.72 + bias * 0.28],
+      roughness: [0.58, 0.90 + bias * 0.10], vertical: [0.32, 0.72 + bias * 0.28], openness: [0.01, 0.18 + bias * 0.30],
+      materials: ["stone", "stone", "porous_rock", "earth", "water", "ice"]
+    },
+    cavern: {
+      x: [18, 72], y: [14, 62], z: [8, 30], irregularity: [0.24, 0.58 + bias * 0.28],
+      roughness: [0.48, 0.86 + bias * 0.14], vertical: [0.44, 0.78 + bias * 0.22], openness: [0, 0.10 + bias * 0.24],
+      materials: ["stone", "porous_rock", "earth", "water", "ice"]
+    },
+    tunnel: {
+      x: [3, 13], y: [22, 80], z: [2.4, 11], irregularity: [0.10, 0.45 + bias * 0.38],
+      roughness: [0.18, 0.64 + bias * 0.32], vertical: [0.08, 0.34 + bias * 0.42], openness: [0.06, 0.28 + bias * 0.34],
+      materials: ["stone", "brick", "concrete", "metal", "earth", "porous_rock"]
+    },
+    canyon: {
+      x: [9, 32], y: [32, 80], z: [10, 30], irregularity: [0.28, 0.68 + bias * 0.28],
+      roughness: [0.56, 0.88 + bias * 0.12], vertical: [0.36, 0.70 + bias * 0.28], openness: [0.58, 0.84 + bias * 0.16],
+      materials: ["stone", "porous_rock", "earth", "concrete"]
+    },
+    clearing: {
+      x: [22, 80], y: [22, 80], z: [12, 30], irregularity: [0.14, 0.48 + bias * 0.30],
+      roughness: [0.52, 0.84 + bias * 0.16], vertical: [0.08, 0.30 + bias * 0.30], openness: [0.78, 0.93 + bias * 0.07],
+      materials: ["vegetation", "vegetation", "earth", "water", "porous_rock"]
+    },
+    abstract: {
+      x: [4, 62], y: [4, 62], z: [3, 30], irregularity: [0.62, 1],
+      roughness: [0.08, 1], vertical: [0.46, 1], openness: [0, 1],
+      materials: Object.keys(materials)
+    }
+  };
+  const preset = familySettings[family] || familySettings.room;
+  controls.roomX.value = round(range(...preset.x), 1);
+  controls.roomY.value = round(range(...preset.y), 1);
+  controls.roomZ.value = round(range(...preset.z), 1);
+  controls.irregularity.value = round(range(...preset.irregularity), 2);
+  controls.surfaceRoughness.value = round(range(...preset.roughness), 2);
+  controls.verticalVariation.value = round(range(...preset.vertical), 2);
+  controls.openness.value = round(range(...preset.openness), 2);
+  controls.materialPreset.value = pick(preset.materials);
+  const material = materials[controls.materialPreset.value] || materials.concrete;
+  controls.absorption.value = round(clamp(material.absorption + (rng() - 0.5) * bias * 0.16, 0.03, 0.95), 2);
+  controls.scattering.value = round(clamp(material.scattering + (Number(controls.surfaceRoughness.value) - 0.5) * 0.26 + (rng() - 0.5) * 0.12, 0, 1), 2);
+  controls.tailSoften.value = round(clamp(material.tailSoften + (rng() - 0.5) * (0.12 + bias * 0.20), 0, 1), 2);
+
+  const connectedChance = family === "abstract" ? 0.92
+    : family === "cave" || family === "cavern" ? 0.72 + bias * 0.22
+      : family === "clearing" || family === "canyon" ? 0.18 + bias * 0.26
+        : 0.28 + bias * 0.52;
+  controls.spaceShape.value = rng() < connectedChance ? "side_chamber" : "shoebox";
   controls.roomShape.value = chooseByBias(
     ["rect", "rect", "trapezoid"],
     ["rect", "trapezoid", "wedge", "skew"],
     ["wedge", "skew", "diamond", "impossible", "impossible"],
-    bias
+    bias,
+    rng
   );
   controls.chamberShape.value = chooseByBias(
     ["rect", "rect", "trapezoid"],
     ["rect", "trapezoid", "wedge", "skew"],
     ["wedge", "skew", "impossible", "impossible"],
-    bias
+    bias,
+    rng
   );
   controls.chamberSide.value = chooseByBias(
     ["back", "left", "right"],
     ["front", "back", "left", "right"],
     ["front", "back", "left", "right", "all", "all"],
-    bias
+    bias,
+    rng
   );
-  controls.chamberMaterial.value = choice(presets);
+  controls.chamberMaterial.value = pick(preset.materials);
   controls.chamberMaterialMode.value = chooseByBias(
     ["uniform", "uniform", "alternating"],
     ["uniform", "alternating", "nested"],
     ["alternating", "nested", "palette", "palette"],
-    bias
+    bias,
+    rng
   );
-  controls.chamberWidth.value = round(2 + Math.random() * Math.min(10, Number(controls.roomX.value) * 0.75), 1);
-  controls.chamberDepth.value = round(1.5 + Math.random() * Math.min(8, Number(controls.roomY.value) * 0.65), 1);
-  controls.chamberCount.value = Math.round(clamp(1 + Math.random() * (1.2 + bias * 2.8), 1, 4));
-  controls.chamberPosition.value = round(Math.random(), 2);
-  controls.nestedChambers.value = Math.round(clamp(Math.random() * (0.4 + bias * 2.4), 0, 2));
+  controls.chamberWidth.value = round(range(1.2, Math.max(1.5, Math.min(14, Number(controls.roomX.value) * 0.72))), 1);
+  controls.chamberDepth.value = round(range(1.2, Math.max(1.5, Math.min(16, Number(controls.roomY.value) * 0.62))), 1);
+  controls.chamberCount.value = integer(1, Math.max(1, Math.round(1.6 + bias * 2.4)));
+  controls.chamberPosition.value = round(rng(), 2);
+  controls.nestedChambers.value = integer(0, Math.round(bias * 2));
   controls.openingWidth.value = round(range(0.48 - bias * 0.32, 0.86 - bias * 0.22), 2);
   controls.chamberCoupling.value = round(rangeBiased(0.12, 0.92), 2);
   controls.chamberMaterialMix.value = round(rangeBiased(0.18, 0.98), 2);
-  controls.outsideOpening.checked = Math.random() < 0.35 + bias * 0.45;
+  controls.outsideOpening.checked = Number(controls.openness.value) > 0.42 || rng() < 0.28 + bias * 0.42;
   controls.outsideOpeningSide.value = chooseByBias(
     ["front", "back", "left", "right"],
     ["front", "back", "left", "right", "all"],
     ["front", "back", "left", "right", "all", "all"],
-    bias
+    bias,
+    rng
   );
-  controls.outsideOpeningCount.value = Math.round(clamp(1 + Math.random() * (1.4 + bias * 4.2), 1, 6));
-  controls.outsideOpeningPosition.value = round(Math.random(), 2);
+  controls.outsideOpeningCount.value = integer(1, Math.max(1, Math.round(2 + bias * 4)));
+  controls.outsideOpeningPosition.value = round(rng(), 2);
   controls.outsideOpeningSpread.value = round(range(0.12, 0.35 + bias * 0.65), 2);
   controls.outsideOpeningWidth.value = round(range(0.10, 0.24 + bias * 0.42), 2);
   controls.outsideLeak.value = round(rangeBiased(0.12, 0.88), 2);
@@ -3063,20 +3836,57 @@ function randomize() {
   controls.fieldY.value = round(range(-0.22 - bias * 0.62, 0.22 + bias * 0.62), 2);
   controls.sourceAz.value = 0;
   controls.sourceEl.value = 0;
-  controls.sourceDistance.value = round(range(1 + bias * 0.5, 6 + bias * 7), 2);
+  controls.sourceDistance.value = round(clamp(range(0.8, Math.min(18, Math.max(2, Math.min(Number(controls.roomX.value), Number(controls.roomY.value)) * 0.72))), 0.25, 20), 2);
   controls.spreadDeg.value = Math.round(range(16 + bias * 8, 52 + bias * 68));
   controls.groupVariation.value = round(rangeBiased(0.08, 0.9), 2);
   controls.surfaceContrast.value = round(rangeBiased(0.12, 0.96), 2);
   controls.distanceVariation.value = round(rangeBiased(0.03, 0.72), 2);
-  controls.duration.value = round(1.5 + Math.random() * 5.5, 2);
+  const durationRange = family === "clearing" ? [0.45, 2.4]
+    : family === "canyon" ? [1.2, 5.5]
+      : family === "cavern" ? [3, 9]
+        : family === "abstract" ? [0.7, 10]
+          : [1.2, 6.5];
+  controls.duration.value = round(range(...durationRange), 2);
   controls.preDelay.value = Math.round(range(2, 24 + bias * 48));
   controls.earlyReflections.value = Math.round(range(8 + bias * 4, 28 + bias * 48));
-  controls.cameraAz.value = Math.round(-80 + Math.random() * 160);
-  controls.cameraEl.value = Math.round(18 + Math.random() * 34);
-  controls.cameraZoom.value = round(0.78 + Math.random() * 0.58, 2);
+  controls.cameraAz.value = Math.round(range(-80, 80));
+  controls.cameraEl.value = Math.round(range(18, 52));
+  controls.cameraZoom.value = round(range(0.78, 1.36), 2);
   state.selectedDirection = 0;
   state.groupMapPositions = {};
-  applyMaterial();
+  updateAllRangeFills();
+  drawRoom();
+}
+
+function mutate() {
+  const bias = clamp(Number(controls.topologyBias.value || 0.35), 0, 1);
+  const seed = freshSeed();
+  const rng = makeRng(seed);
+  const amount = 0.06 + bias * 0.22;
+  controls.spaceSeed.value = seed;
+  if (controls.spaceFamily.value === "any") controls.spaceFamily.value = resolvedSpaceFamily("any", seed, bias);
+  const mutateRange = (control, scale = 1) => {
+    const min = Number(control.min);
+    const max = Number(control.max);
+    const value = Number(control.value);
+    const next = clamp(value + (rng() - 0.5) * (max - min) * amount * scale, min, max);
+    control.value = control.step && Number(control.step) >= 1 ? Math.round(next) : round(next, Number(control.step) < 0.01 ? 3 : 2);
+  };
+  [controls.roomX, controls.roomY, controls.roomZ, controls.irregularity, controls.surfaceRoughness,
+    controls.verticalVariation, controls.openness, controls.chamberWidth, controls.chamberDepth,
+    controls.chamberPosition, controls.openingWidth, controls.chamberCoupling, controls.chamberMaterialMix,
+    controls.outsideOpeningPosition, controls.outsideOpeningSpread, controls.outsideOpeningWidth,
+    controls.outsideLeak, controls.fieldX, controls.fieldY, controls.sourceDistance, controls.spreadDeg,
+    controls.groupVariation, controls.surfaceContrast, controls.distanceVariation, controls.duration,
+    controls.preDelay, controls.earlyReflections].forEach((control) => mutateRange(control));
+  if (rng() < 0.28 + bias * 0.30) controls.roomShape.value = choice(["rect", "trapezoid", "wedge", "skew", "diamond", "impossible"], rng);
+  if (rng() < 0.24 + bias * 0.34) controls.chamberShape.value = choice(["rect", "trapezoid", "wedge", "skew", "impossible"], rng);
+  if (rng() < 0.18 + bias * 0.30) controls.chamberSide.value = choice(["front", "back", "left", "right", "all"], rng);
+  if (rng() < 0.14 + bias * 0.20) controls.spaceShape.value = controls.spaceShape.value === "shoebox" ? "side_chamber" : "shoebox";
+  state.selectedDirection = 0;
+  state.groupMapPositions = {};
+  updateAllRangeFills();
+  drawRoom();
 }
 
 Object.values(controls).forEach((control) => {
@@ -3312,7 +4122,21 @@ window.addEventListener("keydown", (event) => {
 
 $("reset").addEventListener("click", resetDefaults);
 $("randomize").addEventListener("click", randomize);
+$("mutate").addEventListener("click", mutate);
+$("importJson").addEventListener("click", () => $("projectFileInput").click());
+$("projectFileInput").addEventListener("change", async (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  try {
+    await importProjectFile(file);
+  } catch (error) {
+    window.alert(`Could not import Imprint Sketch project: ${error.message}`);
+  } finally {
+    event.target.value = "";
+  }
+});
 $("exportJson").addEventListener("click", downloadJson);
+$("exportImprint").addEventListener("click", downloadImprint);
 $("viewGltf").addEventListener("click", openGltfModal);
 $("exportGltf").addEventListener("click", downloadGltf);
 $("modalExportGltf").addEventListener("click", downloadGltf);

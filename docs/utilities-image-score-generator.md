@@ -7,8 +7,8 @@ prev_page:
   title: Displacement Score
   url: /utilities-displacement-score.html
 next_page:
-  title: IR Sketch
-  url: /utilities-ir-room-sketch-designer.html
+  title: Imprint Sketch
+  url: /utilities-imprint-sketch.html
 toc:
   - title: Open Tool
     href: "#open-tool"

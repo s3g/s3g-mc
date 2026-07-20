@@ -60,8 +60,10 @@ Package Browser group counts:
   exported geometry in Max with points, polygon lines, and a projected heatmap.
 - `Image Score`: opens the browser utility for composing PNG scores
   used by `3OAFX Image Sonogram Field`.
-- `IR Sketch`: opens the browser utility for preparing room
-  sketch JSON used by `3OAFX Synthetic Ambisonic IR Bank`.
+- `Imprint Sketch`: designs repeatable directional responses for rooms, caves,
+  passages, open fields, and imaginary spaces. It exports project JSON for
+  `3OAFX Synthetic Ambisonic IR Bank` and `.s3gimprint` files for `s3g Ambi
+  Imprint 64` in `s3g-dsp`.
 - `Load Automation Score JSON`: opens an ImGui target-assignment window for
   mapping Automation Score lanes to selected track volume envelopes or
   named FX parameter envelopes, with append or replace write modes and optional
