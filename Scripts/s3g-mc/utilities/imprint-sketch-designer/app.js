@@ -4,15 +4,17 @@ const canvas = $("roomCanvas");
 const ctx = canvas.getContext("2d");
 const ROOM_CANVAS_W = 900;
 const ROOM_CANVAS_H = 560;
+const BANK_ELEVATION_PANEL_W = 104;
 const roomSvg = $("roomSvg");
 const timelineCanvas = $("timelineCanvas");
 const timelineCtx = timelineCanvas.getContext("2d");
 const gltfCanvas = $("gltfCanvas");
 const gltfCtx = gltfCanvas.getContext("2d");
-const STORAGE_KEY = "s3g-mc-imprint-sketch-autosave-v1";
+const STORAGE_KEY = "s3g-mc-imprint-sketch-autosave-v2";
+const PREVIOUS_STORAGE_KEY = "s3g-mc-imprint-sketch-autosave-v1";
 const LEGACY_STORAGE_KEY = "s3g-mc-ir-sketch-autosave-v1";
 const PROJECT_FORMAT = "s3g-imprint-sketch";
-const PROJECT_VERSION = 1;
+const PROJECT_VERSION = 2;
 const LEGACY_PROJECT_FORMAT = "s3g-ir-room-sketch";
 const LEGACY_PROJECT_VERSION = 2;
 const IMPRINT_FORMAT = "s3g-ambi-imprint";
@@ -46,8 +48,14 @@ const controls = {
   chamberDepth: $("chamberDepth"),
   chamberCount: $("chamberCount"),
   chamberPosition: $("chamberPosition"),
+  chamberCrossPosition: $("chamberCrossPosition"),
+  chamberHeading: $("chamberHeading"),
+  chamberVerticalPosition: $("chamberVerticalPosition"),
   nestedChambers: $("nestedChambers"),
+  openingShape: $("openingShape"),
   openingWidth: $("openingWidth"),
+  openingHeight: $("openingHeight"),
+  openingPositionZ: $("openingPositionZ"),
   chamberCoupling: $("chamberCoupling"),
   chamberMaterialMix: $("chamberMaterialMix"),
   echoStructure: $("echoStructure"),
@@ -63,6 +71,7 @@ const controls = {
   outsideLeak: $("outsideLeak"),
   fieldX: $("fieldX"),
   fieldY: $("fieldY"),
+  fieldZ: $("fieldZ"),
   sourceAz: $("sourceAz"),
   sourceEl: $("sourceEl"),
   sourceDistance: $("sourceDistance"),
@@ -277,8 +286,14 @@ function settings() {
     chamber_depth: Number(controls.chamberDepth.value),
     chamber_count: Number(controls.chamberCount.value),
     chamber_position: Number(controls.chamberPosition.value),
+    chamber_cross_position: Number(controls.chamberCrossPosition.value),
+    chamber_heading_deg: Number(controls.chamberHeading.value),
+    chamber_vertical_position: Number(controls.chamberVerticalPosition.value),
     nested_chambers: Number(controls.nestedChambers.value),
+    opening_shape: controls.openingShape.value,
     opening_width: Number(controls.openingWidth.value),
+    opening_height: Number(controls.openingHeight.value),
+    opening_position_z: Number(controls.openingPositionZ.value),
     chamber_coupling: Number(controls.chamberCoupling.value),
     chamber_material_mix: Number(controls.chamberMaterialMix.value),
     echo_structure: controls.echoStructure.value,
@@ -295,6 +310,7 @@ function settings() {
     outside_leak_factor: leakFactor,
     field_x: Number(controls.fieldX.value),
     field_y: Number(controls.fieldY.value),
+    field_z: Number(controls.fieldZ.value),
     source_azimuth: Number(controls.sourceAz.value),
     source_elevation: Number(controls.sourceEl.value),
     source_distance: Number(controls.sourceDistance.value),
@@ -415,12 +431,22 @@ function acousticGeometry(s) {
   const roughnessArea = 1 + s.surface_roughness * (0.18 + s.irregularity * 0.42);
   const ceilingArea = area * (1 - s.openness * 0.92);
   const wallArea = perimeter * meanHeight * roughnessArea * (1 - s.openness * 0.28);
+  const stacked = (chamberGeometries(s) || []).filter((chamber) => isStackedAttachment(chamber.attachment));
+  const stackedGeometry = stacked.reduce((sum, chamber) => {
+    const polygon = chamberPolygon(chamber);
+    const branchArea = Math.abs(polygonArea(polygon));
+    const branchSurface = branchArea * 2 + polygonPerimeter(polygon) * chamber.height;
+    return {
+      volume: sum.volume + branchArea * chamber.height,
+      surface: sum.surface + Math.max(0, branchSurface - chamber.portal.area * 2)
+    };
+  }, { volume: 0, surface: 0 });
   return {
     area,
     perimeter,
     meanHeight,
-    volume: area * meanHeight,
-    surface: Math.max(0.5, area + ceilingArea + wallArea)
+    volume: area * meanHeight + stackedGeometry.volume,
+    surface: Math.max(0.5, area + ceilingArea + wallArea + stackedGeometry.surface)
   };
 }
 
@@ -560,26 +586,266 @@ function groupProfile(s, index) {
   };
 }
 
+function branchAttachments(value) {
+  const sets = {
+    left_ceiling: ["left", "ceiling"],
+    right_ceiling: ["right", "ceiling"],
+    left_floor: ["left", "floor"],
+    right_floor: ["right", "floor"],
+    ceiling_floor: ["ceiling", "floor"],
+    all: ["front", "right", "back", "left"],
+    all_surfaces: ["front", "right", "back", "left", "ceiling", "floor"]
+  };
+  return sets[value] || [value || "back"];
+}
+
+function isStackedAttachment(attachment) {
+  return attachment === "ceiling" || attachment === "floor";
+}
+
+function rotatePlanPoint(point, center, headingRadians) {
+  const cosine = Math.cos(headingRadians);
+  const sine = Math.sin(headingRadians);
+  return {
+    x: center.x + point.x * cosine - point.y * sine,
+    y: center.y + point.x * sine + point.y * cosine
+  };
+}
+
+function makeHorizontalChamber(s, attachment, ordinal, count, level, parent, index) {
+  const family = resolvedBranchFamily(s, index, level);
+  const parentPolygon = parent ? chamberPolygon(parent) : roomPolygon(s);
+  const bounds = polygonBounds(parentPolygon);
+  const spanX = Math.max(0.5, bounds.maxX - bounds.minX);
+  const spanY = Math.max(0.5, bounds.maxY - bounds.minY);
+  const levelScale = Math.pow(0.78, level);
+  const width = Math.min(s.chamber_width * levelScale, spanX * 0.82);
+  const depth = Math.min(s.chamber_depth * levelScale, spanY * 0.82);
+  const heading = (s.chamber_heading_deg || 0) * Math.PI / 180;
+  const center = parent ? polygonCentroid(parentPolygon) : {
+    x: bounds.minX + spanX * (0.12 + clamp(s.chamber_position, 0, 1) * 0.76),
+    y: bounds.minY + spanY * (0.12 + clamp(s.chamber_cross_position, 0, 1) * 0.76)
+  };
+  const spread = count > 1 ? Math.min(Math.max(width, depth) * 0.68, Math.min(spanX, spanY) / count) : 0;
+  const offset = (ordinal - (count - 1) * 0.5) * spread;
+  center.x += Math.cos(heading) * offset;
+  center.y += Math.sin(heading) * offset;
+  const halfX = Math.abs(Math.cos(heading)) * width * 0.5 + Math.abs(Math.sin(heading)) * depth * 0.5;
+  const halfY = Math.abs(Math.sin(heading)) * width * 0.5 + Math.abs(Math.cos(heading)) * depth * 0.5;
+  const minCenterX = bounds.minX + halfX;
+  const maxCenterX = bounds.maxX - halfX;
+  const minCenterY = bounds.minY + halfY;
+  const maxCenterY = bounds.maxY - halfY;
+  center.x = minCenterX <= maxCenterX ? clamp(center.x, minCenterX, maxCenterX) : (bounds.minX + bounds.maxX) * 0.5;
+  center.y = minCenterY <= maxCenterY ? clamp(center.y, minCenterY, maxCenterY) : (bounds.minY + bounds.maxY) * 0.5;
+  const localGeometry = branchLocalGeometry(s, -width * 0.5, width, depth, family, index, level);
+  const localCenter = polygonCentroid(localGeometry.poly);
+  const poly = localGeometry.poly.map((point) => rotatePlanPoint({
+    x: point.x - localCenter.x,
+    y: point.y - localCenter.y
+  }, center, heading));
+  const localBounds = polygonBounds(poly);
+  return {
+    x: localBounds.minX,
+    y: localBounds.minY,
+    width: localBounds.maxX - localBounds.minX,
+    depth: localBounds.maxY - localBounds.minY,
+    opening: Math.min(width, depth) * clamp(s.opening_width, 0.05, 1),
+    openingX: center.x,
+    openingY: center.y,
+    poly,
+    side: attachment,
+    attachment,
+    headingDeg: s.chamber_heading_deg || 0,
+    level,
+    parent: parent ? parent.index : -1,
+    index,
+    family,
+    shape: s.chamber_shape
+  };
+}
+
+function portalShapeLocalPoints(shape, width, height, seed = 1) {
+  width = Math.max(0.05, width);
+  height = Math.max(0.05, height);
+  if (shape === "rect") {
+    return [
+      { u: -width * 0.5, v: -height * 0.5 },
+      { u: width * 0.5, v: -height * 0.5 },
+      { u: width * 0.5, v: height * 0.5 },
+      { u: -width * 0.5, v: height * 0.5 }
+    ];
+  }
+  if (shape === "arch") {
+    const radius = Math.min(width * 0.5, height * 0.48);
+    const shoulder = height * 0.5 - radius;
+    const points = [
+      { u: -width * 0.5, v: -height * 0.5 },
+      { u: width * 0.5, v: -height * 0.5 },
+      { u: width * 0.5, v: shoulder }
+    ];
+    for (let index = 0; index <= 10; index += 1) {
+      const angle = index / 10 * Math.PI;
+      points.push({ u: Math.cos(angle) * radius, v: shoulder + Math.sin(angle) * radius });
+    }
+    points.push({ u: -width * 0.5, v: -height * 0.5 });
+    return points;
+  }
+  const segments = shape === "irregular" ? 12 : 20;
+  const circleRadius = Math.min(width, height) * 0.5;
+  return Array.from({ length: segments }, (_, index) => {
+    const angle = index / segments * Math.PI * 2;
+    let radius = 1;
+    if (shape === "irregular") radius = 0.78 + seededNoise(seed + index * 47) * 0.22;
+    if (shape === "slot") {
+      const exponent = 0.36;
+      return {
+        u: Math.sign(Math.cos(angle)) * Math.pow(Math.abs(Math.cos(angle)), exponent) * width * 0.5,
+        v: Math.sign(Math.sin(angle)) * Math.pow(Math.abs(Math.sin(angle)), exponent) * height * 0.5
+      };
+    }
+    const radiusU = shape === "circle" ? circleRadius : width * 0.5;
+    const radiusV = shape === "circle" ? circleRadius : height * 0.5;
+    return { u: Math.cos(angle) * radiusU * radius, v: Math.sin(angle) * radiusV * radius };
+  });
+}
+
+function portalArea(shape, width, height) {
+  if (shape === "circle") {
+    const radius = Math.min(width, height) * 0.5;
+    return Math.PI * radius * radius;
+  }
+  if (shape === "ellipse") return Math.PI * width * height * 0.25;
+  if (shape === "arch") {
+    const radius = Math.min(width * 0.5, height * 0.48);
+    return width * Math.max(0, height - radius) + Math.PI * radius * radius * 0.5;
+  }
+  if (shape === "slot") return width * height * 0.82;
+  if (shape === "irregular") return width * height * 0.70;
+  return width * height;
+}
+
+function portalOutlinePoints(portal) {
+  return portal.localOutline.map((point) => ({
+    x: portal.center.x + portal.axisU.x * point.u + portal.axisV.x * point.v,
+    y: portal.center.y + portal.axisU.y * point.u + portal.axisV.y * point.v,
+    z: portal.center.z + portal.axisU.z * point.u + portal.axisV.z * point.v
+  }));
+}
+
+function finalizeChamber3D(s, chamber, parent = null) {
+  chamber.attachment = chamber.attachment || chamber.side || "back";
+  chamber.height = Math.max(0.25, s.room_z * branchHeightRatio(s, chamber));
+  const parentBase = parent ? parent.baseZ : 0;
+  const parentTop = parent ? parent.baseZ + parent.height : s.room_z;
+  if (chamber.attachment === "ceiling") chamber.baseZ = parentTop;
+  else if (chamber.attachment === "floor") chamber.baseZ = parentBase - chamber.height;
+  else {
+    const available = Math.max(0, parentTop - parentBase - chamber.height);
+    chamber.baseZ = parentBase + available * clamp(s.chamber_vertical_position || 0, 0, 1);
+  }
+
+  let center;
+  let normal;
+  let axisU;
+  let axisV;
+  let width;
+  let height;
+  if (isStackedAttachment(chamber.attachment)) {
+    center = { ...polygonCentroid(chamberPolygon(chamber)), z: chamber.attachment === "ceiling" ? chamber.baseZ : chamber.baseZ + chamber.height };
+    const heading = (chamber.headingDeg || 0) * Math.PI / 180;
+    axisU = { x: Math.cos(heading), y: Math.sin(heading), z: 0 };
+    axisV = { x: -Math.sin(heading), y: Math.cos(heading), z: 0 };
+    normal = { x: 0, y: 0, z: chamber.attachment === "ceiling" ? 1 : -1 };
+    width = Math.max(0.12, Math.min(chamber.width, chamber.depth) * clamp(s.opening_width, 0.05, 1));
+    height = Math.max(0.12, Math.min(chamber.width, chamber.depth) * clamp(s.opening_height, 0.05, 1));
+  } else {
+    const segment = chamberOpeningSegment(chamber);
+    const dx = segment.x2 - segment.x1;
+    const dy = segment.y2 - segment.y1;
+    width = Math.max(0.12, Math.hypot(dx, dy));
+    axisU = { x: dx / width, y: dy / width, z: 0 };
+    axisV = { x: 0, y: 0, z: 1 };
+    const outward = chamber.edgeOutward || chamberOutwardVector(chamber.attachment);
+    normal = { x: outward.x || 0, y: outward.y || 0, z: 0 };
+    const overlapBottom = Math.max(parentBase, chamber.baseZ);
+    const overlapTop = Math.min(parentTop, chamber.baseZ + chamber.height);
+    const overlapHeight = Math.max(0.12, overlapTop - overlapBottom);
+    height = Math.max(0.12, overlapHeight * clamp(s.opening_height, 0.05, 1));
+    const minimumCenter = overlapBottom + height * 0.5;
+    const maximumCenter = overlapTop - height * 0.5;
+    const centerZ = maximumCenter >= minimumCenter
+      ? minimumCenter + (maximumCenter - minimumCenter) * clamp(s.opening_position_z, 0, 1)
+      : (overlapBottom + overlapTop) * 0.5;
+    center = { x: (segment.x1 + segment.x2) * 0.5, y: (segment.y1 + segment.y2) * 0.5, z: centerZ };
+  }
+  if (s.opening_shape === "circle") width = height = Math.min(width, height);
+  const shape = s.opening_shape || "rect";
+  const area = portalArea(shape, width, height);
+  const parentCrossSection = isStackedAttachment(chamber.attachment)
+    ? Math.max(0.1, chamber.width * chamber.depth)
+    : Math.max(0.1, width * Math.max(chamber.height, parentTop - parentBase));
+  const apertureRatio = clamp(area / parentCrossSection, 0.0025, 1);
+  const shapeEfficiency = { rect: 1, arch: 0.96, circle: 0.91, ellipse: 0.88, slot: 0.78, irregular: 0.72 }[shape] || 1;
+  chamber.regionId = `region-${chamber.index + 1}`;
+  chamber.parentRegionId = parent ? parent.regionId : "primary";
+  chamber.portal = {
+    id: `portal-${chamber.index + 1}`,
+    fromRegion: chamber.parentRegionId,
+    toRegion: chamber.regionId,
+    attachment: chamber.attachment,
+    shape,
+    center,
+    normal,
+    axisU,
+    axisV,
+    width,
+    height,
+    area,
+    transmission: clamp(Math.sqrt(apertureRatio) * shapeEfficiency, 0.04, 1),
+    localOutline: portalShapeLocalPoints(shape, width, height, s.space_seed + chamber.index * 97)
+  };
+  return chamber;
+}
+
 function chamberGeometries(s) {
   if (s.space_shape !== "side_chamber") return null;
-  const requestedSides = s.chamber_side === "all" ? ["front", "back", "left", "right"] : [s.chamber_side || "back"];
+  const attachments = branchAttachments(s.chamber_side);
   const count = Math.max(1, Math.round(s.chamber_count));
   const nested = Math.max(0, Math.round(s.nested_chambers));
   const roomPoly = roomPolygon(s);
   const chambers = [];
-  requestedSides.forEach((side) => {
-    const edge = edgeForSide(roomPoly, side);
+  attachments.forEach((attachment) => {
+    if (isStackedAttachment(attachment)) {
+      for (let ordinal = 0; ordinal < count; ordinal += 1) {
+        let chamber = makeHorizontalChamber(s, attachment, ordinal, count, 0, null, chambers.length);
+        finalizeChamber3D(s, chamber, null);
+        chambers.push(chamber);
+        let parent = chamber;
+        for (let level = 1; level <= nested; level += 1) {
+          const child = makeHorizontalChamber(s, attachment, 0, 1, level, parent, chambers.length);
+          finalizeChamber3D(s, child, parent);
+          chambers.push(child);
+          parent = child;
+        }
+      }
+      return;
+    }
+
+    const edge = edgeForSide(roomPoly, attachment);
     const wallLength = edge.length;
     const alongWidth = Math.min(s.chamber_width, wallLength * 0.9);
-    const outwardDepth = Math.min(s.chamber_depth, (side === "left" || side === "right" ? s.room_x : s.room_y) * 0.8);
+    const outwardDepth = Math.min(s.chamber_depth, (attachment === "left" || attachment === "right" ? s.room_x : s.room_y) * 0.8);
     const centerSpan = Math.max(0, wallLength - alongWidth);
     const baseCenter = alongWidth * 0.5 + centerSpan * clamp(s.chamber_position, 0, 1);
     const spacing = count > 1 ? Math.min(alongWidth * 1.15, Math.max(alongWidth * 0.55, wallLength / count)) : 0;
     const opening = clamp(s.opening_width, 0.05, 1) * alongWidth;
-    for (let index = 0; index < count; index += 1) {
-      const offset = (index - (count - 1) * 0.5) * spacing;
+    for (let ordinal = 0; ordinal < count; ordinal += 1) {
+      const offset = (ordinal - (count - 1) * 0.5) * spacing;
       const alongStart = clamp(baseCenter + offset - alongWidth * 0.5, 0, Math.max(0, wallLength - alongWidth));
-      let chamber = makeEdgeChamber(s, side, edge, alongStart, alongWidth, outwardDepth, opening, 0, -1, chambers.length);
+      let chamber = makeEdgeChamber(s, attachment, edge, alongStart, alongWidth, outwardDepth, opening, 0, -1, chambers.length);
+      chamber.attachment = attachment;
+      finalizeChamber3D(s, chamber, null);
       chambers.push(chamber);
       let parent = chamber;
       for (let level = 1; level <= nested; level += 1) {
@@ -588,13 +854,71 @@ function chamberGeometries(s) {
         const childOpening = Math.min(opening * Math.pow(0.82, level), childAlong * 0.9);
         const nestedEdge = nestedEdgeFromChamber(parent);
         const childAlongStart = clamp(nestedEdge.length * 0.5 - childAlong * 0.5, 0, Math.max(0, nestedEdge.length - childAlong));
-        const child = makeEdgeChamber(s, side, nestedEdge, childAlongStart, childAlong, childOutward, childOpening, level, parent.index, chambers.length);
+        const child = makeEdgeChamber(s, attachment, nestedEdge, childAlongStart, childAlong, childOutward, childOpening, level, parent.index, chambers.length);
+        child.attachment = attachment;
+        finalizeChamber3D(s, child, parent);
         chambers.push(child);
         parent = child;
       }
     }
   });
   return chambers;
+}
+
+function chamberFarPoint(chamber) {
+  const portal = chamber.portal;
+  const polygon = chamberPolygon(chamber);
+  const far = polygon.reduce((best, point) => {
+    const distance = Math.hypot(point.x - portal.center.x, point.y - portal.center.y);
+    return !best || distance > best.distance ? { point, distance } : best;
+  }, null).point;
+  return {
+    x: far.x,
+    y: far.y,
+    z: chamber.baseZ + chamber.height * 0.54
+  };
+}
+
+function connectedRegionGraph(s) {
+  const chambers = chamberGeometries(s) || [];
+  return {
+    regions: [
+      {
+        id: "primary",
+        kind: "primary",
+        family: s.space_family,
+        baseZ: 0,
+        height: s.room_z,
+        polygon: roomPolygon(s)
+      },
+      ...chambers.map((chamber) => ({
+        id: chamber.regionId,
+        kind: "branch",
+        family: chamber.family,
+        level: chamber.level,
+        parent: chamber.parentRegionId,
+        attachment: chamber.attachment,
+        baseZ: chamber.baseZ,
+        height: chamber.height,
+        polygon: chamberPolygon(chamber),
+        chamber
+      }))
+    ],
+    portals: chambers.map((chamber) => chamber.portal),
+    chambers
+  };
+}
+
+function volumeBounds3D(s) {
+  const plan = floorplanBounds(s);
+  const chambers = chamberGeometries(s) || [];
+  const minimum = Math.min(0, ...chambers.map((chamber) => chamber.baseZ));
+  const maximum = Math.max(
+    s.room_z,
+    ...ceilingProfile(s).map((point) => point.z),
+    ...chambers.map((chamber) => chamber.baseZ + chamber.height)
+  );
+  return { ...plan, minZ: minimum, maxZ: maximum, depth: maximum - minimum };
 }
 
 function polygonForBox(x, y, w, d, shape) {
@@ -1001,6 +1325,15 @@ function chamberAlongCenter(chamber) {
 }
 
 function chamberOpeningSegment(chamber) {
+  if (chamber.portal) {
+    const half = chamber.portal.width * 0.5;
+    return {
+      x1: chamber.portal.center.x - chamber.portal.axisU.x * half,
+      y1: chamber.portal.center.y - chamber.portal.axisU.y * half,
+      x2: chamber.portal.center.x + chamber.portal.axisU.x * half,
+      y2: chamber.portal.center.y + chamber.portal.axisU.y * half
+    };
+  }
   if (chamber.openA && chamber.openB) {
     return {
       x1: chamber.openA.x,
@@ -1061,14 +1394,58 @@ function roomOpeningSegments(s) {
   return segments;
 }
 
+function exteriorPortalForSegment(s, segment) {
+  const dx = segment.x2 - segment.x1;
+  const dy = segment.y2 - segment.y1;
+  const width = Math.max(0.05, Math.hypot(dx, dy));
+  const localCeiling = Math.max(0.2, Math.min(
+    spaceCeilingHeight(s, segment.x1, segment.y1),
+    spaceCeilingHeight(s, segment.x2, segment.y2),
+    spaceCeilingHeight(s, segment.center.x, segment.center.y)
+  ));
+  const height = Math.max(0.12, localCeiling * 0.76);
+  const baseZ = Math.max(0.02, (localCeiling - height) * 0.5);
+  const outward = segment.outward || chamberOutwardVector(segment.side);
+  return {
+    ...segment,
+    id: `outside-${segment.index + 1}`,
+    kind: "outside",
+    attachment: segment.side,
+    shape: "rect",
+    center: { x: segment.center.x, y: segment.center.y, z: baseZ + height * 0.5 },
+    normal: { x: outward.x || 0, y: outward.y || 0, z: 0 },
+    axisU: { x: dx / width, y: dy / width, z: 0 },
+    axisV: { x: 0, y: 0, z: 1 },
+    width,
+    height,
+    baseZ,
+    area: width * height,
+    localOutline: portalShapeLocalPoints("rect", width, height)
+  };
+}
+
+function exteriorPortals(s) {
+  return roomOpeningSegments(s).map((segment) => exteriorPortalForSegment(s, segment));
+}
+
 function chamberOutwardVector(side) {
   if (side === "front") return { x: 0, y: -1, az: 0 };
   if (side === "left") return { x: -1, y: 0, az: 90 };
   if (side === "right") return { x: 1, y: 0, az: -90 };
+  if (side === "ceiling") return { x: 0, y: 0, z: 1, az: 0, el: 90 };
+  if (side === "floor") return { x: 0, y: 0, z: -1, az: 0, el: -90 };
   return { x: 0, y: 1, az: 180 };
 }
 
 function pointOnOpening(chamber, amount) {
+  if (chamber.portal) {
+    const offset = (clamp(amount, 0, 1) - 0.5) * chamber.portal.width;
+    return {
+      x: chamber.portal.center.x + chamber.portal.axisU.x * offset,
+      y: chamber.portal.center.y + chamber.portal.axisU.y * offset,
+      z: chamber.portal.center.z + chamber.portal.axisU.z * offset
+    };
+  }
   const segment = chamberOpeningSegment(chamber);
   return {
     x: segment.x1 + (segment.x2 - segment.x1) * amount,
@@ -1124,7 +1501,12 @@ function floorplanBounds(s) {
 }
 
 function floorplanPolygons(s) {
-  return [roomPolygon(s), ...(chamberGeometries(s) || []).map(chamberPolygon)];
+  return [
+    roomPolygon(s),
+    ...(chamberGeometries(s) || [])
+      .filter((chamber) => !isStackedAttachment(chamber.attachment))
+      .map(chamberPolygon)
+  ];
 }
 
 function pointInPolygon(point, polygon) {
@@ -1141,6 +1523,15 @@ function pointInPolygon(point, polygon) {
   return inside;
 }
 
+function pointInOrOnPolygon(point, polygon, epsilon = 0.0001) {
+  if (pointInPolygon(point, polygon)) return true;
+  for (let index = 0; index < polygon.length; index += 1) {
+    const candidate = closestPointOnSegment(point, polygon[index], polygon[(index + 1) % polygon.length]);
+    if (Math.hypot(point.x - candidate.x, point.y - candidate.y) <= epsilon) return true;
+  }
+  return false;
+}
+
 function pointInFloorplan(point, s) {
   return floorplanPolygons(s).some((polygon) => pointInPolygon(point, polygon));
 }
@@ -1152,6 +1543,90 @@ function closestPointOnSegment(point, a, b) {
   if (lenSq <= 1e-9) return { x: a.x, y: a.y };
   const t = clamp(((point.x - a.x) * dx + (point.y - a.y) * dy) / lenSq, 0, 1);
   return { x: a.x + dx * t, y: a.y + dy * t };
+}
+
+function closestPointInPolygon(point, polygon) {
+  if (pointInPolygon(point, polygon)) return { x: point.x, y: point.y };
+  let best = null;
+  for (let index = 0; index < polygon.length; index += 1) {
+    const candidate = closestPointOnSegment(point, polygon[index], polygon[(index + 1) % polygon.length]);
+    const dx = point.x - candidate.x;
+    const dy = point.y - candidate.y;
+    const distanceSquared = dx * dx + dy * dy;
+    if (!best || distanceSquared < best.distanceSquared) best = { ...candidate, distanceSquared };
+  }
+  return best ? { x: best.x, y: best.y } : { x: point.x, y: point.y };
+}
+
+function connectedVolumeRegions(s) {
+  return [
+    {
+      id: "primary",
+      kind: "primary",
+      index: -1,
+      polygon: roomPolygon(s),
+      baseZ: 0,
+      height: s.room_z
+    },
+    ...(chamberGeometries(s) || []).map((chamber) => ({
+      id: chamber.regionId,
+      kind: "branch",
+      index: chamber.index,
+      attachment: chamber.attachment,
+      polygon: chamberPolygon(chamber),
+      baseZ: chamber.baseZ,
+      height: chamber.height,
+      chamber
+    }))
+  ];
+}
+
+function connectedRegionVerticalBounds(s, region, x, y, margin = 0) {
+  const rawMinimum = region.kind === "primary" ? 0 : region.baseZ;
+  const rawMaximum = region.kind === "primary"
+    ? spaceCeilingHeight(s, x, y)
+    : region.baseZ + region.height;
+  const safeMargin = Math.min(Math.max(0, margin), Math.max(0, rawMaximum - rawMinimum) * 0.18);
+  return {
+    minimum: rawMinimum + safeMargin,
+    maximum: rawMaximum - safeMargin
+  };
+}
+
+function connectedRegionAtPoint(point, s, epsilon = 0.0001) {
+  let best = null;
+  connectedVolumeRegions(s).forEach((region) => {
+    if (!pointInOrOnPolygon(point, region.polygon, epsilon)) return;
+    const vertical = connectedRegionVerticalBounds(s, region, point.x, point.y);
+    if (point.z < vertical.minimum - epsilon || point.z > vertical.maximum + epsilon) return;
+    const center = (vertical.minimum + vertical.maximum) * 0.5;
+    const distance = Math.abs(point.z - center);
+    if (!best || distance < best.distance) best = { region, distance };
+  });
+  return best ? best.region : null;
+}
+
+function pointInConnectedVolume(point, s) {
+  return connectedRegionAtPoint(point, s) !== null;
+}
+
+function closestPointInConnectedVolume(point, s, margin = 0.05) {
+  let best = null;
+  connectedVolumeRegions(s).forEach((region) => {
+    const plan = closestPointInPolygon(point, region.polygon);
+    const vertical = connectedRegionVerticalBounds(s, region, plan.x, plan.y, margin);
+    const candidate = {
+      x: plan.x,
+      y: plan.y,
+      z: clamp(point.z, vertical.minimum, vertical.maximum)
+    };
+    const dx = point.x - candidate.x;
+    const dy = point.y - candidate.y;
+    const dz = point.z - candidate.z;
+    const distanceSquared = dx * dx + dy * dy + dz * dz;
+    if (!best || distanceSquared < best.distanceSquared) best = { ...candidate, region, distanceSquared };
+  });
+  return best ? { x: best.x, y: best.y, z: best.z } : floorplanCenter(s);
 }
 
 function closestPointInFloorplan(point, s) {
@@ -1182,6 +1657,47 @@ function floorplanCenter(s) {
   };
 }
 
+function fieldVerticalRange(s, x, y) {
+  const bounds = volumeBounds3D(s);
+  const margin = Math.min(0.25, Math.max(0.05, bounds.depth * 0.04));
+  const minimum = bounds.minZ + margin;
+  const maximum = Math.max(minimum, bounds.maxZ - margin);
+  return {
+    minimum,
+    maximum,
+    reference: clamp(spaceCeilingHeight(s, x, y) * 0.5, minimum, maximum)
+  };
+}
+
+function fieldElevationFromOffset(s, x, y, offset = s.field_z || 0) {
+  const range = fieldVerticalRange(s, x, y);
+  const amount = clamp(Number(offset), -1, 1);
+  return amount >= 0
+    ? range.reference + (range.maximum - range.reference) * amount
+    : range.reference + (range.reference - range.minimum) * amount;
+}
+
+function fieldOffsetFromElevation(s, x, y, elevation) {
+  const range = fieldVerticalRange(s, x, y);
+  const bounded = clamp(elevation, range.minimum, range.maximum);
+  if (bounded >= range.reference) {
+    return clamp((bounded - range.reference) / Math.max(0.0001, range.maximum - range.reference), 0, 1);
+  }
+  return clamp((bounded - range.reference) / Math.max(0.0001, range.reference - range.minimum), -1, 0);
+}
+
+function setFieldControlsFromPoint(s, point) {
+  const bounds = floorplanBounds(s);
+  const width = Math.max(0.5, bounds.maxX - bounds.minX);
+  const height = Math.max(0.5, bounds.maxY - bounds.minY);
+  controls.fieldX.value = round(clamp(((point.x - bounds.minX) / width - 0.5) * 2, -1, 1), 3);
+  controls.fieldY.value = round(clamp(((point.y - bounds.minY) / height - 0.5) * 2, -1, 1), 3);
+  controls.fieldZ.value = round(fieldOffsetFromElevation(s, point.x, point.y, point.z), 3);
+  updateRangeFill(controls.fieldX);
+  updateRangeFill(controls.fieldY);
+  updateRangeFill(controls.fieldZ);
+}
+
 function selectedDirection(s) {
   const dirs = activeDirections(s);
   const index = clamp(state.selectedDirection, 0, Math.max(0, dirs.length - 1));
@@ -1205,15 +1721,21 @@ function groupPositionKey(index) {
 function defaultGroupMapPosition(s, dir, profile) {
   const points = roomPoints(s, dir, profile);
   const candidate = { x: points.source.x, y: points.source.y, z: points.source.z };
-  if (pointInFloorplan(candidate, s)) return candidate;
+  if (pointInConnectedVolume(candidate, s)) return candidate;
   const listener = points.listener;
-  if (pointInFloorplan(listener, s)) return { ...listener };
+  if (pointInConnectedVolume(listener, s)) return { ...listener };
   return floorplanCenter(s);
 }
 
 function groupMapPosition(s, info, profile = groupProfile(s, info.index || 0)) {
   const stored = state.groupMapPositions[groupPositionKey(info.index)];
-  if (stored && pointInFloorplan(stored, s)) return { x: stored.x, y: stored.y, z: stored.z || s.room_z * 0.5 };
+  if (stored && pointInConnectedVolume(stored, s)) {
+    return {
+      x: stored.x,
+      y: stored.y,
+      z: Number.isFinite(Number(stored.z)) ? Number(stored.z) : s.room_z * 0.5
+    };
+  }
   return defaultGroupMapPosition(s, info, profile);
 }
 
@@ -1222,24 +1744,25 @@ function roomPoints(s, dir = selectedDirection(s), profile = groupProfile(s, dir
   const margin = 0.25;
   const fieldWidth = Math.max(0.5, bounds.maxX - bounds.minX);
   const fieldHeight = Math.max(0.5, bounds.maxY - bounds.minY);
-  const listenerCandidate = {
+  const listenerPlan = {
     x: clamp(bounds.minX + fieldWidth * (0.5 + s.field_x * 0.5), bounds.minX + margin, bounds.maxX - margin),
-    y: clamp(bounds.minY + fieldHeight * (0.5 + s.field_y * 0.5), bounds.minY + margin, bounds.maxY - margin),
-    z: s.room_z * 0.5
+    y: clamp(bounds.minY + fieldHeight * (0.5 + s.field_y * 0.5), bounds.minY + margin, bounds.maxY - margin)
   };
-  listenerCandidate.z = spaceCeilingHeight(s, listenerCandidate.x, listenerCandidate.y) * 0.5;
-  const listener = closestPointInFloorplan(listenerCandidate, s);
+  const listener = closestPointInConnectedVolume({
+    ...listenerPlan,
+    z: fieldElevationFromOffset(s, listenerPlan.x, listenerPlan.y)
+  }, s);
   const unit = unitFromAed(dir.azimuth, dir.elevation);
-  const maxDist = Math.min(profile.source_distance, Math.min(fieldWidth, fieldHeight, s.room_z) * 0.48);
+  const volume = volumeBounds3D(s);
+  const maxDist = Math.min(profile.source_distance, Math.min(fieldWidth, fieldHeight, Math.max(s.room_z, volume.depth)) * 0.48);
   const sourceX = clamp(listener.x + unit.x * maxDist, bounds.minX + 0.05, bounds.maxX - 0.05);
   const sourceY = clamp(listener.y + unit.z * maxDist, bounds.minY + 0.05, bounds.maxY - 0.05);
-  const sourceCeiling = spaceCeilingHeight(s, sourceX, sourceY);
   const sourceCandidate = {
     x: sourceX,
     y: sourceY,
-    z: clamp(listener.z + unit.y * maxDist, 0.05, sourceCeiling - 0.05)
+    z: clamp(listener.z + unit.y * maxDist, volume.minZ + 0.05, volume.maxZ - 0.05)
   };
-  const source = closestPointInFloorplan(sourceCandidate, s);
+  const source = closestPointInConnectedVolume(sourceCandidate, s);
   return { listener, source };
 }
 
@@ -1294,27 +1817,31 @@ function reflectedPointAcrossEdge(point, a, b) {
 
 function boundaryImageSources(s, source, listener) {
   const candidates = [];
-  floorplanPolygons(s).forEach((polygon, polygonIndex) => {
+  const sourceRegion = connectedRegionAtPoint(source, s) || connectedVolumeRegions(s)[0];
+  const polygons = sourceRegion ? [sourceRegion.polygon] : floorplanPolygons(s);
+  polygons.forEach((polygon, polygonIndex) => {
     polygon.forEach((point, edgeIndex) => {
       const next = polygon[(edgeIndex + 1) % polygon.length];
       const image = reflectedPointAcrossEdge(source, point, next);
       const distance = Math.hypot(image.x - listener.x, image.y - listener.y, image.z - listener.z);
       candidates.push({
         pos: image,
-        wall: polygonIndex === 0 ? `S${edgeIndex + 1}` : `B${polygonIndex}.${edgeIndex + 1}`,
+        wall: sourceRegion && sourceRegion.kind === "branch" ? `B${sourceRegion.index + 1}.${edgeIndex + 1}` : polygonIndex === 0 ? `S${edgeIndex + 1}` : `B${polygonIndex}.${edgeIndex + 1}`,
         distance,
         surfaceGain: 1 - s.surface_roughness * 0.24
       });
     });
   });
+  const vertical = connectedRegionVerticalBounds(s, sourceRegion || connectedVolumeRegions(s)[0], source.x, source.y);
+  const floorImageZ = 2 * vertical.minimum - source.z;
   candidates.push({
-    pos: { x: source.x, y: source.y, z: -source.z },
+    pos: { x: source.x, y: source.y, z: floorImageZ },
     wall: "D",
-    distance: Math.hypot(source.x - listener.x, source.y - listener.y, -source.z - listener.z),
+    distance: Math.hypot(source.x - listener.x, source.y - listener.y, floorImageZ - listener.z),
     surfaceGain: 1 - s.surface_roughness * 0.12
   });
   if (s.openness < 0.985) {
-    const ceiling = spaceCeilingHeight(s, source.x, source.y);
+    const ceiling = vertical.maximum;
     candidates.push({
       pos: { x: source.x, y: source.y, z: 2 * ceiling - source.z },
       wall: "U",
@@ -1400,30 +1927,23 @@ function circulatingEchoPath(s, listener, source) {
 }
 
 function coupledEchoPaths(s, dir, listener, source) {
-  const chambers = chamberGeometries(s) || [];
+  const graph = connectedRegionGraph(s);
+  const chambers = graph.chambers;
   if (!chambers.length) return [];
   const direction = unitFromAed(dir.azimuth, dir.elevation);
   const ranked = chambers.map((chamber) => {
-    const outward = chamberOutwardVector(chamber.side);
-    const alignment = Math.max(0.12, direction.x * outward.x + direction.z * outward.y);
+    const normal = chamber.portal.normal;
+    const alignment = Math.max(0.12, direction.x * normal.x + direction.z * normal.y + direction.y * normal.z);
     return { chamber, alignment, score: alignment + chamber.level * 0.06 + seededNoise(s.space_seed + chamber.index * 41) * 0.08 };
   }).sort((a, b) => b.score - a.score);
-  const pathCount = Math.min(ranked.length, Math.max(1, Math.round(1 + s.echo_prominence * 2)));
-  return ranked.slice(0, pathCount).map(({ chamber, alignment }, index) => {
-    const portal2 = pointOnOpening(chamber, 0.5);
-    const height = s.room_z * branchHeightRatio(s, chamber);
-    const z = clamp(listener.z * (0.82 + chamber.level * 0.05), 0.1, Math.max(0.1, height * 0.88));
-    const portal = { x: portal2.x, y: portal2.y, z };
-    const polygon = chamberPolygon(chamber);
-    const far2 = polygon.reduce((best, point) => {
-      const distance = Math.hypot(point.x - portal.x, point.y - portal.y);
-      return !best || distance > best.distance ? { point, distance } : best;
-    }, null).point;
-    const far = { x: far2.x, y: far2.y, z: clamp(height * 0.54, 0.1, height * 0.9) };
+  const pathCount = Math.min(ranked.length, Math.max(1, Math.round(1 + s.echo_prominence * 1.5)));
+  const paths = ranked.slice(0, pathCount).map(({ chamber, alignment }, index) => {
+    const portal = chamber.portal.center;
+    const far = chamberFarPoint(chamber);
     const family = branchFamilyResponse(s, chamber);
     const material = chamberMaterialProfile(s, chamber);
     const intervalDistance = Math.max(0.5, pointDistance3(portal, far) * 2 * family.path);
-    const coupling = clamp(s.chamber_coupling * (0.35 + alignment * 0.65) * family.coupling, 0, 1.2);
+    const coupling = clamp(s.chamber_coupling * (0.35 + alignment * 0.65) * family.coupling * chamber.portal.transmission, 0, 1.2);
     return {
       id: index + 1,
       structure: "coupled",
@@ -1440,6 +1960,45 @@ function coupledEchoPaths(s, dir, listener, source) {
       branchFamily: chamber.family
     };
   });
+  const roots = ranked.filter(({ chamber }) => chamber.level === 0);
+  if (roots.length >= 2 && s.echo_prominence >= 0.16) {
+    const maximumCrossPaths = Math.min(2, Math.max(1, Math.round(s.echo_prominence * 2)));
+    for (let index = 0; index < maximumCrossPaths; index += 1) {
+      const first = roots[index % roots.length];
+      const second = roots[(index + 1) % roots.length];
+      if (first.chamber.index === second.chamber.index) continue;
+      const aPortal = first.chamber.portal.center;
+      const bPortal = second.chamber.portal.center;
+      const aFar = chamberFarPoint(first.chamber);
+      const bFar = chamberFarPoint(second.chamber);
+      const loopPoints = [aPortal, aFar, aPortal, bPortal, bFar, bPortal];
+      const intervalDistance = loopPoints.reduce((sum, point, pointIndex) => {
+        return sum + pointDistance3(point, loopPoints[(pointIndex + 1) % loopPoints.length]);
+      }, 0);
+      const aMaterial = chamberMaterialProfile(s, first.chamber);
+      const bMaterial = chamberMaterialProfile(s, second.chamber);
+      const aFamily = branchFamilyResponse(s, first.chamber);
+      const bFamily = branchFamilyResponse(s, second.chamber);
+      paths.push({
+        id: paths.length + 1,
+        structure: "coupled",
+        points: loopPoints,
+        directionPoints: [aPortal, bPortal],
+        closed: true,
+        intervalDistance: Math.max(0.5, intervalDistance),
+        baseDistance: pointDistance3(source, aPortal) + intervalDistance + pointDistance3(bPortal, listener),
+        material: aMaterial.material_key === bMaterial.material_key ? aMaterial.material_key : "mixed",
+        absorption: (aMaterial.absorption + bMaterial.absorption) * 0.5,
+        coupling: clamp(s.chamber_coupling
+          * Math.sqrt(first.chamber.portal.transmission * second.chamber.portal.transmission)
+          * (0.35 + (first.alignment + second.alignment) * 0.325), 0, 1.2),
+        strength: (aFamily.energy + bFamily.energy) * 0.42,
+        chamberIndex: null,
+        branchFamily: `${first.chamber.family}/${second.chamber.family}`
+      });
+    }
+  }
+  return paths.slice(0, 5);
 }
 
 function echoPathDefinitions(s, dir = selectedDirection(s)) {
@@ -1605,16 +2164,26 @@ function reflectionEvents(s, dir = selectedDirection(s)) {
     for (let index = 0; index < count; index += 1) {
       const seed = (dir.index + 1) * 211 + index * 23;
       const chamber = chambers[Math.floor(seededNoise(seed + 2) * chambers.length) % chambers.length];
-      const outward = chamberOutwardVector(chamber.side);
-      const sourceTowardChamber = Math.max(0, dirUnit.x * outward.x + dirUnit.z * outward.y);
+      const normal = chamber.portal.normal;
+      const sourceTowardChamber = Math.max(0, dirUnit.x * normal.x + dirUnit.z * normal.y + dirUnit.y * normal.z);
       const familyResponse = branchFamilyResponse(s, chamber);
-      const coupling = s.chamber_coupling * (0.35 + sourceTowardChamber * 0.65) * familyResponse.coupling;
+      const coupling = s.chamber_coupling * (0.35 + sourceTowardChamber * 0.65)
+        * familyResponse.coupling * chamber.portal.transmission;
       const chamberProfile = chamberMaterialProfile(s, chamber);
       const chamberReflectivity = Math.sqrt(Math.max(0, 1 - chamberProfile.absorption));
-      const chamberPath = (chamber.depth * 2 + chamber.width * 0.65 + chamber.level * (s.chamber_depth * 1.4)) * familyResponse.path;
-      const t = profile.pre_delay_ms / 1000 + (profile.source_distance + chamberPath * (0.52 + index * (0.12 + chamberProfile.scattering * 0.12))) / 343;
-      const az = wrapDegrees(outward.az + (seededNoise(seed) - 0.5) * (45 + chamberProfile.scattering * 70) * familyResponse.azimuth);
-      const el = clamp(dir.elevation * 0.35 + (seededNoise(seed + 5) - 0.5) * (24 + chamberProfile.scattering * 38) * familyResponse.elevation, -89, 89);
+      const chamberPath = (pointDistance3(chamber.portal.center, chamberFarPoint(chamber)) * 2
+        + chamber.level * (s.chamber_depth * 1.4)) * familyResponse.path;
+      const t = profile.pre_delay_ms / 1000 + (
+        pointDistance3(source, chamber.portal.center)
+        + chamberPath * (0.52 + index * (0.12 + chamberProfile.scattering * 0.12))
+        + pointDistance3(chamber.portal.center, listener)
+      ) / 343;
+      const portalDirection = echoDirection(listener, chamber.portal.center);
+      const apertureSpread = 0.55 + (1 - chamber.portal.transmission) * 0.75;
+      const az = wrapDegrees(portalDirection.az
+        + (seededNoise(seed) - 0.5) * (30 + chamberProfile.scattering * 58) * familyResponse.azimuth * apertureSpread);
+      const el = clamp(portalDirection.el
+        + (seededNoise(seed + 5) - 0.5) * (18 + chamberProfile.scattering * 34) * familyResponse.elevation * apertureSpread, -89, 89);
       const amp = (0.035 + 0.10 * seededNoise(seed + 9)) * chamberReflectivity * coupling * familyResponse.energy
         * Math.exp(-t / Math.max(0.05, profile.rt60 * (0.9 + chamberProfile.tail_soften * 0.8)));
       chamberEvents.push({
@@ -1626,7 +2195,8 @@ function reflectionEvents(s, dir = selectedDirection(s)) {
         amp,
         az,
         el,
-        type: "chamber"
+        type: "chamber",
+        path_point: chamber.portal.center
       });
     }
   }
@@ -1682,6 +2252,29 @@ function svgOpeningMarker(projection, segment, color) {
   `;
 }
 
+function attachmentLabel(attachment) {
+  if (attachment === "ceiling") return "overhead";
+  if (attachment === "floor") return "beneath";
+  return attachment || "wall";
+}
+
+function branchVisualColor(attachment) {
+  if (attachment === "ceiling") return { rgb: "104,164,195", stroke: "rgba(132,194,222,0.78)" };
+  if (attachment === "floor") return { rgb: "176,146,112", stroke: "rgba(204,172,132,0.76)" };
+  return { rgb: "120,190,150", stroke: "rgba(120,190,150,0.78)" };
+}
+
+function svgPortalMarker(projection, chamber, color) {
+  if (!isStackedAttachment(chamber.attachment)) {
+    const segment = chamberOpeningSegment(chamber);
+    const center = projection.point(chamber.portal.center);
+    return `${svgOpeningMarker(projection, segment, color)}
+      <text x="${round(center.x + 7, 2)}" y="${round(center.y - 7, 2)}" class="svg-tiny svg-portal">${svgEscape(chamber.portal.shape)}</text>`;
+  }
+  const outline = portalOutlinePoints(chamber.portal).map(projection.point);
+  return `<polygon points="${svgPoints(outline)}" fill="rgba(5,6,7,0.76)" stroke="${color}" stroke-width="1.7" stroke-dasharray="4 3" vector-effect="non-scaling-stroke" />`;
+}
+
 function renderVectorRoom(s) {
   const vectorView = state.view === "top" || state.view === "sphere";
   roomSvg.parentElement.classList.toggle("svg-active", vectorView);
@@ -1710,28 +2303,114 @@ function vectorProjection(s) {
   };
 }
 
+function bankMapProjection(s) {
+  const pad = 48;
+  const bounds = floorplanBounds(s);
+  const roomW = Math.max(0.5, bounds.maxX - bounds.minX);
+  const roomH = Math.max(0.5, bounds.height);
+  const mapWidth = ROOM_CANVAS_W - pad * 2 - BANK_ELEVATION_PANEL_W;
+  const scale = Math.min(mapWidth / roomW, (ROOM_CANVAS_H - pad * 2) / roomH);
+  const ox = pad + (mapWidth - roomW * scale) * 0.5;
+  const oy = (ROOM_CANVAS_H - roomH * scale) * 0.5;
+  const volume = volumeBounds3D(s);
+  return {
+    bounds,
+    roomW,
+    roomH,
+    scale,
+    ox,
+    oy,
+    minX: bounds.minX,
+    minY: bounds.minY,
+    maxX: bounds.maxX,
+    maxY: bounds.maxY,
+    px: (p) => ox + (p.x - bounds.minX) * scale,
+    py: (p) => oy + (p.y - bounds.minY) * scale,
+    point: (p) => ({ x: ox + (p.x - bounds.minX) * scale, y: oy + (p.y - bounds.minY) * scale }),
+    elevation: {
+      x: ROOM_CANVAS_W - 50,
+      top: 68,
+      bottom: ROOM_CANVAS_H - 58,
+      minZ: volume.minZ,
+      maxZ: volume.maxZ,
+      hitHalfWidth: 28
+    }
+  };
+}
+
+function bankElevationRanges(s, position, margin = 0.05) {
+  return connectedVolumeRegions(s).filter((region) => (
+    pointInOrOnPolygon(position, region.polygon)
+  )).map((region) => ({
+    region,
+    ...connectedRegionVerticalBounds(s, region, position.x, position.y, margin)
+  }));
+}
+
+function bankElevationColor(region, alpha = 0.9) {
+  if (region.kind === "primary") return `rgba(90,168,199,${alpha})`;
+  const visual = branchVisualColor(region.attachment);
+  return visual.stroke.replace(/,[\d.]+\)$/, `,${alpha})`);
+}
+
+function bankElevationGeometry(s, position, projection = bankMapProjection(s)) {
+  const control = projection.elevation;
+  const depth = Math.max(0.001, control.maxZ - control.minZ);
+  const zToY = (z) => control.bottom - (clamp(z, control.minZ, control.maxZ) - control.minZ) / depth * (control.bottom - control.top);
+  return {
+    ...control,
+    zToY,
+    knobY: zToY(position.z),
+    ranges: bankElevationRanges(s, position).map((range) => ({
+      ...range,
+      top: zToY(range.maximum),
+      bottom: zToY(range.minimum)
+    }))
+  };
+}
+
+function closestElevationAtPlanPoint(s, position, targetZ) {
+  const candidates = bankElevationRanges(s, position).map((range) => ({
+    x: position.x,
+    y: position.y,
+    z: clamp(targetZ, range.minimum, range.maximum),
+    distance: Math.abs(targetZ - clamp(targetZ, range.minimum, range.maximum))
+  }));
+  if (!candidates.length) return closestPointInConnectedVolume({ ...position, z: targetZ }, s);
+  candidates.sort((a, b) => a.distance - b.distance);
+  const { x, y, z } = candidates[0];
+  return { x, y, z };
+}
+
 function renderVectorFloorplan(s, projection) {
   const room = roomPolygon(s).map(projection.point);
   const chambers = chamberGeometries(s) || [];
-  const outsideSvg = roomOpeningSegments(s).map((outside) => {
+  const outsideSvg = exteriorPortals(s).map((outside) => {
     const label = projection.point(outside.center);
+    const outward = outside.outward || chamberOutwardVector(outside.side);
+    const horizontal = Math.abs(outward.x || 0) > 0.5;
+    const labelX = label.x + (outward.x || 0) * 11;
+    const labelY = label.y + (outward.y || 0) * 12 + (horizontal ? 3 : (outward.y || 0) < 0 ? -4 : 10);
+    const anchor = (outward.x || 0) > 0.5 ? "start" : (outward.x || 0) < -0.5 ? "end" : "middle";
     return `
       ${svgOpeningMarker(projection, outside, "rgba(200,245,235,0.82)")}
-      <text x="${round(label.x + 8, 2)}" y="${round(label.y - 8, 2)}" class="svg-tiny svg-outside">${svgEscape(`outside ${outside.index + 1}`)}</text>
+      <text x="${round(labelX, 2)}" y="${round(labelY, 2)}" text-anchor="${anchor}" class="svg-tiny svg-outside">${svgEscape(`open ${outside.index + 1}`)}</text>
     `;
   }).join("");
   const chamberSvg = chambers.map((chamber) => {
     const material = chamberMaterialProfile(s, chamber);
     const alpha = Math.max(0.04, 0.06 + s.chamber_coupling * 0.08 + (1 - material.absorption) * 0.03 - chamber.level * 0.01);
     const poly = chamberPolygon(chamber).map(projection.point);
-    const opening = chamberOpeningSegment(chamber);
-    const label = chamber.level === 0 ? `branch ${chamber.index + 1}` : `depth ${chamber.level}`;
+    const visual = branchVisualColor(chamber.attachment);
+    const label = chamber.level === 0
+      ? `${attachmentLabel(chamber.attachment)} ${chamber.index + 1}`
+      : `${attachmentLabel(chamber.attachment)} depth ${chamber.level}`;
     const text = projection.point({ x: chamber.x, y: chamber.y });
     return `
-      <polygon points="${svgPoints(poly)}" fill="rgba(120,190,150,${alpha.toFixed(3)})" stroke="rgba(120,190,150,${chamber.level === 0 ? 0.78 : 0.5})" stroke-width="1.3" vector-effect="non-scaling-stroke" />
-      ${svgOpeningMarker(projection, opening, chamber.level === 0 ? "rgba(184,255,202,0.88)" : "rgba(184,255,202,0.64)")}
+      <polygon points="${svgPoints(poly)}" fill="rgba(${visual.rgb},${alpha.toFixed(3)})" stroke="${visual.stroke}" stroke-width="1.3" ${isStackedAttachment(chamber.attachment) ? 'stroke-dasharray="5 3"' : ""} vector-effect="non-scaling-stroke" />
+      ${svgPortalMarker(projection, chamber, chamber.level === 0 ? "rgba(184,220,230,0.9)" : "rgba(184,220,230,0.66)")}
       <text x="${round(text.x + 8, 2)}" y="${round(text.y + 16, 2)}" class="svg-small svg-chamber">${svgEscape(label)}</text>
-      <text x="${round(text.x + 8, 2)}" y="${round(text.y + 29, 2)}" class="svg-tiny svg-muted">${svgEscape(material.material_key)} a${round(material.absorption, 2)} s${round(material.scattering, 2)}</text>
+      <text x="${round(text.x + 8, 2)}" y="${round(text.y + 29, 2)}" class="svg-tiny svg-muted">${svgEscape(chamber.portal.shape)} / ${svgEscape(material.material_key)} a${round(material.absorption, 2)} s${round(material.scattering, 2)}</text>
     `;
   }).join("");
   const grid = Array.from({ length: 7 }, (_, i) => {
@@ -1756,6 +2435,7 @@ function renderVectorFloorplan(s, projection) {
         .svg-tiny { font-size: 9px; }
         .svg-muted { fill: #8f9aa0; }
         .svg-chamber { fill: #8f9892; }
+        .svg-portal { fill: #b8dce6; }
         .svg-outside { fill: #c8f5eb; }
         .svg-grid { stroke: rgba(255,255,255,0.09); stroke-width: 1; vector-effect: non-scaling-stroke; }
       </style>
@@ -1806,7 +2486,7 @@ function renderVectorTopView(s) {
   }).join("") : "";
   const eventLines = s.show_early ? events.map((event) => {
     const dir = unitFromAed(event.az, event.el);
-    const endpoint = event.type === "echo" && event.path_point ? event.path_point : {
+    const endpoint = event.path_point || {
       x: clamp(listener.x + dir.x * selectedProfile.source_distance * 0.65, 0, s.room_x),
       y: clamp(listener.y + dir.z * selectedProfile.source_distance * 0.65, 0, s.room_y)
     };
@@ -1833,16 +2513,38 @@ function renderVectorTopView(s) {
     <circle cx="${round(sp.x, 2)}" cy="${round(sp.y, 2)}" r="8" fill="#8d8d8d" />
     <text x="${round(sp.x, 2)}" y="${round(sp.y + 0.5, 2)}" class="svg-label" fill="#050607">${selected.index + 1}</text>
     <text x="12" y="20" class="svg-small svg-muted">TOP group ${selected.index + 1}/${selected.count}  ${selected.azimuth} az / ${selected.elevation} el</text>
-    <text x="12" y="${ROOM_CANVAS_H - 16}" class="svg-small svg-muted">drag in Top view to move the field; use Bank Map to move mic positions</text>
+    <text x="12" y="${ROOM_CANVAS_H - 16}" class="svg-small svg-muted">drag in Top for field X/Y; Side edits X/Z; Bank Map moves response positions</text>
+  `;
+}
+
+function svgBankElevationControl(s, position, projection) {
+  const geometry = bankElevationGeometry(s, position, projection);
+  const ranges = geometry.ranges.map((range) => `
+    <line x1="${geometry.x}" y1="${round(range.top, 2)}" x2="${geometry.x}" y2="${round(range.bottom, 2)}" stroke="${bankElevationColor(range.region, 0.82)}" stroke-width="8" vector-effect="non-scaling-stroke" />
+  `).join("");
+  const zeroY = geometry.minZ < 0 && geometry.maxZ > 0 ? geometry.zToY(0) : null;
+  return `
+    <g>
+      <text x="${geometry.x}" y="48" text-anchor="middle" class="svg-tiny svg-muted">ELEVATION</text>
+      <line x1="${geometry.x}" y1="${geometry.top}" x2="${geometry.x}" y2="${geometry.bottom}" stroke="#252b2e" stroke-width="10" vector-effect="non-scaling-stroke" />
+      ${ranges}
+      ${zeroY === null ? "" : `<line x1="${geometry.x - 12}" y1="${round(zeroY, 2)}" x2="${geometry.x + 12}" y2="${round(zeroY, 2)}" stroke="rgba(215,215,215,0.34)" stroke-width="1" vector-effect="non-scaling-stroke" />`}
+      <line x1="${geometry.x - 13}" y1="${round(geometry.knobY, 2)}" x2="${geometry.x + 13}" y2="${round(geometry.knobY, 2)}" stroke="rgba(216,162,74,0.72)" stroke-width="1.2" vector-effect="non-scaling-stroke" />
+      <rect x="${geometry.x - 6}" y="${round(geometry.knobY - 6, 2)}" width="12" height="12" fill="#a8a8a8" stroke="#050607" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+      <text x="${geometry.x}" y="${geometry.bottom + 22}" text-anchor="middle" class="svg-tiny svg-muted">Z ${round(position.z, 2)} m</text>
+      <text x="${geometry.x + 12}" y="${geometry.top + 3}" class="svg-tiny svg-muted">${round(geometry.maxZ, 1)}</text>
+      <text x="${geometry.x + 12}" y="${geometry.bottom + 3}" class="svg-tiny svg-muted">${round(geometry.minZ, 1)}</text>
+    </g>
   `;
 }
 
 function renderVectorBankMap(s) {
-  const projection = vectorProjection(s);
+  const projection = bankMapProjection(s);
   const dirs = activeDirections(s);
   const selected = selectedDirection(s);
   const listener = roomPoints(s, selected).listener;
   const lp = projection.point(listener);
+  const selectedPosition = groupMapPosition(s, selected, groupProfile(s, selected.index));
   const groupSvg = dirs.map((dir, index) => {
     const metrics = groupMetrics(s, index);
     const position = groupMapPosition(s, metrics, metrics.profile);
@@ -1864,18 +2566,19 @@ function renderVectorBankMap(s) {
     <circle cx="${round(lp.x, 2)}" cy="${round(lp.y, 2)}" r="7" fill="#d7d7d7" />
     <text x="${round(lp.x, 2)}" y="${round(lp.y + 0.5, 2)}" class="svg-label" fill="#050607">L</text>
     ${groupSvg}
+    ${svgBankElevationControl(s, selectedPosition, projection)}
     <text x="12" y="20" class="svg-small svg-muted">Bank Map: ${dirs.length} responses placed in ${svgEscape(s.space_family)} topology / ${s.channels_per_ir}ch per group / ${s.stacked_channels}ch stacked</text>
-    <text x="12" y="38" class="svg-small svg-muted">selected G${selected.index + 1}: ${selected.channels_start}-${selected.channels_end}</text>
-    <text x="12" y="${ROOM_CANVAS_H - 16}" class="svg-small svg-muted">drag response points inside the primary and branch geometry</text>
+    <text x="12" y="38" class="svg-small svg-muted">selected G${selected.index + 1}: ${selected.channels_start}-${selected.channels_end} / Z ${round(selectedPosition.z, 2)} m</text>
+    <text x="12" y="${ROOM_CANVAS_H - 16}" class="svg-small svg-muted">drag response points for X/Y; drag ELEVATION for Z</text>
   `;
 }
 
 function project3DFactory(s) {
-  const bounds = floorplanBounds(s);
+  const bounds = volumeBounds3D(s);
   const center = {
     x: (bounds.minX + bounds.maxX) * 0.5,
     y: (bounds.minY + bounds.maxY) * 0.5,
-    z: s.room_z * 0.5
+    z: (bounds.minZ + bounds.maxZ) * 0.5
   };
   const az = s.camera_azimuth * Math.PI / 180;
   const el = s.camera_elevation * Math.PI / 180;
@@ -1883,7 +2586,7 @@ function project3DFactory(s) {
   const sinA = Math.sin(az);
   const cosE = Math.cos(el);
   const sinE = Math.sin(el);
-  const diagonal = Math.sqrt((bounds.maxX - bounds.minX) ** 2 + bounds.height ** 2 + s.room_z ** 2);
+  const diagonal = Math.sqrt((bounds.maxX - bounds.minX) ** 2 + bounds.height ** 2 + bounds.depth ** 2);
   const scale = Math.min(ROOM_CANVAS_W, ROOM_CANVAS_H) * 0.82 * s.camera_zoom / Math.max(1, diagonal);
   return (p) => {
     const x = p.x - center.x;
@@ -1939,6 +2642,26 @@ function drawEchoPathGeometry(paths, project) {
   ctx.restore();
 }
 
+function drawPortal3D(portal, project, strokeColor = "rgba(184,220,230,0.9)") {
+  const outline = portalOutlinePoints(portal);
+  if (outline.length < 3) return;
+  const first = project(outline[0]);
+  ctx.beginPath();
+  ctx.moveTo(first.x, first.y);
+  outline.slice(1).forEach((point) => {
+    const projected = project(point);
+    ctx.lineTo(projected.x, projected.y);
+  });
+  ctx.closePath();
+  ctx.fillStyle = "rgba(5,6,7,0.72)";
+  ctx.fill();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
 function drawPlanPolygon(points, ox, oy, scale, bounds, fillStyle, strokeStyle, lineWidth = 1) {
   if (!points.length) return;
   const first = points[0];
@@ -1960,11 +2683,11 @@ function drawPlanPolygon(points, ox, oy, scale, bounds, fillStyle, strokeStyle, 
 function drawRoom3D(s) {
   const project = project3DFactory(s);
   const selected = selectedDirection(s);
-  const { listener, source } = roomPoints(s, selected);
+  const { listener } = roomPoints(s, selected);
   const selectedProfile = groupProfile(s, selected.index);
   const mapSource = groupMapPosition(s, selected, selectedProfile);
   const listenerPoint = { x: listener.x, y: listener.y, z: listener.z };
-  const sourcePoint = { x: mapSource.x, y: mapSource.y, z: mapSource.z || source.z };
+  const sourcePoint = { x: mapSource.x, y: mapSource.y, z: mapSource.z };
   const roomFloor = roomPolygon(s).map((p) => ({ ...p, z: 0 }));
   const roomTop = roomPolygon(s).map((p) => ({ ...p, z: spaceCeilingHeight(s, p.x, p.y) }));
   state.roomHitPoints = [];
@@ -1976,36 +2699,18 @@ function drawRoom3D(s) {
   drawPolyline3D(project, roomTop, true);
   roomFloor.forEach((point, index) => drawPolyline3D(project, [point, roomTop[index]]));
 
-  openingSegmentsForModel(s).forEach((opening) => {
-    const height = opening.height || s.room_z * 0.82;
-    const a = { x: opening.x1, y: opening.y1, z: 0.03 };
-    const b = { x: opening.x2, y: opening.y2, z: 0.03 };
-    const c = { x: opening.x2, y: opening.y2, z: height };
-    const d = { x: opening.x1, y: opening.y1, z: height };
-    const pa = project(a);
-    const pb = project(b);
-    const pc = project(c);
-    const pd = project(d);
-    ctx.fillStyle = "rgba(5,6,7,0.74)";
-    ctx.strokeStyle = "rgba(200,245,235,0.88)";
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(pa.x, pa.y);
-    ctx.lineTo(pb.x, pb.y);
-    ctx.lineTo(pc.x, pc.y);
-    ctx.lineTo(pd.x, pd.y);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+  exteriorPortals(s).forEach((portal) => {
+    drawPortal3D(portal, project, "rgba(200,245,235,0.92)");
   });
 
   const chambers = chamberGeometries(s) || [];
   chambers.forEach((chamber) => {
     const material = chamberMaterialProfile(s, chamber);
     const poly = chamberPolygon(chamber);
-    const floor = poly.map((p) => ({ ...p, z: 0 }));
-    const top = poly.map((p) => ({ ...p, z: s.room_z * (0.42 + chamber.level * 0.08) }));
-    ctx.fillStyle = `rgba(120,190,150,${0.035 + (1 - material.absorption) * 0.06})`;
+    const floor = poly.map((p) => ({ ...p, z: chamber.baseZ }));
+    const top = poly.map((p) => ({ ...p, z: chamber.baseZ + chamber.height }));
+    const visual = branchVisualColor(chamber.attachment);
+    ctx.fillStyle = `rgba(${visual.rgb},${0.035 + (1 - material.absorption) * 0.06})`;
     const first = project(floor[0]);
     ctx.beginPath();
     ctx.moveTo(first.x, first.y);
@@ -2015,11 +2720,12 @@ function drawRoom3D(s) {
     });
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = chamber.level === 0 ? "rgba(120,190,150,0.64)" : "rgba(120,190,150,0.42)";
+    ctx.strokeStyle = chamber.level === 0 ? visual.stroke : `rgba(${visual.rgb},0.42)`;
     ctx.lineWidth = 1.4;
     drawPolyline3D(project, floor, true);
     drawPolyline3D(project, top, true);
     poly.forEach((point, index) => drawPolyline3D(project, [floor[index], top[index]]));
+    drawPortal3D(chamber.portal, project);
   });
 
   if (s.show_diffuse) {
@@ -2036,7 +2742,7 @@ function drawRoom3D(s) {
     const selectedProfile = groupProfile(s, selected.index);
     reflectionEvents(s, selected).slice(0, Math.min(s.early_reflections, 28)).forEach((event) => {
       const dir = unitFromAed(event.az, event.el);
-      const endpoint = event.type === "echo" && event.path_point ? event.path_point : {
+      const endpoint = event.path_point || {
         x: clamp(listener.x + dir.x * selectedProfile.source_distance * 0.9, 0, s.room_x),
         y: clamp(listener.y + dir.z * selectedProfile.source_distance * 0.9, 0, s.room_y),
         z: clamp(listener.z + dir.y * selectedProfile.source_distance * 0.9, 0, s.room_z)
@@ -2084,7 +2790,7 @@ function drawRoom3D(s) {
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
   ctx.fillText(`3D ${s.space_family}  group ${selected.index + 1}/${selected.count}  camera ${s.camera_azimuth} az / ${s.camera_elevation} el / ${round(s.camera_zoom, 2)}x`, 12, 20);
-  ctx.fillText("use camera controls for 3D; Bank Map edits response positions, Top edits field offset", 12, ROOM_CANVAS_H - 16);
+  ctx.fillText("use camera controls for 3D; Top edits field X/Y, Side edits X/Z", 12, ROOM_CANVAS_H - 16);
 }
 
 function drawRoomView(s) {
@@ -2094,22 +2800,24 @@ function drawRoomView(s) {
   }
   const pad = 48;
   const bounds = floorplanBounds(s);
+  const volumeBounds = volumeBounds3D(s);
   const viewMinX = bounds.minX;
-  const viewMinY = state.view === "side" ? 0 : bounds.minY;
+  const viewMinY = state.view === "side" ? volumeBounds.minZ : bounds.minY;
   const roomW = bounds.maxX - bounds.minX;
-  const sideHeight = Math.max(s.room_z, ...ceilingProfile(s).map((point) => point.z));
+  const sideTop = volumeBounds.maxZ;
+  const sideHeight = volumeBounds.depth;
   const roomH = state.view === "side" ? sideHeight : bounds.height;
   const scale = Math.min((ROOM_CANVAS_W - pad * 2) / roomW, (ROOM_CANVAS_H - pad * 2) / roomH);
   const ox = (ROOM_CANVAS_W - roomW * scale) / 2;
   const oy = (ROOM_CANVAS_H - roomH * scale) / 2;
   const selected = selectedDirection(s);
-  const { listener, source } = roomPoints(s, selected);
+  const { listener } = roomPoints(s, selected);
   const selectedProfile = groupProfile(s, selected.index);
   const mapSource = groupMapPosition(s, selected, selectedProfile);
   const px = (p) => ox + (p.x - viewMinX) * scale;
-  const py = (p) => oy + (state.view === "side" ? (roomH - p.z) : (p.y - viewMinY)) * scale;
+  const py = (p) => oy + (state.view === "side" ? (sideTop - p.z) : (p.y - viewMinY)) * scale;
   const listenerPoint = { x: listener.x, y: listener.y, z: listener.z };
-  const sourcePoint = state.view === "top" ? { x: mapSource.x, y: mapSource.y, z: mapSource.z } : { x: source.x, y: source.y, z: source.z };
+  const sourcePoint = { x: mapSource.x, y: mapSource.y, z: mapSource.z };
   state.roomHitPoints = [];
   state.roomProjection = { ox, oy, scale, roomW, roomH, minX: viewMinX, minY: viewMinY, view: state.view };
 
@@ -2122,17 +2830,18 @@ function drawRoomView(s) {
   } else {
     const profile = ceilingProfile(s);
     ctx.beginPath();
-    ctx.moveTo(ox + (bounds.minX - viewMinX) * scale, oy + roomH * scale);
-    ctx.lineTo(ox + (bounds.maxX - viewMinX) * scale, oy + roomH * scale);
+    ctx.moveTo(ox + (bounds.minX - viewMinX) * scale, py({ z: 0 }));
+    ctx.lineTo(ox + (bounds.maxX - viewMinX) * scale, py({ z: 0 }));
     profile.slice().reverse().forEach((point) => {
-      ctx.lineTo(ox + (point.x - viewMinX) * scale, oy + (roomH - point.z) * scale);
+      ctx.lineTo(ox + (point.x - viewMinX) * scale, py(point));
     });
     ctx.closePath();
     ctx.fillStyle = "rgba(90,168,199,0.045)";
     ctx.fill();
     ctx.strokeStyle = "rgba(90,168,199,0.72)";
     ctx.stroke();
-    drawChamberSide(s, ox, oy, scale, bounds);
+    drawChamberSide(s, ox, oy, scale, bounds, sideTop);
+    drawExteriorOpeningSide(s, ox, oy, scale, bounds, sideTop);
   }
 
   const grid = state.view === "side" ? roomH : bounds.height;
@@ -2159,7 +2868,7 @@ function drawRoomView(s) {
       channels_start: index * s.channels_per_ir + 1,
       channels_end: (index + 1) * s.channels_per_ir
     };
-    const point = state.view === "top" ? groupMapPosition(s, info, profile) : roomPoints(s, info, profile).source;
+    const point = groupMapPosition(s, info, profile);
     const active = index === selected.index;
     if (index > 0) {
       const previousDir = activeDirections(s)[index - 1];
@@ -2171,7 +2880,7 @@ function drawRoomView(s) {
         channels_end: index * s.channels_per_ir
       };
       const previousProfile = groupProfile(s, index - 1);
-      const previousPoint = state.view === "top" ? groupMapPosition(s, previousInfo, previousProfile) : roomPoints(s, previousInfo, previousProfile).source;
+      const previousPoint = groupMapPosition(s, previousInfo, previousProfile);
       ctx.strokeStyle = "rgba(90,168,199,0.18)";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
@@ -2196,10 +2905,10 @@ function drawRoomView(s) {
     drawEchoPathGeometry(echoPathDefinitions(s, selected).paths, (point) => ({ x: px(point), y: py(point) }));
     events.slice(0, Math.min(events.length, s.early_reflections)).forEach((event) => {
       const dir = unitFromAed(event.az, event.el);
-      const endpoint = event.type === "echo" && event.path_point ? event.path_point : {
+      const endpoint = event.path_point || {
         x: clamp(listener.x + dir.x * selectedProfile.source_distance * 0.65, bounds.minX, bounds.maxX),
         y: clamp(listener.y + dir.z * selectedProfile.source_distance * 0.65, bounds.minY, bounds.maxY),
-        z: clamp(listener.z + dir.y * selectedProfile.source_distance * 0.65, 0, sideHeight)
+        z: clamp(listener.z + dir.y * selectedProfile.source_distance * 0.65, volumeBounds.minZ, volumeBounds.maxZ)
       };
       const eventColor = event.type === "echo" ? "170, 146, 202" : event.type === "chamber" ? "120, 190, 150" : "216, 162, 74";
       ctx.strokeStyle = `rgba(${eventColor}, ${clamp(event.amp * 3.6, 0.18, 0.72)})`;
@@ -2237,45 +2946,19 @@ function drawRoomView(s) {
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
   ctx.fillText(`${state.view.toUpperCase()} ${s.space_family}  group ${selected.index + 1}/${selected.count}  ${selected.azimuth} az / ${selected.elevation} el`, 12, 20);
-  ctx.fillText("drag in Top view to move the field; use Bank Map to move response positions", 12, ROOM_CANVAS_H - 16);
+  const fieldHint = state.view === "side"
+    ? "drag in Side view to move field X/Z; Top edits X/Y"
+    : "drag in Top view to move field X/Y; Side edits X/Z";
+  ctx.fillText(fieldHint, 12, ROOM_CANVAS_H - 16);
 }
 
 function drawChamberRay(s, event, listenerPoint, px, py) {
   const chambers = chamberGeometries(s);
   const chamber = chambers && chambers.length ? chambers[Math.min(chambers.length - 1, Math.max(0, event.chamber_index || 0))] : null;
   if (!chamber) return;
-  const seed = Math.round(event.time * 10000 + event.amp * 100000);
-  const openingPoint = pointOnOpening(chamber, 0.25 + seededNoise(seed + 1) * 0.5);
-  const opening = {
-    x: openingPoint.x,
-    y: openingPoint.y,
-    z: listenerPoint.z
-  };
-  const wallPick = seededNoise(seed + 3);
-  let bounce;
-  if (wallPick < 0.33) {
-    bounce = {
-      x: chamber.x + chamber.width * seededNoise(seed + 5),
-      y: chamber.y + chamber.depth,
-      z: listenerPoint.z
-    };
-  } else if (wallPick < 0.66) {
-    bounce = {
-      x: chamber.x,
-      y: chamber.y + chamber.depth * seededNoise(seed + 7),
-      z: listenerPoint.z
-    };
-  } else {
-    bounce = {
-      x: chamber.x + chamber.width,
-      y: chamber.y + chamber.depth * seededNoise(seed + 9),
-      z: listenerPoint.z
-    };
-  }
-  const returnPoint = {
-    ...pointOnOpening(chamber, 0.18 + seededNoise(seed + 11) * 0.64),
-    z: listenerPoint.z
-  };
+  const opening = chamber.portal.center;
+  const bounce = chamberFarPoint(chamber);
+  const returnPoint = chamber.portal.center;
   ctx.beginPath();
   ctx.moveTo(px(listenerPoint), py(listenerPoint));
   ctx.lineTo(px(opening), py(opening));
@@ -2286,34 +2969,81 @@ function drawChamberRay(s, event, listenerPoint, px, py) {
   ctx.fillRect(px(bounce) - 3, py(bounce) - 3, 6, 6);
 }
 
-function drawChamberSide(s, ox, oy, scale, bounds) {
+function drawChamberSide(s, ox, oy, scale, bounds, sideTop) {
   const chambers = chamberGeometries(s);
   if (!chambers) return;
   chambers.forEach((chamber) => {
     const chamberBoundsLocal = chamberBounds(chamber);
     const material = chamberMaterialProfile(s, chamber);
     const x = ox + (chamberBoundsLocal.minX - bounds.minX) * scale;
-    const heightRatio = branchHeightRatio(s, chamber);
-    const yTop = oy + s.room_z * (1 - heightRatio) * scale;
+    const yTop = oy + (sideTop - (chamber.baseZ + chamber.height)) * scale;
     const w = Math.max(3, (chamberBoundsLocal.maxX - chamberBoundsLocal.minX) * scale);
-    const h = s.room_z * heightRatio * scale;
+    const h = chamber.height * scale;
     const alpha = Math.max(0.045, 0.07 + s.chamber_coupling * 0.08 + (1 - material.absorption) * 0.035 - chamber.level * 0.012);
-    ctx.fillStyle = `rgba(120, 190, 150, ${alpha})`;
+    const visual = branchVisualColor(chamber.attachment);
+    ctx.fillStyle = `rgba(${visual.rgb}, ${alpha})`;
     ctx.fillRect(x, yTop, w, h);
-    ctx.strokeStyle = chamber.level === 0 ? "rgba(120, 190, 150, 0.72)" : "rgba(120, 190, 150, 0.48)";
+    ctx.strokeStyle = chamber.level === 0 ? visual.stroke : `rgba(${visual.rgb},0.48)`;
     ctx.lineWidth = 1.2;
     ctx.strokeRect(x, yTop, w, h);
 
-    const opening = chamberOpeningSegment(chamber);
-    const openCenterX = (opening.x1 + opening.x2) * 0.5;
-    const openWidth = Math.max(Math.abs(opening.x2 - opening.x1), chamber.opening * 0.16);
-    const openX = ox + (openCenterX - bounds.minX) * scale - openWidth * scale * 0.5;
-    ctx.fillStyle = "rgba(5, 6, 7, 0.92)";
-    ctx.fillRect(openX, oy + s.room_z * 0.24 * scale, Math.max(3, openWidth * scale), s.room_z * 0.56 * scale);
+    const portalOutline = portalOutlinePoints(chamber.portal).map((point) => ({
+      x: ox + (point.x - bounds.minX) * scale,
+      y: oy + (sideTop - point.z) * scale
+    }));
+    if (portalOutline.length >= 3) {
+      ctx.beginPath();
+      ctx.moveTo(portalOutline[0].x, portalOutline[0].y);
+      portalOutline.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+      ctx.closePath();
+      ctx.fillStyle = "rgba(5,6,7,0.8)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(184,220,230,0.88)";
+      ctx.setLineDash([4, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
 
     ctx.fillStyle = "#8f9892";
     ctx.font = "9px Menlo, monospace";
-    ctx.fillText(chamber.level === 0 ? `b${chamber.index + 1} ${branchFamilyLabel(chamber.family)}` : `d${chamber.level} ${branchFamilyLabel(chamber.family)}`, x + 6, yTop + 14);
+    ctx.fillText(chamber.level === 0
+      ? `b${chamber.index + 1} ${attachmentLabel(chamber.attachment)} ${branchFamilyLabel(chamber.family)}`
+      : `d${chamber.level} ${attachmentLabel(chamber.attachment)} ${branchFamilyLabel(chamber.family)}`, x + 6, yTop + 14);
+  });
+  ctx.lineWidth = 1;
+}
+
+function drawExteriorOpeningSide(s, ox, oy, scale, bounds, sideTop) {
+  exteriorPortals(s).forEach((portal) => {
+    let outline = portalOutlinePoints(portal).map((point) => ({
+      x: ox + (point.x - bounds.minX) * scale,
+      y: oy + (sideTop - point.z) * scale
+    }));
+    const minX = Math.min(...outline.map((point) => point.x));
+    const maxX = Math.max(...outline.map((point) => point.x));
+    if (maxX - minX < 5) {
+      const centerX = (minX + maxX) * 0.5;
+      outline = outline.map((point, index) => ({
+        x: centerX + (index === 0 || index === 3 ? -3 : 3),
+        y: point.y
+      }));
+    }
+    ctx.beginPath();
+    ctx.moveTo(outline[0].x, outline[0].y);
+    outline.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+    ctx.closePath();
+    ctx.fillStyle = "rgba(5,6,7,0.82)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(200,245,235,0.92)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const labelX = Math.max(...outline.map((point) => point.x)) + 6;
+    const labelY = Math.min(...outline.map((point) => point.y)) + 10;
+    ctx.fillStyle = "rgba(200,245,235,0.88)";
+    ctx.font = "9px Menlo, monospace";
+    ctx.fillText(`open ${portal.index + 1}`, labelX, labelY);
   });
   ctx.lineWidth = 1;
 }
@@ -2334,33 +3064,53 @@ function drawChamberPlan(s, ox, oy, scale) {
     const openY2 = oy + (openingSegment.y2 - bounds.minY) * scale;
     const material = chamberMaterialProfile(s, chamber);
     const alpha = 0.05 + s.chamber_coupling * 0.08 - chamber.level * 0.01;
-    ctx.fillStyle = `rgba(120, 190, 150, ${Math.max(0.035, alpha + (1 - material.absorption) * 0.03)})`;
+    const visual = branchVisualColor(chamber.attachment);
+    ctx.fillStyle = `rgba(${visual.rgb}, ${Math.max(0.035, alpha + (1 - material.absorption) * 0.03)})`;
     ctx.beginPath();
     ctx.moveTo(ox + (first.x - bounds.minX) * scale, oy + (first.y - bounds.minY) * scale);
     poly.slice(1).forEach((point) => ctx.lineTo(ox + (point.x - bounds.minX) * scale, oy + (point.y - bounds.minY) * scale));
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = chamber.level === 0 ? "rgba(120, 190, 150, 0.72)" : "rgba(120, 190, 150, 0.48)";
+    ctx.strokeStyle = chamber.level === 0 ? visual.stroke : `rgba(${visual.rgb},0.48)`;
     ctx.stroke();
-    ctx.strokeStyle = "rgba(5, 6, 7, 0.95)";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(openX1, openY1);
-    ctx.lineTo(openX2, openY2);
-    ctx.stroke();
+    if (isStackedAttachment(chamber.attachment)) {
+      const portal = portalOutlinePoints(chamber.portal).map((point) => ({
+        x: ox + (point.x - bounds.minX) * scale,
+        y: oy + (point.y - bounds.minY) * scale
+      }));
+      ctx.beginPath();
+      ctx.moveTo(portal[0].x, portal[0].y);
+      portal.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+      ctx.closePath();
+      ctx.fillStyle = "rgba(5,6,7,0.8)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(184,220,230,0.88)";
+      ctx.setLineDash([4, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = "rgba(5, 6, 7, 0.95)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(openX1, openY1);
+      ctx.lineTo(openX2, openY2);
+      ctx.stroke();
+    }
     ctx.lineWidth = 1;
     ctx.fillStyle = "#8f9892";
     ctx.font = "10px Menlo, monospace";
-    ctx.fillText(chamber.level === 0 ? `b${chamber.index + 1} ${branchFamilyLabel(chamber.family)}` : `d${chamber.level} ${branchFamilyLabel(chamber.family)}`, x + 8, y + 16);
+    ctx.fillText(chamber.level === 0
+      ? `b${chamber.index + 1} ${attachmentLabel(chamber.attachment)} ${branchFamilyLabel(chamber.family)}`
+      : `d${chamber.level} ${attachmentLabel(chamber.attachment)} ${branchFamilyLabel(chamber.family)}`, x + 8, y + 16);
     ctx.fillStyle = "#8f9a94";
     ctx.font = "9px Menlo, monospace";
-    ctx.fillText(`${material.material_key} a${round(material.absorption, 2)} s${round(material.scattering, 2)}`, x + 8, y + 29);
+    ctx.fillText(`${chamber.portal.shape} / ${material.material_key} a${round(material.absorption, 2)} s${round(material.scattering, 2)}`, x + 8, y + 29);
   });
 }
 
 function drawOutsideOpeningPlan(s, ox, oy, scale) {
   const bounds = floorplanBounds(s);
-  roomOpeningSegments(s).forEach((opening) => {
+  exteriorPortals(s).forEach((opening) => {
     const openX1 = ox + (opening.x1 - bounds.minX) * scale;
     const openY1 = oy + (opening.y1 - bounds.minY) * scale;
     const openX2 = ox + (opening.x2 - bounds.minX) * scale;
@@ -2382,9 +3132,22 @@ function drawOutsideOpeningPlan(s, ox, oy, scale) {
     ctx.lineTo(openX2, openY2);
     ctx.stroke();
     ctx.setLineDash([]);
+    const dx = openX2 - openX1;
+    const dy = openY2 - openY1;
+    const length = Math.max(0.001, Math.hypot(dx, dy));
+    const nx = -dy / length;
+    const ny = dx / length;
+    const tick = 7;
+    ctx.lineWidth = 1.4;
+    [[openX1, openY1], [openX2, openY2]].forEach(([x, y]) => {
+      ctx.beginPath();
+      ctx.moveTo(x - nx * tick, y - ny * tick);
+      ctx.lineTo(x + nx * tick, y + ny * tick);
+      ctx.stroke();
+    });
     ctx.fillStyle = "rgba(200, 245, 235, 0.88)";
     ctx.font = "9px Menlo, monospace";
-    ctx.fillText(`outside ${opening.index + 1}`, centerX + outward.x * 16 + 5, centerY + outward.y * 16 + 3);
+    ctx.fillText(`open ${opening.index + 1}`, centerX + outward.x * 16 + 5, centerY + outward.y * 16 + 3);
   });
   ctx.lineWidth = 1;
 }
@@ -2409,20 +3172,64 @@ function drawPoint(x, y, r, color, label, labelInside = false) {
   ctx.textBaseline = "alphabetic";
 }
 
+function drawBankElevationControl(s, position, projection) {
+  const geometry = bankElevationGeometry(s, position, projection);
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#8f9aa0";
+  ctx.font = "9px Menlo, monospace";
+  ctx.fillText("ELEVATION", geometry.x, 48);
+  ctx.strokeStyle = "#252b2e";
+  ctx.lineWidth = 10;
+  ctx.beginPath();
+  ctx.moveTo(geometry.x, geometry.top);
+  ctx.lineTo(geometry.x, geometry.bottom);
+  ctx.stroke();
+  geometry.ranges.forEach((range) => {
+    ctx.strokeStyle = bankElevationColor(range.region, 0.82);
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(geometry.x, range.top);
+    ctx.lineTo(geometry.x, range.bottom);
+    ctx.stroke();
+  });
+  if (geometry.minZ < 0 && geometry.maxZ > 0) {
+    const zeroY = geometry.zToY(0);
+    ctx.strokeStyle = "rgba(215,215,215,0.34)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(geometry.x - 12, zeroY);
+    ctx.lineTo(geometry.x + 12, zeroY);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "rgba(216,162,74,0.72)";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(geometry.x - 13, geometry.knobY);
+  ctx.lineTo(geometry.x + 13, geometry.knobY);
+  ctx.stroke();
+  ctx.fillStyle = "#a8a8a8";
+  ctx.strokeStyle = "#050607";
+  ctx.lineWidth = 1.5;
+  ctx.fillRect(geometry.x - 6, geometry.knobY - 6, 12, 12);
+  ctx.strokeRect(geometry.x - 6, geometry.knobY - 6, 12, 12);
+  ctx.fillStyle = "#8f9aa0";
+  ctx.fillText(`Z ${round(position.z, 2)} m`, geometry.x, geometry.bottom + 22);
+  ctx.textAlign = "start";
+  ctx.fillText(String(round(geometry.maxZ, 1)), geometry.x + 12, geometry.top + 3);
+  ctx.fillText(String(round(geometry.minZ, 1)), geometry.x + 12, geometry.bottom + 3);
+  ctx.restore();
+}
+
 function drawDirections(s) {
   const dirs = activeDirections(s);
   const selected = selectedDirection(s);
-  const pad = 48;
-  const bounds = floorplanBounds(s);
-  const roomW = Math.max(0.5, bounds.maxX - bounds.minX);
-  const roomH = Math.max(0.5, bounds.maxY - bounds.minY);
-  const scale = Math.min((ROOM_CANVAS_W - pad * 2) / roomW, (ROOM_CANVAS_H - pad * 2) / roomH);
-  const ox = (ROOM_CANVAS_W - roomW * scale) / 2;
-  const oy = (ROOM_CANVAS_H - roomH * scale) / 2;
-  const px = (p) => ox + (p.x - bounds.minX) * scale;
-  const py = (p) => oy + (p.y - bounds.minY) * scale;
+  const projection = bankMapProjection(s);
+  const { bounds, roomW, roomH, scale, ox, oy } = projection;
+  const px = projection.px;
+  const py = projection.py;
   state.directionHitPoints = [];
-  state.bankProjection = { ox, oy, scale, minX: bounds.minX, minY: bounds.minY, maxX: bounds.maxX, maxY: bounds.maxY };
+  state.bankProjection = projection;
 
   drawPlanPolygon(roomPolygon(s), ox, oy, scale, bounds, "rgba(90,168,199,0.045)", "rgba(90,168,199,0.72)", 1.2);
   drawChamberPlan(s, ox, oy, scale);
@@ -2488,11 +3295,13 @@ function drawDirections(s) {
     }
   });
   ctx.globalAlpha = 1;
+  const selectedPosition = groupMapPosition(s, selected, groupProfile(s, selected.index));
+  drawBankElevationControl(s, selectedPosition, projection);
   ctx.fillStyle = "#9a9a9a";
   ctx.font = "11px Menlo, monospace";
   ctx.fillText(`Bank Map: ${dirs.length} responses placed in ${s.space_family} topology / ${s.channels_per_ir}ch per group / ${s.stacked_channels}ch stacked`, 12, 20);
-  ctx.fillText(`selected G${selected.index + 1}: ${selected.channels_start}-${selected.channels_end}`, 12, 38);
-  ctx.fillText("drag response points inside the primary and branch geometry", 12, ROOM_CANVAS_H - 16);
+  ctx.fillText(`selected G${selected.index + 1}: ${selected.channels_start}-${selected.channels_end} / Z ${round(selectedPosition.z, 2)} m`, 12, 38);
+  ctx.fillText("drag response points for X/Y; drag ELEVATION for Z", 12, ROOM_CANVAS_H - 16);
 }
 
 function drawDirectivityLobe(cx, cy, x, y, radius, spreadDeg) {
@@ -2852,17 +3661,20 @@ function updateReadouts(s) {
   const metrics = groupMetrics(s, selected.index);
   const echo = echoPathSummary(s, selected);
   const echoInterval = echo.paths.length ? `${round(echo.paths[0].interval_ms, 1)} ms` : "-";
-  const branchFamilies = [...new Set((chamberGeometries(s) || []).map((chamber) => chamber.family))];
+  const chambers = chamberGeometries(s) || [];
+  const branchFamilies = [...new Set(chambers.map((chamber) => chamber.family))];
+  const attachments = [...new Set(chambers.map((chamber) => attachmentLabel(chamber.attachment)))];
   readouts.rt60.textContent = `${s.estimated_rt60.toFixed(2)} s`;
   readouts.volume.textContent = `${s.acoustic_volume.toFixed(1)} m3`;
   readouts.channels.textContent = `${s.stacked_channels}`;
   readouts.late.textContent = `${Math.round(s.late_start_seconds * 1000)} ms`;
   readouts.group.innerHTML = `
     <div><span>Space</span><strong>${s.space_family} / seed ${s.space_seed}</strong></div>
-    <div><span>Branches</span><strong>${s.branch_family}${branchFamilies.length ? ` / ${branchFamilies.join(", ")}` : " / none"}</strong></div>
+    <div><span>Branches</span><strong>${s.branch_family}${branchFamilies.length ? ` / ${branchFamilies.join(", ")}` : " / none"}${attachments.length ? ` / ${attachments.join(", ")}` : ""}</strong></div>
     <div><span>Group</span><strong>${selected.index + 1} / ${selected.count}</strong></div>
     <div><span>AED</span><strong>${round(selected.azimuth)} deg / ${round(selected.elevation)} deg</strong></div>
     <div><span>Stacked channels</span><strong>${selected.channels_start}-${selected.channels_end}</strong></div>
+    <div><span>Field XYZ m</span><strong>${round(points.listener.x, 2)}, ${round(points.listener.y, 2)}, ${round(points.listener.z, 2)}</strong></div>
     <div><span>Source XYZ m</span><strong>${round(metrics.map_position.x, 2)}, ${round(metrics.map_position.y, 2)}, ${round(metrics.map_position.z, 2)}</strong></div>
     <div><span>Direct arrival</span><strong>${Math.round(metrics.direct_time * 1000)} ms</strong></div>
     <div><span>First reflection</span><strong>${metrics.first_reflection_wall} / ${Math.round(metrics.first_reflection_time * 1000)} ms</strong></div>
@@ -2878,7 +3690,8 @@ function updateReadouts(s) {
 }
 
 function exportObject(s = settings()) {
-  const outsideOpenings = roomOpeningSegments(s);
+  const outsideOpenings = exteriorPortals(s);
+  const graph = connectedRegionGraph(s);
   const directions = activeDirections(s);
   const firstDirection = directions[0] || [0, 0];
   const echoReference = {
@@ -2968,7 +3781,36 @@ function exportObject(s = settings()) {
       vertical_variation: round(s.vertical_variation, 3),
       openness: round(s.openness, 3),
       acoustic_volume_m3: round(s.acoustic_volume, 3),
-      acoustic_surface_m2: round(s.acoustic_surface, 3)
+      acoustic_surface_m2: round(s.acoustic_surface, 3),
+      regions: graph.regions.map((region) => ({
+        id: region.id,
+        kind: region.kind,
+        family: region.family,
+        level: region.level || 0,
+        parent_region: region.parent || null,
+        attachment: region.attachment || null,
+        base_z_m: round(region.baseZ, 4),
+        height_m: round(region.height, 4),
+        polygon_xy_m: region.polygon.map((point) => ({ x: round(point.x, 4), y: round(point.y, 4) }))
+      })),
+      portals: graph.portals.map((portal) => ({
+        id: portal.id,
+        from_region: portal.fromRegion,
+        to_region: portal.toRegion,
+        attachment: portal.attachment,
+        shape: portal.shape,
+        center_m: { x: round(portal.center.x, 4), y: round(portal.center.y, 4), z: round(portal.center.z, 4) },
+        normal: { x: round(portal.normal.x, 5), y: round(portal.normal.y, 5), z: round(portal.normal.z, 5) },
+        axis_u: { x: round(portal.axisU.x, 5), y: round(portal.axisU.y, 5), z: round(portal.axisU.z, 5) },
+        axis_v: { x: round(portal.axisV.x, 5), y: round(portal.axisV.y, 5), z: round(portal.axisV.z, 5) },
+        width_m: round(portal.width, 4),
+        height_m: round(portal.height, 4),
+        area_m2: round(portal.area, 5),
+        transmission: round(portal.transmission, 5),
+        outline_xyz_m: portalOutlinePoints(portal).map((point) => ({
+          x: round(point.x, 4), y: round(point.y, 4), z: round(point.z, 4)
+        }))
+      }))
     },
     chamber_shape: s.chamber_shape,
     chamber_side: s.chamber_side,
@@ -2986,13 +3828,24 @@ function exportObject(s = settings()) {
       openings: outsideOpenings.map((opening) => ({
         index: opening.index + 1,
         side: opening.side,
+        shape: opening.shape,
         opening_m: round(opening.opening, 3),
+        base_z_m: round(opening.baseZ, 3),
+        height_m: round(opening.height, 3),
+        center_m: {
+          x: round(opening.center.x, 3),
+          y: round(opening.center.y, 3),
+          z: round(opening.center.z, 3)
+        },
         opening_segment: {
           x1: round(opening.x1, 3),
           y1: round(opening.y1, 3),
           x2: round(opening.x2, 3),
           y2: round(opening.y2, 3)
-        }
+        },
+        outline_xyz_m: portalOutlinePoints(opening).map((point) => ({
+          x: round(point.x, 3), y: round(point.y, 3), z: round(point.z, 3)
+        }))
       })),
       opening_segment: {
         x1: round(outsideOpenings[0].x1, 3),
@@ -3013,8 +3866,14 @@ function exportObject(s = settings()) {
       depth: round(s.chamber_depth, 3),
       count: round(s.chamber_count, 0),
       position: round(s.chamber_position, 3),
+      cross_position: round(s.chamber_cross_position, 3),
+      heading_deg: round(s.chamber_heading_deg, 2),
+      wall_elevation: round(s.chamber_vertical_position, 3),
       nested_chambers: round(s.nested_chambers, 0),
+      opening_shape: s.opening_shape,
       opening_width: round(s.opening_width, 3),
+      opening_height: round(s.opening_height, 3),
+      opening_position_z: round(s.opening_position_z, 3),
       coupling: round(s.chamber_coupling, 3),
       chambers: (chamberGeometries(s) || []).map((chamber) => ({
         ...(function () {
@@ -3031,7 +3890,11 @@ function exportObject(s = settings()) {
         index: chamber.index + 1,
         level: chamber.level,
         family: chamber.family,
-        height_m: round(s.room_z * branchHeightRatio(s, chamber), 3),
+        region_id: chamber.regionId,
+        parent_region: chamber.parentRegionId,
+        attachment: chamber.attachment,
+        base_z_m: round(chamber.baseZ, 3),
+        height_m: round(chamber.height, 3),
         x: round(chamber.x, 3),
         y: round(chamber.y, 3),
         width: round(chamber.width, 3),
@@ -3039,6 +3902,19 @@ function exportObject(s = settings()) {
         opening_x: round(chamber.openingX, 3),
         opening_y: round(chamber.openingY, 3),
         opening: round(chamber.opening, 3),
+        portal: {
+          id: chamber.portal.id,
+          shape: chamber.portal.shape,
+          center_m: {
+            x: round(chamber.portal.center.x, 4),
+            y: round(chamber.portal.center.y, 4),
+            z: round(chamber.portal.center.z, 4)
+          },
+          width_m: round(chamber.portal.width, 4),
+          height_m: round(chamber.portal.height, 4),
+          area_m2: round(chamber.portal.area, 5),
+          transmission: round(chamber.portal.transmission, 5)
+        },
         polygon: chamberPolygon(chamber).map((point) => ({ x: round(point.x, 3), y: round(point.y, 3) })),
         opening_segment: (function () {
           const segment = chamberOpeningSegment(chamber);
@@ -3056,7 +3932,8 @@ function exportObject(s = settings()) {
     echo_paths: echoPathSummary(s, echoReference),
     field_offset: {
       x: round(s.field_x, 3),
-      y: round(s.field_y, 3)
+      y: round(s.field_y, 3),
+      z: round(s.field_z, 3)
     },
     source_distance: round(s.source_distance, 3),
     direction_spread_deg: round(s.direction_spread_deg),
@@ -3253,8 +4130,14 @@ const RESTORE_KEYS = {
   chamber_depth: "chamberDepth",
   chamber_count: "chamberCount",
   chamber_position: "chamberPosition",
+  chamber_cross_position: "chamberCrossPosition",
+  chamber_heading_deg: "chamberHeading",
+  chamber_vertical_position: "chamberVerticalPosition",
   nested_chambers: "nestedChambers",
+  opening_shape: "openingShape",
   opening_width: "openingWidth",
+  opening_height: "openingHeight",
+  opening_position_z: "openingPositionZ",
   chamber_coupling: "chamberCoupling",
   chamber_material_mix: "chamberMaterialMix",
   echo_structure: "echoStructure",
@@ -3269,6 +4152,7 @@ const RESTORE_KEYS = {
   outside_leak: "outsideLeak",
   field_x: "fieldX",
   field_y: "fieldY",
+  field_z: "fieldZ",
   source_azimuth: "sourceAz",
   source_elevation: "sourceEl",
   source_distance: "sourceDistance",
@@ -3294,6 +4178,7 @@ function applyExportObject(data) {
   const echoPaths = data.echo_paths && typeof data.echo_paths === "object" ? data.echo_paths : {};
   const exterior = data.exterior_opening && typeof data.exterior_opening === "object" ? data.exterior_opening : {};
   const space = data.space && typeof data.space === "object" ? data.space : {};
+  const fieldOffset = data.field_offset && typeof data.field_offset === "object" ? data.field_offset : {};
   const restored = {
     ...data,
     space_family: space.family ?? data.space_family ?? "room",
@@ -3311,8 +4196,14 @@ function applyExportObject(data) {
     chamber_depth: chamber.depth ?? data.chamber_depth,
     chamber_count: chamber.count ?? data.chamber_count,
     chamber_position: chamber.position ?? data.chamber_position,
+    chamber_cross_position: chamber.cross_position ?? data.chamber_cross_position ?? 0.5,
+    chamber_heading_deg: chamber.heading_deg ?? data.chamber_heading_deg ?? 0,
+    chamber_vertical_position: chamber.wall_elevation ?? data.chamber_vertical_position ?? 0,
     nested_chambers: chamber.nested_chambers ?? data.nested_chambers,
+    opening_shape: chamber.opening_shape ?? data.opening_shape ?? "rect",
     opening_width: chamber.opening_width ?? data.opening_width,
+    opening_height: chamber.opening_height ?? data.opening_height ?? 0.72,
+    opening_position_z: chamber.opening_position_z ?? data.opening_position_z ?? 0.5,
     chamber_coupling: chamber.coupling ?? data.chamber_coupling,
     echo_structure: echoPaths.requested_structure ?? data.echo_structure ?? "off",
     echo_prominence: echoPaths.prominence ?? data.echo_prominence,
@@ -3323,7 +4214,10 @@ function applyExportObject(data) {
     outside_opening_position: exterior.position ?? data.outside_opening_position,
     outside_opening_spread: exterior.spread ?? data.outside_opening_spread,
     outside_opening_width: exterior.width ?? data.outside_opening_width,
-    outside_leak: exterior.leak ?? data.outside_leak
+    outside_leak: exterior.leak ?? data.outside_leak,
+    field_x: fieldOffset.x ?? data.field_x ?? 0,
+    field_y: fieldOffset.y ?? data.field_y ?? 0,
+    field_z: fieldOffset.z ?? data.field_z ?? 0
   };
   Object.entries(RESTORE_KEYS).forEach(([key, controlId]) => {
     if (restored[key] === undefined || !controls[controlId]) return;
@@ -3333,6 +4227,7 @@ function applyExportObject(data) {
   if (data.field_offset) {
     if (controls.fieldX && data.field_offset.x !== undefined) controls.fieldX.value = data.field_offset.x;
     if (controls.fieldY && data.field_offset.y !== undefined) controls.fieldY.value = data.field_offset.y;
+    if (controls.fieldZ && data.field_offset.z !== undefined) controls.fieldZ.value = data.field_offset.z;
   }
   if (data.camera) {
     if (controls.cameraAz && data.camera.azimuth !== undefined) controls.cameraAz.value = data.camera.azimuth;
@@ -3380,7 +4275,9 @@ function autosave() {
 
 function restoreAutosave() {
   try {
-    const json = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    const json = localStorage.getItem(STORAGE_KEY)
+      || localStorage.getItem(PREVIOUS_STORAGE_KEY)
+      || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!json) return false;
     applyExportObject(JSON.parse(json));
     lastAutosaveJson = json;
@@ -3408,13 +4305,32 @@ function pushVec3(list, x, y, z) {
   list.push(round(x, 4), round(y, 4), round(z, 4));
 }
 
-function addExtrudedPolygonMesh(meshes, name, poly, height, materialIndex) {
+const GLTF_MATERIAL = Object.freeze({
+  primary: 0,
+  wallBranch: 1,
+  overheadBranch: 2,
+  beneathBranch: 3,
+  fieldCenter: 4,
+  response: 5,
+  portalVoid: 6,
+  portalFrame: 7,
+  outsideOpening: 8
+});
+
+function gltfBranchMaterial(attachment) {
+  if (attachment === "ceiling") return GLTF_MATERIAL.overheadBranch;
+  if (attachment === "floor") return GLTF_MATERIAL.beneathBranch;
+  return GLTF_MATERIAL.wallBranch;
+}
+
+function addExtrudedPolygonMesh(meshes, name, poly, height, materialIndex, baseHeight = 0) {
   if (!poly || poly.length < 3) return;
   const positions = [];
   const indices = [];
   const clockwise = polygonArea(poly) < 0;
-  const topHeights = poly.map((point, index) => typeof height === "function" ? height(point, index) : height);
-  poly.forEach((point) => pushVec3(positions, point.x, 0, -point.y));
+  const baseHeights = poly.map((point, index) => typeof baseHeight === "function" ? baseHeight(point, index) : baseHeight);
+  const topHeights = poly.map((point, index) => typeof height === "function" ? height(point, index) : baseHeights[index] + height);
+  poly.forEach((point, index) => pushVec3(positions, point.x, baseHeights[index], -point.y));
   poly.forEach((point, index) => pushVec3(positions, point.x, topHeights[index], -point.y));
   for (let i = 1; i < poly.length - 1; i += 1) {
     if (clockwise) {
@@ -3446,13 +4362,88 @@ function addPointMarkerMesh(meshes, name, point, radius, height, materialIndex) 
       y: point.y + Math.sin(angle) * radius
     };
   });
-  addExtrudedPolygonMesh(meshes, name, poly, height, materialIndex);
+  const centerZ = Number.isFinite(Number(point.z)) ? Number(point.z) : height * 0.5;
+  addExtrudedPolygonMesh(meshes, name, poly, height, materialIndex, centerZ - height * 0.5);
 }
 
 function addOpeningPortalMesh(meshes, name, chamber, height, materialIndex) {
   const segment = chamberOpeningSegment(chamber);
   const outward = chamber.edgeOutward || chamberOutwardVector(chamber.side);
   addSegmentPortalMesh(meshes, name, segment, outward, height, materialIndex);
+}
+
+function cleanPortalLocalOutline(portal) {
+  const cleaned = [];
+  (portal.localOutline || []).forEach((point) => {
+    const previous = cleaned[cleaned.length - 1];
+    if (!previous || Math.hypot(point.u - previous.u, point.v - previous.v) > 0.0001) cleaned.push({ u: point.u, v: point.v });
+  });
+  if (cleaned.length > 2 && Math.hypot(cleaned[0].u - cleaned[cleaned.length - 1].u, cleaned[0].v - cleaned[cleaned.length - 1].v) <= 0.0001) cleaned.pop();
+  return cleaned;
+}
+
+function portalModelPoint(portal, localPoint, normalOffset = 0) {
+  const world = {
+    x: portal.center.x + portal.axisU.x * localPoint.u + portal.axisV.x * localPoint.v + portal.normal.x * normalOffset,
+    y: portal.center.y + portal.axisU.y * localPoint.u + portal.axisV.y * localPoint.v + portal.normal.y * normalOffset,
+    z: portal.center.z + portal.axisU.z * localPoint.u + portal.axisV.z * localPoint.v + portal.normal.z * normalOffset
+  };
+  return { x: world.x, y: world.z, z: -world.y };
+}
+
+function pushModelPoint(positions, point) {
+  pushVec3(positions, point.x, point.y, point.z);
+}
+
+function addShapedPortalMeshes(meshes, name, portal, apertureMaterialIndex, frameMaterialIndex, portalKind = "chamber") {
+  const localOutline = cleanPortalLocalOutline(portal);
+  if (localOutline.length < 3) return;
+  const apertureOffset = 0.038;
+  const frameOffset = 0.048;
+  const aperturePositions = [];
+  const apertureIndices = [];
+  localOutline.forEach((point) => pushModelPoint(aperturePositions, portalModelPoint(portal, point, apertureOffset)));
+  const centerIndex = localOutline.length;
+  pushModelPoint(aperturePositions, portalModelPoint(portal, { u: 0, v: 0 }, apertureOffset));
+  for (let index = 0; index < localOutline.length; index += 1) {
+    apertureIndices.push(centerIndex, index, (index + 1) % localOutline.length);
+  }
+  meshes.push({
+    name: `${name} aperture`,
+    positions: aperturePositions,
+    indices: apertureIndices,
+    materialIndex: apertureMaterialIndex,
+    portalAperture: true,
+    portalLoopSize: localOutline.length,
+    portalShape: portal.shape,
+    portalAttachment: portal.attachment,
+    portalKind
+  });
+
+  const frameThickness = clamp(Math.min(portal.width, portal.height) * 0.085, 0.025, 0.14);
+  const scaleU = clamp(1 - frameThickness * 2 / Math.max(0.05, portal.width), 0.42, 0.92);
+  const scaleV = clamp(1 - frameThickness * 2 / Math.max(0.05, portal.height), 0.42, 0.92);
+  const innerOutline = localOutline.map((point) => ({ u: point.u * scaleU, v: point.v * scaleV }));
+  const framePositions = [];
+  const frameIndices = [];
+  localOutline.forEach((point) => pushModelPoint(framePositions, portalModelPoint(portal, point, frameOffset)));
+  innerOutline.forEach((point) => pushModelPoint(framePositions, portalModelPoint(portal, point, frameOffset)));
+  const count = localOutline.length;
+  for (let index = 0; index < count; index += 1) {
+    const next = (index + 1) % count;
+    frameIndices.push(index, next, count + next, index, count + next, count + index);
+  }
+  meshes.push({
+    name: `${name} frame`,
+    positions: framePositions,
+    indices: frameIndices,
+    materialIndex: frameMaterialIndex,
+    portalFrame: true,
+    portalLoopSize: count,
+    portalShape: portal.shape,
+    portalAttachment: portal.attachment,
+    portalKind
+  });
 }
 
 function addRoomOpeningPortalMesh(meshes, name, s, height, materialIndex) {
@@ -3538,18 +4529,6 @@ function openingSegmentsForModel(s) {
     kind: "outside",
     height: s.room_z * 0.86
   }));
-  (chamberGeometries(s) || []).forEach((chamber) => {
-    const chamberHeight = s.room_z * branchHeightRatio(s, chamber);
-    openings.push({
-      ...chamberOpeningSegment(chamber),
-      index: openings.length,
-      kind: "chamber",
-      level: chamber.level,
-      side: chamber.side,
-      outward: chamber.edgeOutward || chamberOutwardVector(chamber.side),
-      height: Math.min(s.room_z, chamberHeight) * 0.92
-    });
-  });
   return mergedOpeningSegments(openings);
 }
 
@@ -3604,16 +4583,16 @@ function addSegmentPortalMesh(meshes, name, segment, outward, height, materialIn
 
 function buildGltfMeshes(s = settings()) {
   const meshes = [];
-  addExtrudedPolygonMesh(meshes, "Primary space", roomPolygon(s), (point) => spaceCeilingHeight(s, point.x, point.y), 0);
+  addExtrudedPolygonMesh(meshes, "Primary space", roomPolygon(s), (point) => spaceCeilingHeight(s, point.x, point.y), GLTF_MATERIAL.primary);
   (chamberGeometries(s) || []).forEach((chamber) => {
-    const chamberHeight = s.room_z * branchHeightRatio(s, chamber);
-    addExtrudedPolygonMesh(meshes, `Branch ${chamber.index + 1} ${chamber.family}`, chamberPolygon(chamber), chamberHeight, 1);
+    addExtrudedPolygonMesh(meshes, `Branch ${chamber.index + 1} ${chamber.family}`, chamberPolygon(chamber), chamber.height, gltfBranchMaterial(chamber.attachment), chamber.baseZ);
+    addShapedPortalMeshes(meshes, `Portal ${chamber.index + 1} ${chamber.portal.shape}`, chamber.portal, GLTF_MATERIAL.portalVoid, GLTF_MATERIAL.portalFrame, "chamber");
   });
-  openingSegmentsForModel(s).forEach((segment) => {
-    addSegmentPortalMesh(meshes, `Opening ${segment.index + 1}`, segment, segment.outward, segment.height || s.room_z * 0.72, 4);
+  exteriorPortals(s).forEach((portal) => {
+    addShapedPortalMeshes(meshes, `Opening ${portal.index + 1}`, portal, GLTF_MATERIAL.portalVoid, GLTF_MATERIAL.outsideOpening, "outside");
   });
   const listener = roomPoints(s).listener;
-  addPointMarkerMesh(meshes, "Field center", listener, Math.max(0.12, Math.min(s.room_x, s.room_y) * 0.018), s.room_z * 0.08, 2);
+  addPointMarkerMesh(meshes, "Field center", listener, Math.max(0.12, Math.min(s.room_x, s.room_y) * 0.018), s.room_z * 0.08, GLTF_MATERIAL.fieldCenter);
   activeDirections(s).forEach((dir, index) => {
     const info = {
       index,
@@ -3623,7 +4602,7 @@ function buildGltfMeshes(s = settings()) {
       channels_end: (index + 1) * s.channels_per_ir
     };
     const position = groupMapPosition(s, info, groupProfile(s, index));
-    addPointMarkerMesh(meshes, `Response ${index + 1}`, position, Math.max(0.09, Math.min(s.room_x, s.room_y) * 0.014), s.room_z * 0.06, 3);
+    addPointMarkerMesh(meshes, `Response ${index + 1}`, position, Math.max(0.09, Math.min(s.room_x, s.room_y) * 0.014), s.room_z * 0.06, GLTF_MATERIAL.response);
   });
   return meshes;
 }
@@ -3694,11 +4673,15 @@ function buildGltf(s = settings()) {
     nodes,
     meshes: gltfMeshes,
     materials: [
-      { name: "Primary space cyan", pbrMetallicRoughness: { baseColorFactor: [0.2, 0.75, 0.85, 0.42], metallicFactor: 0, roughnessFactor: 0.92 }, alphaMode: "BLEND", doubleSided: true },
-      { name: "Branches green", pbrMetallicRoughness: { baseColorFactor: [0.32, 0.78, 0.52, 0.48], metallicFactor: 0, roughnessFactor: 0.86 }, alphaMode: "BLEND", doubleSided: true },
+      { name: "Primary space cyan", pbrMetallicRoughness: { baseColorFactor: [0.35, 0.66, 0.78, 0.20], metallicFactor: 0, roughnessFactor: 0.92 }, alphaMode: "BLEND", doubleSided: true },
+      { name: "Wall branches green", pbrMetallicRoughness: { baseColorFactor: [0.47, 0.75, 0.59, 0.24], metallicFactor: 0, roughnessFactor: 0.86 }, alphaMode: "BLEND", doubleSided: true },
+      { name: "Overhead branches blue", pbrMetallicRoughness: { baseColorFactor: [0.41, 0.64, 0.76, 0.24], metallicFactor: 0, roughnessFactor: 0.86 }, alphaMode: "BLEND", doubleSided: true },
+      { name: "Beneath branches brown", pbrMetallicRoughness: { baseColorFactor: [0.69, 0.57, 0.44, 0.24], metallicFactor: 0, roughnessFactor: 0.86 }, alphaMode: "BLEND", doubleSided: true },
       { name: "Field center", pbrMetallicRoughness: { baseColorFactor: [0.9, 0.9, 0.9, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
-      { name: "Response groups", pbrMetallicRoughness: { baseColorFactor: [0.93, 0.62, 0.22, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
-      { name: "Opening frames", pbrMetallicRoughness: { baseColorFactor: [0.78, 0.96, 0.92, 0.28], metallicFactor: 0, roughnessFactor: 0.96 }, alphaMode: "BLEND", doubleSided: true }
+      { name: "Response groups cyan", pbrMetallicRoughness: { baseColorFactor: [0.35, 0.66, 0.78, 1], metallicFactor: 0, roughnessFactor: 0.5 } },
+      { name: "Portal apertures", pbrMetallicRoughness: { baseColorFactor: [0.02, 0.025, 0.03, 0.94], metallicFactor: 0, roughnessFactor: 1 }, doubleSided: true },
+      { name: "Portal frames", pbrMetallicRoughness: { baseColorFactor: [0.72, 0.86, 0.90, 0.88], metallicFactor: 0, roughnessFactor: 0.96 }, alphaMode: "BLEND", doubleSided: true },
+      { name: "Exterior openings", pbrMetallicRoughness: { baseColorFactor: [0.78, 0.96, 0.92, 0.84], metallicFactor: 0, roughnessFactor: 0.96 }, alphaMode: "BLEND", doubleSided: true }
     ],
     accessors,
     bufferViews,
@@ -3782,16 +4765,24 @@ function drawGltfPreview() {
   const fills = [
     "rgba(90,168,199,0.20)",
     "rgba(120,190,150,0.24)",
+    "rgba(104,164,195,0.24)",
+    "rgba(176,146,112,0.24)",
     "rgba(230,230,230,0.88)",
-    "rgba(216,162,74,0.92)",
-    "rgba(200,245,235,0.70)"
+    "rgba(90,168,199,0.92)",
+    "rgba(5,6,7,0.92)",
+    "rgba(184,220,230,0.86)",
+    "rgba(200,245,235,0.82)"
   ];
   const strokes = [
     "rgba(90,168,199,0)",
     "rgba(120,190,150,0)",
+    "rgba(104,164,195,0)",
+    "rgba(176,146,112,0)",
     "rgba(245,245,245,0.95)",
-    "rgba(216,162,74,0.95)",
-    "rgba(200,245,235,0.92)"
+    "rgba(90,168,199,0.95)",
+    "rgba(5,6,7,0.95)",
+    "rgba(184,220,230,0.94)",
+    "rgba(200,245,235,0.94)"
   ];
   const triangles = [];
   meshes.forEach((mesh) => {
@@ -3813,7 +4804,7 @@ function drawGltfPreview() {
   });
   triangles.sort((a, b) => a.depth - b.depth);
   triangles.forEach((tri) => {
-    if (tri.materialIndex === 4) return;
+    if (tri.materialIndex >= GLTF_MATERIAL.portalVoid) return;
     gltfCtx.beginPath();
     gltfCtx.moveTo(tri.pts[0].x, tri.pts[0].y);
     gltfCtx.lineTo(tri.pts[1].x, tri.pts[1].y);
@@ -3821,13 +4812,17 @@ function drawGltfPreview() {
     gltfCtx.closePath();
     gltfCtx.fillStyle = fills[tri.materialIndex] || fills[0];
     gltfCtx.strokeStyle = strokes[tri.materialIndex] || strokes[0];
-    gltfCtx.lineWidth = tri.materialIndex === 2 || tri.materialIndex === 3 ? 1.4 : 0;
+    gltfCtx.lineWidth = tri.materialIndex === GLTF_MATERIAL.fieldCenter || tri.materialIndex === GLTF_MATERIAL.response ? 1.4 : 0;
     gltfCtx.fill();
-    if (tri.materialIndex === 2 || tri.materialIndex === 3) gltfCtx.stroke();
+    if (tri.materialIndex === GLTF_MATERIAL.fieldCenter || tri.materialIndex === GLTF_MATERIAL.response) gltfCtx.stroke();
   });
   const outlineStyles = [
     { stroke: "rgba(90,168,199,0.92)", width: 1.45 },
     { stroke: "rgba(120,190,150,0.78)", width: 1.2 },
+    { stroke: "rgba(132,194,222,0.78)", width: 1.2 },
+    { stroke: "rgba(204,172,132,0.76)", width: 1.2 },
+    null,
+    null,
     null,
     null,
     null
@@ -3860,10 +4855,45 @@ function drawGltfPreview() {
     }
     gltfCtx.stroke();
   });
+
+  const meshPoint = (mesh, index) => {
+    const offset = index * 3;
+    return project({ x: mesh.positions[offset], y: mesh.positions[offset + 1], z: mesh.positions[offset + 2] });
+  };
+  const traceMeshLoop = (mesh, start, count) => {
+    const first = meshPoint(mesh, start);
+    gltfCtx.moveTo(first.x, first.y);
+    for (let index = 1; index < count; index += 1) {
+      const point = meshPoint(mesh, start + index);
+      gltfCtx.lineTo(point.x, point.y);
+    }
+    gltfCtx.closePath();
+  };
+
+  meshes.filter((mesh) => mesh.portalAperture && mesh.portalLoopSize).forEach((mesh) => {
+    gltfCtx.save();
+    gltfCtx.beginPath();
+    traceMeshLoop(mesh, 0, mesh.portalLoopSize);
+    gltfCtx.fillStyle = "rgba(5,6,7,0.88)";
+    gltfCtx.fill();
+    gltfCtx.restore();
+  });
+
+  meshes.filter((mesh) => mesh.portalFrame && mesh.portalLoopSize).forEach((mesh) => {
+    gltfCtx.save();
+    gltfCtx.beginPath();
+    traceMeshLoop(mesh, 0, mesh.portalLoopSize);
+    traceMeshLoop(mesh, mesh.portalLoopSize, mesh.portalLoopSize);
+    gltfCtx.strokeStyle = mesh.portalKind === "outside" ? "rgba(200,245,235,0.94)" : "rgba(184,220,230,0.92)";
+    gltfCtx.lineWidth = 1.7;
+    gltfCtx.setLineDash([5, 4]);
+    gltfCtx.stroke();
+    gltfCtx.setLineDash([]);
+    gltfCtx.restore();
+  });
+
   meshes.filter((mesh) => mesh.portalFrame && mesh.portalSegment).forEach((mesh) => {
     const segment = mesh.portalSegment;
-    const chamberPortal = segment.kind === "chamber";
-    const nestedPortal = chamberPortal && Number(segment.level || 0) > 0;
     const p1b = project({ x: segment.x1, y: 0.02, z: -segment.y1 });
     const p2b = project({ x: segment.x2, y: 0.02, z: -segment.y2 });
     const p1t = project({ x: segment.x1, y: segment.height, z: -segment.y1 });
@@ -3880,12 +4910,8 @@ function drawGltfPreview() {
     gltfCtx.moveTo(p1t.x, p1t.y);
     gltfCtx.lineTo(p2t.x, p2t.y);
     gltfCtx.stroke();
-    gltfCtx.strokeStyle = nestedPortal
-      ? "rgba(255,202,126,0.98)"
-      : chamberPortal
-        ? "rgba(184,255,202,0.98)"
-        : "rgba(220,255,248,0.98)";
-    gltfCtx.lineWidth = nestedPortal ? 3.0 : chamberPortal ? 2.6 : 2.2;
+    gltfCtx.strokeStyle = "rgba(220,255,248,0.96)";
+    gltfCtx.lineWidth = 2.2;
     gltfCtx.beginPath();
     gltfCtx.moveTo(p1b.x, p1b.y);
     gltfCtx.lineTo(p1t.x, p1t.y);
@@ -3894,20 +4920,6 @@ function drawGltfPreview() {
     gltfCtx.moveTo(p1t.x, p1t.y);
     gltfCtx.lineTo(p2t.x, p2t.y);
     gltfCtx.stroke();
-    if (chamberPortal) {
-      gltfCtx.setLineDash(nestedPortal ? [3, 3] : [5, 4]);
-      gltfCtx.strokeStyle = nestedPortal ? "rgba(255,202,126,0.95)" : "rgba(120,190,150,0.95)";
-      gltfCtx.lineWidth = nestedPortal ? 1.9 : 1.5;
-      gltfCtx.beginPath();
-      gltfCtx.moveTo(p1b.x, p1b.y);
-      gltfCtx.lineTo(p2b.x, p2b.y);
-      if (nestedPortal) {
-        gltfCtx.moveTo(p1t.x, p1t.y);
-        gltfCtx.lineTo(p2t.x, p2t.y);
-      }
-      gltfCtx.stroke();
-      gltfCtx.setLineDash([]);
-    }
     gltfCtx.restore();
   });
   gltfCtx.fillStyle = "#aeb7bd";
@@ -3982,8 +4994,14 @@ function resetDefaults() {
   controls.chamberDepth.value = 3.8;
   controls.chamberCount.value = 2;
   controls.chamberPosition.value = 0.5;
+  controls.chamberCrossPosition.value = 0.5;
+  controls.chamberHeading.value = 0;
+  controls.chamberVerticalPosition.value = 0;
   controls.nestedChambers.value = 1;
+  controls.openingShape.value = "rect";
   controls.openingWidth.value = 0.42;
+  controls.openingHeight.value = 0.72;
+  controls.openingPositionZ.value = 0.5;
   controls.chamberCoupling.value = 0.48;
   controls.chamberMaterialMix.value = 0.65;
   controls.echoStructure.value = "off";
@@ -3999,6 +5017,7 @@ function resetDefaults() {
   controls.outsideLeak.value = 0.28;
   controls.fieldX.value = 0;
   controls.fieldY.value = 0;
+  controls.fieldZ.value = 0;
   controls.sourceAz.value = 0;
   controls.sourceEl.value = 0;
   controls.sourceDistance.value = 3.2;
@@ -4104,8 +5123,8 @@ function randomize(seedOverride = null) {
   );
   controls.chamberSide.value = chooseByBias(
     ["back", "left", "right"],
-    ["front", "back", "left", "right"],
-    ["front", "back", "left", "right", "all", "all"],
+    ["front", "back", "left", "right", "ceiling", "floor", "left_ceiling"],
+    ["front", "back", "left", "right", "ceiling", "floor", "left_ceiling", "right_ceiling", "left_floor", "right_floor", "ceiling_floor", "all", "all_surfaces"],
     bias,
     rng
   );
@@ -4121,8 +5140,20 @@ function randomize(seedOverride = null) {
   controls.chamberDepth.value = round(range(1.2, Math.max(1.5, Math.min(16, Number(controls.roomY.value) * 0.62))), 1);
   controls.chamberCount.value = integer(1, Math.max(1, Math.round(1.6 + bias * 2.4)));
   controls.chamberPosition.value = round(rng(), 2);
+  controls.chamberCrossPosition.value = round(rng(), 2);
+  controls.chamberHeading.value = Math.round(range(-180, 180));
+  controls.chamberVerticalPosition.value = round(range(0, bias), 2);
   controls.nestedChambers.value = integer(0, Math.round(bias * 2));
+  controls.openingShape.value = chooseByBias(
+    ["rect", "rect", "arch"],
+    ["rect", "arch", "circle", "ellipse"],
+    ["arch", "circle", "ellipse", "slot", "irregular", "irregular"],
+    bias,
+    rng
+  );
   controls.openingWidth.value = round(range(0.48 - bias * 0.32, 0.86 - bias * 0.22), 2);
+  controls.openingHeight.value = round(range(0.42 - bias * 0.18, 0.90 - bias * 0.10), 2);
+  controls.openingPositionZ.value = round(range(0.22, 0.78), 2);
   controls.chamberCoupling.value = round(rangeBiased(0.12, 0.92), 2);
   controls.chamberMaterialMix.value = round(rangeBiased(0.18, 0.98), 2);
   controls.outsideOpening.checked = Number(controls.openness.value) > 0.42 || rng() < 0.28 + bias * 0.42;
@@ -4140,6 +5171,7 @@ function randomize(seedOverride = null) {
   controls.outsideLeak.value = round(rangeBiased(0.12, 0.88), 2);
   controls.fieldX.value = round(range(-0.22 - bias * 0.62, 0.22 + bias * 0.62), 2);
   controls.fieldY.value = round(range(-0.22 - bias * 0.62, 0.22 + bias * 0.62), 2);
+  controls.fieldZ.value = round(range(-0.18 - bias * 0.54, 0.18 + bias * 0.54), 2);
   controls.sourceAz.value = 0;
   controls.sourceEl.value = 0;
   controls.sourceDistance.value = round(clamp(range(0.8, Math.min(18, Math.max(2, Math.min(Number(controls.roomX.value), Number(controls.roomY.value)) * 0.72))), 0.25, 20), 2);
@@ -4185,15 +5217,21 @@ function mutate() {
   };
   [controls.roomX, controls.roomY, controls.roomZ, controls.irregularity, controls.surfaceRoughness,
     controls.verticalVariation, controls.openness, controls.chamberWidth, controls.chamberDepth,
-    controls.chamberPosition, controls.openingWidth, controls.chamberCoupling, controls.chamberMaterialMix,
+    controls.chamberPosition, controls.chamberCrossPosition, controls.chamberHeading,
+    controls.chamberVerticalPosition, controls.openingWidth, controls.openingHeight,
+    controls.openingPositionZ, controls.chamberCoupling, controls.chamberMaterialMix,
     controls.outsideOpeningPosition, controls.outsideOpeningSpread, controls.outsideOpeningWidth,
-    controls.outsideLeak, controls.fieldX, controls.fieldY, controls.sourceDistance, controls.spreadDeg,
+    controls.outsideLeak, controls.fieldX, controls.fieldY, controls.fieldZ, controls.sourceDistance, controls.spreadDeg,
     controls.groupVariation, controls.surfaceContrast, controls.distanceVariation, controls.duration,
     controls.preDelay, controls.earlyReflections, controls.echoProminence, controls.echoPersistence,
     controls.echoRegularity].forEach((control) => mutateRange(control));
   if (rng() < 0.28 + bias * 0.30) controls.roomShape.value = choice(["rect", "trapezoid", "wedge", "skew", "diamond", "impossible"], rng);
   if (rng() < 0.24 + bias * 0.34) controls.chamberShape.value = choice(["rect", "trapezoid", "wedge", "skew", "impossible"], rng);
-  if (rng() < 0.18 + bias * 0.30) controls.chamberSide.value = choice(["front", "back", "left", "right", "all"], rng);
+  if (rng() < 0.18 + bias * 0.30) controls.chamberSide.value = choice([
+    "front", "back", "left", "right", "ceiling", "floor", "left_ceiling",
+    "right_ceiling", "left_floor", "right_floor", "ceiling_floor", "all", "all_surfaces"
+  ], rng);
+  if (rng() < 0.20 + bias * 0.34) controls.openingShape.value = choice(["rect", "arch", "circle", "ellipse", "slot", "irregular"], rng);
   if (rng() < 0.14 + bias * 0.20) controls.spaceShape.value = controls.spaceShape.value === "shoebox" ? "side_chamber" : "shoebox";
   state.selectedDirection = 0;
   state.groupMapPositions = {};
@@ -4327,17 +5365,20 @@ function updateDistanceFromCanvas(point) {
 function updateFieldFromCanvas(point) {
   const s = settings();
   const projection = state.roomProjection;
-  if (!projection || projection.view !== "top") return;
+  if (!projection || (projection.view !== "top" && projection.view !== "side")) return;
   const bounds = floorplanBounds(s);
-  const fieldWidth = Math.max(0.5, bounds.maxX - bounds.minX);
-  const fieldHeight = Math.max(0.5, bounds.maxY - bounds.minY);
   const planX = clamp((point.x - projection.ox) / projection.scale + projection.minX, bounds.minX, bounds.maxX);
-  const planY = clamp((point.y - projection.oy) / projection.scale + projection.minY, bounds.minY, bounds.maxY);
-  const boundedPoint = closestPointInFloorplan({ x: planX, y: planY, z: s.room_z * 0.5 }, s);
-  controls.fieldX.value = round(clamp((boundedPoint.x - bounds.minX) / fieldWidth - 0.5, -0.5, 0.5) * 2, 3);
-  controls.fieldY.value = round(clamp((boundedPoint.y - bounds.minY) / fieldHeight - 0.5, -0.5, 0.5) * 2, 3);
-  updateRangeFill(controls.fieldX);
-  updateRangeFill(controls.fieldY);
+  const currentListener = roomPoints(s, selectedDirection(s)).listener;
+  const planY = projection.view === "top"
+    ? clamp((point.y - projection.oy) / projection.scale + projection.minY, bounds.minY, bounds.maxY)
+    : currentListener.y;
+  let worldZ = currentListener.z;
+  if (projection.view === "side") {
+    const axisY = clamp((point.y - projection.oy) / projection.scale, 0, projection.roomH);
+    worldZ = (projection.minY || 0) + projection.roomH - axisY;
+  }
+  const boundedPoint = closestPointInConnectedVolume({ x: planX, y: planY, z: worldZ }, s);
+  setFieldControlsFromPoint(s, boundedPoint);
   drawRoom();
 }
 
@@ -4345,19 +5386,56 @@ function updateGroupMapFromCanvas(index, point) {
   const s = settings();
   const projection = state.bankProjection;
   if (!projection) return;
-  const candidate = {
+  const dirs = activeDirections(s);
+  const dir = dirs[index] || dirs[0] || [0, 0];
+  const info = {
+    index,
+    azimuth: dir[0],
+    elevation: dir[1],
+    channels_start: index * s.channels_per_ir + 1,
+    channels_end: (index + 1) * s.channels_per_ir
+  };
+  const current = groupMapPosition(s, info, groupProfile(s, index));
+  const candidate = closestPointInConnectedVolume({
     x: clamp((point.x - projection.ox) / projection.scale + projection.minX, projection.minX, projection.maxX),
     y: clamp((point.y - projection.oy) / projection.scale + projection.minY, projection.minY, projection.maxY),
-    z: s.room_z * 0.5
-  };
-  if (!pointInFloorplan(candidate, s)) return;
+    z: current.z
+  }, s);
   state.groupMapPositions[groupPositionKey(index)] = candidate;
+  drawRoom();
+}
+
+function updateGroupElevationFromCanvas(index, point) {
+  const s = settings();
+  const projection = state.bankProjection;
+  const elevation = projection && projection.elevation;
+  if (!elevation) return;
+  const dirs = activeDirections(s);
+  const dir = dirs[index] || dirs[0] || [0, 0];
+  const info = {
+    index,
+    azimuth: dir[0],
+    elevation: dir[1],
+    channels_start: index * s.channels_per_ir + 1,
+    channels_end: (index + 1) * s.channels_per_ir
+  };
+  const current = groupMapPosition(s, info, groupProfile(s, index));
+  const amount = clamp((point.y - elevation.top) / Math.max(1, elevation.bottom - elevation.top), 0, 1);
+  const targetZ = elevation.maxZ - amount * (elevation.maxZ - elevation.minZ);
+  state.groupMapPositions[groupPositionKey(index)] = closestElevationAtPlanPoint(s, current, targetZ);
   drawRoom();
 }
 
 canvas.addEventListener("pointerdown", (event) => {
   const { x, y } = canvasPoint(event);
   if (state.view === "sphere") {
+    const elevation = state.bankProjection && state.bankProjection.elevation;
+    if (elevation && Math.abs(x - elevation.x) <= elevation.hitHalfWidth && y >= elevation.top - 10 && y <= elevation.bottom + 10) {
+      state.drag = { mode: "group_elevation", index: state.selectedDirection };
+      canvas.setPointerCapture(event.pointerId);
+      updateGroupElevationFromCanvas(state.selectedDirection, { x, y });
+      return;
+    }
     const hit = state.directionHitPoints.find((point) => {
       const dx = x - point.x;
       const dy = y - point.y;
@@ -4388,7 +5466,7 @@ canvas.addEventListener("pointerdown", (event) => {
   if (roomHit) {
     state.selectedDirection = roomHit.index;
   }
-  if (state.view === "top" && state.roomProjection) {
+  if ((state.view === "top" || state.view === "side") && state.roomProjection) {
     state.drag = { mode: "field" };
     canvas.setPointerCapture(event.pointerId);
     updateFieldFromCanvas({ x, y });
@@ -4404,6 +5482,7 @@ canvas.addEventListener("pointermove", (event) => {
   if (state.drag.mode === "distance") updateDistanceFromCanvas(canvasPoint(event));
   if (state.drag.mode === "field") updateFieldFromCanvas(canvasPoint(event));
   if (state.drag.mode === "group_map") updateGroupMapFromCanvas(state.drag.index, canvasPoint(event));
+  if (state.drag.mode === "group_elevation") updateGroupElevationFromCanvas(state.drag.index, canvasPoint(event));
 });
 
 canvas.addEventListener("pointerup", (event) => {

@@ -61,9 +61,10 @@ Package Browser group counts:
 - `Image Score`: opens the browser utility for composing PNG scores
   used by `3OAFX Image Sonogram Field`.
 - `Imprint Sketch`: designs repeatable directional responses and geometry-
-  derived echo paths for rooms, caves, passages, open fields, and imaginary
-  spaces. It exports project JSON for `3OAFX Synthetic Ambisonic IR Bank` and
-  `.s3gimprint` files for `s3g Ambi Imprint 64` in `s3g-dsp`.
+  derived echo paths for connected 3D regions, including wall, overhead, and
+  beneath-listener branches with shaped portals. It exports project JSON for
+  `3OAFX Synthetic Ambisonic IR Bank` and `.s3gimprint` files for
+  `s3g Ambi Imprint 64` in `s3g-dsp`.
 - `Load Automation Score JSON`: opens an ImGui target-assignment window for
   mapping Automation Score lanes to selected track volume envelopes or
   named FX parameter envelopes, with append or replace write modes and optional

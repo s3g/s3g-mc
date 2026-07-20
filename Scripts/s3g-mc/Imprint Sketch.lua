@@ -1,8 +1,8 @@
 -- @description Imprint Sketch
 -- @author s3g
--- @version 0.3
+-- @version 0.4
 -- @category Utils
--- @method Opens the browser-based directional response and geometry-derived echo-path designer for rooms, caves, passages, open fields, and imaginary spaces. Exports editable projects, 3OAFX-compatible JSON, glTF, and .s3gimprint files for s3g Ambi Imprint 64.
+-- @method Opens the browser-based directional response and geometry-derived echo-path designer for connected wall, overhead, and beneath-listener regions with shaped portals. Exports editable projects, 3OAFX-compatible JSON, glTF, and .s3gimprint files for s3g Ambi Imprint 64.
 
 local script_name = "Imprint Sketch"
 

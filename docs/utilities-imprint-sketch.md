@@ -13,6 +13,8 @@ toc:
     href: "#open-tool"
   - title: Spaces
     href: "#spaces"
+  - title: Connected Volumes
+    href: "#connected-volumes"
   - title: Generate And Mutate
     href: "#generate-and-mutate"
   - title: Directional Responses
@@ -64,8 +66,44 @@ distribution, directional spread, coupling, and energy loss; `Branch
 material` remains a separate surface choice.
 
 The Top, Side, and 3D views show the generated boundary and response
-positions. Bank Map edits directional response positions. Bank Matrix and
-Reflection Layers compare timing and energy between response groups.
+positions. Bank Map edits directional response positions: drag a response in
+the plan for X/Y, then use the `ELEVATION` rail for its Z position. Colored
+segments on the rail show the primary and connected vertical regions available
+at that response's current plan position. Bank Matrix and Reflection Layers
+compare timing and energy between response groups.
+
+`Field X offset`, `Field Y offset`, and `Field Z offset` position the pickup
+inside the connected acoustic volumes. Z ranges from the lowest beneath region
+to the highest overhead region while keeping zero at the primary-space center.
+The pickup is constrained to a real region rather than empty space between
+volumes. Drag in Top view to edit X/Y, or drag in Side view to edit X/Z and
+enter vertically connected chambers.
+
+## Connected Volumes
+
+Connected regions can attach to the front, back, left, or right wall, sit
+overhead, or continue beneath the primary space. Pair placements such as
+`Left + overhead` make it possible to compose arrivals from different planes
+around the pickup. Nested overhead and beneath regions stack vertically rather
+than being flattened into the floor plan.
+
+`Opening shape` selects rectangular, arched, circular, elliptical, slot, or
+irregular portals. Portal width, height, vertical position, area, and shape
+affect coupling, loss, and directional spread as well as drawing. `Branch
+heading` and `Cross-position` place ceiling and floor regions in plan, while
+`Wall elevation` raises wall-attached regions within the available vertical
+span.
+
+The internal model is a graph of three-dimensional regions joined by portals.
+Top view distinguishes wall, overhead, and beneath regions; Side and 3D show
+their actual vertical positions and opening outlines. The graph is saved in
+project and imprint metadata while its acoustic result is resolved into the
+ordinary timed AED events consumed by Ambi Imprint.
+
+`Open boundary` uses the same aperture language as a connected corridor: a
+dark opening inside a light frame. Its mint frame distinguishes energy escape
+to the exterior from the pale-blue portals between modeled regions. The
+opening is shown consistently in Top, Side, 3D, and glTF views.
 
 ## Generate And Mutate
 
@@ -97,7 +135,7 @@ energy rather than behaving like oversized rooms.
 `Echo Paths` adds deterministic higher-order return structures without turning
 the imprint into a live feedback processor. `Axial return` follows the longest
 primary-room axis, `Flutter pair` alternates across the shortest opposing
-surfaces, `Coupled chambers` derives independent portal-and-branch loops, and
+surfaces, `Coupled chambers` derives independent and cross-region portal loops, and
 `Circulating perimeter` advances around the primary polygon. `Automatic
 geometry` selects among those models from the current topology and space
 family.
@@ -119,12 +157,17 @@ resolved into ordinary directional early-reflection entries understood by
 
 `Export Project` writes a versioned `s3g-imprint-sketch` JSON file that can be
 re-imported for editing. Legacy `s3g-ir-room-sketch` JSON remains readable.
-The project retains the room-compatible fields required by `3OAFX Synthetic
-Ambisonic IR Bank` while adding the generalized space model.
+Version 2 adds `space.regions` and `space.portals`; version 1 projects remain
+readable with wall-attached rectangular portal defaults. The project retains
+the room-compatible fields required by `3OAFX Synthetic Ambisonic IR Bank`
+while adding the generalized space model.
 
 `Export Imprint` writes `.s3gimprint` for realtime use in `s3g Ambi Imprint
 64`. The file contains directional direct arrivals, boundary, scatter, and
 structured echo events, eight-band absorption and decay data, connected-region
 information, and procedural-space provenance. `Export glTF` writes a visual
 model with the generated boundary, ceiling variation, branches, openings,
-listener, and response positions.
+listener, and response positions. Shaped chamber apertures and frames are
+preserved, exterior openings retain their dark aperture and mint frame, and
+wall, overhead, and beneath regions use the same green, blue, and muted-brown
+identity as the Top, Side, and 3D views.

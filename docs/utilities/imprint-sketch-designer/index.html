@@ -156,13 +156,21 @@
                 <option value="impossible">Impossible fold</option>
               </select>
             </label>
-            <label>Attachment side
+            <label>Branch placement
               <select id="chamberSide">
                 <option value="back" selected>Back wall</option>
                 <option value="front">Front wall</option>
                 <option value="left">Left wall</option>
                 <option value="right">Right wall</option>
-                <option value="all">All sides</option>
+                <option value="ceiling">Overhead</option>
+                <option value="floor">Beneath</option>
+                <option value="left_ceiling">Left + overhead</option>
+                <option value="right_ceiling">Right + overhead</option>
+                <option value="left_floor">Left + beneath</option>
+                <option value="right_floor">Right + beneath</option>
+                <option value="ceiling_floor">Overhead + beneath</option>
+                <option value="all">All walls</option>
+                <option value="all_surfaces">All surfaces</option>
               </select>
             </label>
             <label>Branch material
@@ -196,8 +204,23 @@
             <label>Branch depth m <input id="chamberDepth" type="range" min="1" max="20" value="3.8" step="0.1" /></label>
             <label>Branch count <input id="chamberCount" type="range" min="1" max="4" value="2" step="1" /></label>
             <label>Branch position <input id="chamberPosition" type="range" min="0" max="1" value="0.5" step="0.01" /></label>
+            <label>Cross-position <input id="chamberCrossPosition" type="range" min="0" max="1" value="0.5" step="0.01" /></label>
+            <label>Branch heading <input id="chamberHeading" type="range" min="-180" max="180" value="0" step="1" /></label>
+            <label>Wall elevation <input id="chamberVerticalPosition" type="range" min="0" max="1" value="0" step="0.01" /></label>
             <label>Branch depth levels <input id="nestedChambers" type="range" min="0" max="2" value="1" step="1" /></label>
+            <label>Opening shape
+              <select id="openingShape">
+                <option value="rect" selected>Rectangular</option>
+                <option value="arch">Arched</option>
+                <option value="circle">Circular</option>
+                <option value="ellipse">Elliptical</option>
+                <option value="slot">Slot</option>
+                <option value="irregular">Irregular polygon</option>
+              </select>
+            </label>
             <label>Portal width <input id="openingWidth" type="range" min="0.1" max="1" value="0.42" step="0.01" /></label>
+            <label>Portal height <input id="openingHeight" type="range" min="0.1" max="1" value="0.72" step="0.01" /></label>
+            <label>Portal vertical position <input id="openingPositionZ" type="range" min="0" max="1" value="0.5" step="0.01" /></label>
             <label>Region coupling <input id="chamberCoupling" type="range" min="0" max="1" value="0.48" step="0.01" /></label>
             <label>Material contrast <input id="chamberMaterialMix" type="range" min="0" max="1" value="0.65" step="0.01" /></label>
             <label class="check-row"><input id="outsideOpening" type="checkbox" checked /> Open boundary</label>
@@ -238,6 +261,7 @@
             <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Field / Response</span></h2>
             <label>Field X offset <input id="fieldX" type="range" min="-1" max="1" value="0" step="0.01" /></label>
             <label>Field Y offset <input id="fieldY" type="range" min="-1" max="1" value="0" step="0.01" /></label>
+            <label>Field Z offset <input id="fieldZ" type="range" min="-1" max="1" value="0" step="0.01" /></label>
             <label>Distance m <input id="sourceDistance" type="range" min="0.25" max="20" value="3.2" step="0.05" /></label>
             <label>Direction spread <input id="spreadDeg" type="range" min="0" max="120" value="45" step="1" /></label>
             <label>Group variation <input id="groupVariation" type="range" min="0" max="1" value="0.35" step="0.01" /></label>
