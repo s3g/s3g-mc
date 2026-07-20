@@ -11,7 +11,7 @@
       <header class="topbar">
         <div>
           <h1>s3g-mc Imprint Sketch</h1>
-          <p>Directional responses for rooms, caves, passages, open fields, and impossible spaces</p>
+          <p>Directional responses for rooms, caves, passages, open fields, echo paths, and impossible spaces</p>
         </div>
         <div class="top-actions">
           <button id="reset" type="button">Reset</button>
@@ -49,7 +49,7 @@
           <section class="collapsible">
             <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Response Sketch</span></h2>
             <canvas id="timelineCanvas" width="512" height="180"></canvas>
-            <p class="hint">Early marks show boundary and scatter timing. The tail preview uses absorption, scattering, openness, and duration.</p>
+            <p class="hint">Early marks show boundary, branch, and structured echo timing. The tail preview uses absorption, scattering, openness, and duration.</p>
           </section>
           <section class="collapsible">
             <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Export Preview</span></h2>
@@ -215,6 +215,23 @@
             <label>Boundary spread <input id="outsideOpeningSpread" type="range" min="0" max="1" value="0.42" step="0.01" /></label>
             <label>Boundary width <input id="outsideOpeningWidth" type="range" min="0.03" max="1" value="0.22" step="0.01" /></label>
             <label>Energy escape <input id="outsideLeak" type="range" min="0" max="1" value="0.28" step="0.01" /></label>
+          </section>
+
+          <section class="collapsible">
+            <h2><button type="button" class="section-toggle" aria-expanded="true">-</button><span>Echo Paths</span></h2>
+            <label>Structure
+              <select id="echoStructure">
+                <option value="off" selected>Off</option>
+                <option value="geometry">Automatic geometry</option>
+                <option value="axial">Axial return</option>
+                <option value="flutter">Flutter pair</option>
+                <option value="coupled">Coupled chambers</option>
+                <option value="circulating">Circulating perimeter</option>
+              </select>
+            </label>
+            <label>Prominence <input id="echoProminence" type="range" min="0" max="1" value="0.58" step="0.01" /></label>
+            <label>Persistence <input id="echoPersistence" type="range" min="0.05" max="0.96" value="0.68" step="0.01" /></label>
+            <label>Regularity <input id="echoRegularity" type="range" min="0" max="1" value="0.82" step="0.01" /></label>
           </section>
 
           <section class="collapsible">

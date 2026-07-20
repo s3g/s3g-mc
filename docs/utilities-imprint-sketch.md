@@ -17,6 +17,8 @@ toc:
     href: "#generate-and-mutate"
   - title: Directional Responses
     href: "#directional-responses"
+  - title: Echo Paths
+    href: "#echo-paths"
   - title: Export
     href: "#export"
 ---
@@ -90,6 +92,29 @@ Material curves, RT60 values, and natural-space controls are creative
 estimates. Open spaces intentionally produce sparse returns and reduced late
 energy rather than behaving like oversized rooms.
 
+## Echo Paths
+
+`Echo Paths` adds deterministic higher-order return structures without turning
+the imprint into a live feedback processor. `Axial return` follows the longest
+primary-room axis, `Flutter pair` alternates across the shortest opposing
+surfaces, `Coupled chambers` derives independent portal-and-branch loops, and
+`Circulating perimeter` advances around the primary polygon. `Automatic
+geometry` selects among those models from the current topology and space
+family.
+
+Path interval comes from geometric distance at 343 metres per second.
+`Prominence` controls event count and initial level, `Persistence` controls
+loss across successive returns, and `Regularity` moves from perturbed natural
+timing toward a strict periodic sequence. Dimensions, materials, portal width,
+region coupling, duration, and the existing reflection count continue to shape
+the result. Muted violet paths appear in Top and 3D views, while the response
+timeline and Reflection Layers show their resolved events.
+
+The default is `Off`, preserving projects created before the echo model. An
+export stores optional path geometry and provenance, but audio is still
+resolved into ordinary directional early-reflection entries understood by
+`s3g Ambi Imprint 64`.
+
 ## Export
 
 `Export Project` writes a versioned `s3g-imprint-sketch` JSON file that can be
@@ -98,8 +123,8 @@ The project retains the room-compatible fields required by `3OAFX Synthetic
 Ambisonic IR Bank` while adding the generalized space model.
 
 `Export Imprint` writes `.s3gimprint` for realtime use in `s3g Ambi Imprint
-64`. The file contains directional direct arrivals, boundary and scatter
-events, eight-band absorption and decay data, connected-region information,
-and procedural-space provenance. `Export glTF` writes a visual model with the
-generated boundary, ceiling variation, branches, openings, listener, and
-response positions.
+64`. The file contains directional direct arrivals, boundary, scatter, and
+structured echo events, eight-band absorption and decay data, connected-region
+information, and procedural-space provenance. `Export glTF` writes a visual
+model with the generated boundary, ceiling variation, branches, openings,
+listener, and response positions.
