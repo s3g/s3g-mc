@@ -65,8 +65,14 @@ the 24-point direction layer and before that layer is re-encoded to ACN/SN3D.
 This makes the displacement score a spatial transform for the intermediate
 virtual speaker field rather than a replacement for ambisonic encoding.
 
-The first version exports JSON for renderer integration. It does not render
-audio by itself.
+The browser utility does not render audio by itself. Its version 1 JSON export
+can be loaded directly by **s3g 3OAFX Displacement** in the related
+[`s3g-dsp`](https://github.com/s3g/s3g-dsp) CLAP collection. The plugin performs
+the 24-point decode, score playback, displaced re-encode, and selectable gain
+or physical distance interpretation inside a 16-channel 3OA insert. Its Free
+clock advances at an internal rate with Loop or Palindrome traversal. Sync
+derives score position directly from the host beat timeline and selected beat
+length, so transport starts, seeks, and project recalls remain time aligned.
 
 ## Time Layer
 

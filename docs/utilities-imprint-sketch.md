@@ -6,8 +6,8 @@ prev_page:
   title: Image Score
   url: /utilities-image-score-generator.html
 next_page:
-  title: Spatial Score
-  url: /utilities-spatial-score.html
+  title: Ray Sketch
+  url: /utilities-ray-sketch.html
 toc:
   - title: Open Tool
     href: "#open-tool"

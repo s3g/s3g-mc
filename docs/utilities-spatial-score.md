@@ -4,8 +4,8 @@ title: Spatial Score
 utility_nav: true
 lightbox: true
 prev_page:
-  title: Imprint Sketch
-  url: /utilities-imprint-sketch.html
+  title: Ray Sketch
+  url: /utilities-ray-sketch.html
 next_page:
   title: References
   url: /references.html

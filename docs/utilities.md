@@ -17,6 +17,8 @@ toc:
     href: "#image-score"
   - title: Imprint Sketch
     href: "#imprint-sketch"
+  - title: Ray Sketch
+    href: "#ray-sketch"
   - title: Spatial Score
     href: "#spatial-score"
 ---
@@ -85,6 +87,19 @@ package.
 
 The same utility can be launched from REAPER with `Imprint Sketch`. The retired
 `IR Sketch` action remains as a hidden compatibility launcher.
+
+## Ray Sketch
+
+[Open Ray Sketch](utilities/ray-sketch-designer/){:target="_blank" rel="noopener noreferrer" .utility-link}
+
+[Read Ray Sketch notes](utilities-ray-sketch.md)
+
+Adapts the Imprint Sketch space engine for one movable source. Its `NAV` view
+keeps top and side projections together, while a valid-position grid captures
+stable early-reflection slots and late-field estimates for smooth runtime
+interpolation. `Export Ray Field` writes `.s3gray` for `s3g Ambi Ray Encoder`.
+
+The same utility can be launched from REAPER with `Ray Sketch`.
 
 ## Spatial Score
 

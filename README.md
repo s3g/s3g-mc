@@ -65,6 +65,9 @@ Package Browser group counts:
   beneath-listener branches with shaped portals. It exports project JSON for
   `3OAFX Synthetic Ambisonic IR Bank` and `.s3gimprint` files for
   `s3g Ambi Imprint 64` in `s3g-dsp`.
+- `Ray Sketch`: adapts the same space engine for a movable source, adjacent top
+  and side navigation, and interpolated acoustic cells. It exports `.s3gray`
+  maps for `s3g Ambi Ray Encoder` in `s3g-dsp`.
 - `Load Automation Score JSON`: opens an ImGui target-assignment window for
   mapping Automation Score lanes to selected track volume envelopes or
   named FX parameter envelopes, with append or replace write modes and optional
