@@ -4,12 +4,12 @@
   --panel: #171717;
   --panel-2: #202020;
   --field: #0f0f0f;
-  --line: #3e484a;
-  --line-soft: #293033;
+  --line: #3f3f3f;
+  --line-soft: #292929;
   --text: #c9c9c9;
   --muted: #9a9a9a;
-  --cyan: #83b7bf;
-  --amber: #c4a66d;
+  --active: #8d8d8d;
+  --active-strong: #a8a8a8;
 }
 
 * {
@@ -58,7 +58,7 @@ button {
 
 button:hover,
 button.active {
-  border-color: var(--cyan);
+  border-color: var(--active);
   background: #232323;
   color: #d8d8d2;
 }
@@ -110,7 +110,7 @@ select {
 
 .custom-select-button:hover,
 .custom-select.open .custom-select-button {
-  border-color: var(--cyan);
+  border-color: var(--active);
   background: #232323;
   color: #d8d8d2;
 }
@@ -121,7 +121,7 @@ select {
   min-width: 120px;
   max-height: 260px;
   overflow: auto;
-  border: 1px solid var(--cyan);
+  border: 1px solid var(--active);
   background: #101010;
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.48);
 }
@@ -142,7 +142,7 @@ select {
 
 input[type="range"] {
   width: 100%;
-  accent-color: var(--cyan);
+  accent-color: var(--active);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -187,7 +187,7 @@ input[type="range"]::-moz-range-thumb {
 
 input[type="range"]:hover,
 input[type="range"]:focus-visible {
-  border-color: var(--cyan);
+  border-color: var(--active);
   background:
     linear-gradient(90deg, #b6b6b6 0 var(--fill, 50%), #2e2e2e var(--fill, 50%) 100%);
 }
@@ -366,7 +366,7 @@ h2 {
 
 .collapsible > h2:hover::after,
 .collapsible > h2:focus-visible::after {
-  border-color: var(--cyan);
+  border-color: var(--active);
   color: var(--text);
 }
 
@@ -482,12 +482,12 @@ label select {
 }
 
 .group-chip.active {
-  border-color: var(--amber);
-  background: #2a2418;
+  border-color: var(--active-strong);
+  background: #282828;
 }
 
 .group-chip.active span {
-  color: #f0d39a;
+  color: #d8d8d2;
 }
 
 .canvas-frame {

@@ -67,6 +67,14 @@ Many of these tools are inspired by or extend existing computer music practices,
 [`s3g-dsp`](https://github.com/s3g/s3g-dsp) is a sibling project for macOS
 CLAP plugins that can be used alongside `s3g-mc` or independently.
 
+For realtime procedural synthesis, the sibling
+[`s3g Fault`](https://s3g.github.io/s3g-dsp/fault.html) CLAP generates an
+eight-channel byte field, reads any file as literal unsigned 8-bit PCM, or
+reduces a PCM WAV to eight lossy waveform-derived lanes. It passes the result
+through stochastic geometry and damaged codec models and includes its own
+resonant nonlinear stage. It is distributed with `s3g-dsp`, not through the
+`s3g-mc` ReaPack package.
+
 Some realtime ideas that began as JSFX/ReaImGui tools in `s3g-mc` now have
 newer CLAP versions in `s3g-dsp`. The `s3g-mc` versions remain part of this
 package because they are functional, useful for existing sessions, and closely

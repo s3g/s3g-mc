@@ -41,8 +41,8 @@ local FX_NAME_CLEAN = "LAYOUT PANNER"
 local FX_NAME_LEGACY = "s3g/Layout Panner"
 local NUM_SOURCES = 8
 local selected_source = 1
-local view_yaw_deg = -35
-local view_pitch_deg = -42
+local view_yaw_deg = 0
+local view_pitch_deg = 0
 local view_roll_deg = 0
 local view_zoom = 1.0
 local dragging_source = 0
@@ -637,9 +637,9 @@ local function draw_camera_controls()
   nudge_camera("-##camzoom", 32, 24, function() view_zoom = clamp(view_zoom - 0.025, 0.45, 2.5) end)
   ImGui.SameLine(ctx)
   nudge_camera("+##camzoom", 32, 24, function() view_zoom = clamp(view_zoom + 0.025, 0.45, 2.5) end)
-  if ImGui.Button(ctx, "3/4##cam", 68, 24) then reset_camera(-35, -42) end
   if ImGui.Button(ctx, "TOP##cam", 68, 24) then reset_camera(0, 0) end
   if ImGui.Button(ctx, "FRONT##cam", 68, 24) then reset_camera(0, -90) end
+  if ImGui.Button(ctx, "3/4##cam", 68, 24) then reset_camera(-35, -42) end
   ImGui.EndGroup(ctx)
 end
 
@@ -869,16 +869,16 @@ local function loop()
           draw_source_mixer(track, fx)
         end
         if toolbox_header("VIEW") then
-          if ImGui.Button(ctx, "3/4") then reset_camera(-35, -42) end
-          ImGui.SameLine(ctx)
           if ImGui.Button(ctx, "TOP") then reset_camera(0, 0) end
           ImGui.SameLine(ctx)
           if ImGui.Button(ctx, "FRONT") then reset_camera(0, -90) end
+          ImGui.SameLine(ctx)
+          if ImGui.Button(ctx, "3/4") then reset_camera(-35, -42) end
           local changed
-          changed, view_yaw_deg = ui_theme.slider_row(ImGui, ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg", false)
-          changed, view_pitch_deg = ui_theme.slider_row(ImGui, ctx, "Pitch", view_pitch_deg, -180, 180, "%.0f deg", false)
-          changed, view_roll_deg = ui_theme.slider_row(ImGui, ctx, "Roll", view_roll_deg, -180, 180, "%.0f deg", false)
-          changed, view_zoom = ui_theme.slider_row(ImGui, ctx, "Zoom", view_zoom, 0.45, 2.5, "%.2f", false)
+          changed, view_yaw_deg = ui_theme.slider_row(ImGui, ctx, "Yaw", view_yaw_deg, -180, 180, "%.0f deg", false, nil, 0)
+          changed, view_pitch_deg = ui_theme.slider_row(ImGui, ctx, "Pitch", view_pitch_deg, -180, 180, "%.0f deg", false, nil, 0)
+          changed, view_roll_deg = ui_theme.slider_row(ImGui, ctx, "Roll", view_roll_deg, -180, 180, "%.0f deg", false, nil, 0)
+          changed, view_zoom = ui_theme.slider_row(ImGui, ctx, "Zoom", view_zoom, 0.45, 2.5, "%.2f", false, nil, 1.0)
         end
         end
         ImGui.EndChild(ctx)

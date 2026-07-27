@@ -104,7 +104,9 @@ local function palette(ImGui)
     return 0xffffffff
   end
   return {
+    bg_alt = color(0.074, 0.074, 0.074, 1.0),
     panel_soft = color(0.145, 0.145, 0.145, 1.0),
+    edge = color(0.337, 0.337, 0.337, 1.0),
     frame = color(0.074, 0.074, 0.074, 1.0),
     frame_hover = color(0.074, 0.074, 0.074, 1.0),
     frame_active = color(0.195, 0.195, 0.195, 1.0),
@@ -400,8 +402,10 @@ function M.begin_section(ImGui, ctx, label, height)
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
   ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + height, p.panel_soft)
+  ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + 21, p.bg_alt)
+  ImGui.DrawList_AddRect(dl, x, y, x + w, y + height, p.edge)
   ImGui.DrawList_AddRectFilled(dl, x, y, x + w, y + 2, p.active)
-  ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
+  ImGui.SetCursorScreenPos(ctx, x + 8, y + 6)
   if theme and theme.text then
     theme.text(ImGui, ctx, clean_label(label))
   else

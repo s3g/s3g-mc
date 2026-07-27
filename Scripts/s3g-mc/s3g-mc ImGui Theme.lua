@@ -3,6 +3,7 @@
 
 local M = {}
 local installed = setmetatable({}, { __mode = "k" })
+local slider_reset_values = setmetatable({}, { __mode = "k" })
 local DEFAULT_FONT_SIZE = 11
 
 local function color(ImGui, r, g, b, a)
@@ -529,6 +530,38 @@ local function text_width(ImGui, ctx, text)
   return #text * 7
 end
 
+local function compact_slider_value(ImGui, ctx, value, format, integer, max_width)
+  local full = display_slider_value(value, format, integer)
+  if text_width(ImGui, ctx, full) <= max_width or integer then return full end
+
+  local prefix, suffix = "", ""
+  if format and format ~= "" then
+    prefix, suffix = format:match("^(.-)%%[%+%- 0#]*%d*%.?%d*[fFeEgG](.*)$")
+    prefix = prefix or ""
+    suffix = (suffix or ""):gsub("%%%%", "%%")
+  end
+  for precision = 2, 0, -1 do
+    local numeric = string.format("%." .. tostring(precision) .. "f", value)
+    numeric = numeric:gsub("(%..-)0+$", "%1"):gsub("%.$", "")
+    if format and format:find("%+", 1, true) and value >= 0 then numeric = "+" .. numeric end
+    local candidate = prefix .. numeric .. suffix
+    if text_width(ImGui, ctx, candidate) <= max_width then return candidate end
+  end
+  local compact = prefix .. string.format("%.2g", value) .. suffix
+  return compact
+end
+
+local function push_clip_rect(ImGui, draw, x0, y0, x1, y1)
+  if not ImGui.DrawList_PushClipRect then return false end
+  local ok = pcall(ImGui.DrawList_PushClipRect, draw, x0, y0, x1, y1, true)
+  if not ok then ok = pcall(ImGui.DrawList_PushClipRect, draw, x0, y0, x1, y1) end
+  return ok
+end
+
+local function pop_clip_rect(ImGui, draw, pushed)
+  if pushed and ImGui.DrawList_PopClipRect then pcall(ImGui.DrawList_PopClipRect, draw) end
+end
+
 local function visible_text(text)
   return tostring(text or ""):gsub("##.*$", "")
 end
@@ -554,7 +587,7 @@ local function row_metrics(ImGui, ctx, width)
   local avail = width or ImGui.GetContentRegionAvail(ctx)
   if type(avail) ~= "number" then avail = 220 end
   avail = math.max(220, avail)
-  local left_pad = 12
+  local left_pad = 16
   local x = outer_x + left_pad
   local content_avail = math.max(180, avail - left_pad)
   local label_w = 96
@@ -573,7 +606,7 @@ local function row_metrics(ImGui, ctx, width)
     control_x = control_x,
     control_w = control_w,
     value_x = value_x,
-    h = 22,
+    h = 26,
   }
 end
 
@@ -596,7 +629,7 @@ local function finish_row(ImGui, ctx, row)
   ImGui.SetCursorScreenPos(ctx, row.outer_x or row.x, row.y + row.h)
 end
 
-function M.slider_row(ImGui, ctx, label, value, min_value, max_value, format, integer, width)
+function M.slider_row(ImGui, ctx, label, value, min_value, max_value, format, integer, width, default_value)
   local row = row_metrics(ImGui, ctx, width)
   local x, y = row.x, row.y
   local p = M.palette(ImGui)
@@ -604,17 +637,38 @@ function M.slider_row(ImGui, ctx, label, value, min_value, max_value, format, in
   local track_x = row.control_x
   local track_w = row.control_w
   local value_x = row.value_x
-  local track_y = y + 6
+  local track_y = y + 8
   local track_h = 8
   local norm = 0
   if max_value ~= min_value then norm = clamp((value - min_value) / (max_value - min_value), 0, 1) end
 
-  local id = string.format("##s3g_slider_%s_%d_%d", tostring(label or ""), math.floor(x + 0.5), math.floor(y + 0.5))
+  local id = string.format("##s3g_slider_%s_%g_%g_%d_%d", tostring(label or ""), min_value, max_value, math.floor(x + 0.5), math.floor(y + 0.5))
   ImGui.InvisibleButton(ctx, id, row.avail, h)
   local hovered = ImGui.IsItemHovered(ctx)
   local active = ImGui.IsItemActive(ctx)
   local changed = false
-  if (hovered or active) and ImGui.IsMouseDown(ctx, 0) then
+  local context_defaults = slider_reset_values[ctx]
+  if not context_defaults then
+    context_defaults = {}
+    slider_reset_values[ctx] = context_defaults
+  end
+  if default_value ~= nil then
+    context_defaults[id] = default_value
+  elseif context_defaults[id] == nil then
+    -- Backward-compatible reset baseline for existing callers. New controls
+    -- should pass their declared default explicitly.
+    context_defaults[id] = value
+  end
+  local reset_value = context_defaults[id]
+  if hovered and ImGui.IsMouseDoubleClicked and ImGui.IsMouseDoubleClicked(ctx, 0) then
+    local next_value = clamp(reset_value, min_value, max_value)
+    if integer then next_value = math.floor(next_value + 0.5) end
+    if math.abs(next_value - value) > (integer and 0 or 0.0000001) then
+      value = next_value
+      changed = true
+    end
+    norm = max_value ~= min_value and clamp((value - min_value) / (max_value - min_value), 0, 1) or 0
+  elseif (hovered or active) and ImGui.IsMouseDown(ctx, 0) then
     local mx = ImGui.GetMousePos(ctx)
     local new_norm = clamp((mx - track_x) / track_w, 0, 1)
     local new_value = min_value + (max_value - min_value) * new_norm
@@ -630,22 +684,26 @@ function M.slider_row(ImGui, ctx, label, value, min_value, max_value, format, in
   local track_col = active and p.frame_active or (hovered and p.frame_hover or p.frame)
   local fill_col = active and p.active or p.fill
   local handle_col = active and p.active_hover or p.active
-  ImGui.DrawList_AddText(draw, x, y + 2, p.label, slider_label(label))
+  ImGui.DrawList_AddText(draw, x, y + 4, p.label, slider_label(label))
   ImGui.DrawList_AddRectFilled(draw, track_x, track_y, track_x + track_w, track_y + track_h, track_col)
   ImGui.DrawList_AddRectFilled(draw, track_x + 1, track_y + 1, track_x + math.max(2, track_w * norm), track_y + track_h - 1, fill_col)
   local hx = clamp(track_x + track_w * norm - 1.5, track_x + 1, track_x + track_w - 4)
   ImGui.DrawList_AddRectFilled(draw, hx, track_y - 2, hx + 3, track_y + track_h + 2, handle_col)
-  ImGui.DrawList_AddText(draw, value_x, y + 2, p.value, display_slider_value(value, format, integer))
+  local value_text = compact_slider_value(ImGui, ctx, value, format, integer, row.value_w)
+  local value_text_x = value_x + math.max(0, row.value_w - text_width(ImGui, ctx, value_text))
+  local clipped = push_clip_rect(ImGui, draw, value_x, y, value_x + row.value_w, y + h)
+  ImGui.DrawList_AddText(draw, value_text_x, y + 4, p.value, value_text)
+  pop_clip_rect(ImGui, draw, clipped)
   ImGui.SetCursorScreenPos(ctx, row.outer_x or row.x, row.y + row.h)
   return changed, value
 end
 
-function M.slider_int(ImGui, ctx, label, value, min_value, max_value, width)
-  return M.slider_row(ImGui, ctx, label, value, min_value, max_value, nil, true, width)
+function M.slider_int(ImGui, ctx, label, value, min_value, max_value, width, default_value)
+  return M.slider_row(ImGui, ctx, label, value, min_value, max_value, nil, true, width, default_value)
 end
 
-function M.slider_double(ImGui, ctx, label, value, min_value, max_value, format, width)
-  return M.slider_row(ImGui, ctx, label, value, min_value, max_value, format or "%.3f", false, width)
+function M.slider_double(ImGui, ctx, label, value, min_value, max_value, format, width, default_value)
+  return M.slider_row(ImGui, ctx, label, value, min_value, max_value, format or "%.3f", false, width, default_value)
 end
 
 function M.combo_row(ImGui, ctx, label, labels, value, width)
@@ -827,10 +885,11 @@ end
 
 function M.push_soft_panel(ImGui, ctx)
   local function rgba(r, g, b, a) return ImGui.ColorConvertDouble4ToU32(r, g, b, a or 1.0) end
+  local p = M.palette(ImGui)
   local colors = 0
   local vars = 0
-  local body = rgba(0.125, 0.128, 0.130, 1.0)
-  local title = rgba(0.058, 0.060, 0.062, 1.0)
+  local body = p.panel
+  local title = p.bg_alt
   local title_hover = rgba(0.078, 0.080, 0.083, 1.0)
   local title_active = rgba(0.094, 0.096, 0.098, 1.0)
   local control = rgba(0.052, 0.054, 0.056, 1.0)
@@ -870,11 +929,13 @@ function M.begin_section(ImGui, ctx, title, height)
   local draw = ImGui.GetWindowDrawList(ctx)
   local x, y = ImGui.GetCursorScreenPos(ctx)
   local w = ImGui.GetContentRegionAvail(ctx)
-  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + height, p.panel_soft)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + height, p.panel)
+  ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + 21, p.bg_alt)
+  ImGui.DrawList_AddRect(draw, x, y, x + w, y + height, p.edge)
   ImGui.DrawList_AddRectFilled(draw, x, y, x + w, y + 2, p.active)
-  ImGui.SetCursorScreenPos(ctx, x + 12, y + 10)
+  ImGui.SetCursorScreenPos(ctx, x + 8, y + 6)
   M.text(ImGui, ctx, tostring(title or ""):upper())
-  ImGui.SetCursorScreenPos(ctx, x + 12, y + 36)
+  ImGui.SetCursorScreenPos(ctx, x, y + 36)
   return x, y, height, stack
 end
 

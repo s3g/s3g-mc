@@ -28,8 +28,8 @@ local ctx = ImGui.CreateContext("Spatial Automation Composer")
 local theme_font = theme.attach_font(ImGui, ctx, 11)
 local open = true
 local last_status = ""
-local view_yaw_deg = -35
-local view_pitch_deg = -42
+local view_yaw_deg = 0
+local view_pitch_deg = 0
 local view_zoom = 1.0
 local preview_t = 0.0
 local preview_play = false
@@ -152,9 +152,9 @@ local function draw_preview_camera_controls()
   nudge_camera("-##motioncamzoom", 32, 24, function() view_zoom = clamp(view_zoom - 0.025, 0.45, 2.5) end)
   ImGui.SameLine(ctx)
   nudge_camera("+##motioncamzoom", 32, 24, function() view_zoom = clamp(view_zoom + 0.025, 0.45, 2.5) end)
-  if ImGui.Button(ctx, "3/4##motioncam", 68, 24) then reset_camera(-35, -42) end
   if ImGui.Button(ctx, "TOP##motioncam", 68, 24) then reset_camera(0, 0) end
   if ImGui.Button(ctx, "FRONT##motioncam", 68, 24) then reset_camera(0, -90) end
+  if ImGui.Button(ctx, "3/4##motioncam", 68, 24) then reset_camera(-35, -42) end
   ImGui.EndGroup(ctx)
 end
 

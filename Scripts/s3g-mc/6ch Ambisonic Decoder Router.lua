@@ -32,8 +32,8 @@ local FX_NAME_CLEAN = "6ch Ambisonic Decoder Router"
 local ctx = ImGui.CreateContext("6ch Ambisonic Decoder Router")
 local open = true
 local selected_speaker = 1
-local view_yaw_deg = -35
-local view_pitch_deg = -42
+local view_yaw_deg = 0
+local view_pitch_deg = 0
 local view_roll_deg = 0
 local view_zoom = 1.0
 local load_error = ""
@@ -252,9 +252,9 @@ local function draw_camera_controls()
   nudge_camera("+##decoderzoom", 32, 24, function()
     view_zoom = clamp(view_zoom + 0.025, 0.5, 2.2)
   end)
-  if ImGui.Button(ctx, "3/4##decodercam", 68, 24) then reset_camera(-35, -42) end
   if ImGui.Button(ctx, "TOP##decodercam", 68, 24) then reset_camera(0, 0) end
   if ImGui.Button(ctx, "FRONT##decodercam", 68, 24) then reset_camera(0, -90) end
+  if ImGui.Button(ctx, "3/4##decodercam", 68, 24) then reset_camera(-35, -42) end
   ImGui.EndGroup(ctx)
 end
 

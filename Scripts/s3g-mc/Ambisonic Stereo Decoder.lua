@@ -137,8 +137,8 @@ local ctx = ImGui.CreateContext("Ambisonic Stereo Decoder")
 local open = true
 local preset_index = 1
 local custom_weight_preset_index = 1
-local view_yaw_deg = -35
-local view_pitch_deg = -42
+local view_yaw_deg = 0
+local view_pitch_deg = 0
 local view_zoom = 1.0
 local load_error = ""
 local param_warning = ""
@@ -402,9 +402,9 @@ local function draw_camera_controls()
   nudge_camera("-##ambstzoom", 32, 24, function() view_zoom = clamp(view_zoom - 0.025, 0.5, 2.2) end)
   ImGui.SameLine(ctx)
   nudge_camera("+##ambstzoom", 32, 24, function() view_zoom = clamp(view_zoom + 0.025, 0.5, 2.2) end)
-  if ImGui.Button(ctx, "3/4##ambstcam", 68, 24) then reset_camera(-35, -42) end
   if ImGui.Button(ctx, "TOP##ambstcam", 68, 24) then reset_camera(0, 0) end
   if ImGui.Button(ctx, "FRONT##ambstcam", 68, 24) then reset_camera(0, -90) end
+  if ImGui.Button(ctx, "3/4##ambstcam", 68, 24) then reset_camera(-35, -42) end
   ImGui.EndGroup(ctx)
 end
 

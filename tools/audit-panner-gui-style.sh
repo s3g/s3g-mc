@@ -22,7 +22,7 @@ check() {
   tmp="$(mktemp)"
   while IFS= read -r file; do
     [[ -n "$file" && -f "$file" ]] || continue
-    rg --pcre2 -n "$pattern" "$file" >> "$tmp" || true
+    rg --pcre2 -n -U "$pattern" "$file" >> "$tmp" || true
   done < "$FILES_TMP"
   if [[ -s "$tmp" ]]; then
     printf '\nFAIL: %s\n' "$label"
@@ -39,7 +39,7 @@ check_file_has() {
   tmp="$(mktemp)"
   while IFS= read -r file; do
     [[ -n "$file" && -f "$file" ]] || continue
-    if ! rg -q "$pattern" "$file"; then
+    if ! rg --pcre2 -q -U "$pattern" "$file"; then
       printf '%s\n' "$file" >> "$tmp"
     fi
   done < "$FILES_TMP"
@@ -68,8 +68,12 @@ check \
   'CollapsingHeader\(ctx, "[A-Z][a-z]'
 
 check \
-  'old camera labels; use 3/4, TOP, FRONT in panner controls' \
+  'old camera labels; use TOP, FRONT, 3/4 in panner controls' \
   '"3/4 view"|"Top"|"Front"|"top##cam"|"front##cam"'
+
+check_file_has \
+  'camera presets must be ordered TOP, FRONT, 3/4' \
+  '(?s)Button\(ctx, "TOP##cam".{0,500}Button\(ctx, "FRONT##cam".{0,500}Button\(ctx, "3/4##cam"'
 
 check \
   'fixed buttons should use all-CAPS visible labels' \

@@ -3,6 +3,7 @@ set -euo pipefail
 ROOT="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SCRIPTS="$ROOT/Scripts/s3g-mc"
 UTILITIES="$SCRIPTS/utilities"
+THEME="$SCRIPTS/s3g-mc ImGui Theme.lua"
 SAMPLE_LINES="${S3G_MC_AUDIT_SAMPLE_LINES:-16}"
 warn() { printf 'WARN: %s\n' "$*"; }
 info() { printf 'INFO: %s\n' "$*"; }
@@ -27,6 +28,23 @@ report_rg() {
     if (( count > SAMPLE_LINES )); then
       printf '... %d more\n' "$((count - SAMPLE_LINES))"
     fi
+  fi
+  rm -f "$tmp"
+}
+
+report_rg_multiline() {
+  local level="$1"
+  local label="$2"
+  local pattern="$3"
+  local tmp
+  tmp="$(mktemp)"
+  rg --pcre2 -n -U "$pattern" "$SCRIPTS" --glob '*.lua' --glob '!*s3g-mc Package Browser.lua' > "$tmp" || true
+  local count
+  count=$(wc -l < "$tmp" | tr -d ' ')
+  if [[ "$count" != "0" ]]; then
+    if [[ "$level" == "WARN" ]]; then warn "$label ($count output lines)"; else info "$label ($count output lines)"; fi
+    head -n "$SAMPLE_LINES" "$tmp"
+    if (( count > SAMPLE_LINES )); then printf '... %d more output lines\n' "$((count - SAMPLE_LINES))"; fi
   fi
   rm -f "$tmp"
 }
@@ -114,6 +132,23 @@ if [[ ! -d "$SCRIPTS" ]]; then
   exit 0
 fi
 
+if ! rg -q 'IsMouseDoubleClicked' "$THEME"; then
+  warn "shared slider helper is missing double-click reset"
+fi
+if ! rg -q 'compact_slider_value' "$THEME" || ! rg -q 'DrawList_PushClipRect' "$THEME"; then
+  warn "shared slider helper is missing compact clipped value rendering"
+fi
+if ! rg -q 'row\.value_w - text_width' "$THEME"; then
+  warn "shared slider values are not right-aligned in the fixed value column"
+fi
+if ! rg -q 'y \+ 21, p\.bg_alt' "$THEME" || ! rg -q 'left_pad = 16' "$THEME"; then
+  warn "shared section/row metrics have drifted from the 21 px strip and 16 px control inset"
+fi
+
+report_rg_multiline "WARN" \
+  "flat static category tiles remain; add the dark 21 px title band before the top rule" \
+  'panel_soft\);?\s*ImGui\.DrawList_AddRectFilled\([^;\n]*,\s*x,\s*y,\s*x\s*\+\s*w,\s*y\s*\+\s*2(?![0-9])'
+
 printf 's3g-mc ReImGui consistency audit\n'
 printf 'root: %s\n\n' "$ROOT"
 printf 'exempt: s3g-mc Package Browser keeps its package-index browser visual language\n\n'
@@ -178,7 +213,7 @@ report_rg "WARN" \
   "s3g-mc Package Browser.lua"
 
 report_rg "INFO" \
-  "camera/view labels: normalize TOP/SIDE/FRONT/3/4 wording and zoom placement by family" \
+  "camera/view labels: normalize ReaImGui spatial rows to -/+ then TOP/FRONT/3/4" \
   '"3/4 view"|"3/4##|"top##|"Top"|"front##|"Front"|"Side"|"Zoom"'
 
 report_rg "INFO" \
@@ -208,7 +243,7 @@ report_rg "INFO" \
 
 report_rg_path "WARN" \
   "browser utilities: hardcoded saturated legacy colors; consider shared neutral utility palette or semantic exception" \
-  "#6ee7f2|#5aa8c7|#70dcf4|#78be96|#d8a24a|#f06eca|#b998ff|#86a7ff|#cf695f" \
+  "#6ee7f2|#5aa8c7|#70dcf4|#78be96|#d8a24a|#f06eca|#b998ff|#86a7ff|#cf695f|#83b7bf|#c4a66d|#3e484a" \
   "$UTILITIES" "*.css" "*.js" "*.html"
 
 report_rg_path "INFO" \

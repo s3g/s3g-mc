@@ -17,6 +17,10 @@ useful.
 
 [`s3g-dsp`](https://github.com/s3g/s3g-dsp) is a sibling project for native
 macOS CLAP plugins that can be used alongside `s3g-mc` or independently.
+Its [s3g Fault](https://s3g.github.io/s3g-dsp/fault.html) instrument complements
+the procedural-synthesis tools here with eight-channel generated, raw-file,
+or waveform-derived byte-field synthesis, codec damage, and resonant
+wavefolding.
 
 [`s3g-rnbo-clap`](https://github.com/s3g/s3g-rnbo-clap) is a separate
 experimental wrapper for RNBO/Max-generated C++ exports in the same CLAP
@@ -484,4 +488,3 @@ Attribution is appreciated for software development, publications, research,
 teaching materials, and projects that build on or adapt this package. See
 <a href="https://github.com/s3g/s3g-mc/blob/main/CITATION.cff" target="_blank" rel="noopener noreferrer">CITATION.cff</a>.
 
-Development assistance: OpenAI Codex.

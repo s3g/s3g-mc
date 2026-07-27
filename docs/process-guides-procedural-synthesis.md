@@ -21,13 +21,16 @@ toc:
     href: "#spectra-synth-midi-controller"
   - title: Spectra Synth Render
     href: "#spectra-synth-render"
+  - title: s3g Fault CLAP
+    href: "#s3g-fault-clap"
 ---
 
 # Procedural Synthesis Guides
 
 These guides match the Package Browser's Procedural Synthesis group. They
 cover the included JSFX synth engines as offline render tools and
-MIDI-controlled realtime instruments.
+MIDI-controlled realtime instruments. The final section points to a related
+realtime instrument from the sibling `s3g-dsp` CLAP collection.
 
 ## Carto Synth MIDI Controller
 
@@ -152,3 +155,33 @@ Impulse and resonator modes can become clicky if the event layer is too sharp.
 Increase event smoothing or use slower envelopes when that happens.
 Spectral-mass modes often reveal more internal motion when density changes over
 time rather than staying fixed.
+
+## s3g Fault CLAP
+
+[`s3g Fault`](https://s3g.github.io/s3g-dsp/fault.html) is a zero-input,
+eight-output procedural instrument distributed with `s3g-dsp`. It generates a
+structured byte field internally, reads any file from byte zero as unsigned
+8-bit PCM, or decodes a PCM WAV's data chunk into eight requantized waveform
+lanes. It turns sample points into stochastic curves, passes them through
+reduced-rate PCM, delta, ADPCM, companding, or damaged codebook models, and
+then applies resonant wavefolding. It is not installed by the `s3g-mc` ReaPack
+package.
+
+Starting approach:
+
+- Set the REAPER track to eight channels before inserting the CLAP.
+- Choose `SLOW FOLD`, `CODEC SCAR`, or `DELTA STAIRS` as a starting point.
+- Use `OPEN ANY` with its WAVE option enabled for eight waveform-derived lanes,
+  or disable the option to hear every source byte including the header.
+- Begin with `WAVE TRACE` when source contour should remain apparent, or use
+  `GEN FIELD` to return to internally generated material.
+- Lower the displayed codec update rate and raise `FOLD` when the source should
+  resolve into slower vector-like curves.
+- Use `ROUTE` and `SPREAD` to separate the eight outputs before following the
+  instrument with other multichannel processors.
+- Use `MUTATE` for a nearby variation, `RANDOM PATCH` for a larger departure,
+  and `UNDO` to compare the result with the preceding state.
+
+Unlike Carto, Lattice, and Spectra, Fault runs continuously in the CLAP host
+and does not create a rendered media item. REAPER automation can still capture
+or sequence its named controls as part of an `s3g-mc` project workflow.
