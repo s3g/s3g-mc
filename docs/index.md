@@ -1,6 +1,7 @@
 ---
 layout: default
 title: s3g-mc
+lightbox: true
 next_page:
   title: Installation
   url: /installation.html
@@ -20,6 +21,12 @@ toc:
 s3g-mc is a collection of REAPER tools for multichannel composition, spatial audio, offline sound transformation, and procedural synthesis.
 
 It includes Lua actions, ReaImGui controllers, and JSFX for channel editing, automation, fold-down monitoring, dome panning, 3OA send/return routing, and render-based multichannel processes.
+
+<div class="utility-screenshot">
+  <button class="utility-screenshot-button" type="button" data-lightbox-image="assets/images/gallery/PackageBrowser.png" aria-label="Open s3g-mc Package Browser screenshot">
+    <img src="assets/images/gallery/PackageBrowser.png" alt="s3g-mc Package Browser showing the categorized script collection" decoding="async">
+  </button>
+</div>
 
 Current package snapshot: the browser exposes 121 user-facing tools/controllers, plus the Package Browser. Of those, 50 are Python/NumPy-backed offline processes, 26 load, control, or render included JSFX, and 45 are Lua/ReaImGui REAPER actions. The repository also ships 24 underlying JSFX engine/effect files. The Lua folder includes helper libraries and support dialogs that are not shown as Package Browser entries.
 
