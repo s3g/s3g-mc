@@ -4,7 +4,7 @@
 local M = {}
 local installed = setmetatable({}, { __mode = "k" })
 local slider_reset_values = setmetatable({}, { __mode = "k" })
-local DEFAULT_FONT_SIZE = 11
+local DEFAULT_FONT_SIZE = 12
 
 local function color(ImGui, r, g, b, a)
   if ImGui and ImGui.ColorConvertDouble4ToU32 then
@@ -962,12 +962,15 @@ end
 function M.attach_font(ImGui, ctx, size)
   if not (ImGui and ImGui.CreateFont and ImGui.Attach) then return nil end
   size = size or DEFAULT_FONT_SIZE
-  local candidates = { "Menlo", "Monaco", "Arial" }
+  local candidates = { "sans-serif", "Arial", "Helvetica", "Menlo" }
   for _, name in ipairs(candidates) do
-    local ok, font = pcall(ImGui.CreateFont, name, size)
+    -- ReaImGui 0.10 moved the font size to PushFont. Passing the size as the
+    -- second CreateFont argument treats it as a flags bitmask and can reject
+    -- the font, leaving Dear ImGui's low-resolution fallback font in use.
+    local ok, font = pcall(ImGui.CreateFont, name)
     if ok and font then
-      pcall(ImGui.Attach, ctx, font)
-      return { font = font, size = size }
+      local attached = pcall(ImGui.Attach, ctx, font)
+      if attached then return { font = font, size = size } end
     end
   end
   return nil
@@ -1054,15 +1057,25 @@ function M.install(ImGui)
 
   local original_begin = ImGui.Begin
   local original_end = ImGui.End
+  local original_create_context = ImGui.CreateContext
   local stacks_by_ctx = setmetatable({}, { __mode = "k" })
   local fonts_by_ctx = setmetatable({}, { __mode = "k" })
   local unpack_fn = table.unpack or unpack
+
+  local function themed_create_context(...)
+    local ctx = original_create_context(...)
+    fonts_by_ctx[ctx] = M.attach_font(ImGui, ctx, DEFAULT_FONT_SIZE) or false
+    return ctx
+  end
 
   local function themed_begin(ctx, ...)
     local font = fonts_by_ctx[ctx]
     if font == nil then
       font = M.attach_font(ImGui, ctx, DEFAULT_FONT_SIZE) or false
       fonts_by_ctx[ctx] = font
+      -- A context created before the theme was installed needs one frame for
+      -- ReaImGui to rebuild its font atlas after the resource is attached.
+      font = false
     end
     local font_pushed = font and M.push_font(ImGui, ctx, font) or false
     local stack = M.push(ImGui, ctx)
@@ -1092,6 +1105,7 @@ function M.install(ImGui)
   end
 
   local ok = pcall(function()
+    if original_create_context then ImGui.CreateContext = themed_create_context end
     ImGui.Begin = themed_begin
     ImGui.End = themed_end
   end)

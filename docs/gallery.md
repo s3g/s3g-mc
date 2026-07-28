@@ -10,46 +10,124 @@ next_page:
 toc:
   - title: Interface Screenshots
     href: "#interface-screenshots"
+  - title: Channel Mixing / Automation
+    href: "#channel-mixing--automation"
+  - title: MIDI Composition
+    href: "#midi-composition"
+  - title: Procedural Synthesis
+    href: "#procedural-synthesis"
+  - title: Offline Synthesis / IR
+    href: "#offline-synthesis--ir"
+  - title: Spatial Panners
+    href: "#spatial-panners"
+  - title: 3OAFX
+    href: "#3oafx"
+  - title: Spectral / Convolution
+    href: "#spectral--convolution"
+  - title: Multichannel Texture / Montage
+    href: "#multichannel-texture--montage"
+  - title: Utilities
+    href: "#utilities"
 ---
 
 # Gallery
 
-Screenshots of selected s3g-mc controllers, render tools, panners, and workflow helpers. Click any image to browse the gallery at larger size.
+Current high-resolution screenshots of selected s3g-mc controllers, render tools, panners, and workflow helpers. Click any image to browse the gallery at larger size.
 
 ## Interface Screenshots
 
-<div class="gallery-grid gallery-mosaic" data-gallery>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/PackageBrowser.png" aria-label="Open Package Browser screenshot"><img src="assets/images/gallery/PackageBrowser.png" alt="s3g-mc Package Browser"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/128chAutomationMixer.png" aria-label="Open 128ch Automation Mixer screenshot"><img src="assets/images/gallery/128chAutomationMixer.png" alt="128ch Automation Mixer"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/MCtoStereoAutogain.png" aria-label="Open MC to Stereo Autogain screenshot"><img src="assets/images/gallery/MCtoStereoAutogain.png" alt="MC to Stereo Autogain"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/LayoutPanner.png" aria-label="Open Layout Panner screenshot"><img src="assets/images/gallery/LayoutPanner.png" alt="Layout Panner"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/25chLBAPDomePanner.png" aria-label="Open 25ch LBAP Dome Panner screenshot"><img src="assets/images/gallery/25chLBAPDomePanner.png" alt="25ch LBAP Dome Panner"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/17chCubeXYZPanner.png" aria-label="Open 17ch Cube XYZ Panner screenshot"><img src="assets/images/gallery/17chCubeXYZPanner.png" alt="17ch Cube XYZ Panner"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/12chDodecaPanner.png" aria-label="Open 12ch Dodeca Panner screenshot"><img src="assets/images/gallery/12chDodecaPanner.png" alt="12ch Dodeca Panner"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/6chAmbisonicDecoderRouter.png" aria-label="Open 6ch Ambisonic Decoder Router screenshot"><img src="assets/images/gallery/6chAmbisonicDecoderRouter.png" alt="6ch Ambisonic Decoder Router"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/AmbisonicStereoDecoder.png" aria-label="Open Ambisonic Stereo Decoder screenshot"><img src="assets/images/gallery/AmbisonicStereoDecoder.png" alt="Ambisonic Stereo Decoder"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/3OAFXSendReturnController.png" aria-label="Open 3OAFX Send Return Controller screenshot"><img src="assets/images/gallery/3OAFXSendReturnController.png" alt="3OAFX Send Return Controller"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/3OAFXOfflineRenderer.png" aria-label="Open 3OAFX Offline Renderer screenshot"><img src="assets/images/gallery/3OAFXOfflineRenderer.png" alt="3OAFX Offline Renderer"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/3OAFXSceneNavigator.png" aria-label="Open 3OAFX Scene Navigator screenshot"><img src="assets/images/gallery/3OAFXSceneNavigator.png" alt="3OAFX Scene Navigator"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/3OAFXSyntheticAmbisonicIRBank.png" aria-label="Open 3OAFX Synthetic Ambisonic IR Bank screenshot"><img src="assets/images/gallery/3OAFXSyntheticAmbisonicIRBank.png" alt="3OAFX Synthetic Ambisonic IR Bank"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/AmbisonicKernelCollage.png" aria-label="Open Ambisonic Kernel Collage screenshot"><img src="assets/images/gallery/AmbisonicKernelCollage.png" alt="Ambisonic Kernel Collage"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/SpatialAutomationComposer.png" aria-label="Open Spatial Automation Composer screenshot"><img src="assets/images/gallery/SpatialAutomationComposer.png" alt="Spatial Automation Composer"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/128chNodeTrackMixer.png" aria-label="Open 128ch Node Track Mixer screenshot"><img src="assets/images/gallery/128chNodeTrackMixer.png" alt="128ch Node Track Mixer"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/128chNodeTrackMixer_stacked.png" aria-label="Open 128ch Node Track Mixer stacked screenshot"><img src="assets/images/gallery/128chNodeTrackMixer_stacked.png" alt="128ch Node Track Mixer stacked mode"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/ConvolveSelectedItems.png" aria-label="Open Convolve Selected Items screenshot"><img src="assets/images/gallery/ConvolveSelectedItems.png" alt="Convolve Selected Items"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/SpectralShaper.png" aria-label="Open Spectral Shaper screenshot"><img src="assets/images/gallery/SpectralShaper.png" alt="Spectral Shaper"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/DenseGrainCloud.png" aria-label="Open Dense Grain Cloud screenshot"><img src="assets/images/gallery/DenseGrainCloud.png" alt="Dense Grain Cloud"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/FataMorganaResynth.png" aria-label="Open Fata Morgana Resynth screenshot"><img src="assets/images/gallery/FataMorganaResynth.png" alt="Fata Morgana Resynth"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/LoopDrift.png" aria-label="Open Loop Drift screenshot"><img src="assets/images/gallery/LoopDrift.png" alt="Loop Drift"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/RenderMCCartoSynth.png" aria-label="Open Carto Synth Render screenshot"><img src="assets/images/gallery/RenderMCCartoSynth.png" alt="Carto Synth Render"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/MCCartoSynth.png" aria-label="Open Carto Synth screenshot"><img src="assets/images/gallery/MCCartoSynth.png" alt="Carto Synth"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/ResonantTerrain.png" aria-label="Open Resonant Terrain screenshot"><img src="assets/images/gallery/ResonantTerrain.png" alt="Resonant Terrain"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/MusicalSpace.png" aria-label="Open Musical Space screenshot"><img src="assets/images/gallery/MusicalSpace.png" alt="Musical Space"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/LatticeTables.png" aria-label="Open Lattice Tables screenshot"><img src="assets/images/gallery/LatticeTables.png" alt="Lattice Tables"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/LatticeDrums.png" aria-label="Open Lattice Drums screenshot"><img src="assets/images/gallery/LatticeDrums.png" alt="Lattice Drums"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/PolymetricDrumStates.png" aria-label="Open Polymetric Drum States screenshot"><img src="assets/images/gallery/PolymetricDrumStates.png" alt="Polymetric Drum States"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/PolymetricPitchLanes.png" aria-label="Open Polymetric Pitch Lanes screenshot"><img src="assets/images/gallery/PolymetricPitchLanes.png" alt="Polymetric Pitch Lanes"></button>
-  <button class="gallery-tile" type="button" data-full="assets/images/gallery/FormLearner.png" aria-label="Open Form Learner screenshot"><img src="assets/images/gallery/FormLearner.png" alt="Form Learner"></button>
+<div data-gallery>
+  <h3 id="channel-mixing--automation">Channel Mixing / Automation</h3>
+  <div class="gallery-grid gallery-mosaic">
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/VerticalTimelineNavigator.png" aria-label="Open Vertical Timeline Navigator screenshot"><img src="assets/images/gallery/VerticalTimelineNavigator.png" alt="Vertical Timeline Navigator" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/128chAutomationMixer.png" aria-label="Open 128ch Automation Mixer screenshot"><img src="assets/images/gallery/128chAutomationMixer.png" alt="128ch Automation Mixer" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/MCtoStereoAutogain.png" aria-label="Open MC to Stereo Autogain screenshot"><img src="assets/images/gallery/MCtoStereoAutogain.png" alt="MC to Stereo Autogain" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/128chNodeTrackMixer.png" aria-label="Open 128ch Node Track Mixer screenshot"><img src="assets/images/gallery/128chNodeTrackMixer.png" alt="128ch Node Track Mixer" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/TransauralCrosstalkCanceller.png" aria-label="Open Transaural Crosstalk Canceller screenshot"><img src="assets/images/gallery/TransauralCrosstalkCanceller.png" alt="Transaural Crosstalk Canceller" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/PatchRoutingView.png" aria-label="Open Patch Routing View screenshot"><img src="assets/images/gallery/PatchRoutingView.png" alt="Patch Routing View" loading="lazy" decoding="async"></button>
+  </div>
+
+  <h3 id="midi-composition">MIDI Composition</h3>
+  <div class="gallery-grid gallery-mosaic">
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/MusicalSpace.png" aria-label="Open Musical Space screenshot"><img src="assets/images/gallery/MusicalSpace.png" alt="Musical Space" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/TerrainForm.png" aria-label="Open Terrain Form screenshot"><img src="assets/images/gallery/TerrainForm.png" alt="Terrain Form" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/FormLearner.png" aria-label="Open Form Learner screenshot"><img src="assets/images/gallery/FormLearner.png" alt="Form Learner with selected MIDI source" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/LatticeTables.png" aria-label="Open Lattice Tables screenshot"><img src="assets/images/gallery/LatticeTables.png" alt="Lattice Tables" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/LatticeDrums.png" aria-label="Open Lattice Drums screenshot"><img src="assets/images/gallery/LatticeDrums.png" alt="Lattice Drums" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/PolymetricDrumStates.png" aria-label="Open Polymetric Drum States screenshot"><img src="assets/images/gallery/PolymetricDrumStates.png" alt="Polymetric Drum States" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/PolymetricPitchLanes.png" aria-label="Open Polymetric Pitch Lanes screenshot"><img src="assets/images/gallery/PolymetricPitchLanes.png" alt="Polymetric Pitch Lanes" loading="lazy" decoding="async"></button>
+  </div>
+
+  <h3 id="procedural-synthesis">Procedural Synthesis</h3>
+  <div class="gallery-grid gallery-mosaic">
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/RenderMCCartoSynth.png" aria-label="Open Carto Synth Render screenshot"><img src="assets/images/gallery/RenderMCCartoSynth.png" alt="Carto Synth Render" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/SpectraSynthRender.png" aria-label="Open Spectra Synth Render screenshot"><img src="assets/images/gallery/SpectraSynthRender.png" alt="Spectra Synth Render with shaped routes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/LatticeSynthRender.png" aria-label="Open Lattice Synth Render screenshot"><img src="assets/images/gallery/LatticeSynthRender.png" alt="Lattice Synth Render" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/LatticeSynthMIDIController.png" aria-label="Open Lattice Synth MIDI Controller screenshot"><img src="assets/images/gallery/LatticeSynthMIDIController.png" alt="Lattice Synth MIDI Controller" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/CartoSynthMIDIController.png" aria-label="Open Carto Synth MIDI Controller screenshot"><img src="assets/images/gallery/CartoSynthMIDIController.png" alt="Carto Synth MIDI Controller" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/SpectraSynthMIDIController.png" aria-label="Open Spectra Synth MIDI Controller screenshot"><img src="assets/images/gallery/SpectraSynthMIDIController.png" alt="Spectra Synth MIDI Controller" loading="lazy" decoding="async"></button>
+  </div>
+
+  <h3 id="offline-synthesis--ir">Offline Synthesis / IR</h3>
+  <div class="gallery-grid gallery-mosaic">
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/ResonantTerrain.png" aria-label="Open Resonant Terrain screenshot"><img src="assets/images/gallery/ResonantTerrain.png" alt="Resonant Terrain with active breakpoint envelopes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/EVPField.png" aria-label="Open EVP Field screenshot"><img src="assets/images/gallery/EVPField.png" alt="EVP Field with active breakpoint envelopes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/ModalTerrain.png" aria-label="Open Modal Terrain screenshot"><img src="assets/images/gallery/ModalTerrain.png" alt="Modal Terrain with active breakpoint envelopes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/MassPartialField.png" aria-label="Open Mass Partial Field screenshot"><img src="assets/images/gallery/MassPartialField.png" alt="Mass Partial Field with active breakpoint envelopes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/DenseGrainCloud.png" aria-label="Open Dense Grain Cloud screenshot"><img src="assets/images/gallery/DenseGrainCloud.png" alt="Dense Grain Cloud with selected audio and active breakpoint envelopes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/PartialTraceResynth.png" aria-label="Open Partial Trace Resynth screenshot"><img src="assets/images/gallery/PartialTraceResynth.png" alt="Partial Trace Resynth with selected audio and active breakpoint envelopes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/FataMorganaResynth.png" aria-label="Open Fata Morgana Resynth screenshot"><img src="assets/images/gallery/FataMorganaResynth.png" alt="Fata Morgana Resynth with multiple selected sources" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/IRToolkit.png" aria-label="Open IR Toolkit screenshot"><img src="assets/images/gallery/IRToolkit.png" alt="IR Toolkit with selected impulse response" loading="lazy" decoding="async"></button>
+  </div>
+
+  <h3 id="spatial-panners">Spatial Panners</h3>
+  <div class="gallery-grid gallery-mosaic">
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/LayoutPanner.png" aria-label="Open Layout Panner screenshot"><img src="assets/images/gallery/LayoutPanner.png" alt="Layout Panner with eight distributed sources" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/12chDodecaPanner.png" aria-label="Open 12ch Dodeca Panner screenshot"><img src="assets/images/gallery/12chDodecaPanner.png" alt="12ch Dodeca Panner with eight distributed sources" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/17chCubeXYZPanner.png" aria-label="Open 17ch Cube XYZ Panner screenshot"><img src="assets/images/gallery/17chCubeXYZPanner.png" alt="17ch Cube XYZ Panner" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/25chLBAPDomePanner.png" aria-label="Open 25ch LBAP Dome Panner screenshot"><img src="assets/images/gallery/25chLBAPDomePanner.png" alt="25ch LBAP Dome Panner with eight distributed sources" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/25chRegionDomePanner.png" aria-label="Open 25ch Region Dome Panner screenshot"><img src="assets/images/gallery/25chRegionDomePanner.png" alt="25ch Region Dome Panner with region-assigned sources" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/25chVectorMorphDomePanner.png" aria-label="Open 25ch Vector Morph Dome Panner screenshot"><img src="assets/images/gallery/25chVectorMorphDomePanner.png" alt="25ch Vector Morph Dome Panner" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/25chDBAPDomePanner.png" aria-label="Open 25ch DBAP Dome Panner screenshot"><img src="assets/images/gallery/25chDBAPDomePanner.png" alt="25ch DBAP Dome Panner with eight distributed sources" loading="lazy" decoding="async"></button>
+  </div>
+
+  <h3 id="3oafx">3OAFX</h3>
+  <div class="gallery-grid gallery-mosaic">
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/3OAFXSyntheticAmbisonicIRBank.png" aria-label="Open 3OAFX Synthetic Ambisonic IR Bank screenshot"><img src="assets/images/gallery/3OAFXSyntheticAmbisonicIRBank.png" alt="3OAFX Synthetic Ambisonic IR Bank" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/3OAFXPulsarField.png" aria-label="Open 3OAFX Pulsar Field screenshot"><img src="assets/images/gallery/3OAFXPulsarField.png" alt="3OAFX Pulsar Field with active breakpoint envelopes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/3OAFXOfflineRenderer.png" aria-label="Open 3OAFX Offline Renderer screenshot"><img src="assets/images/gallery/3OAFXOfflineRenderer.png" alt="3OAFX Offline Renderer with ambisonic energy preview" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/3OAFXSceneNavigator.png" aria-label="Open 3OAFX Scene Navigator screenshot"><img src="assets/images/gallery/3OAFXSceneNavigator.png" alt="3OAFX Scene Navigator with multiple scene nodes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/AmbisonicKernelCollage.png" aria-label="Open 3OAFX Ambisonic Kernel Collage screenshot"><img src="assets/images/gallery/AmbisonicKernelCollage.png" alt="3OAFX Ambisonic Kernel Collage with multiple kernels" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/3OAFXParticleCloud.png" aria-label="Open 3OAFX Particle Cloud screenshot"><img src="assets/images/gallery/3OAFXParticleCloud.png" alt="3OAFX Particle Cloud with selected audio and active breakpoint envelopes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/3OAFXAEDGranulator.png" aria-label="Open 3OAFX AED Granulator screenshot"><img src="assets/images/gallery/3OAFXAEDGranulator.png" alt="3OAFX AED Granulator with selected audio and active breakpoint envelopes" loading="lazy" decoding="async"></button>
+  </div>
+
+  <h3 id="spectral--convolution">Spectral / Convolution</h3>
+  <div class="gallery-grid gallery-mosaic">
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/RenderMCImpulseField.png" aria-label="Open Render MC Impulse Field screenshot"><img src="assets/images/gallery/RenderMCImpulseField.png" alt="Render MC Impulse Field" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/SpectralFreeze.png" aria-label="Open Spectral Freeze screenshot"><img src="assets/images/gallery/SpectralFreeze.png" alt="Spectral Freeze with selected audio" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/SpectralTrace.png" aria-label="Open Spectral Trace screenshot"><img src="assets/images/gallery/SpectralTrace.png" alt="Spectral Trace with selected audio" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/SpectralSpatializer.png" aria-label="Open Spectral Spatializer screenshot"><img src="assets/images/gallery/SpectralSpatializer.png" alt="Spectral Spatializer with selected audio" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/SpectralShaper.png" aria-label="Open Spectral Shaper screenshot"><img src="assets/images/gallery/SpectralShaper.png" alt="Spectral Shaper with carrier and shaper sources" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/SpectralMorph.png" aria-label="Open Spectral Morph screenshot"><img src="assets/images/gallery/SpectralMorph.png" alt="Spectral Morph with carrier and modulator sources" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/CrossSynthesis.png" aria-label="Open Cross Synthesis screenshot"><img src="assets/images/gallery/CrossSynthesis.png" alt="Cross Synthesis with carrier and modulator sources" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/ConvolveSelectedItems.png" aria-label="Open Convolve Selected Items screenshot"><img src="assets/images/gallery/ConvolveSelectedItems.png" alt="Convolve Selected Items with source and impulse" loading="lazy" decoding="async"></button>
+  </div>
+
+  <h3 id="multichannel-texture--montage">Multichannel Texture / Montage</h3>
+  <div class="gallery-grid gallery-mosaic">
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/ScatterSlices.png" aria-label="Open Scatter Slices screenshot"><img src="assets/images/gallery/ScatterSlices.png" alt="Scatter Slices with multiple selected sources" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/LoopDrift.png" aria-label="Open Loop Drift screenshot"><img src="assets/images/gallery/LoopDrift.png" alt="Loop Drift with selected sources and active breakpoint envelopes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/LoopRift.png" aria-label="Open Loop Rift screenshot"><img src="assets/images/gallery/LoopRift.png" alt="Loop Rift with selected sources and active breakpoint envelopes" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/Fracture.png" aria-label="Open Fracture screenshot"><img src="assets/images/gallery/Fracture.png" alt="Fracture with selected audio" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/FrameShift.png" aria-label="Open Frame Shift screenshot"><img src="assets/images/gallery/FrameShift.png" alt="Frame Shift with selected multichannel audio" loading="lazy" decoding="async"></button>
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/ShredSlice.png" aria-label="Open Shred Slice screenshot"><img src="assets/images/gallery/ShredSlice.png" alt="Shred Slice with selected multichannel audio" loading="lazy" decoding="async"></button>
+  </div>
+
+  <h3 id="utilities">Utilities</h3>
+  <div class="gallery-grid gallery-mosaic">
+    <button class="gallery-tile" type="button" data-full="assets/images/gallery/PackageBrowser.png" aria-label="Open Package Browser screenshot"><img src="assets/images/gallery/PackageBrowser.png" alt="s3g-mc Package Browser" loading="lazy" decoding="async"></button>
+  </div>
 </div>
 
 <div class="gallery-lightbox" data-gallery-lightbox aria-hidden="true">
