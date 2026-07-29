@@ -13,43 +13,14 @@ Many of these tools are inspired by or extend existing computer music
 practices, with references mentioned in the documentation where they are
 useful.
 
-## Related Projects
-
-[`s3g-dsp`](https://github.com/s3g/s3g-dsp) is a sibling project for native
-macOS CLAP plugins that can be used alongside `s3g-mc` or independently.
-Its [s3g Fault](https://s3g.github.io/s3g-dsp/fault.html) instrument complements
-the procedural-synthesis tools here with eight-channel generated, raw-file,
-or waveform-derived byte-field synthesis, codec damage, and resonant
-wavefolding.
-
-[`s3g-rnbo-clap`](https://github.com/s3g/s3g-rnbo-clap) is a separate
-experimental wrapper for RNBO/Max-generated C++ exports in the same CLAP
-workflow.
-
 ## Processes
 
 For step-by-step notes on selected processes, see the [Process Guides](docs/process-guides.md).
 
-Current package snapshot: the browser exposes 121 user-facing tools/controllers,
-plus the Package Browser. Of those, 50 are Python/NumPy-backed offline
-processes, 26 load, control, or render included JSFX, and 45 are Lua/ReaImGui
-REAPER actions. The repository also ships 24 underlying JSFX engine/effect
-files. The Lua folder includes helper libraries and support dialogs that are
-not shown as Package Browser entries.
-
-Package Browser group counts:
-
-- Channel Mixing / Automation: 9
-- MIDI Composition: 8
-- Procedural Synthesis: 6
-- Offline Synthesis / IR: 10
-- Spatial Panners: 10
-- 3OAFX: 23
-- Spectral / Convolution: 16
-- Multichannel Texture / Montage: 20
-- Item Channel Transforms: 10
-- Track Building / Routing: 3
-- Utils: 8
+The Package Browser discovers user-facing tools and controllers from their
+script metadata and groups them by workflow. Helper libraries and support
+dialogs remain hidden from the browser. Included JSFX engines and effects live
+under `Effects/s3g`.
 
 ### Utils
 
@@ -64,14 +35,14 @@ Package Browser group counts:
   exported geometry in Max with points, polygon lines, and a projected heatmap.
 - `Image Score`: opens the browser utility for composing PNG scores
   used by `3OAFX Image Sonogram Field`.
-- `Imprint Sketch`: designs repeatable directional responses and geometry-
-  derived echo paths for connected 3D regions, including wall, overhead, and
-  beneath-listener branches with shaped portals. It exports project JSON for
-  `3OAFX Synthetic Ambisonic IR Bank` and `.s3gimprint` files for
+- `Imprint Sketch`: designs seeded directional responses and geometry-derived
+  echo paths for connected 3D regions, including wall, overhead, and
+  beneath-listener branches with shaped portals. It exports compatible JSON
+  for `3OAFX Synthetic Ambisonic IR Bank` and `.s3gimprint` files for
   `s3g Ambi Imprint 64` in `s3g-dsp`.
-- `Ray Sketch`: adapts the same space engine for a movable source, adjacent top
-  and side navigation, and interpolated acoustic cells. It exports `.s3gray`
-  maps for `s3g Ambi Ray Encoder` in `s3g-dsp`.
+- `Ray Sketch`: designs musical moving-source fields from the same connected
+  geometry, materials, portals, and echo paths. It exports `.s3gray` maps for
+  `s3g Ambi Ray Encoder` in `s3g-dsp`.
 - `Load Automation Score JSON`: opens an ImGui target-assignment window for
   mapping Automation Score lanes to selected track volume envelopes or
   named FX parameter envelopes, with append or replace write modes and optional
@@ -320,9 +291,10 @@ behaviors.
   its own ambisonic item for creative or diagnostic use.
 - `3OAFX Synthetic Ambisonic IR Bank`: designs encoded ambisonic IR banks for
   `3OAFX Offline Ambisonic Convolve`, with room size, material absorption,
-  scattering, early reflections, late-field controls, and separate or stacked
-  output formats. Higher-order banks use 8 directions: stacked 2OA is 72
-  channels and stacked 3OA is 128 channels.
+  scattering, early reflections, late-field controls, optional Imprint Sketch
+  JSON import, and separate or stacked output formats. Higher-order
+  banks use 8 directions: stacked 2OA is 72 channels and stacked 3OA is 128
+  channels.
 
 ### Spectral / Convolution
 
@@ -487,4 +459,3 @@ Zero-Clause BSD. See
 Attribution is appreciated for software development, publications, research,
 teaching materials, and projects that build on or adapt this package. See
 <a href="https://github.com/s3g/s3g-mc/blob/main/CITATION.cff" target="_blank" rel="noopener noreferrer">CITATION.cff</a>.
-

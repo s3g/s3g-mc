@@ -36,7 +36,7 @@ ReaImGui is available through ReaPack's default ReaTeam Extensions repository.
 For NumPy-backed processes, use WAV-backed media. Convert compressed source
 files to WAV before analysis or rendering.
 
-eSpeak NG is only required by `EVP Field` at this point. On macOS, it can be
+eSpeak NG is required only by `EVP Field`. On macOS, it can be
 installed with Homebrew:
 
 ```sh

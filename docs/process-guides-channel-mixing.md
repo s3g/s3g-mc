@@ -13,8 +13,8 @@ toc:
     href: "#ambisonic-stereo-decoder"
   - title: 6ch Ambisonic Decoder Router
     href: "#6ch-ambisonic-decoder-router"
-  - title: MC Channel Automation Mixer
-    href: "#mc-channel-automation-mixer"
+  - title: 128ch Automation Mixer
+    href: "#128ch-automation-mixer"
   - title: 128ch Ambisonic Node Track Mixer
     href: "#128ch-ambisonic-node-track-mixer"
   - title: 128ch Node Track Mixer
@@ -119,7 +119,7 @@ with the same monitor rig.
 
 
 
-## MC Channel Automation Mixer
+## 128ch Automation Mixer
 
 Use this as a track-level multichannel mixer when REAPER's normal JSFX fader view becomes too long to manage.
 

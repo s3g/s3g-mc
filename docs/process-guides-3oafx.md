@@ -518,7 +518,7 @@ Direction formats:
 
 The stacked 2OA bank is `72ch`. The stacked 3OA bank is `128ch`, which fits REAPER's maximum track channel count. The script also writes a direction-map CSV next to the generated IRs so the direction order can be checked later.
 
-The browser-based Imprint Sketch can preview the same bank groups, response positions, and stacked channel ranges before rendering. Export a project JSON sketch from the browser tool, then use `Load Imprint Sketch JSON` in this renderer. Imported sketches can set dimensions, material values, source distance, duration, pre-delay, early-reflection count, and ambisonic order. Polygon geometry, field offset, connected regions, open boundaries, and Bank Map positions are also available to the renderer. Natural and abstract Imprint Sketch spaces are intentionally reinterpreted by this older offline renderer, while `.s3gimprint` export preserves their complete directional event model for Ambi Imprint.
+The browser-based Imprint Sketch can preview the same bank groups, response positions, and stacked channel ranges before rendering. Export a project JSON sketch from the browser tool, then use `Load Imprint Sketch JSON` in this renderer. Imported sketches can set dimensions, material values, source distance, duration, pre-delay, early-reflection count, and ambisonic order. Polygon geometry, field offset, connected regions, open boundaries, and Bank Map positions are also available to the renderer. The offline renderer reinterprets natural and abstract Imprint Sketch spaces, while `.s3gimprint` export preserves their complete directional event model for `s3g Ambi Imprint 64`.
 
 Main controls:
 

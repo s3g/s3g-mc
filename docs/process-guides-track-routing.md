@@ -23,7 +23,14 @@ These are utility actions for building and routing multichannel projects. They u
 
 Useful starting points:
 
-- `Route Selected Tracks to Multichannel Bus` gathers selected mono or lower-channel tracks into a new multichannel folder/bus and assigns channel routing in order.
-- `Build multichannel stem from selected tracks` creates a rendered multichannel stem from selected tracks.
+- `Build multichannel stem from selected tracks` routes selected tracks to
+  consecutive channels on a new destination and offers to render the bounded
+  source range as a multichannel stem.
+- `Cycle mono tracks into multichannel stem` renders selected mono tracks to a
+  requested channel count, repeating sources or grouping them with compensated
+  gain when the source and output counts differ.
+- `Route selected tracks to multichannel folder bus` gathers selected tracks
+  into a new parent folder and assigns each child track to a consecutive span
+  of bus channels without rendering.
 
 For routing actions, select only the tracks you want included. If the requested result would exceed REAPER's 128-channel limit, the action should stop rather than build an invalid bus. For render-based helpers, expect a new media item or track and keep the source material until you have checked the result.

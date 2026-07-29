@@ -10,8 +10,6 @@ toc:
     href: "#start-here"
   - title: Highlights
     href: "#highlights"
-  - title: Related Projects
-    href: "#related-projects"
   - title: License
     href: "#license"
 ---
@@ -28,7 +26,10 @@ It includes Lua actions, ReaImGui controllers, and JSFX for channel editing, aut
   </button>
 </div>
 
-Current package snapshot: the browser exposes 121 user-facing tools/controllers, plus the Package Browser. Of those, 50 are Python/NumPy-backed offline processes, 26 load, control, or render included JSFX, and 45 are Lua/ReaImGui REAPER actions. The repository also ships 24 underlying JSFX engine/effect files. The Lua folder includes helper libraries and support dialogs that are not shown as Package Browser entries.
+The Package Browser discovers user-facing tools and controllers from their
+script metadata and groups them by workflow. Helper libraries and support
+dialogs remain hidden from the browser. Included JSFX engines and effects live
+under `Effects/s3g`.
 
 The package also includes browser-based companion utilities for spatial motion,
 automation lanes, image scores, acoustic imprint sketches, and 3OAFX displacement maps.
@@ -68,30 +69,6 @@ Many of these tools are inspired by or extend existing computer music practices,
 - Offline spectral, convolution, and resynthesis processes
 - Multichannel texture and montage actions
 - Procedural synth engines with offline render and MIDI-controller workflows
-
-## Related Projects
-
-[`s3g-dsp`](https://github.com/s3g/s3g-dsp) is a sibling project for macOS
-CLAP plugins that can be used alongside `s3g-mc` or independently.
-
-For realtime procedural synthesis, the sibling
-[`s3g Fault`](https://s3g.github.io/s3g-dsp/fault.html) CLAP generates an
-eight-channel byte field, reads any file as literal unsigned 8-bit PCM, or
-reduces a PCM WAV to eight lossy waveform-derived lanes. It passes the result
-through stochastic geometry and damaged codec models and includes its own
-resonant nonlinear stage. It is distributed with `s3g-dsp`, not through the
-`s3g-mc` ReaPack package.
-
-Some realtime ideas that began as JSFX/ReaImGui tools in `s3g-mc` now have
-newer CLAP versions in `s3g-dsp`. The `s3g-mc` versions remain part of this
-package because they are functional, useful for existing sessions, and closely
-integrated with REAPER actions and automation workflows. For newer projects
-that benefit from the more developed plugin interfaces, higher channel counts,
-or saved plugin state, check whether a matching `s3g-dsp` CLAP plugin exists.
-
-[`s3g-rnbo-clap`](https://github.com/s3g/s3g-rnbo-clap) is a separate
-experimental wrapper for RNBO/Max-generated C++ exports in the same CLAP
-workflow.
 
 ## License
 

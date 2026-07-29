@@ -9,7 +9,7 @@ next_page:
   title: Multichannel Texture / Montage Guides
   url: /process-guides-texture-montage.html
 toc:
-  - title: Convolve Selected Items
+  - title: Convolve selected items
     href: "#convolve-selected-items"
   - title: Render MC Impulse Field
     href: "#render-mc-impulse-field"
@@ -25,7 +25,7 @@ toc:
 
 These guides match the Package Browser's Spectral / Convolution group for non-ambisonic spectral and convolution tools. For ambisonic variants, use the 3OAFX guide page.
 
-## Convolve Selected Items
+## Convolve selected items
 
 Use this when you want one selected item to be convolved with another item used as an impulse response.
 

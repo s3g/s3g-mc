@@ -37,26 +37,10 @@ The [Utilities](utilities.md) pages cover the browser-based companion tools for
 Automation Score breakpoint lanes, image scores, acoustic imprints, and Spatial
 Score automation JSON.
 
-Current package snapshot: the browser exposes 121 user-facing tools/controllers,
-plus the Package Browser. Of those, 50 are Python/NumPy-backed offline
-processes, 26 load, control, or render included JSFX, and 45 are Lua/ReaImGui
-REAPER actions. The repository also ships 24 underlying JSFX engine/effect
-files. The Lua folder includes helper libraries and support dialogs that are
-not shown as Package Browser entries.
-
-Package Browser group counts:
-
-- Channel Mixing / Automation: 9
-- MIDI Composition: 8
-- Procedural Synthesis: 6
-- Offline Synthesis / IR: 10
-- Spatial Panners: 10
-- 3OAFX: 23
-- Spectral / Convolution: 16
-- Multichannel Texture / Montage: 20
-- Item Channel Transforms: 10
-- Track Building / Routing: 3
-- Utils: 8
+The Package Browser discovers user-facing tools and controllers from their
+script metadata and groups them by workflow. The inventory below follows those
+same groups. Helper libraries and support dialogs remain hidden from the
+browser, while included JSFX engines and effects live under `Effects/s3g`.
 
 ## Utils
 
