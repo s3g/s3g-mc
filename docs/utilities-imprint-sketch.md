@@ -2,6 +2,7 @@
 layout: default
 title: Imprint Sketch
 utility_nav: true
+lightbox: true
 prev_page:
   title: Image Score
   url: /utilities-image-score-generator.html
@@ -26,6 +27,12 @@ toc:
 ---
 
 # Imprint Sketch
+
+<div class="utility-screenshot">
+  <button class="utility-screenshot-button" type="button" data-lightbox-image="assets/images/utilities/ImprintSketch.png" aria-label="Open Imprint Sketch screenshot">
+    <img src="assets/images/utilities/ImprintSketch.png" alt="Imprint Sketch browser utility showing connected architectural regions and directional response controls">
+  </button>
+</div>
 
 ## Open Tool
 

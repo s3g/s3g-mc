@@ -3,6 +3,7 @@ layout: default
 title: Ray Sketch
 description: Design musical moving-source ray fields for s3g Ambi Ray Encoder.
 utility_nav: true
+lightbox: true
 prev_page:
   title: Imprint Sketch
   url: /utilities-imprint-sketch.html
@@ -21,6 +22,12 @@ toc:
 ---
 
 # Ray Sketch
+
+<div class="utility-screenshot">
+  <button class="utility-screenshot-button" type="button" data-lightbox-image="assets/images/utilities/RaySketch.png" aria-label="Open Ray Sketch screenshot">
+    <img src="assets/images/utilities/RaySketch.png" alt="Ray Sketch browser utility showing top and side navigation paths for source and listener">
+  </button>
+</div>
 
 [Open Ray Sketch](utilities/ray-sketch-designer/){:target="_blank" rel="noopener noreferrer" .utility-link}
 
