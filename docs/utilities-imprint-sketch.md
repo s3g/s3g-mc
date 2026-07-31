@@ -30,7 +30,7 @@ toc:
 
 <div class="utility-screenshot">
   <button class="utility-screenshot-button" type="button" data-lightbox-image="assets/images/utilities/ImprintSketch.png" aria-label="Open Imprint Sketch screenshot">
-    <img src="assets/images/utilities/ImprintSketch.png" alt="Imprint Sketch browser utility showing connected architectural regions and directional response controls">
+    <img src="assets/images/utilities/ImprintSketch.png" alt="Imprint Sketch browser utility showing a high-strangeness abstract connected space in 3D">
   </button>
 </div>
 

@@ -25,7 +25,7 @@ toc:
 
 <div class="utility-screenshot">
   <button class="utility-screenshot-button" type="button" data-lightbox-image="assets/images/utilities/RaySketch.png" aria-label="Open Ray Sketch screenshot">
-    <img src="assets/images/utilities/RaySketch.png" alt="Ray Sketch browser utility showing top and side navigation paths for source and listener">
+    <img src="assets/images/utilities/RaySketch.png" alt="Ray Sketch browser utility showing a high-strangeness abstract field map with sampled source cells">
   </button>
 </div>
 
